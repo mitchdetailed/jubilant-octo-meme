@@ -1,0 +1,66 @@
+{
+  "compat-empty.json": {
+    "pointer": "/quantities/0/units/1/compat",
+    "why": "compat is a non-empty lower-case token"
+  },
+  "delta-with-delta-family.json": {
+    "pointer": "/quantities/0",
+    "why": "a delta quantity has no deltaFamily of its own"
+  },
+  "dimension-fraction.json": {
+    "pointer": "/quantities/0/dim/0",
+    "why": "exponents are integers"
+  },
+  "dimension-length.json": {
+    "pointer": "/quantities/0/dim",
+    "why": "a dimension has seven exponents"
+  },
+  "dimension-reserved-unknown.json": {
+    "pointer": "/quantities/0/dim/0",
+    "why": "-128 is reserved for the unknown dimension (D-085)"
+  },
+  "duplicate-alias.json": {
+    "pointer": "/quantities/0/units/1/aliases",
+    "why": "aliases of one unit are unique"
+  },
+  "empty-units.json": {
+    "pointer": "/quantities/0/units",
+    "why": "a quantity has at least its base unit"
+  },
+  "ids-not-symbols.json": {
+    "pointer": "/quantities/0/base",
+    "why": "files store symbols, never registry ids"
+  },
+  "missing-base.json": {
+    "pointer": "/quantities/0",
+    "why": "every quantity names its base unit"
+  },
+  "no-quantities.json": {
+    "pointer": "",
+    "why": "quantities is required"
+  },
+  "scalar-and-tobase.json": {
+    "pointer": "/quantities/0/units/1",
+    "why": "scalar and toBase state the same factor; give one"
+  },
+  "scalar-zero.json": {
+    "pointer": "/quantities/0/units/1/scalar",
+    "why": "a scalar of 0 has no inverse"
+  },
+  "symbol-non-ascii.json": {
+    "pointer": "/quantities/0/units/1/symbol",
+    "why": "symbols are ASCII; the Unicode form goes in display"
+  },
+  "symbol-padded.json": {
+    "pointer": "/quantities/0/units/1/symbol",
+    "why": "symbols have no leading or trailing space"
+  },
+  "tobase-zero.json": {
+    "pointer": "/quantities/0/units/1/toBase",
+    "why": "a unit of size 0 has no inverse"
+  },
+  "unit-unknown-member.json": {
+    "pointer": "/quantities/0/units/1",
+    "why": "unit records are closed (factor is not a member)"
+  }
+}

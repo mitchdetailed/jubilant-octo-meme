@@ -1,0 +1,212 @@
+{
+  "$schema": "urn:esses:units-1",
+  "schemaVersion": 1,
+  "note": "Esses unit table (02_DATA_MODEL.md section 2, D-010, D-141). Our own table: quantities, dimension vectors [L, M, T, I, Theta, N, J], base units and conversion factors come from the SI Brochure (9th edition) and NIST SP 811 (2008 edition, appendix B) for SI and customary units, plus standard automotive units; sized by need (the shipped readers, dictionaries, maths and components, and the unit spellings of the private S-1 log corpus). value_in_unit = value_in_base * scalar + offset; 'toBase' states the size of one unit in base units instead (scalar = 1 / toBase) where NIST gives the factor that way. Units flagged compat 'legacy' are spellings kept so imported legacy configuration and user maths resolve; they are defined from their physical meaning and are not offered in unit pickers. Symbols are frozen once shipped (02 section 2.2 rule 5).",
+  "quantities": [
+    { "name": "Unitless", "family": "Unitless", "dim": [0, 0, 0, 0, 0, 0, 0], "base": "",
+      "note": "Quantity 0; its first unit, the empty symbol, is unit 0 (kNoUnit).",
+      "units": [
+        { "symbol": "", "aliases": ["unitless", "-", "none"] } ] },
+
+    { "name": "Ratio", "family": "Ratio", "dim": [0, 0, 0, 0, 0, 0, 0], "base": "ratio",
+      "units": [
+        { "symbol": "ratio", "aliases": ["fraction"] },
+        { "symbol": "%", "scalar": 100, "aliases": ["percent", "pct", "angle%"] },
+        { "symbol": "Trim", "offset": -1, "compat": "legacy", "note": "A multiplier written as its deviation from 1: ratio 1.05 is Trim 0.05." },
+        { "symbol": "%Trim", "scalar": 100, "offset": -100, "compat": "legacy", "note": "A multiplier written as its deviation from 1 in percent: ratio 1.05 is 5 %Trim." } ] },
+
+    { "name": "Angle", "family": "Angle", "dim": [0, 0, 0, 0, 0, 0, 0], "base": "rad",
+      "note": "Plane angle: dimensionless in the SI, its own display family. Base rad; crank angles are positive after top dead centre.",
+      "units": [
+        { "symbol": "rad", "aliases": ["radian", "radians"] },
+        { "symbol": "deg", "display": "°", "scalar": 57.29577951308232, "aliases": ["degree", "degrees"], "note": "180/pi degrees per radian (SI Brochure, table 8)." },
+        { "symbol": "dBTDC", "scalar": -57.29577951308232, "compat": "legacy", "note": "Degrees before top dead centre (ignition advance): crank degrees with the sign flipped." },
+        { "symbol": "dRTD", "scalar": 57.29577951308232, "compat": "legacy", "note": "Degrees of ignition retard: crank degrees, positive towards later ignition." } ] },
+
+    { "name": "Air Fuel Ratio", "family": "Air Fuel Ratio", "dim": [0, 0, 0, 0, 0, 0, 0], "base": "lambda",
+      "note": "AFR = lambda x stoichiometric ratio (D-010, D-068). The fuel-specific units are fixed-scalar lambda units for imported data and maths; a vehicle's own stoichiometric ratio is the numeric detail 'Stoich Ratio' used by the shipped maths item AFR = 'Lambda' * 'Stoich Ratio', not a unit. A bare 'AFR' spelling names no fuel and is left to the importer's unit mapping (05 section 8).",
+      "units": [
+        { "symbol": "lambda", "display": "λ", "aliases": ["LA"] },
+        { "symbol": "P A/F", "scalar": 14.7, "compat": "legacy", "aliases": ["G A/F"], "note": "Petrol (gasoline) air-fuel ratio, stoichiometric 14.7." },
+        { "symbol": "A A/F", "scalar": 6.4, "compat": "legacy", "note": "Alcohol (methanol) air-fuel ratio, stoichiometric 6.4." },
+        { "symbol": "D A/F", "scalar": 14.5, "compat": "legacy", "note": "Diesel air-fuel ratio, stoichiometric 14.5." },
+        { "symbol": "LPG A/F", "scalar": 15.5, "compat": "legacy", "note": "LPG air-fuel ratio, stoichiometric 15.5." } ] },
+
+    { "name": "Distance", "family": "Distance", "dim": [1, 0, 0, 0, 0, 0, 0], "base": "m", "aliases": ["Length"],
+      "units": [
+        { "symbol": "m", "aliases": ["meter", "meters", "metre", "metres"] },
+        { "symbol": "km", "scalar": 0.001, "aliases": ["kilometer", "kilometers", "kilometre", "kilometres"] },
+        { "symbol": "cm", "scalar": 100 },
+        { "symbol": "mm", "scalar": 1000, "aliases": ["millimeter", "millimeters", "millimetre", "millimetres"] },
+        { "symbol": "in", "toBase": 0.0254, "aliases": ["inch", "inches"], "note": "NIST SP 811: 1 in = 0.0254 m exactly." },
+        { "symbol": "ft", "toBase": 0.3048, "aliases": ["foot", "feet"], "note": "NIST SP 811: 1 ft = 0.3048 m exactly." },
+        { "symbol": "mi", "toBase": 1609.344, "aliases": ["mile", "miles"], "note": "NIST SP 811: 1 mi (international) = 1609.344 m exactly." } ] },
+
+    { "name": "Speed", "family": "Speed", "dim": [1, 0, -1, 0, 0, 0, 0], "base": "m/s",
+      "units": [
+        { "symbol": "m/s" },
+        { "symbol": "km/h", "scalar": 3.6, "aliases": ["kph", "km/hr", "kmh", "kmph"] },
+        { "symbol": "mph", "toBase": 0.44704, "aliases": ["mi/h", "mile/h", "miles/h"], "note": "NIST SP 811: 1 mi/h = 0.44704 m/s exactly." },
+        { "symbol": "ft/s", "toBase": 0.3048 },
+        { "symbol": "mm/s", "scalar": 1000 },
+        { "symbol": "in/s", "toBase": 0.0254 } ] },
+
+    { "name": "Acceleration", "family": "Acceleration", "dim": [1, 0, -2, 0, 0, 0, 0], "base": "m/s/s",
+      "units": [
+        { "symbol": "m/s/s", "display": "m/s²", "aliases": ["m/s2"] },
+        { "symbol": "G", "toBase": 9.80665, "note": "Standard acceleration of free fall, 9.80665 m/s/s exactly (NIST SP 811). Lower-case 'g' is the gram; a lookup scoped to this quantity still accepts it." } ] },
+
+    { "name": "Time", "family": "Time", "dim": [0, 0, 1, 0, 0, 0, 0], "base": "s",
+      "units": [
+        { "symbol": "s", "aliases": ["sec", "secs", "second", "seconds"] },
+        { "symbol": "ms", "scalar": 1000, "aliases": ["msec", "millisecond", "milliseconds"] },
+        { "symbol": "us", "display": "µs", "scalar": 1000000, "aliases": ["usec", "microsecond", "microseconds"] },
+        { "symbol": "ns", "scalar": 1000000000, "aliases": ["nsec", "nanosecond", "nanoseconds"] },
+        { "symbol": "min", "toBase": 60, "aliases": ["mins", "minute", "minutes"] },
+        { "symbol": "h", "toBase": 3600, "aliases": ["hr", "hrs", "hour", "hours"] },
+        { "symbol": "day", "toBase": 86400, "aliases": ["days"] } ] },
+
+    { "name": "Frequency", "family": "Frequency", "dim": [0, 0, -1, 0, 0, 0, 0], "base": "Hz",
+      "units": [
+        { "symbol": "Hz", "aliases": ["hertz", "1/s"] },
+        { "symbol": "kHz", "scalar": 0.001 } ] },
+
+    { "name": "Angular Speed", "family": "Angular Speed", "dim": [0, 0, -1, 0, 0, 0, 0], "base": "rad/s", "aliases": ["Angular Velocity"],
+      "units": [
+        { "symbol": "rad/s" },
+        { "symbol": "rpm", "scalar": 9.549296585513721, "aliases": ["r/min", "rev/min", "revs/min"], "note": "60 / (2 pi) revolutions per minute per rad/s." },
+        { "symbol": "1000rpm", "scalar": 0.009549296585513721, "compat": "legacy", "aliases": ["rpm1000", "krpm"] },
+        { "symbol": "deg/s", "display": "°/s", "scalar": 57.29577951308232, "aliases": ["deg/sec", "degrees/sec"] } ] },
+
+    { "name": "Angular Acceleration", "family": "Angular Acceleration", "dim": [0, 0, -2, 0, 0, 0, 0], "base": "rad/s/s",
+      "units": [
+        { "symbol": "rad/s/s", "display": "rad/s²", "aliases": ["rad/s2"] },
+        { "symbol": "rpm/s", "scalar": 9.549296585513721 },
+        { "symbol": "rpm/ms", "scalar": 0.009549296585513721 },
+        { "symbol": "deg/s/s", "display": "°/s²", "scalar": 57.29577951308232, "aliases": ["deg/s2"] } ] },
+
+    { "name": "Mass", "family": "Mass", "dim": [0, 1, 0, 0, 0, 0, 0], "base": "kg",
+      "units": [
+        { "symbol": "kg", "aliases": ["kilogram", "kilograms"] },
+        { "symbol": "g", "scalar": 1000, "caseSensitive": ["g"], "aliases": ["gram", "grams"], "note": "The symbol 'g' matches only exactly; upper-case 'G' is the acceleration unit." },
+        { "symbol": "mg", "scalar": 1000000, "aliases": ["milligram", "milligrams"] },
+        { "symbol": "lbm", "toBase": 0.45359237, "aliases": ["pound", "pounds"], "note": "NIST SP 811: 1 lb (avoirdupois) = 0.45359237 kg exactly. The bare spelling 'lb' is the force unit lbf, because logged channels use it for force." } ] },
+
+    { "name": "Force", "family": "Force", "dim": [1, 1, -2, 0, 0, 0, 0], "base": "N",
+      "units": [
+        { "symbol": "N", "aliases": ["newton", "newtons"] },
+        { "symbol": "kN", "scalar": 0.001 },
+        { "symbol": "lbf", "toBase": 4.4482216152605, "aliases": ["lb", "pound-force"], "note": "NIST SP 811: 1 lbf = 0.45359237 kg x 9.80665 m/s/s = 4.4482216152605 N exactly." },
+        { "symbol": "kgf", "toBase": 9.80665 } ] },
+
+    { "name": "Energy", "family": "Energy", "dim": [2, 1, -2, 0, 0, 0, 0], "base": "J", "aliases": ["Energy & Work", "Work"],
+      "units": [
+        { "symbol": "J", "aliases": ["joule", "joules"] },
+        { "symbol": "kJ", "scalar": 0.001 },
+        { "symbol": "MJ", "scalar": 0.000001 },
+        { "symbol": "Wh", "toBase": 3600 },
+        { "symbol": "kWh", "toBase": 3600000 } ] },
+
+    { "name": "Torque", "family": "Torque", "dim": [2, 1, -2, 0, 0, 0, 0], "base": "N.m",
+      "note": "Same dimension as Energy, separate display family (02 section 2.2 rule 2).",
+      "units": [
+        { "symbol": "N.m", "display": "N·m", "aliases": ["Nm", "N m", "N*m"] },
+        { "symbol": "lbf.ft", "display": "lbf·ft", "toBase": 1.3558179483314004, "aliases": ["lb.ft", "lb ft", "lbft", "lb-ft", "ft.lb", "ft lb", "ftlb", "ft-lb"], "note": "4.4482216152605 N x 0.3048 m exactly." },
+        { "symbol": "lbf.in", "display": "lbf·in", "toBase": 0.1129848290276167, "aliases": ["lb.in", "lb in", "in.lb", "in lb", "in-lb"], "note": "4.4482216152605 N x 0.0254 m exactly." } ] },
+
+    { "name": "Power", "family": "Power", "dim": [2, 1, -3, 0, 0, 0, 0], "base": "W",
+      "units": [
+        { "symbol": "W", "aliases": ["watt", "watts"] },
+        { "symbol": "kW", "scalar": 0.001 },
+        { "symbol": "hp", "toBase": 745.69987158227022, "aliases": ["bhp"], "note": "Mechanical horsepower, 550 ft lbf/s exactly (NIST SP 811)." },
+        { "symbol": "PS", "toBase": 735.49875, "note": "Metric horsepower, 75 kgf m/s exactly." } ] },
+
+    { "name": "Pressure", "family": "Pressure", "dim": [-1, 1, -2, 0, 0, 0, 0], "base": "Pa", "deltaFamily": "Pressure Delta",
+      "note": "Absolute pressure. Bare spellings (kPa, MPa, bar, psi) are absolute; gauge and differential pressures are Pressure Delta.",
+      "units": [
+        { "symbol": "Pa", "aliases": ["pascal", "pascals"] },
+        { "symbol": "kPa a", "scalar": 0.001, "aliases": ["kPa", "kPaA", "kPa abs", "kilopascal", "kilopascals"] },
+        { "symbol": "MPa a", "scalar": 0.000001, "aliases": ["MPa"] },
+        { "symbol": "bar a", "scalar": 0.00001, "aliases": ["bar", "bara"] },
+        { "symbol": "mbar", "scalar": 0.01, "aliases": ["millibar", "millibars", "hPa"] },
+        { "symbol": "psi a", "toBase": 6894.757293168361337, "aliases": ["psi", "psia"], "note": "1 lbf/in^2 = 4.4482216152605 N / 0.00064516 m^2 (NIST SP 811)." },
+        { "symbol": "inHg", "toBase": 3386.388640341, "aliases": ["in Hg"], "note": "Conventional inch of mercury, 25.4 x 133.322387415 Pa (NIST SP 811)." } ] },
+
+    { "name": "Pressure Delta", "family": "Pressure Delta", "dim": [-1, 1, -2, 0, 0, 0, 0], "base": "dPa", "isDelta": true,
+      "note": "Gauge and differential pressure: the difference of two pressures.",
+      "units": [
+        { "symbol": "dPa", "display": "ΔPa" },
+        { "symbol": "kPa g", "scalar": 0.001, "aliases": ["kPag", "dKPA"] },
+        { "symbol": "MPa g", "scalar": 0.000001, "aliases": ["MPag", "dMPa"] },
+        { "symbol": "bar g", "scalar": 0.00001, "aliases": ["barg", "dbar"] },
+        { "symbol": "psi g", "toBase": 6894.757293168361337, "aliases": ["psig", "dpsi"] } ] },
+
+    { "name": "Temperature", "family": "Temperature", "dim": [0, 0, 0, 0, 1, 0, 0], "base": "K", "deltaFamily": "Temperature Delta",
+      "units": [
+        { "symbol": "K", "aliases": ["kelvin"] },
+        { "symbol": "deg C", "display": "°C", "offset": -273.15, "aliases": ["C", "degC", "celsius"] },
+        { "symbol": "deg F", "display": "°F", "scalar": 1.8, "offset": -459.67, "aliases": ["F", "degF", "fahrenheit"] } ] },
+
+    { "name": "Temperature Delta", "family": "Temperature Delta", "dim": [0, 0, 0, 0, 1, 0, 0], "base": "dK", "isDelta": true,
+      "units": [
+        { "symbol": "dK", "display": "ΔK" },
+        { "symbol": "dC", "display": "Δ°C" },
+        { "symbol": "dF", "display": "Δ°F", "scalar": 1.8 } ] },
+
+    { "name": "Voltage", "family": "Voltage", "dim": [2, 1, -3, -1, 0, 0, 0], "base": "V",
+      "units": [
+        { "symbol": "V", "aliases": ["volt", "volts"] },
+        { "symbol": "mV", "scalar": 1000, "aliases": ["millivolt", "millivolts"] } ] },
+
+    { "name": "Current", "family": "Current", "dim": [0, 0, 0, 1, 0, 0, 0], "base": "A", "aliases": ["Electric Current"],
+      "units": [
+        { "symbol": "A", "aliases": ["amp", "amps", "ampere", "amperes"] },
+        { "symbol": "mA", "scalar": 1000, "aliases": ["milliamp", "milliamps"] } ] },
+
+    { "name": "Resistance", "family": "Resistance", "dim": [2, 1, -3, -2, 0, 0, 0], "base": "ohm",
+      "units": [
+        { "symbol": "ohm", "display": "Ω", "aliases": ["ohms"] },
+        { "symbol": "kohm", "display": "kΩ", "scalar": 0.001 } ] },
+
+    { "name": "Charge", "family": "Charge", "dim": [0, 0, 1, 1, 0, 0, 0], "base": "A.s", "aliases": ["Electric Charge"],
+      "note": "Base A.s (the coulomb); the letter C is a temperature spelling in this table.",
+      "units": [
+        { "symbol": "A.s", "aliases": ["coulomb", "coulombs"] },
+        { "symbol": "Ah", "toBase": 3600, "aliases": ["A.h", "A h", "ampere*hour", "amp hour", "amp hours"] },
+        { "symbol": "mAh", "toBase": 3.6 } ] },
+
+    { "name": "Volume", "family": "Volume", "dim": [3, 0, 0, 0, 0, 0, 0], "base": "m3",
+      "units": [
+        { "symbol": "m3", "display": "m³" },
+        { "symbol": "l", "scalar": 1000, "aliases": ["L", "liter", "liters", "litre", "litres"] },
+        { "symbol": "ml", "scalar": 1000000, "aliases": ["cc", "cm3", "milliliter", "milliliters", "millilitre", "millilitres"] },
+        { "symbol": "ul", "display": "µl", "scalar": 1000000000, "aliases": ["microliter", "microlitre", "Micro_Liter"] },
+        { "symbol": "USgal", "display": "US gal", "toBase": 0.003785411784, "aliases": ["gal", "gallon", "gallons"], "note": "NIST SP 811: 1 gal (US) = 231 in^3 = 3.785411784 L exactly." } ] },
+
+    { "name": "Volume Flow", "family": "Volume Flow", "dim": [3, 0, -1, 0, 0, 0, 0], "base": "m3/s",
+      "units": [
+        { "symbol": "m3/s", "display": "m³/s" },
+        { "symbol": "l/s", "scalar": 1000, "aliases": ["liter/second", "litre/second", "liters/second", "litres/second"] },
+        { "symbol": "l/min", "scalar": 60000, "aliases": ["lpm"] },
+        { "symbol": "l/h", "scalar": 3600000, "aliases": ["lph", "liter/hour", "litre/hour"] },
+        { "symbol": "ml/s", "scalar": 1000000, "aliases": ["cc/s"] },
+        { "symbol": "ml/min", "scalar": 60000000, "aliases": ["cc/min"] } ] },
+
+    { "name": "Mass Flow", "family": "Mass Flow", "dim": [0, 1, -1, 0, 0, 0, 0], "base": "kg/s",
+      "units": [
+        { "symbol": "kg/s" },
+        { "symbol": "g/s", "scalar": 1000 },
+        { "symbol": "kg/h", "scalar": 3600, "aliases": ["kg/hr"] } ] },
+
+    { "name": "Density", "family": "Density", "dim": [-3, 1, 0, 0, 0, 0, 0], "base": "kg/m3",
+      "units": [
+        { "symbol": "kg/m3", "display": "kg/m³" },
+        { "symbol": "kg/l", "scalar": 0.001, "aliases": ["g/ml", "g/cc", "g/cm3"] } ] },
+
+    { "name": "Fuel Economy", "family": "Fuel Economy", "dim": [-2, 0, 0, 0, 0, 0, 0], "base": "m/m3",
+      "note": "Distance travelled per volume of fuel.",
+      "units": [
+        { "symbol": "m/m3", "display": "m/m³" },
+        { "symbol": "km/l", "scalar": 0.000001, "aliases": ["kmpl"] } ] }
+  ]
+}

@@ -1,0 +1,307 @@
+{
+  "$schema": "urn:esses:probe-1",
+  "schemaVersion": 1,
+  "companions": ["input.ldx"],
+  "details": [
+    {
+      "id": "Device Type",
+      "value": "ADL"
+    },
+    {
+      "id": "Device Serial",
+      "value": "8004"
+    },
+    {
+      "id": "Device Version",
+      "value": "420"
+    },
+    {
+      "id": "Log Date",
+      "value": "11/10/2026"
+    },
+    {
+      "id": "Log Time",
+      "value": "10:00:00"
+    },
+    {
+      "id": "Driver",
+      "value": "Synthetic Driver"
+    },
+    {
+      "id": "Vehicle Id",
+      "value": "SYN-01"
+    },
+    {
+      "id": "Venue",
+      "value": "Synthetic Circuit"
+    },
+    {
+      "id": "Session",
+      "value": "Fixture"
+    },
+    {
+      "id": "Short Comment",
+      "value": "synthetic-acc-dialect"
+    },
+    {
+      "id": "Total Laps",
+      "value": "14"
+    }
+  ],
+  "dialect": "sim-exporter",
+  "enumTables": [],
+  "importerId": "motec.ld",
+  "importerVersion": "0.1.0",
+  "layers": [
+    {
+      "channels": [
+        {
+          "dps": 3,
+          "dtype": "F32",
+          "flags": 8,
+          "index": 0,
+          "kind": "Real",
+          "loggedName": "SPEED",
+          "sampleCount": 3600000,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 1000
+            }
+          },
+          "vendorDtype": "f32",
+          "vendorId": "20101",
+          "vendorUnit": "km/h"
+        },
+        {
+          "dps": 3,
+          "dtype": "F32",
+          "flags": 8,
+          "index": 1,
+          "kind": "Real",
+          "loggedName": "STEERANGLE",
+          "sampleCount": 3600000,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 1000
+            }
+          },
+          "vendorDtype": "f32",
+          "vendorId": "20102",
+          "vendorUnit": "deg"
+        },
+        {
+          "dps": 3,
+          "dtype": "F32",
+          "flags": 8,
+          "index": 2,
+          "kind": "Real",
+          "loggedName": "RPMS",
+          "sampleCount": 360000,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 100
+            }
+          },
+          "vendorDtype": "f32",
+          "vendorId": "20103",
+          "vendorUnit": "rpm"
+        },
+        {
+          "dps": 0,
+          "dtype": "I32",
+          "flags": 0,
+          "index": 3,
+          "kind": "Integer",
+          "loggedName": "GEAR",
+          "sampleCount": 7200,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 2
+            }
+          },
+          "vendorDtype": "i16",
+          "vendorId": "20104",
+          "vendorUnit": ""
+        },
+        {
+          "dps": 3,
+          "dtype": "F32",
+          "flags": 8,
+          "index": 4,
+          "kind": "Real",
+          "loggedName": "FUEL",
+          "sampleCount": 3600,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 1
+            }
+          },
+          "vendorDtype": "f32",
+          "vendorId": "20105",
+          "vendorUnit": "l"
+        }
+      ],
+      "durationUs": 3600000000,
+      "markers": [
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "name": "Manual.1",
+          "ordinal": 0,
+          "tUs": 130000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "name": "Manual.2",
+          "ordinal": 0,
+          "tUs": 400000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "name": "Manual.3",
+          "ordinal": 0,
+          "tUs": 670000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "name": "Manual.4",
+          "ordinal": 0,
+          "tUs": 940000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "name": "Manual.5",
+          "ordinal": 0,
+          "tUs": 1210000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "name": "Manual.6",
+          "ordinal": 0,
+          "tUs": 1480000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "name": "Manual.7",
+          "ordinal": 0,
+          "tUs": 1750000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "name": "Manual.8",
+          "ordinal": 0,
+          "tUs": 2020000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "name": "Manual.9",
+          "ordinal": 0,
+          "tUs": 2290000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "name": "Manual.10",
+          "ordinal": 0,
+          "tUs": 2560000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "name": "Manual.11",
+          "ordinal": 0,
+          "tUs": 2830000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "name": "Manual.12",
+          "ordinal": 0,
+          "tUs": 3100000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "name": "Manual.13",
+          "ordinal": 0,
+          "tUs": 3370000000
+        }
+      ],
+      "name": "Normal",
+      "utc": {
+        "assumedLocal": true,
+        "unixUs": 1791712800000000
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "code": "ld.string_encoding",
+      "ctx": {
+        "detail": "ascii",
+        "offset": 0
+      },
+      "level": "Info",
+      "message": "strings decoded as ascii"
+    },
+    {
+      "code": "ld.unit_from_short_name",
+      "ctx": {
+        "channel": "SPEED",
+        "offset": 13384,
+        "repeats": 4
+      },
+      "level": "Info",
+      "message": "unit taken from the 8-byte field at 0x40 (4 occurrences; first named)"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "urn:esses:fixture-1",
+  "schemaVersion": 1,
+  "format": "text.profile:generic.csv",
+  "name": "donated-long-session",
+  "input": {
+    "file": "input.csv",
+    "sha256": "9c56cc51b374c3ba189210d5b6d4bf57790d351c96c47c02190ecf1e430635ab",
+    "bytes": 314572800,
+    "remote": {
+      "url": "https://example.org/esses-fixtures/donated-long-session.csv",
+      "sha256": "9c56cc51b374c3ba189210d5b6d4bf57790d351c96c47c02190ecf1e430635ab",
+      "bytes": 314572800
+    }
+  },
+  "source": "donated by its author for the public corpus",
+  "licence": "CC-BY-4.0",
+  "private": false,
+  "oracle": {
+    "kind": "public-project",
+    "ref": "pandas read_csv 2.2, pinned (BSD-3-Clause)",
+    "tolerance": {
+      "F32": "1ulp",
+      "F64": "1ulp",
+      "I32": "exact",
+      "timesUs": "exact"
+    }
+  }
+}

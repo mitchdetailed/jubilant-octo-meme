@@ -1,0 +1,43 @@
+{
+  "note": "Unit spellings of the private S-1 log corpus (fixtures/private/s1, 87 files) that data/units.json deliberately does not resolve. Each needs a decision the unit table cannot make; the importer's unit mapping (05 section 8, D-028) handles them. private_corpus_tests.cpp fails on any corpus spelling that neither resolves nor appears here. C-series short names that the unit rule (05 section 3) keeps as short names are not units and are not listed.",
+  "spellings": [
+    { "spelling": "AFR", "reason": "an air-fuel ratio without a fuel: lambda x the vehicle's 'Stoich Ratio' detail, not a unit (D-010, D-068)" },
+    { "spelling": "afr", "reason": "as AFR" },
+    { "spelling": "#", "reason": "count label" },
+    { "spelling": "cnt", "reason": "count label" },
+    { "spelling": "count", "reason": "count label" },
+    { "spelling": "counts", "reason": "count label" },
+    { "spelling": "Counts", "reason": "count label" },
+    { "spelling": "cycles", "reason": "count label" },
+    { "spelling": "cylinders", "reason": "count label" },
+    { "spelling": "packets", "reason": "count label" },
+    { "spelling": "pulse", "reason": "count label" },
+    { "spelling": "Sats", "reason": "count label (satellites)" },
+    { "spelling": "steps", "reason": "count label" },
+    { "spelling": "Steps", "reason": "count label" },
+    { "spelling": "bool", "reason": "state label" },
+    { "spelling": "Discrete", "reason": "state label" },
+    { "spelling": "err", "reason": "state label" },
+    { "spelling": "raw", "reason": "state label" },
+    { "spelling": "SED", "reason": "state label (encoded discrete signal)" },
+    { "spelling": "state", "reason": "state label" },
+    { "spelling": ".", "reason": "placeholder" },
+    { "spelling": "�", "reason": "a replacement character written in place of a unit by a converter" },
+    { "spelling": "%/ms", "reason": "rate of a ratio; no shipped quantity needs it" },
+    { "spelling": "s/s", "reason": "rate of a time delta (dimensionless); no shipped quantity needs it" },
+    { "spelling": "volts/second", "reason": "rate of a voltage; no shipped quantity needs it" },
+    { "spelling": "rpm/kph", "reason": "gear ratio as engine speed per road speed (dimension L^-1); no shipped quantity needs it" },
+    { "spelling": "rpm_custom", "reason": "converter label, not a unit" },
+    { "spelling": "second^0.5", "reason": "fractional dimension; not representable (D-085)" },
+    { "spelling": "dBm", "reason": "logarithmic power level; not an affine unit" },
+    { "spelling": "dBHz", "reason": "logarithmic carrier-to-noise density; not an affine unit" },
+    { "spelling": "fps", "reason": "frame-rate label" },
+    { "spelling": "frac Sec", "reason": "fraction-of-second counter with an unstated scale" },
+    { "spelling": "Hg", "reason": "ambiguous column of mercury (inches or millimetres)" },
+    { "spelling": "KB", "reason": "data size; 1000 or 1024 is not stated" },
+    { "spelling": "year", "reason": "calendar field, not a duration" }
+  ],
+  "prefixes": [
+    { "prefix": "irsdk_", "reason": "enumeration type names a converter writes in the unit field" }
+  ]
+}

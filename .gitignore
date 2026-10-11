@@ -1,0 +1,22 @@
+build/
+out/
+CMakeUserPresets.json
+*.user
+.vs/
+__pycache__/
+# Clean-room working material: research and design-panel notes stay private (08 section 1, D-128)
+docs/design/background/
+# Private fixtures (real logs) live in a separate private checkout
+fixtures/private/
+# Added with the M0 skeleton (08 section 11)
+.vcpkg-bc/
+.cache/
+compile_commands.json
+# Clean-room directories never enter the repository (defence in depth; the lint job is the gate)
+research/
+help_text/
+conv_samples/
+# Synthetic fixture inputs are generated (esses-gen-fixtures --inputs-only); only fixture.json, README.md and the
+# expectations are committed (05 section 9.1)
+fixtures/motec.ld/synthetic-*/input.ld
+fixtures/motec.ld/synthetic-*/input.ldx

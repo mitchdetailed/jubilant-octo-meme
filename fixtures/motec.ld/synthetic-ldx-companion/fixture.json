@@ -1,0 +1,41 @@
+{
+  "$schema": "urn:esses:fixture-1",
+  "schemaVersion": 1,
+  "channelsCompared": "all",
+  "companions": [
+    {
+      "bytes": 1359,
+      "file": "input.ldx",
+      "sha256": "c48674515f5df52f1da07f258126c90dff7953cf29873baab381fa2d500f5940"
+    }
+  ],
+  "dialect": "pc-layout",
+  "format": "motec.ld",
+  "importOptions": {
+    "ld": {
+      "shiftOrder": "afterMul"
+    }
+  },
+  "input": {
+    "bytes": 14760,
+    "file": "input.ld",
+    "sha256": "11eec9515f6aae8ef0254b229284cef2cd11d9097d6b2f2c0093a144c59e4f8b"
+  },
+  "licence": "CC0-1.0",
+  "name": "synthetic-ldx-companion",
+  "notes": "unknown classes stay opaque (ldx.unknown_marker_class), unknown elements are kept (ldx.unknown_element); companion details win over the .ld (D-015); marker times keep fractions of a microsecond",
+  "oracle": {
+    "kind": "ref-decode",
+    "ref": "tools/ld_ref_decode.py 0.1.0 (MIT), afterMul",
+    "tolerance": {
+      "F32": "1ulp",
+      "F64": "1ulp",
+      "I32": "exact",
+      "timesUs": "exact"
+    },
+    "validity": "strict"
+  },
+  "private": false,
+  "provenance": "synthetic",
+  "source": "synthetic: an .ldx companion with markers of every class, an unknown marker class, details overriding the .ld (Driver) and unknown elements at several levels"
+}

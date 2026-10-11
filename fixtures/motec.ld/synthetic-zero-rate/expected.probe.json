@@ -1,0 +1,124 @@
+{
+  "$schema": "urn:esses:probe-1",
+  "schemaVersion": 1,
+  "companions": [],
+  "details": [
+    {
+      "id": "Device Type",
+      "value": "Esses"
+    },
+    {
+      "id": "Device Serial",
+      "value": "1"
+    },
+    {
+      "id": "Device Version",
+      "value": "100"
+    },
+    {
+      "id": "Log Date",
+      "value": "11/10/2026"
+    },
+    {
+      "id": "Log Time",
+      "value": "10:00:00"
+    },
+    {
+      "id": "Driver",
+      "value": "Synthetic Driver"
+    },
+    {
+      "id": "Vehicle Id",
+      "value": "SYN-01"
+    },
+    {
+      "id": "Venue",
+      "value": "Synthetic Circuit"
+    },
+    {
+      "id": "Session",
+      "value": "Fixture"
+    },
+    {
+      "id": "Short Comment",
+      "value": "synthetic-zero-rate"
+    }
+  ],
+  "dialect": "pc-layout",
+  "enumTables": [],
+  "importerId": "motec.ld",
+  "importerVersion": "0.1.0",
+  "layers": [
+    {
+      "channels": [
+        {
+          "dps": 3,
+          "dtype": "F32",
+          "flags": 0,
+          "index": 0,
+          "kind": "Real",
+          "loggedName": "Before",
+          "sampleCount": 20,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 10
+            }
+          },
+          "vendorDtype": "f32",
+          "vendorId": "20101",
+          "vendorUnit": ""
+        },
+        {
+          "dps": 3,
+          "dtype": "F32",
+          "flags": 0,
+          "index": 1,
+          "kind": "Real",
+          "loggedName": "After",
+          "sampleCount": 20,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 10
+            }
+          },
+          "vendorDtype": "f32",
+          "vendorId": "20103",
+          "vendorUnit": ""
+        }
+      ],
+      "durationUs": 2000000,
+      "markers": [],
+      "name": "Normal",
+      "utc": {
+        "assumedLocal": true,
+        "unixUs": 1791712800000000
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "code": "ld.string_encoding",
+      "ctx": {
+        "detail": "ascii",
+        "offset": 0
+      },
+      "level": "Info",
+      "message": "strings decoded as ascii"
+    },
+    {
+      "code": "ld.zero_rate",
+      "ctx": {
+        "channel": "Untimed",
+        "offset": 13508
+      },
+      "level": "Warning",
+      "message": "channel 'Untimed' has rate 0; skipped"
+    }
+  ]
+}

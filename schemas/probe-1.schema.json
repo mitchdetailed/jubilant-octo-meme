@@ -1,0 +1,523 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:probe-1",
+  "title": "Esses probe result (probe-1)",
+  "description": "probe_json: the canonical serialisation of ProbeResult, the complete metadata of a log without any bulk sample decode (05 section 1.2). One schema, three uses: the Open dialog's Details pane, the fixture expectation expected.probe.json and the v1.0 catalogue row. Closed throughout: nothing may appear in a fixture expectation that is not in probe_json. Optional members are omitted when absent; null is never written. warnings[] holds the sniff, probe and open Import Log entries only; decode-time entries live in the source's DecodeLog and are never serialised here (05 section 1.1).",
+  "type": "object",
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "importerId",
+    "importerVersion",
+    "dialect",
+    "companions",
+    "details",
+    "layers",
+    "enumTables",
+    "warnings"
+  ],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072). The urn:esses: form is written; the bare esses: form of earlier drafts and the later https form are accepted on load and normalised on save (02 section 6.6 rule 1).",
+      "type": "string",
+      "pattern": "^(urn:esses:probe-1|esses:probe-1|https://[^/\\s]+(/[^/\\s]+)*/probe-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "importerId": {
+      "$ref": "#/definitions/importerId"
+    },
+    "importerVersion": {
+      "$ref": "#/definitions/semver"
+    },
+    "dialect": {
+      "$ref": "#/definitions/dialect"
+    },
+    "companions": {
+      "description": "Companion file names (relative to the log's directory), e.g. the .ldx beside an .ld.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/fileName"
+      },
+      "uniqueItems": true
+    },
+    "details": {
+      "description": "Details as found in the file (provenance Logged, not written).",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/detail"
+      }
+    },
+    "layers": {
+      "description": "Data layers; the first is the canonical layer \"Normal\" (02 section 4.2). A header-only .ld (no channel list) is a valid empty source: one layer Normal with no channels and durationUs 0, plus the warning ld.header_only (05 section 3.4).",
+      "type": "array",
+      "minItems": 1,
+      "items": [
+        {
+          "allOf": [
+            {
+              "$ref": "#/definitions/layer"
+            },
+            {
+              "properties": {
+                "name": {
+                  "const": "Normal"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "additionalItems": {
+        "$ref": "#/definitions/layer"
+      }
+    },
+    "enumTables": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/enumTable"
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/importLogEntry"
+      }
+    },
+    "x-esses-legacy": {
+      "$ref": "#/definitions/legacyBag"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "detail": {
+      "type": "object",
+      "required": ["id", "value"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "$ref": "#/definitions/detailValue"
+        }
+      },
+      "additionalProperties": false
+    },
+    "layer": {
+      "description": "LayerInfo (05 section 1.2).",
+      "type": "object",
+      "required": ["name", "durationUs", "channels", "markers"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "durationUs": {
+          "description": "Maximum over the channels of timeAt(sampleCount); 0 for an empty layer.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "utc": {
+          "$ref": "#/definitions/utcAnchor"
+        },
+        "channels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/channel"
+          }
+        },
+        "markers": {
+          "description": "Markers as found, device events included (class DeviceEvent, group DeviceEvents), ordered by (tUs, stored order).",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/markerInfo"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "utcAnchor": {
+      "description": "Absolute time of Micros 0 of the layer. assumedLocal is true when the file states a local date and time without a zone (the .ld header) and the instant was computed as if it were UTC (05 section 3.7).",
+      "type": "object",
+      "required": ["unixUs"],
+      "properties": {
+        "unixUs": {
+          "$ref": "#/definitions/micros"
+        },
+        "assumedLocal": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "channel": {
+      "description": "ChannelInfo (05 section 1.2). Strings are as found: trimmed, NUL-stripped and transcoded to UTF-8 (the .ld reader records the string encoding it used once per file as Info ld.string_encoding).",
+      "type": "object",
+      "required": [
+        "index",
+        "loggedName",
+        "shortName",
+        "vendorUnit",
+        "vendorDtype",
+        "dtype",
+        "kind",
+        "timing",
+        "sampleCount",
+        "t0Us",
+        "dps",
+        "flags"
+      ],
+      "properties": {
+        "index": {
+          "description": "Position in the layer, stable for the life of the reader.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "loggedName": {
+          "type": "string"
+        },
+        "shortName": {
+          "type": "string"
+        },
+        "vendorUnit": {
+          "description": "The unit text as found; resolved against the unit registry later (05 section 2 step 4).",
+          "type": "string"
+        },
+        "vendorId": {
+          "description": "Format-specific channel id, e.g. the .ld record counter.",
+          "type": "string"
+        },
+        "vendorDtype": {
+          "description": "On-disk type as the format names it: \"i16\", \"i32\", \"u16\", \"u32\", \"f16\", \"f32\", \"f64\", \"text\", ...",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*$"
+        },
+        "dtype": {
+          "description": "Storage dtype after decode (D-009).",
+          "enum": ["F32", "F64", "I32"]
+        },
+        "kind": {
+          "enum": ["Real", "Integer", "Enum", "Bool", "Bitfield", "Text"]
+        },
+        "timing": {
+          "$ref": "#/definitions/timing"
+        },
+        "sampleCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "t0Us": {
+          "$ref": "#/definitions/micros"
+        },
+        "dps": {
+          "description": "Display decimals from the file (the .ld byte at record 0x64, else the decimal-places scaling field).",
+          "type": "integer",
+          "minimum": 0
+        },
+        "enumTable": {
+          "description": "Id of the enumeration table in enumTables; present on every Enum channel.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "flags": {
+          "description": "ChannelFlags bit set (VendorDerived, HasDisplayRange, StatusBits, UnitFromShortName, DtypeGuessed).",
+          "$ref": "#/definitions/flags32"
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": ["kind"],
+        "properties": {
+          "kind": {
+            "const": "Enum"
+          }
+        }
+      },
+      "then": {
+        "required": ["enumTable"]
+      }
+    },
+    "timing": {
+      "description": "A uniform rate (Rate num/den in Hz) or timestamped (sample times come from readTimestamps).",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["rate"],
+          "properties": {
+            "rate": {
+              "$ref": "#/definitions/rate"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["timestamped"],
+          "properties": {
+            "timestamped": {
+              "const": true
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "rate": {
+      "description": "Rational sample rate num/den Hz (D-008); both 32-bit unsigned, non-zero.",
+      "type": "object",
+      "required": ["num", "den"],
+      "properties": {
+        "num": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "den": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        }
+      },
+      "additionalProperties": false
+    },
+    "markerInfo": {
+      "description": "MarkerInfo (05 section 1.2): the shared marker vocabulary (02 section 5.3 rule 8) without id and prov, plus ordinal, the marker's index among markers of the same (class, group, tUs) in file order. A device event's flags is its event code.",
+      "type": "object",
+      "required": ["class", "tUs", "name", "group", "comment", "flags", "ordinal"],
+      "properties": {
+        "class": {
+          "$ref": "#/definitions/markerClass"
+        },
+        "tUs": {
+          "$ref": "#/definitions/micros"
+        },
+        "name": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        },
+        "comment": {
+          "type": "string"
+        },
+        "flags": {
+          "$ref": "#/definitions/flags32"
+        },
+        "ordinal": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": ["class"],
+        "properties": {
+          "class": {
+            "const": "DeviceEvent"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "group": {
+            "const": "DeviceEvents"
+          }
+        }
+      }
+    },
+    "enumTable": {
+      "description": "EnumTableInfo (05 section 1.2).",
+      "type": "object",
+      "required": ["id", "entries"],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["value", "label", "severity"],
+            "properties": {
+              "value": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "label": {
+                "type": "string"
+              },
+              "severity": {
+                "description": "0 normal, 1 info, 2 warning, 3 fault (02 section 4.1).",
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 3
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "importLogEntry": {
+      "description": "ImportLogEntry (05 section 1.1). Every heuristic a reader applies is one entry with a stable code (05 section 1.3 rule 9).",
+      "type": "object",
+      "required": ["level", "code", "message", "ctx"],
+      "properties": {
+        "level": {
+          "enum": ["Info", "Warning", "Error"]
+        },
+        "code": {
+          "description": "Stable dotted id: \"ld.count_mismatch\", \"ld.string_encoding\", \"ldx.unknown_marker_class\", ...",
+          "type": "string",
+          "pattern": "^[a-z0-9]+(\\.[a-z0-9_]+)+$"
+        },
+        "message": {
+          "type": "string"
+        },
+        "ctx": {
+          "description": "Context; members are omitted when absent and repeats when it is 1.",
+          "type": "object",
+          "properties": {
+            "layer": {
+              "type": "string"
+            },
+            "channel": {
+              "type": "string"
+            },
+            "detail": {
+              "description": "The value chosen, e.g. \"afterMul\" for ld.shift_mul_order or \"utf-8\" for ld.string_encoding.",
+              "type": "string"
+            },
+            "line": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "repeats": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4294967295
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "dialect": {
+      "description": "Comma-separated dialect flags in the importer's documented order, no spaces (\"m1,pro-logging\"); \"\" when none applies (05 section 3.8).",
+      "type": "string",
+      "pattern": "^$|^[a-z0-9]+(-[a-z0-9]+)*(,[a-z0-9]+(-[a-z0-9]+)*)*$"
+    },
+    "markerClass": {
+      "description": "MarkerClass (02 section 4.3). Companion marker classes outside this list are not markers: they stay opaque (05 section 4 rule 1).",
+      "enum": ["SOL", "EOL", "BCN", "SPLTBCN", "IGRDBCN", "RESET", "STGSTRT", "STGEND", "DeviceEvent"]
+    },
+    "detailValue": {
+      "description": "DetailValue (02 section 4.2): text, a number with an optional unit symbol and display decimals, or a date-time. A bare string is the short form of a text value that probe-1 writes (05 section 1.2); sidecar-1 writes the tagged form (02 section 5.2).",
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "required": ["t", "v"],
+          "properties": {
+            "t": {
+              "const": "string"
+            },
+            "v": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["t", "v"],
+          "properties": {
+            "t": {
+              "const": "number"
+            },
+            "v": {
+              "type": "number"
+            },
+            "unit": {
+              "$ref": "#/definitions/unitSymbol"
+            },
+            "dps": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["t", "v"],
+          "properties": {
+            "t": {
+              "const": "datetime"
+            },
+            "v": {
+              "$ref": "#/definitions/isoDateTime"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "unitSymbol": {
+      "description": "A unit symbol or alias of the unit registry (units-1), without leading or trailing white space.",
+      "type": "string",
+      "pattern": "^\\S(.*\\S)?$"
+    },
+    "isoDateTime": {
+      "description": "ISO 8601 date-time with seconds and a UTC offset (or Z).",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "micros": {
+      "description": "Micros: signed 64-bit microseconds.",
+      "type": "integer"
+    },
+    "flags32": {
+      "description": "Unsigned 32-bit flag word, passed through uninterpreted.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "importerId": {
+      "description": "Importer id (D-028): \"motec.ld\", \"motec.csv\", \"text.profile:generic.csv\", ...",
+      "type": "string",
+      "pattern": "^[a-z0-9]+([._:-][a-z0-9]+)*$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$"
+    },
+    "fileName": {
+      "description": "A bare file name relative to the log's directory: no directory separators.",
+      "type": "string",
+      "pattern": "^[^/\\\\]+$"
+    },
+    "legacyBag": {
+      "description": "Fields removed by a migration, kept verbatim (02 section 6.6 rule 3).",
+      "type": "object"
+    }
+  }
+}

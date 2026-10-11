@@ -1,0 +1,56 @@
+{
+  "$schema": "urn:esses:probe-1",
+  "schemaVersion": 1,
+  "importerId": "text.profile:generic.csv",
+  "importerVersion": "0.2.0",
+  "dialect": "",
+  "companions": [],
+  "details": [],
+  "layers": [
+    {
+      "name": "Normal",
+      "durationUs": 1250000,
+      "channels": [
+        {
+          "index": 0,
+          "loggedName": "Wheel Speed FL",
+          "shortName": "",
+          "vendorUnit": "km/h",
+          "vendorDtype": "text",
+          "dtype": "F32",
+          "kind": "Real",
+          "timing": { "timestamped": true },
+          "sampleCount": 26,
+          "t0Us": 0,
+          "dps": 1,
+          "flags": 0
+        },
+        {
+          "index": 1,
+          "loggedName": "Lap Time Display",
+          "shortName": "",
+          "vendorUnit": "",
+          "vendorDtype": "text",
+          "dtype": "F64",
+          "kind": "Real",
+          "timing": { "rate": { "num": 512, "den": 25 } },
+          "sampleCount": 26,
+          "t0Us": 0,
+          "dps": 3,
+          "flags": 0
+        }
+      ],
+      "markers": []
+    },
+    {
+      "name": "Burst0",
+      "durationUs": 0,
+      "channels": [],
+      "markers": []
+    }
+  ],
+  "enumTables": [],
+  "warnings": [
+    { "level": "Info", "code": "text.ragged_row", "message": "row shorter than the header", "ctx": { "line": 17 } }
+  ]
+}

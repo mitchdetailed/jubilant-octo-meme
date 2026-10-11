@@ -1,0 +1,13 @@
+{
+  "$schema": "urn:esses:sidecar-1",
+  "schemaVersion": 1,
+  "source": { "path": "a.ld", "size": 10, "hash": "xxh3:0123456789abcdef0123456789abcdef", "importer": { "id": "motec.ld", "version": "0.1.0" } },
+  "edited": "2026-10-10T08:00:00Z",
+  "layers": {
+    "Normal": {
+      "markers": [
+        { "id": "3F6A2C1E-8D4B-4F0A-9C1D-2B7E5A9F0C11", "class": "BCN", "group": "Beacons", "tUs": 1, "name": "Manual.1", "comment": "", "prov": "User" }
+      ]
+    }
+  }
+}

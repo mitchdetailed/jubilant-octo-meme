@@ -1,0 +1,135 @@
+{
+  "$schema": "urn:esses:probe-1",
+  "schemaVersion": 1,
+  "companions": [],
+  "details": [
+    {
+      "id": "Device Type",
+      "value": "Esses"
+    },
+    {
+      "id": "Device Serial",
+      "value": "1"
+    },
+    {
+      "id": "Device Version",
+      "value": "100"
+    },
+    {
+      "id": "Log Date",
+      "value": "11/10/2026"
+    },
+    {
+      "id": "Log Time",
+      "value": "10:00:00"
+    },
+    {
+      "id": "Driver",
+      "value": "Synthetic Driver"
+    },
+    {
+      "id": "Vehicle Id",
+      "value": "SYN-01"
+    },
+    {
+      "id": "Venue",
+      "value": "Synthetic Circuit"
+    },
+    {
+      "id": "Session",
+      "value": "Fixture"
+    },
+    {
+      "id": "Short Comment",
+      "value": "synthetic-dtype-08-2"
+    }
+  ],
+  "dialect": "pc-layout",
+  "enumTables": [],
+  "importerId": "motec.ld",
+  "importerVersion": "0.1.0",
+  "layers": [
+    {
+      "channels": [
+        {
+          "dps": 0,
+          "dtype": "I32",
+          "flags": 16,
+          "index": 0,
+          "kind": "Integer",
+          "loggedName": "Raw (0x08, 2)",
+          "sampleCount": 40,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 10
+            }
+          },
+          "vendorDtype": "i16",
+          "vendorId": "20101",
+          "vendorUnit": ""
+        },
+        {
+          "dps": 1,
+          "dtype": "F32",
+          "flags": 16,
+          "index": 1,
+          "kind": "Real",
+          "loggedName": "Scaled (0x08, 2)",
+          "sampleCount": 41,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 10
+            }
+          },
+          "vendorDtype": "i16",
+          "vendorId": "20102",
+          "vendorUnit": ""
+        }
+      ],
+      "durationUs": 4100000,
+      "markers": [],
+      "name": "Normal",
+      "utc": {
+        "assumedLocal": true,
+        "unixUs": 1791712800000000
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "code": "ld.dtype_guessed",
+      "ctx": {
+        "channel": "Raw (0x08, 2)",
+        "detail": "(8, 2)",
+        "offset": 13384
+      },
+      "level": "Info",
+      "message": "channel 'Raw (0x08, 2)' type pair (8, 2) decoded by a guess"
+    },
+    {
+      "code": "ld.dtype_guessed",
+      "ctx": {
+        "channel": "Scaled (0x08, 2)",
+        "detail": "(8, 2)",
+        "offset": 13508
+      },
+      "level": "Info",
+      "message": "channel 'Scaled (0x08, 2)' type pair (8, 2) decoded by a guess"
+    },
+    {
+      "code": "ld.string_encoding",
+      "ctx": {
+        "detail": "ascii",
+        "offset": 0
+      },
+      "level": "Info",
+      "message": "strings decoded as ascii"
+    }
+  ]
+}

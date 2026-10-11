@@ -1,0 +1,74 @@
+{
+  "companion-with-directory.json": {
+    "pointer": "/companions/0",
+    "why": "companions are bare file names"
+  },
+  "dialect-with-space.json": {
+    "pointer": "/dialect",
+    "why": "dialect flags are comma-separated without spaces"
+  },
+  "dtype-not-storage.json": {
+    "pointer": "/layers/0/channels/0/dtype",
+    "why": "storage dtypes are F32, F64 and I32 only"
+  },
+  "enum-without-table.json": {
+    "pointer": "/layers/0/channels/0",
+    "why": "an Enum channel names its enumeration table"
+  },
+  "first-layer-not-normal.json": {
+    "pointer": "/layers/0/name",
+    "why": "the first layer is Normal"
+  },
+  "flags-over-32-bits.json": {
+    "pointer": "/layers/0/channels/0/flags",
+    "why": "flags is a u32"
+  },
+  "marker-unknown-class.json": {
+    "pointer": "/layers/0/markers/0/class",
+    "why": "unknown companion classes stay opaque, never markers"
+  },
+  "marker-without-ordinal.json": {
+    "pointer": "/layers/0/markers/0",
+    "why": "probe markers carry ordinal"
+  },
+  "missing-warnings.json": {
+    "pointer": "",
+    "why": "warnings is required (empty when nothing was logged)"
+  },
+  "negative-duration.json": {
+    "pointer": "/layers/0/durationUs",
+    "why": "durations are non-negative"
+  },
+  "no-layers.json": {
+    "pointer": "/layers",
+    "why": "every source has at least the Normal layer"
+  },
+  "null-vendor-id.json": {
+    "pointer": "/layers/0/channels/0/vendorId",
+    "why": "absent optionals are omitted, never null"
+  },
+  "rate-zero.json": {
+    "pointer": "/layers/0/channels/0/timing",
+    "why": "a uniform rate has num >= 1 (zero-rate channels are skipped)"
+  },
+  "severity-out-of-range.json": {
+    "pointer": "/enumTables/0/entries/0/severity",
+    "why": "severity is 0..3"
+  },
+  "timing-both-forms.json": {
+    "pointer": "/layers/0/channels/0/timing",
+    "why": "timing is a rate or timestamped, not both"
+  },
+  "unknown-top-level-member.json": {
+    "pointer": "",
+    "why": "probe_json is closed"
+  },
+  "warning-bad-level.json": {
+    "pointer": "/warnings/0/level",
+    "why": "levels are Info, Warning, Error"
+  },
+  "warning-without-ctx.json": {
+    "pointer": "/warnings/0",
+    "why": "ctx is always written (possibly empty)"
+  }
+}

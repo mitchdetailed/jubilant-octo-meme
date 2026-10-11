@@ -1,0 +1,42 @@
+{
+  "device-event-group.json": {
+    "pointer": "/layers/Normal/0/group",
+    "why": "device events are in group DeviceEvents"
+  },
+  "empty-layer-name.json": {
+    "pointer": "/layers",
+    "why": "layer names are non-empty (Normal, not the empty alias)"
+  },
+  "layers-as-array.json": {
+    "pointer": "/layers",
+    "why": "layers is an object keyed by layer name"
+  },
+  "missing-prov.json": {
+    "pointer": "/layers/Normal/0",
+    "why": "markers-1 markers carry prov"
+  },
+  "negative-flags.json": {
+    "pointer": "/layers/Normal/0/flags",
+    "why": "flags is a u32"
+  },
+  "ordinal-member.json": {
+    "pointer": "/layers/Normal/0",
+    "why": "ordinal belongs to probe-1 only"
+  },
+  "unknown-class.json": {
+    "pointer": "/layers/Normal/0/class",
+    "why": "unknown companion classes stay opaque"
+  },
+  "unknown-provenance.json": {
+    "pointer": "/layers/Normal/0/prov",
+    "why": "provenance is Logged, Companion, User or Derived"
+  },
+  "unknown-top-level-member.json": {
+    "pointer": "",
+    "why": "markers-1 is closed"
+  },
+  "wrong-schema-id.json": {
+    "pointer": "/$schema",
+    "why": "the $schema id names another schema"
+  }
+}

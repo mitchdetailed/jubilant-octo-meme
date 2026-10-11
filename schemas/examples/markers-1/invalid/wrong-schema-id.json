@@ -1,0 +1,18 @@
+{
+  "$schema": "urn:esses:markers-2",
+  "schemaVersion": 1,
+  "layers": {
+    "Normal": [
+      {
+        "id": "3d6a4adc-4bc3-53f4-a55b-2238f5eec649",
+        "class": "BCN",
+        "group": "Beacons",
+        "tUs": 83412340,
+        "name": "Manual.1",
+        "comment": "",
+        "flags": 77,
+        "prov": "Companion"
+      }
+    ]
+  }
+}

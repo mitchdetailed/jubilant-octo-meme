@@ -1,0 +1,105 @@
+{
+  "$schema": "urn:esses:markers-1",
+  "schemaVersion": 1,
+  "layers": {
+    "Normal": [
+      {
+        "class": "SOL",
+        "comment": "",
+        "group": "",
+        "id": "4a220465-0e86-5534-8b34-1cae5de4ee3b",
+        "name": "",
+        "prov": "Derived",
+        "tUs": 0
+      },
+      {
+        "class": "DeviceEvent",
+        "comment": "",
+        "group": "DeviceEvents",
+        "id": "5ce157e4-548f-5abf-baed-c042858e7cc3",
+        "name": "Firmware start",
+        "prov": "Logged",
+        "tUs": 0
+      },
+      {
+        "class": "DeviceEvent",
+        "comment": "",
+        "flags": 3,
+        "group": "DeviceEvents",
+        "id": "84236710-2a95-5a84-9bb4-09f0c3a92e8d",
+        "name": "Logging on",
+        "prov": "Logged",
+        "tUs": 0
+      },
+      {
+        "class": "DeviceEvent",
+        "comment": "",
+        "flags": 17,
+        "group": "DeviceEvents",
+        "id": "17ec67d3-ad90-5993-8e2e-afccd3cb8552",
+        "name": "Event 17",
+        "prov": "Logged",
+        "tUs": 1000000
+      },
+      {
+        "class": "DeviceEvent",
+        "comment": "",
+        "flags": 1,
+        "group": "DeviceEvents",
+        "id": "c2d13e30-7598-541c-ac5d-edb014575b01",
+        "name": "Firmware stop",
+        "prov": "Logged",
+        "tUs": 2500000
+      },
+      {
+        "class": "DeviceEvent",
+        "comment": "",
+        "flags": 52,
+        "group": "DeviceEvents",
+        "id": "77f782af-720a-5e7c-b2d7-790d15d259c8",
+        "name": "Event 52",
+        "prov": "Logged",
+        "tUs": 3000000
+      },
+      {
+        "class": "DeviceEvent",
+        "comment": "",
+        "flags": 2,
+        "group": "DeviceEvents",
+        "id": "1a89c226-0c9e-5fc7-8c9c-3c595dc4653a",
+        "name": "Power cycled",
+        "prov": "Logged",
+        "tUs": 4000000
+      },
+      {
+        "class": "DeviceEvent",
+        "comment": "",
+        "flags": 5,
+        "group": "DeviceEvents",
+        "id": "26c0ff50-334b-531d-8906-a9e506aeafde",
+        "name": "Log discontinuity",
+        "prov": "Logged",
+        "tUs": 5000000
+      },
+      {
+        "class": "DeviceEvent",
+        "comment": "",
+        "flags": 4,
+        "group": "DeviceEvents",
+        "id": "7d7897e5-124e-533a-9f81-87d8e5fa6cb6",
+        "name": "Logging off",
+        "prov": "Logged",
+        "tUs": 9999999
+      },
+      {
+        "class": "EOL",
+        "comment": "",
+        "group": "",
+        "id": "d56ca4b8-2a55-576b-8091-1db199f5266d",
+        "name": "",
+        "prov": "Derived",
+        "tUs": 10000000
+      }
+    ]
+  }
+}

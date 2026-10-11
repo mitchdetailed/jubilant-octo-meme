@@ -1,0 +1,119 @@
+{
+  "version": 8,
+  "cmakeMinimumRequired": { "major": 3, "minor": 28, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base", "hidden": true, "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": { "CMAKE_EXPORT_COMPILE_COMMANDS": "ON", "ESSES_BUILD_TESTS": "ON" }
+    },
+    { "name": "qt",   "hidden": true, "cacheVariables": { "ESSES_BUILD_QT": "ON" } },
+    { "name": "core", "hidden": true, "cacheVariables": { "ESSES_BUILD_QT": "OFF" } },
+    {
+      "name": "ci", "hidden": true,
+      "cacheVariables": { "ESSES_WARNINGS_AS_ERRORS": "ON", "ESSES_FORCE_ASSERTS": "ON",
+                          "CMAKE_MSVC_DEBUG_INFORMATION_FORMAT": "Embedded" }
+    },
+    {
+      "name": "win-msvc", "hidden": true, "inherits": "base",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" },
+      "architecture": { "value": "x64", "strategy": "external" },
+      "cacheVariables": { "CMAKE_C_COMPILER": "cl", "CMAKE_CXX_COMPILER": "cl" }
+    },
+    { "name": "win-msvc-core",     "displayName": "Windows MSVC, Qt-free, Debug",
+      "inherits": ["win-msvc", "core"], "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" } },
+    { "name": "win-msvc-core-rel", "displayName": "Windows MSVC, Qt-free, RelWithDebInfo",
+      "inherits": ["win-msvc", "core"], "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo" } },
+    { "name": "win-msvc-debug",    "displayName": "Windows MSVC with Qt, Debug (M1+)",
+      "inherits": ["win-msvc", "qt"], "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" } },
+    { "name": "win-msvc-release",  "displayName": "Windows MSVC with Qt, RelWithDebInfo (M1+)",
+      "inherits": ["win-msvc", "qt"], "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "ESSES_LTO": "ON" } },
+    {
+      "name": "linux-gcc-core", "displayName": "Linux GCC, Qt-free, Debug", "inherits": ["base", "core"],
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" },
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "CMAKE_C_COMPILER": "gcc", "CMAKE_CXX_COMPILER": "g++" }
+    },
+    {
+      "name": "linux-clang-asan", "displayName": "Linux Clang, ASan + UBSan", "inherits": ["base", "core"],
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" },
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "CMAKE_C_COMPILER": "clang", "CMAKE_CXX_COMPILER": "clang++",
+                          "ESSES_SANITIZE": "address,undefined" }
+    },
+    {
+      "name": "linux-clang-tsan", "displayName": "Linux Clang, TSan", "inherits": ["base", "core"],
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" },
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "CMAKE_C_COMPILER": "clang", "CMAKE_CXX_COMPILER": "clang++",
+                          "ESSES_SANITIZE": "thread" }
+    },
+    {
+      "name": "linux-clang-fuzz", "displayName": "Linux Clang, libFuzzer", "inherits": ["base", "core"],
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" },
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "CMAKE_C_COMPILER": "clang",
+                          "CMAKE_CXX_COMPILER": "clang++", "ESSES_BUILD_FUZZ": "ON",
+                          "ESSES_SANITIZE": "address,undefined" }
+    },
+    {
+      "name": "win-msvc-fuzz", "displayName": "Windows MSVC, libFuzzer + ASan (fuzz targets only)",
+      "inherits": ["win-msvc", "core"],
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "ESSES_BUILD_FUZZ": "ON", "ESSES_SANITIZE": "address",
+                          "ESSES_BUILD_TESTS": "OFF", "ESSES_WITH_CLI": "OFF" }
+    },
+    {
+      "name": "mac-clang-core", "displayName": "macOS Apple Clang, Qt-free, Debug", "inherits": ["base", "core"],
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Darwin" },
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    { "name": "ci-win-msvc-core",   "inherits": ["win-msvc-core", "ci"] },
+    { "name": "ci-linux-gcc-core",  "inherits": ["linux-gcc-core", "ci"] },
+    { "name": "ci-mac-clang-core",  "inherits": ["mac-clang-core", "ci"] },
+    { "name": "ci-linux-lint",      "inherits": ["linux-gcc-core", "ci"],
+      "cacheVariables": { "ESSES_ENABLE_CLANG_TIDY": "ON" } }
+  ],
+  "buildPresets": [
+    { "name": "win-msvc-core",      "configurePreset": "win-msvc-core" },
+    { "name": "win-msvc-core-rel",  "configurePreset": "win-msvc-core-rel" },
+    { "name": "win-msvc-debug",     "configurePreset": "win-msvc-debug" },
+    { "name": "win-msvc-release",   "configurePreset": "win-msvc-release" },
+    { "name": "linux-gcc-core",     "configurePreset": "linux-gcc-core" },
+    { "name": "linux-clang-asan",   "configurePreset": "linux-clang-asan" },
+    { "name": "linux-clang-tsan",   "configurePreset": "linux-clang-tsan" },
+    { "name": "linux-clang-fuzz",   "configurePreset": "linux-clang-fuzz" },
+    { "name": "win-msvc-fuzz",      "configurePreset": "win-msvc-fuzz" },
+    { "name": "mac-clang-core",     "configurePreset": "mac-clang-core" },
+    { "name": "ci-win-msvc-core",   "configurePreset": "ci-win-msvc-core" },
+    { "name": "ci-linux-gcc-core",  "configurePreset": "ci-linux-gcc-core" },
+    { "name": "ci-mac-clang-core",  "configurePreset": "ci-mac-clang-core" },
+    { "name": "ci-linux-lint",      "configurePreset": "ci-linux-lint" }
+  ],
+  "testPresets": [
+    { "name": "test-base", "hidden": true, "output": { "outputOnFailure": true },
+      "execution": { "noTestsAction": "error", "timeout": 600 } },
+    { "name": "win-msvc-core",      "inherits": "test-base", "configurePreset": "win-msvc-core" },
+    { "name": "win-msvc-core-rel",  "inherits": "test-base", "configurePreset": "win-msvc-core-rel" },
+    { "name": "win-msvc-debug",     "inherits": "test-base", "configurePreset": "win-msvc-debug",
+      "environment": { "QT_QPA_PLATFORM": "offscreen" } },
+    { "name": "win-msvc-release",   "inherits": "test-base", "configurePreset": "win-msvc-release",
+      "environment": { "QT_QPA_PLATFORM": "offscreen" } },
+    { "name": "linux-gcc-core",     "inherits": "test-base", "configurePreset": "linux-gcc-core" },
+    { "name": "linux-clang-asan",   "inherits": "test-base", "configurePreset": "linux-clang-asan" },
+    { "name": "linux-clang-tsan",   "inherits": "test-base", "configurePreset": "linux-clang-tsan",
+      "filter": { "include": { "name": "^(base|store)\\." } } },
+    { "name": "mac-clang-core",     "inherits": "test-base", "configurePreset": "mac-clang-core" },
+    { "name": "ci-win-msvc-core",   "inherits": "test-base", "configurePreset": "ci-win-msvc-core" },
+    { "name": "ci-linux-gcc-core",  "inherits": "test-base", "configurePreset": "ci-linux-gcc-core" },
+    { "name": "ci-mac-clang-core",  "inherits": "test-base", "configurePreset": "ci-mac-clang-core" },
+    { "name": "ci-linux-lint",      "inherits": "test-base", "configurePreset": "ci-linux-lint",
+      "filter": { "include": { "label": "lint" } } }
+  ],
+  "workflowPresets": [
+    { "name": "ci-core-windows", "steps": [ { "type": "configure", "name": "ci-win-msvc-core" },
+                                            { "type": "build", "name": "ci-win-msvc-core" },
+                                            { "type": "test", "name": "ci-win-msvc-core" } ] },
+    { "name": "ci-core-linux",   "steps": [ { "type": "configure", "name": "ci-linux-gcc-core" },
+                                            { "type": "build", "name": "ci-linux-gcc-core" },
+                                            { "type": "test", "name": "ci-linux-gcc-core" } ] },
+    { "name": "ci-core-macos",   "steps": [ { "type": "configure", "name": "ci-mac-clang-core" },
+                                            { "type": "build", "name": "ci-mac-clang-core" },
+                                            { "type": "test", "name": "ci-mac-clang-core" } ] }
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:markers-1",
+  "title": "Esses merged marker list (markers-1)",
+  "description": "The merged markers of every data layer of one source after the companion (.ldx) merge and before the sidecar is applied: the fixture expectation expected.markers.json (05 section 9.1). It is the array form of the sidecar-1 marker record with markers of every provenance and is written by the same serializer (02 section 5.3 rule 8). Each layer's list is in model order, sorted by (tUs, class, id) (02 section 4.3 behaviour 8; checked by fixture verify, not by this schema). Closed: Esses writes it and fixture verify compares it.",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "layers"],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072). The urn:esses: form is written; the bare esses: form of earlier drafts and the later https form are accepted on load and normalised on save (02 section 6.6 rule 1).",
+      "type": "string",
+      "pattern": "^(urn:esses:markers-1|esses:markers-1|https://[^/\\s]+(/[^/\\s]+)*/markers-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "layers": {
+      "description": "Marker lists keyed by data-layer name (\"Normal\", \"Fastest\", ...). A layer without markers has an empty list.",
+      "type": "object",
+      "propertyNames": {
+        "minLength": 1
+      },
+      "patternProperties": {
+        "^.+$": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/marker"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "x-esses-legacy": {
+      "$ref": "#/definitions/legacyBag"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "marker": {
+      "description": "One marker in the key vocabulary shared by sidecar-1, markers-1 and probe-1 (02 section 5.3 rule 8). An absent flags means 0. Device events are markers of class DeviceEvent in group DeviceEvents (02 section 4.3).",
+      "type": "object",
+      "required": ["id", "class", "group", "tUs", "name", "comment", "prov"],
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/uuid"
+        },
+        "class": {
+          "$ref": "#/definitions/markerClass"
+        },
+        "group": {
+          "description": "\"\" for intrinsic markers (SOL, EOL, RESET), \"Beacons\", \"StageMarkers\", \"DeviceEvents\" or a companion group name.",
+          "type": "string"
+        },
+        "tUs": {
+          "$ref": "#/definitions/micros"
+        },
+        "name": {
+          "type": "string"
+        },
+        "comment": {
+          "type": "string"
+        },
+        "flags": {
+          "$ref": "#/definitions/flags32"
+        },
+        "prov": {
+          "$ref": "#/definitions/provenance"
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": ["class"],
+        "properties": {
+          "class": {
+            "const": "DeviceEvent"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "group": {
+            "const": "DeviceEvents"
+          }
+        }
+      }
+    },
+    "markerClass": {
+      "description": "MarkerClass (02 section 4.3). Companion marker classes outside this list are not markers: they stay opaque (05 section 4 rule 1).",
+      "enum": ["SOL", "EOL", "BCN", "SPLTBCN", "IGRDBCN", "RESET", "STGSTRT", "STGEND", "DeviceEvent"]
+    },
+    "provenance": {
+      "enum": ["Logged", "Companion", "User", "Derived"]
+    },
+    "uuid": {
+      "description": "Canonical lower-case 8-4-4-4-12 UUID (Uuid::str()).",
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "micros": {
+      "description": "Micros: signed 64-bit microseconds.",
+      "type": "integer"
+    },
+    "flags32": {
+      "description": "Unsigned 32-bit flag word, passed through uninterpreted.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "legacyBag": {
+      "description": "Fields removed by a migration, kept verbatim (02 section 6.6 rule 3).",
+      "type": "object"
+    }
+  }
+}

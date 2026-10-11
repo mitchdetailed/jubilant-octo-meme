@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 the Esses contributors
+# SPDX-License-Identifier: MIT
+#
+# Allow-list for tools/check_vendor_marks.py: exactly the classes of 00_OVERVIEW.md section 8 rule 2 (D-125).
+# Entry kinds:
+#   literal <text>   exact, case-sensitive text that may appear anywhere in scope (removed before scanning)
+#   ident <name>     an identifier that may appear in code
+#   path <glob>      files that are not scanned (prose); fnmatch syntax on repository-relative paths
+# Every addition needs a class letter and a reason in its comment; reviewers check it against D-125.
+
+# (a) importer ids and their dictionary/profile file names (data/dictionaries/motec.ld.json, ...)
+literal motec.ld
+literal motec.csv
+
+# (b) import/export dialog format labels that name the file formats: added with the dialogs (M1+)
+
+# (c) the CSV writer's format-name constant and the motec.csv sniff pattern: added in phase B (M2)
+
+# (d) the D-019 round-trip bag: JSON key x-i2 and its C++ member xI2 (rename offered as Q-17)
+literal x-i2
+ident xI2
+
+# (e) prose: CLEANROOM.md, NOTICES.md, TRADEMARK.md, docs/, fixture READMEs and fixture.json source fields
+path CLEANROOM.md
+path NOTICES.md
+path TRADEMARK.md
+path docs/*
+path fixtures/*README.md
+path fixtures/*fixture.json

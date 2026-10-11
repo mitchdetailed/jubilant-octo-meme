@@ -1,0 +1,313 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:fixture-1",
+  "title": "Esses fixture description (fixture-1)",
+  "description": "fixture.json of one fixture directory fixtures/<formatId>/<name>/ or fixtures/private/<formatId>/<name>/ (05 section 9.1, D-033, D-127): the input and its companions with their hashes, provenance and licence, the reader options, the dialect the probe must report and the oracle the expected channel values come from. Closed: a misspelt member is an error. Policy rules encoded here: a public fixture (private false) needs a redistributable licence; a vendor-software export oracle needs private true and a recorded permission (05 section 9.1). Semantic rules the schema cannot express (a self oracle never settles a dialect claim, D-041) are checked by fixture verify.",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "format", "name", "input", "source", "licence", "private", "oracle"],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072). The urn:esses: form is written; the bare esses: form of earlier drafts and the later https form are accepted on load and normalised on save (02 section 6.6 rule 1).",
+      "type": "string",
+      "pattern": "^(urn:esses:fixture-1|esses:fixture-1|https://[^/\\s]+(/[^/\\s]+)*/fixture-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "format": {
+      "description": "The importer id whose file stem names the corpus directory (\"motec.ld\").",
+      "$ref": "#/definitions/importerId"
+    },
+    "name": {
+      "description": "The fixture directory name (\"synthetic-acc-dialect\").",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "input": {
+      "$ref": "#/definitions/input"
+    },
+    "companions": {
+      "description": "Companions sit beside the input with the same stem (input.ldx), because companion discovery is by sibling stem.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/companion"
+      }
+    },
+    "source": {
+      "description": "Provenance prose: who produced the input, with what, when.",
+      "type": "string",
+      "minLength": 1
+    },
+    "provenance": {
+      "description": "Provenance class of the input (CLEANROOM.md categories, D-145): synthetic (written by Esses' own generator, esses-gen-fixtures), user-device-log (the user's own logger files), user-tool-output (outputs of the user's own tools), third-party (another producer's export, licence per D-040) or vendor-sample (vendor sample and test-model files, D-117, D-146). Absent: not stated.",
+      "enum": ["synthetic", "user-device-log", "user-tool-output", "third-party", "vendor-sample"]
+    },
+    "licence": {
+      "description": "SPDX licence expression of the input (\"CC0-1.0\", \"LicenseRef-unknown\").",
+      "type": "string",
+      "pattern": "^\\S(.*\\S)?$"
+    },
+    "permission": {
+      "description": "Why the file may be used here (the U-03/U-13 answer for private fixtures).",
+      "type": "string",
+      "minLength": 1
+    },
+    "private": {
+      "description": "true: lives in fixtures/private (never committed to the public tree, D-005).",
+      "type": "boolean"
+    },
+    "importOptions": {
+      "$ref": "#/definitions/importOptions"
+    },
+    "dialect": {
+      "description": "The dialect string the probe must report (probe-1 dialect).",
+      "$ref": "#/definitions/dialect"
+    },
+    "oracle": {
+      "$ref": "#/definitions/oracle"
+    },
+    "channelsCompared": {
+      "description": "\"all\" (default) or the logged names whose expected.channels/<channel>.csv.gz files exist.",
+      "oneOf": [
+        {
+          "const": "all"
+        },
+        {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ]
+    },
+    "notes": {
+      "type": "string"
+    },
+    "x-esses-legacy": {
+      "$ref": "#/definitions/legacyBag"
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "description": "A public fixture needs a licence that permits redistribution (D-040, D-127).",
+      "if": {
+        "required": ["private"],
+        "properties": {
+          "private": {
+            "const": false
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "licence": {
+            "not": {
+              "const": "LicenseRef-unknown"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "A private fixture records why it may be used.",
+      "if": {
+        "required": ["private"],
+        "properties": {
+          "private": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "required": ["permission"]
+      }
+    },
+    {
+      "description": "A vendor-software export oracle needs a private fixture and a recorded permission (05 section 9.1).",
+      "if": {
+        "required": ["oracle"],
+        "properties": {
+          "oracle": {
+            "required": ["kind"],
+            "properties": {
+              "kind": {
+                "$ref": "#/definitions/exportOracleKind"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "private": {
+            "const": true
+          },
+          "oracle": {
+            "required": ["permitted"]
+          }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "input": {
+      "type": "object",
+      "required": ["file", "sha256", "bytes"],
+      "properties": {
+        "file": {
+          "$ref": "#/definitions/inputFileName"
+        },
+        "sha256": {
+          "$ref": "#/definitions/sha256"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "remote": {
+          "description": "For inputs over 2 MB that are not committed: where CI fetches and caches them; null or absent otherwise.",
+          "type": ["object", "null"],
+          "required": ["url", "sha256", "bytes"],
+          "properties": {
+            "url": {
+              "type": "string",
+              "pattern": "^https://\\S+$"
+            },
+            "sha256": {
+              "$ref": "#/definitions/sha256"
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "companion": {
+      "type": "object",
+      "required": ["file", "sha256"],
+      "properties": {
+        "file": {
+          "$ref": "#/definitions/inputFileName"
+        },
+        "sha256": {
+          "$ref": "#/definitions/sha256"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "inputFileName": {
+      "description": "input.<ext>: the input and its companions share the stem \"input\".",
+      "type": "string",
+      "pattern": "^input\\.[A-Za-z0-9]+$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "importOptions": {
+      "description": "ImportOptions.options: reader options keyed by importer namespace, validated in full against the importer's options schema. The .ld reader's ld.shiftOrder is checked here (D-037: default afterMul).",
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z][A-Za-z0-9]*$"
+      },
+      "properties": {
+        "ld": {
+          "type": "object",
+          "properties": {
+            "shiftOrder": {
+              "enum": ["afterMul", "beforeMul"]
+            }
+          }
+        }
+      }
+    },
+    "oracle": {
+      "description": "Where the expected channel values come from (05 section 9.1, D-041). Kinds: ref-decode (tools/ld_ref_decode.py), public-project (a pinned third-party decoder), converter, self (round trips of our own writer only), and the vendor-software export kind of 05 section 9.1, matched by exportOracleKind.",
+      "type": "object",
+      "required": ["kind", "ref", "tolerance"],
+      "properties": {
+        "kind": {
+          "anyOf": [
+            {
+              "enum": ["ref-decode", "public-project", "converter", "self"]
+            },
+            {
+              "$ref": "#/definitions/exportOracleKind"
+            }
+          ]
+        },
+        "ref": {
+          "description": "The oracle tool or project with its version and licence.",
+          "type": "string",
+          "minLength": 1
+        },
+        "permitted": {
+          "description": "The recorded permission to use this oracle (U-03/U-13).",
+          "type": "boolean"
+        },
+        "validity": {
+          "description": "What the valid column of expected.channels/*.csv asserts. strict (default): it is the expected validity of every listed sample (the generator's declared invalid ranges for synthetic families). finite-only: the oracle reports only non-finite values as invalid (tools/ld_ref_decode.py does not decode gap blocks), so a sample the reader marks invalid while the oracle has a finite value is counted, not compared.",
+          "enum": ["strict", "finite-only"]
+        },
+        "tolerance": {
+          "description": "Per-dtype comparison tolerance; integers and timestamps are always exact (AC-M0-02).",
+          "type": "object",
+          "required": ["F32", "F64", "I32", "timesUs"],
+          "properties": {
+            "F32": {
+              "$ref": "#/definitions/floatTolerance"
+            },
+            "F64": {
+              "$ref": "#/definitions/floatTolerance"
+            },
+            "I32": {
+              "const": "exact"
+            },
+            "timesUs": {
+              "const": "exact"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "exportOracleKind": {
+      "description": "The vendor-software export oracle kind of 05 section 9.1 (<product>-export). It is matched by pattern because the vendor-mark lint (D-125) allows no product name in schemas/.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*-export$"
+    },
+    "floatTolerance": {
+      "type": "string",
+      "pattern": "^(exact|[1-9][0-9]*ulp)$"
+    },
+    "importerId": {
+      "description": "Importer id (D-028): \"motec.ld\", \"motec.csv\", \"text.profile:generic.csv\", ...",
+      "type": "string",
+      "pattern": "^[a-z0-9]+([._:-][a-z0-9]+)*$"
+    },
+    "dialect": {
+      "description": "Comma-separated dialect flags in the importer's documented order, no spaces (\"m1,pro-logging\"); \"\" when none applies (05 section 3.8).",
+      "type": "string",
+      "pattern": "^$|^[a-z0-9]+(-[a-z0-9]+)*(,[a-z0-9]+(-[a-z0-9]+)*)*$"
+    },
+    "legacyBag": {
+      "description": "Fields removed by a migration, kept verbatim (02 section 6.6 rule 3).",
+      "type": "object"
+    }
+  }
+}

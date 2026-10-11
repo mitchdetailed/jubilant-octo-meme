@@ -1,0 +1,34 @@
+{
+  "$schema": "urn:esses:fixture-1",
+  "schemaVersion": 1,
+  "channelsCompared": "all",
+  "dialect": "pc-layout",
+  "format": "motec.ld",
+  "importOptions": {
+    "ld": {
+      "shiftOrder": "afterMul"
+    }
+  },
+  "input": {
+    "bytes": 13737,
+    "file": "input.ld",
+    "sha256": "6441d0b55e47c32d55052ed8655bf023bab2521962e8b639e97281cc53311ccb"
+  },
+  "licence": "CC0-1.0",
+  "name": "synthetic-dtype-04-1",
+  "notes": "integer pair: the signed extremes of the width (width 8: +-(2^53 - 1)) and a ramp; the scaled channel has mul 3, scale 4, dec 1; dtype_a 0x04 is decoded unsigned by Esses and signed by the oracle, so the values keep the high bit clear (unsettled: no real file has 0x04, docs/formats/ld.md)",
+  "oracle": {
+    "kind": "ref-decode",
+    "ref": "tools/ld_ref_decode.py 0.1.0 (MIT), afterMul",
+    "tolerance": {
+      "F32": "1ulp",
+      "F64": "1ulp",
+      "I32": "exact",
+      "timesUs": "exact"
+    },
+    "validity": "strict"
+  },
+  "private": false,
+  "provenance": "synthetic",
+  "source": "synthetic: the (dtype_a, dtype) pair (0x04, 1) with identity and non-identity scaling, written by esses-gen-fixtures through the motec.ld writer"
+}

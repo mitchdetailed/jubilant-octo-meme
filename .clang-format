@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2026 the Esses contributors
+# SPDX-License-Identifier: MIT
+# 08_REPO_AND_BUILD.md section 3.8. CI runs clang-format --dry-run --Werror on every C/C++ file outside third_party/.
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 110
+AllowShortFunctionsOnASingleLine: Inline
+BreakBeforeBraces: Attach
+PointerAlignment: Left
+AccessModifierOffset: -4
+IndentCaseLabels: false
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^"'                                        # local test helpers and generated headers
+    Priority: 1
+  - Regex: '^<esses/'                                  # own headers
+    Priority: 2
+  - Regex: '^<(catch2/|catch_amalgamated|pugixml|xxhash|nlohmann/|CLI/|fast_float/)'  # third-party
+    Priority: 3
+  - Regex: '^<windows\.h>'                             # must precede the other Win32 headers
+    Priority: 5
+  - Regex: '^<(knownfolders|shlobj|mach-o/|sys/|fcntl|unistd)'   # other platform headers
+    Priority: 6
+  - Regex: '^<'                                        # standard library
+    Priority: 4

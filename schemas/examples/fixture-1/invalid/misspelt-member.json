@@ -1,0 +1,35 @@
+{
+  "$schema": "urn:esses:fixture-1",
+  "schemaVersion": 1,
+  "format": "motec.ld",
+  "name": "synthetic-shift-mul-after",
+  "input": {
+    "file": "input.ld",
+    "sha256": "4a44dc15364204a80fe80e9039455cc1608281820fe2b24f1e5233ade6af1dd5",
+    "bytes": 18432
+  },
+  "source": "generated at test time by esses-gen-fixtures (our own writer)",
+  "licence": "CC0-1.0",
+  "private": false,
+  "importOptions": {
+    "ld": {
+      "shiftOrder": "afterMul"
+    }
+  },
+  "dialect": "",
+  "oracle": {
+    "kind": "ref-decode",
+    "ref": "tools/ld_ref_decode.py",
+    "tolerance": {
+      "F32": "1ulp",
+      "F64": "exact",
+      "I32": "exact",
+      "timesUs": "exact"
+    }
+  },
+  "channelsCompared": [
+    "Gbox Oil Temp",
+    "Engine Speed"
+  ],
+  "note": "typo for notes"
+}

@@ -1,0 +1,33 @@
+{
+  "$schema": "urn:esses:fixture-1",
+  "schemaVersion": 1,
+  "format": "motec.ld",
+  "name": "synthetic-gap-blocks",
+  "input": {
+    "file": "input.ld",
+    "sha256": "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae",
+    "bytes": 21504
+  },
+  "source": "synthetic: written by esses-gen-fixtures through the motec.ld writer",
+  "provenance": "synthetic",
+  "licence": "CC0-1.0",
+  "private": false,
+  "importOptions": {
+    "ld": {
+      "shiftOrder": "afterMul"
+    }
+  },
+  "dialect": "pc-layout",
+  "oracle": {
+    "kind": "ref-decode",
+    "ref": "tools/ld_ref_decode.py 0.1.0 (MIT)",
+    "validity": "strict",
+    "tolerance": {
+      "F32": "1ulp",
+      "F64": "1ulp",
+      "I32": "exact",
+      "timesUs": "exact"
+    }
+  },
+  "channelsCompared": "all"
+}

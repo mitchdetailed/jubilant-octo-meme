@@ -1,0 +1,182 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:units-1",
+  "title": "Esses unit table (units-1)",
+  "description": "The unit registry's table: data/units.json (shipped, 02 section 2.3) and the per-user units.user.json. Quantities with their dimension, display family and SI base unit, each with its units in display-list order; a unit converts as value_in_unit = value_in_base * scalar + offset (02 section 2.1). Files never store registry ids, only symbols (02 section 2.2 rule 6). Rules the schema cannot express are checked by UnitRegistry::load: the first quantity of the shipped table is the unitless quantity whose first unit has the empty symbol (unit 0, kNoUnit); the base symbol is one of the quantity's units with scalar 1 and offset 0; deltaFamily names a quantity with isDelta true and the same dimension; quantities sharing a family share dimension and isDelta; no spelling (symbol, alias or display) belongs to two units, exactly, after case folding or after the spelling normaliser, except that a spelling listed in caseSensitive matches exactly only; caseSensitive lists only the unit's own symbol or aliases; a user file may extend a shipped quantity (same name, family, dim, base, isDelta and deltaFamily; units are appended) or add quantities, and may not reuse a shipped spelling. Unknown top-level members are allowed and preserved; quantity and unit records are closed.",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "quantities"],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072). The urn:esses: form is written; the bare esses: form of earlier drafts and the later https form are accepted on load and normalised on save (02 section 6.6 rule 1).",
+      "type": "string",
+      "pattern": "^(urn:esses:units-1|esses:units-1|https://[^/\\s]+(/[^/\\s]+)*/units-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "quantities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/quantity"
+      }
+    },
+    "x-esses-legacy": {
+      "$ref": "#/definitions/legacyBag"
+    }
+  },
+  "definitions": {
+    "quantity": {
+      "description": "Quantity (02 section 2.1).",
+      "type": "object",
+      "required": ["name", "family", "dim", "base", "units"],
+      "properties": {
+        "name": {
+          "description": "\"Temperature\", \"Temperature Delta\", \"Angular Speed\" ...",
+          "$ref": "#/definitions/label"
+        },
+        "aliases": {
+          "description": "Further names UnitRegistry::quantityByName accepts, case-insensitively (\"Angular Velocity\" for \"Angular Speed\").",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/definitions/label"
+          }
+        },
+        "family": {
+          "description": "Display family: distinct for Delta vs Absolute, Torque vs Energy, Angle vs Ratio; conversion across families is refused even when dimensions match.",
+          "$ref": "#/definitions/label"
+        },
+        "dim": {
+          "$ref": "#/definitions/dimension"
+        },
+        "base": {
+          "description": "Symbol of the SI base unit of this quantity (scalar 1, offset 0).",
+          "$ref": "#/definitions/symbol"
+        },
+        "isDelta": {
+          "type": "boolean"
+        },
+        "deltaFamily": {
+          "description": "Name of the delta quantity that a difference of two absolute values of this quantity yields (Temperature -> Temperature Delta).",
+          "$ref": "#/definitions/label"
+        },
+        "units": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/unit"
+          }
+        },
+        "note": {
+          "$ref": "#/definitions/note"
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": ["isDelta"],
+        "properties": {
+          "isDelta": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": ["deltaFamily"]
+        }
+      }
+    },
+    "unit": {
+      "description": "Unit (02 section 2.1). scalar defaults to 1 and offset to 0.",
+      "type": "object",
+      "required": ["symbol"],
+      "properties": {
+        "symbol": {
+          "$ref": "#/definitions/symbol"
+        },
+        "display": {
+          "description": "Unicode display form (\"°C\", \"µs\", \"m³/s\"); absent = symbol.",
+          "type": "string",
+          "minLength": 1
+        },
+        "scalar": {
+          "description": "Non-zero; negative for a sign-flipping compatibility unit.",
+          "type": "number",
+          "not": {
+            "const": 0
+          }
+        },
+        "toBase": {
+          "description": "The size of one unit in base units, for factors defined that way (NIST SP 811: 1 in = 0.0254 m); scalar = 1 / toBase. Non-zero; mutually exclusive with scalar.",
+          "type": "number",
+          "not": {
+            "const": 0
+          }
+        },
+        "offset": {
+          "type": "number"
+        },
+        "aliases": {
+          "description": "Case-insensitive import spellings, matched after white-space collapsing and case folding (02 section 2.2 rule 3).",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^\\S(.*\\S)?$"
+          }
+        },
+        "compat": {
+          "description": "Compatibility tag (D-141): a lower-case token naming the analysis software whose units and maths this spelling exists to resolve; the unit is defined from its physical meaning.",
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "caseSensitive": {
+          "description": "Spellings of this unit (its symbol or aliases) that match only exactly, because another unit uses the same letters in a different case (\"g\" the gram, \"G\" the acceleration unit).",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "note": {
+          "$ref": "#/definitions/note"
+        }
+      },
+      "additionalProperties": false,
+      "not": {
+        "required": ["scalar", "toBase"]
+      }
+    },
+    "symbol": {
+      "description": "Canonical ASCII unit key (\"km/h\", \"kPa a\", \"deg C\"): printable ASCII, single inner spaces, no leading or trailing space. The empty symbol is the unitless unit (unit 0, kNoUnit), the base of the first quantity of the shipped table.",
+      "type": "string",
+      "pattern": "^([!-~]( ?[!-~])*)?$"
+    },
+    "note": {
+      "description": "Free text for maintainers (provenance, rationale); ignored by the loader.",
+      "type": "string"
+    },
+    "label": {
+      "type": "string",
+      "pattern": "^\\S(.*\\S)?$"
+    },
+    "dimension": {
+      "description": "Exponents of [L, M, T, I, Theta, N, J]; angle and ratio are dimensionless. -128 is reserved for the unknown dimension (D-085).",
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": {
+        "type": "integer",
+        "minimum": -127,
+        "maximum": 127
+      }
+    },
+    "legacyBag": {
+      "description": "Fields removed by a migration, kept verbatim (02 section 6.6 rule 3).",
+      "type": "object"
+    }
+  }
+}

@@ -1,0 +1,232 @@
+{
+  "$schema": "urn:esses:probe-1",
+  "schemaVersion": 1,
+  "companions": [],
+  "details": [
+    {
+      "id": "Device Type",
+      "value": "M1"
+    },
+    {
+      "id": "Device Serial",
+      "value": "1"
+    },
+    {
+      "id": "Device Version",
+      "value": "100"
+    },
+    {
+      "id": "Log Date",
+      "value": "11/10/2026"
+    },
+    {
+      "id": "Log Time",
+      "value": "14:02:44"
+    }
+  ],
+  "dialect": "m1,pc-layout",
+  "enumTables": [
+    {
+      "entries": [
+        {
+          "label": "Unknown",
+          "severity": 0,
+          "value": -1
+        },
+        {
+          "label": "Stopped",
+          "severity": 0,
+          "value": 0
+        },
+        {
+          "label": "Cranking",
+          "severity": 1,
+          "value": 1
+        },
+        {
+          "label": "Running",
+          "severity": 0,
+          "value": 2
+        },
+        {
+          "label": "Overheat",
+          "severity": 3,
+          "value": 3
+        }
+      ],
+      "id": 3
+    }
+  ],
+  "importerId": "motec.ld",
+  "importerVersion": "0.1.0",
+  "layers": [
+    {
+      "channels": [
+        {
+          "dps": 0,
+          "dtype": "I32",
+          "enumTable": 3,
+          "flags": 0,
+          "index": 0,
+          "kind": "Enum",
+          "loggedName": "Engine State",
+          "sampleCount": 8,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 20
+            }
+          },
+          "vendorDtype": "i16",
+          "vendorId": "20101",
+          "vendorUnit": ""
+        },
+        {
+          "dps": 0,
+          "dtype": "I32",
+          "flags": 0,
+          "index": 1,
+          "kind": "Integer",
+          "loggedName": "GPS Sats Used",
+          "sampleCount": 4,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 1
+            }
+          },
+          "vendorDtype": "i32",
+          "vendorId": "20102",
+          "vendorUnit": ""
+        },
+        {
+          "dps": 7,
+          "dtype": "F64",
+          "flags": 8,
+          "index": 2,
+          "kind": "Real",
+          "loggedName": "GPS Latitude",
+          "sampleCount": 3,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 10
+            }
+          },
+          "vendorDtype": "f64",
+          "vendorId": "20103",
+          "vendorUnit": "deg"
+        },
+        {
+          "dps": 1,
+          "dtype": "F32",
+          "flags": 8,
+          "index": 3,
+          "kind": "Real",
+          "loggedName": "Gbox Oil Temp",
+          "sampleCount": 3,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 10
+            }
+          },
+          "vendorDtype": "i16",
+          "vendorId": "20104",
+          "vendorUnit": "F"
+        }
+      ],
+      "durationUs": 4000000,
+      "markers": [
+        {
+          "class": "DeviceEvent",
+          "comment": "",
+          "flags": 0,
+          "group": "DeviceEvents",
+          "name": "Firmware start",
+          "ordinal": 0,
+          "tUs": 0
+        },
+        {
+          "class": "DeviceEvent",
+          "comment": "",
+          "flags": 3,
+          "group": "DeviceEvents",
+          "name": "Logging on",
+          "ordinal": 1,
+          "tUs": 0
+        },
+        {
+          "class": "DeviceEvent",
+          "comment": "",
+          "flags": 4,
+          "group": "DeviceEvents",
+          "name": "Logging off",
+          "ordinal": 0,
+          "tUs": 800000
+        }
+      ],
+      "name": "Normal",
+      "utc": {
+        "assumedLocal": true,
+        "unixUs": 1791727364000000
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "code": "ld.shift_mul_order",
+      "ctx": {
+        "channel": "Gbox Oil Temp",
+        "detail": "afterMul",
+        "offset": 14078
+      },
+      "level": "Info",
+      "message": "channel 'Gbox Oil Temp' has shift 32 and mul 9; decoded afterMul"
+    },
+    {
+      "code": "ld.shift_nonzero",
+      "ctx": {
+        "channel": "Gbox Oil Temp",
+        "offset": 14078
+      },
+      "level": "Info",
+      "message": "channels with shift != 0 present (first named)"
+    },
+    {
+      "code": "ld.string_encoding",
+      "ctx": {
+        "detail": "ascii",
+        "offset": 0
+      },
+      "level": "Info",
+      "message": "strings decoded as ascii"
+    },
+    {
+      "code": "ld.terminator_entry",
+      "ctx": {
+        "offset": 14202
+      },
+      "level": "Info",
+      "message": "all-zero last record is the list terminator"
+    },
+    {
+      "code": "ld.unit_from_short_name",
+      "ctx": {
+        "channel": "GPS Latitude",
+        "offset": 13954,
+        "repeats": 2
+      },
+      "level": "Info",
+      "message": "unit taken from the 8-byte field at 0x40 (2 occurrences; first named)"
+    }
+  ]
+}

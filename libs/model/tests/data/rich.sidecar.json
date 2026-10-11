@@ -1,0 +1,140 @@
+{
+  "$schema": "urn:esses:sidecar-1",
+  "schemaVersion": 1,
+  "edited": "2026-10-09T21:14:00+10:00",
+  "layers": {
+    "Fastest": {
+      "rangeOverrides": [
+        {
+          "group": "Outings:Laps:Track Sections:Default",
+          "name": "Turn 3",
+          "offsetM": -1.5
+        }
+      ]
+    },
+    "Normal": {
+      "annotations": [
+        {
+          "channel": "Brake Pres F",
+          "id": "0d9e8f7a-6b5c-4d3e-8f1a-0b9c8d7e6f5a",
+          "tUs": 456000000,
+          "text": "Wheel lock T4"
+        },
+        {
+          "id": "c1a2b3c4-d5e6-4f70-8a9b-0c1d2e3f4a5b",
+          "tUs": -5000,
+          "text": "early"
+        }
+      ],
+      "details": [
+        {
+          "id": "Driver",
+          "original": {
+            "t": "string",
+            "v": "MMINTON"
+          },
+          "value": {
+            "t": "string",
+            "v": "M. Minton"
+          }
+        },
+        {
+          "id": "Diff Ratio",
+          "value": {
+            "dps": 2,
+            "t": "number",
+            "unit": "ratio",
+            "v": 3.9
+          }
+        },
+        {
+          "id": "Log Date",
+          "value": {
+            "t": "datetime",
+            "v": "2026-10-09T14:32:11+10:00"
+          }
+        }
+      ],
+      "localMaths": {
+        "$schema": "urn:esses:maths-1",
+        "schemaVersion": 1,
+        "id": "local",
+        "items": [
+          {
+            "kind": "scale_offset",
+            "name": "Brake Pres F",
+            "scale": 1.02
+          }
+        ]
+      },
+      "markerEdits": [
+        {
+          "dtUs": -120000,
+          "op": "offset",
+          "ref": "5a73095a-1c57-5242-891a-156d576fb792"
+        },
+        {
+          "op": "ignore",
+          "ref": "fa6febda-9cb3-5cd6-8049-8cc097e927be"
+        },
+        {
+          "dM": {
+            "unit": "m",
+            "v": 12.5
+          },
+          "op": "offsetDistance"
+        }
+      ],
+      "markers": [
+        {
+          "class": "BCN",
+          "comment": "missed beacon T1",
+          "group": "Beacons",
+          "id": "3f6a2c1e-8d4b-4f0a-9c1d-2b7e5a9f0c11",
+          "name": "Manual.1",
+          "prov": "User",
+          "tUs": 412356789
+        }
+      ],
+      "rangeOverrides": [
+        {
+          "group": "Outings:Laps",
+          "name": "Lap 3",
+          "startMarker": "5a73095a-1c57-5242-891a-156d576fb792",
+          "trusted": false
+        },
+        {
+          "group": "Outings:Laps",
+          "name": "Lap 7",
+          "offsetM": 0,
+          "offsetUs": 350000,
+          "startMarker": "fa6febda-9cb3-5cd6-8049-8cc097e927be"
+        }
+      ],
+      "runs": [],
+      "stages": [],
+      "videoLinks": [
+        {
+          "cameraView": "Driver",
+          "file": "cam1.mp4",
+          "offsetUs": -1250000,
+          "syncPoints": [[0, 1250000], [10, 20]]
+        }
+      ]
+    }
+  },
+  "source": {
+    "companions": ["bathurst_r1.ldx"],
+    "contentHash": "xxh3:00000000000000020000000000000001",
+    "hash": "xxh3:9f3c1b2a0d4e5f600d4e5f60718293a4",
+    "importer": {
+      "id": "motec.ld",
+      "version": "0.1.0"
+    },
+    "path": "bathurst_r1.ld",
+    "size": 48213344
+  },
+  "x-esses-legacy": {
+    "oldField": 1
+  }
+}

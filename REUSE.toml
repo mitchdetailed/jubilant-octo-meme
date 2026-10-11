@@ -1,0 +1,75 @@
+# SPDX-FileCopyrightText: 2026 the Esses contributors
+# SPDX-License-Identifier: MIT
+#
+# REUSE metadata (08_REPO_AND_BUILD.md section 10). Source files carry their own SPDX header; this file gives
+# the default for everything else and the licences of the vendored libraries. `reuse lint` runs in CI.
+version = 1
+SPDX-PackageName = "esses"
+SPDX-PackageSupplier = "the Esses contributors"
+SPDX-PackageDownloadLocation = "NOASSERTION"
+
+# Default for project files without a header of their own (Markdown, JSON, presets, licence-free config).
+[[annotations]]
+path = "**"
+precedence = "closest"
+SPDX-FileCopyrightText = "2026 the Esses contributors"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "DCO"
+precedence = "override"
+SPDX-FileCopyrightText = "2004, 2006 The Linux Foundation and its contributors"
+SPDX-License-Identifier = "LicenseRef-DCO"
+
+# Vendored third-party code: upstream files unchanged, upstream licence (08 section 3.7.2). Provenance and file
+# hashes: third_party/README.md (project documentation, covered by the default above).
+[[annotations]]
+path = "third_party/pugixml/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2006-2024 Arseny Kapoulkine"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "third_party/xxhash/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2012-2023 Yann Collet"
+SPDX-License-Identifier = "BSD-2-Clause"
+
+[[annotations]]
+path = "third_party/nlohmann_json/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2013-2022 Niels Lohmann"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "third_party/json-schema-validator/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2016 Patrick Boettcher"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "third_party/cli11/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2017-2024 University of Cincinnati, developed by Henry Schreiner"
+SPDX-License-Identifier = "BSD-3-Clause"
+
+# Triple-licensed; the three texts are LICENSES/MIT.txt, LICENSES/Apache-2.0.txt and LICENSES/BSL-1.0.txt.
+[[annotations]]
+path = "third_party/fast_float/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2021 The fast_float authors"
+SPDX-License-Identifier = "MIT OR Apache-2.0 OR BSL-1.0"
+
+[[annotations]]
+path = "third_party/catch2v3/**"
+precedence = "override"
+SPDX-FileCopyrightText = "Catch2 Authors"
+SPDX-License-Identifier = "BSL-1.0"
+
+# Synthetic fixtures written by our own generator (esses-gen-fixtures) and their expectations are CC0-1.0
+# (08 section 10); LICENSES/CC0-1.0.txt holds the licence text.
+[[annotations]]
+path = ["fixtures/motec.ld/synthetic-*/**"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 the Esses contributors"
+SPDX-License-Identifier = "CC0-1.0"

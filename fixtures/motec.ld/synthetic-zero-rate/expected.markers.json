@@ -1,0 +1,26 @@
+{
+  "$schema": "urn:esses:markers-1",
+  "schemaVersion": 1,
+  "layers": {
+    "Normal": [
+      {
+        "class": "SOL",
+        "comment": "",
+        "group": "",
+        "id": "4a220465-0e86-5534-8b34-1cae5de4ee3b",
+        "name": "",
+        "prov": "Derived",
+        "tUs": 0
+      },
+      {
+        "class": "EOL",
+        "comment": "",
+        "group": "",
+        "id": "f7fc13db-37ad-582f-85bd-16f7f70528e3",
+        "name": "",
+        "prov": "Derived",
+        "tUs": 2000000
+      }
+    ]
+  }
+}

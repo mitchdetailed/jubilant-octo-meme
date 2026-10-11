@@ -1,0 +1,110 @@
+# SPDX-FileCopyrightText: 2026 the Esses contributors
+# SPDX-License-Identifier: MIT
+#
+# Top-level build (08_REPO_AND_BUILD.md section 3). Layers 0-3 are Qt-free and build with
+# ESSES_BUILD_QT=OFF; the Qt layers are added only when ESSES_BUILD_QT is ON (M1 onwards).
+
+cmake_minimum_required(VERSION 3.28...4.4)   # presets v8 need 3.28; the developer has 4.4
+project(esses VERSION 0.1.0 DESCRIPTION "Motorsport data analysis" LANGUAGES C CXX)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+include(naming)          # the only place the codename appears as a prefix (D-003)
+
+# ---- options (08 section 3.2) -------------------------------------------------------------------
+option(ESSES_BUILD_QT "Build the Qt layers 4-5 and the GUI (no Qt code exists in M0)" OFF)
+option(ESSES_BUILD_TESTS "Build the Catch2 test executables and enable ctest" ON)
+option(ESSES_BUILD_BENCH "Build Google Benchmark targets (phase B: not vendored yet)" OFF)
+option(ESSES_BUILD_FUZZ "Build libFuzzer targets (Clang only)" OFF)
+option(ESSES_BUILD_PLUGINS "Build plugins/ and sdk/ (v1.0)" OFF)
+option(ESSES_WARNINGS_AS_ERRORS "Treat warnings as errors (ON in the ci-* presets only)" OFF)
+option(ESSES_ENABLE_CLANG_TIDY "Run clang-tidy on Qt-free targets" OFF)
+option(ESSES_LTO "Interprocedural optimisation" OFF)
+option(ESSES_FORCE_ASSERTS "Keep ESSES_ASSERT active in optimised builds (CI release-with-asserts)" OFF)
+set(ESSES_SANITIZE "" CACHE STRING "Sanitizers for Clang/GCC: address,undefined or thread")
+# Per-component switches (default ON): a configure can leave out a library or application that is still being
+# written, so work on its siblings is not blocked. Honoured by the guarded add_subdirectory() calls below and in
+# libs/CMakeLists.txt; a component that DEPS on a switched-off one fails the layer check naming the switch.
+option(ESSES_WITH_UNITS "Build libs/units (esses_units)" ON)
+option(ESSES_WITH_MODEL "Build libs/model (esses_model)" ON)
+option(ESSES_WITH_FORMATS "Build libs/formats (esses_formats)" ON)
+option(ESSES_WITH_CLI "Build the command-line application esses-cli (apps/cli)" ON)
+
+# ---- global settings (08 section 3.1) -----------------------------------------------------------
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)      # no C++20 modules; skips the per-file dependency scan
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")   # /MD, matches Qt kits
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")   # every exe, test exe and DLL in one directory
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
+if(MSVC)
+  add_compile_options(/utf-8 /bigobj
+                      "$<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus;/Zc:preprocessor;/permissive-;/EHsc>")
+endif()
+if(ESSES_FORCE_ASSERTS)
+  add_compile_definitions(ESSES_FORCE_ASSERTS=1)
+endif()
+if(ESSES_LTO)
+  include(CheckIPOSupported)
+  check_ipo_supported(RESULT _esses_ipo_ok OUTPUT _esses_ipo_msg LANGUAGES CXX)
+  if(_esses_ipo_ok)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+  else()
+    message(WARNING "ESSES_LTO requested but not supported: ${_esses_ipo_msg}")
+  endif()
+endif()
+
+include(sanitizers)
+include(fuzzing)         # ESSES_BUILD_FUZZ: coverage instrumentation for the libFuzzer targets
+include(version)
+include(third_party)
+include(esses_targets)    # esses_add_library / esses_add_executable / esses_add_test, layer check, warnings
+include(qt-free-check)    # deferred configure-time check over every QT_FREE target (08 section 3.9)
+
+if(ESSES_BUILD_QT)
+  # Qt is found only here; with ESSES_BUILD_QT=OFF there is no find_package(Qt6) at all (D-007).
+  find_package(Qt6 6.7 REQUIRED COMPONENTS Core Gui Widgets Svg PrintSupport Test)
+endif()
+
+if(ESSES_BUILD_TESTS)
+  enable_testing()
+  add_subdirectory(tests)   # vendored-library smoke tests, test-discovery self-tests, configure-level checks
+endif()
+
+add_subdirectory(libs)
+
+# Applications: 08 section 1 places the CLI in apps/cli; libs/cli is accepted too while the tree settles.
+esses_component_enabled(cli _esses_cli_enabled)
+foreach(_esses_app_dir apps/cli libs/cli)
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_esses_app_dir}/CMakeLists.txt")
+    if(_esses_cli_enabled)
+      add_subdirectory(${_esses_app_dir})
+    else()
+      message(STATUS "${_esses_app_dir}: switched off (ESSES_WITH_CLI=OFF)")
+    endif()
+    break()
+  endif()
+endforeach()
+# C++ developer tools (tools/gen_ld_fixtures.cpp -> esses-gen-fixtures) and the fixture corpus tests; they share
+# the CLI's command library, so they follow it.
+if(TARGET ${ESSES_PREFIX}_cli_core AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/CMakeLists.txt")
+  add_subdirectory(tools)
+endif()
+if(ESSES_BUILD_QT)
+  foreach(_esses_app_dir apps/render apps/app)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_esses_app_dir}/CMakeLists.txt")
+      add_subdirectory(${_esses_app_dir})
+    endif()
+  endforeach()
+endif()
+if(ESSES_BUILD_FUZZ AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/fuzz/CMakeLists.txt")
+  add_subdirectory(tests/fuzz)
+endif()
+
+message(STATUS "${ESSES_APP_NAME} ${ESSES_VERSION_STRING} (git ${ESSES_GIT_SHA}); Qt layers: ${ESSES_BUILD_QT}; "
+               "tests: ${ESSES_BUILD_TESTS}; warnings as errors: ${ESSES_WARNINGS_AS_ERRORS}")

@@ -1,0 +1,233 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:laps-1",
+  "title": "Esses markers and range-group tree of one source (laps-1)",
+  "description": "The output of esses-cli laps --json and the fixture expectation expected.laps.json (05 section 9.1, D-127): per data layer, the enabled markers in model order and the range-group tree the phase-1 rules built (M0: the whole-outing rule only, group Outings), with each range's id, kind, lap class, number, name, trust and [startUs, endUs). expected.laps.json is written without the sidecar (esses-cli laps --no-sidecar). Markers use the key vocabulary of markers-1. Closed: Esses writes it and fixture verify compares it.",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "layers"],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072). The urn:esses: form is written; the bare esses: form of earlier drafts and the later https form are accepted on load and normalised on save (02 section 6.6 rule 1).",
+      "type": "string",
+      "pattern": "^(urn:esses:laps-1|esses:laps-1|https://[^/\\s]+(/[^/\\s]+)*/laps-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "layers": {
+      "description": "Keyed by data-layer name (\"Normal\", \"Fastest\", ...).",
+      "type": "object",
+      "propertyNames": {
+        "minLength": 1
+      },
+      "patternProperties": {
+        "^.+$": {
+          "$ref": "#/definitions/layerRanges"
+        }
+      },
+      "additionalProperties": false
+    },
+    "x-esses-legacy": {
+      "$ref": "#/definitions/legacyBag"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "layerRanges": {
+      "description": "One data layer: its duration, its enabled markers in model order (sorted by tUs, class, id) and its range-group roots.",
+      "type": "object",
+      "required": ["durationUs", "markers", "groups"],
+      "properties": {
+        "durationUs": {
+          "$ref": "#/definitions/micros"
+        },
+        "markers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/marker"
+          }
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/rangeGroup"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "rangeGroup": {
+      "description": "RangeGroup (02 section 4.4): a group path such as \"Outings\" or \"Outings:Laps\", its time-ordered ranges and its child groups. Per-path versions (D-140) are runtime state and are not written.",
+      "type": "object",
+      "required": ["path", "name", "ranges", "children"],
+      "properties": {
+        "path": {
+          "$ref": "#/definitions/groupPath"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ranges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/range"
+          }
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/rangeGroup"
+          }
+        },
+        "supportsTrackGeneration": {
+          "type": "boolean"
+        },
+        "supportsReporting": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "range": {
+      "description": "Range (02 section 4.4, D-014) over [startUs, endUs). startMarker and endMarker are omitted when the bound has no marker; stint is omitted when unknown (0), pitStop when false, offsetUs and offsetM when 0.",
+      "type": "object",
+      "required": ["id", "kind", "lapClass", "number", "name", "abbrev", "startUs", "endUs", "trusted", "enabled"],
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/uuid"
+        },
+        "kind": {
+          "enum": ["Outing", "Lap", "Run", "Stage", "Section", "Split", "Data"]
+        },
+        "lapClass": {
+          "enum": ["Flying", "Out", "In", "Partial", "Pit", "None"]
+        },
+        "number": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "abbrev": {
+          "type": "string"
+        },
+        "startUs": {
+          "$ref": "#/definitions/micros"
+        },
+        "endUs": {
+          "$ref": "#/definitions/micros"
+        },
+        "startMarker": {
+          "$ref": "#/definitions/uuid"
+        },
+        "endMarker": {
+          "$ref": "#/definitions/uuid"
+        },
+        "trusted": {
+          "type": "boolean"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "stint": {
+          "description": "Phase-2 annotation: 1-based stint.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "pitStop": {
+          "const": true
+        },
+        "offsetUs": {
+          "$ref": "#/definitions/micros"
+        },
+        "offsetM": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "groupPath": {
+      "description": "Range-group path, colon-separated (\"Outings:Laps\", \"Outings:Laps:Track Sections:Default\").",
+      "type": "string",
+      "pattern": "^[^:]+(:[^:]+)*$"
+    },
+    "marker": {
+      "description": "One marker in the key vocabulary shared by sidecar-1, markers-1 and probe-1 (02 section 5.3 rule 8). An absent flags means 0. Device events are markers of class DeviceEvent in group DeviceEvents (02 section 4.3).",
+      "type": "object",
+      "required": ["id", "class", "group", "tUs", "name", "comment", "prov"],
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/uuid"
+        },
+        "class": {
+          "$ref": "#/definitions/markerClass"
+        },
+        "group": {
+          "description": "\"\" for intrinsic markers (SOL, EOL, RESET), \"Beacons\", \"StageMarkers\", \"DeviceEvents\" or a companion group name.",
+          "type": "string"
+        },
+        "tUs": {
+          "$ref": "#/definitions/micros"
+        },
+        "name": {
+          "type": "string"
+        },
+        "comment": {
+          "type": "string"
+        },
+        "flags": {
+          "$ref": "#/definitions/flags32"
+        },
+        "prov": {
+          "$ref": "#/definitions/provenance"
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": ["class"],
+        "properties": {
+          "class": {
+            "const": "DeviceEvent"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "group": {
+            "const": "DeviceEvents"
+          }
+        }
+      }
+    },
+    "markerClass": {
+      "description": "MarkerClass (02 section 4.3). Companion marker classes outside this list are not markers: they stay opaque (05 section 4 rule 1).",
+      "enum": ["SOL", "EOL", "BCN", "SPLTBCN", "IGRDBCN", "RESET", "STGSTRT", "STGEND", "DeviceEvent"]
+    },
+    "provenance": {
+      "enum": ["Logged", "Companion", "User", "Derived"]
+    },
+    "uuid": {
+      "description": "Canonical lower-case 8-4-4-4-12 UUID (Uuid::str()).",
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "micros": {
+      "description": "Micros: signed 64-bit microseconds.",
+      "type": "integer"
+    },
+    "flags32": {
+      "description": "Unsigned 32-bit flag word, passed through uninterpreted.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "legacyBag": {
+      "description": "Fields removed by a migration, kept verbatim (02 section 6.6 rule 3).",
+      "type": "object"
+    }
+  }
+}

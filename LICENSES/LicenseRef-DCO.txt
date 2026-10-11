@@ -1,0 +1,5 @@
+The Developer Certificate of Origin (the file DCO at the repository root) is
+Copyright (C) 2004, 2006 The Linux Foundation and its contributors.
+
+Everyone is permitted to copy and distribute verbatim copies of this
+license document, but changing it is not allowed.

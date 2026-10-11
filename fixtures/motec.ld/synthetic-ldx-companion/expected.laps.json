@@ -1,0 +1,121 @@
+{
+  "$schema": "urn:esses:laps-1",
+  "schemaVersion": 1,
+  "layers": {
+    "Normal": {
+      "durationUs": 25000000,
+      "groups": [
+        {
+          "children": [],
+          "name": "Outings",
+          "path": "Outings",
+          "ranges": [
+            {
+              "abbrev": "1",
+              "enabled": true,
+              "endMarker": "7855b47b-3635-5402-a05b-a9082332b08a",
+              "endUs": 25000000,
+              "id": "16845ead-b6ef-5c0c-8fb6-003722a0c028",
+              "kind": "Outing",
+              "lapClass": "None",
+              "name": "input.ld",
+              "number": 1,
+              "startMarker": "4a220465-0e86-5534-8b34-1cae5de4ee3b",
+              "startUs": 0,
+              "trusted": true
+            }
+          ],
+          "supportsReporting": true,
+          "supportsTrackGeneration": false
+        }
+      ],
+      "markers": [
+        {
+          "class": "SOL",
+          "comment": "",
+          "group": "",
+          "id": "4a220465-0e86-5534-8b34-1cae5de4ee3b",
+          "name": "",
+          "prov": "Derived",
+          "tUs": 0
+        },
+        {
+          "class": "STGSTRT",
+          "comment": "",
+          "group": "Stages",
+          "id": "e2cb2438-26c8-5f3d-bbc8-d20564d44eee",
+          "name": "Stage 1",
+          "prov": "Companion",
+          "tUs": 2000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "id": "795a7dc4-b7c4-5db8-ab31-c66928cbd34f",
+          "name": "Manual.1",
+          "prov": "Companion",
+          "tUs": 5000000
+        },
+        {
+          "class": "SPLTBCN",
+          "comment": "",
+          "flags": 5,
+          "group": "Beacons",
+          "id": "b7607573-0c99-55dd-a888-e50dfbd9a299",
+          "name": "Split.1",
+          "prov": "Companion",
+          "tUs": 9000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "id": "4e53d113-b9c4-51ee-b582-f55583d43f01",
+          "name": "Manual.2",
+          "prov": "Companion",
+          "tUs": 15000000
+        },
+        {
+          "class": "IGRDBCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "id": "b2004a45-be54-544f-bbc5-3c6e28d30432",
+          "name": "Ignored",
+          "prov": "Companion",
+          "tUs": 17000000
+        },
+        {
+          "class": "STGEND",
+          "comment": "",
+          "group": "Stages",
+          "id": "40fbc93c-f62b-5400-9cb1-a2b9607079fe",
+          "name": "Stage 1",
+          "prov": "Companion",
+          "tUs": 20000000
+        },
+        {
+          "class": "RESET",
+          "comment": "",
+          "group": "Stages",
+          "id": "0c0b2164-da0d-581b-a438-8cb2b90e4890",
+          "name": "Reset",
+          "prov": "Companion",
+          "tUs": 21000000
+        },
+        {
+          "class": "EOL",
+          "comment": "",
+          "group": "",
+          "id": "7855b47b-3635-5402-a05b-a9082332b08a",
+          "name": "",
+          "prov": "Derived",
+          "tUs": 25000000
+        }
+      ]
+    }
+  }
+}

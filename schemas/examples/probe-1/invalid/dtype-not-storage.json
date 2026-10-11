@@ -1,0 +1,77 @@
+{
+  "$schema": "urn:esses:probe-1",
+  "schemaVersion": 1,
+  "importerId": "motec.ld",
+  "importerVersion": "0.1.0",
+  "dialect": "m1",
+  "companions": [
+    "run.ldx"
+  ],
+  "details": [
+    {
+      "id": "Venue",
+      "value": "Test Track"
+    }
+  ],
+  "layers": [
+    {
+      "name": "Normal",
+      "durationUs": 1000000,
+      "channels": [
+        {
+          "index": 0,
+          "loggedName": "Engine Speed",
+          "shortName": "",
+          "vendorUnit": "rpm",
+          "vendorId": "100",
+          "vendorDtype": "i16",
+          "dtype": "I16",
+          "kind": "Real",
+          "timing": {
+            "rate": {
+              "num": 100,
+              "den": 1
+            }
+          },
+          "sampleCount": 100,
+          "t0Us": 0,
+          "dps": 0,
+          "flags": 0
+        }
+      ],
+      "markers": [
+        {
+          "class": "BCN",
+          "tUs": 500000,
+          "name": "B1",
+          "group": "Beacons",
+          "comment": "",
+          "flags": 77,
+          "ordinal": 0
+        }
+      ]
+    }
+  ],
+  "enumTables": [
+    {
+      "id": 1,
+      "entries": [
+        {
+          "value": 0,
+          "label": "Off",
+          "severity": 0
+        }
+      ]
+    }
+  ],
+  "warnings": [
+    {
+      "level": "Info",
+      "code": "ld.string_encoding",
+      "message": "ASCII",
+      "ctx": {
+        "detail": "ascii"
+      }
+    }
+  ]
+}

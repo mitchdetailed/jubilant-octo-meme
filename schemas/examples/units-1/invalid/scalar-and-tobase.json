@@ -1,0 +1,33 @@
+{
+  "$schema": "urn:esses:units-1",
+  "schemaVersion": 1,
+  "quantities": [
+    {
+      "name": "Speed",
+      "family": "Speed",
+      "dim": [
+        1,
+        0,
+        -1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "base": "m/s",
+      "units": [
+        {
+          "symbol": "m/s"
+        },
+        {
+          "symbol": "km/h",
+          "scalar": 3.6,
+          "aliases": [
+            "kph"
+          ],
+          "toBase": 0.2777777777777778
+        }
+      ]
+    }
+  ]
+}

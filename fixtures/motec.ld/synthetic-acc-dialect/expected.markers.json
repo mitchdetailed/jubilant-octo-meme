@@ -1,0 +1,156 @@
+{
+  "$schema": "urn:esses:markers-1",
+  "schemaVersion": 1,
+  "layers": {
+    "Normal": [
+      {
+        "class": "SOL",
+        "comment": "",
+        "group": "",
+        "id": "4a220465-0e86-5534-8b34-1cae5de4ee3b",
+        "name": "",
+        "prov": "Derived",
+        "tUs": 0
+      },
+      {
+        "class": "BCN",
+        "comment": "",
+        "flags": 77,
+        "group": "Beacons",
+        "id": "aed7c421-e634-57ff-bcb0-a44f154e66ec",
+        "name": "Manual.1",
+        "prov": "Companion",
+        "tUs": 130000000
+      },
+      {
+        "class": "BCN",
+        "comment": "",
+        "flags": 77,
+        "group": "Beacons",
+        "id": "cb3463c9-2f05-595c-b90b-c1d4aad84e74",
+        "name": "Manual.2",
+        "prov": "Companion",
+        "tUs": 400000000
+      },
+      {
+        "class": "BCN",
+        "comment": "",
+        "flags": 77,
+        "group": "Beacons",
+        "id": "3e7c92f0-a656-556a-b4eb-23406b07d9de",
+        "name": "Manual.3",
+        "prov": "Companion",
+        "tUs": 670000000
+      },
+      {
+        "class": "BCN",
+        "comment": "",
+        "flags": 77,
+        "group": "Beacons",
+        "id": "8bd9473e-0ec7-5939-8294-a54105db6b28",
+        "name": "Manual.4",
+        "prov": "Companion",
+        "tUs": 940000000
+      },
+      {
+        "class": "BCN",
+        "comment": "",
+        "flags": 77,
+        "group": "Beacons",
+        "id": "86c5106e-e8dc-5042-a20f-536a456ed73e",
+        "name": "Manual.5",
+        "prov": "Companion",
+        "tUs": 1210000000
+      },
+      {
+        "class": "BCN",
+        "comment": "",
+        "flags": 77,
+        "group": "Beacons",
+        "id": "6e50b7d8-2357-5388-b015-df04541f579e",
+        "name": "Manual.6",
+        "prov": "Companion",
+        "tUs": 1480000000
+      },
+      {
+        "class": "BCN",
+        "comment": "",
+        "flags": 77,
+        "group": "Beacons",
+        "id": "ecec3b14-1cc4-5f85-95a9-011c9693eb06",
+        "name": "Manual.7",
+        "prov": "Companion",
+        "tUs": 1750000000
+      },
+      {
+        "class": "BCN",
+        "comment": "",
+        "flags": 77,
+        "group": "Beacons",
+        "id": "9b4bfa94-b197-55a4-a530-e3e2a2187bd1",
+        "name": "Manual.8",
+        "prov": "Companion",
+        "tUs": 2020000000
+      },
+      {
+        "class": "BCN",
+        "comment": "",
+        "flags": 77,
+        "group": "Beacons",
+        "id": "698f88bc-8d4b-537f-9591-91defaa0d35f",
+        "name": "Manual.9",
+        "prov": "Companion",
+        "tUs": 2290000000
+      },
+      {
+        "class": "BCN",
+        "comment": "",
+        "flags": 77,
+        "group": "Beacons",
+        "id": "136bcab8-fd75-5627-b41c-0edfbb5f231e",
+        "name": "Manual.10",
+        "prov": "Companion",
+        "tUs": 2560000000
+      },
+      {
+        "class": "BCN",
+        "comment": "",
+        "flags": 77,
+        "group": "Beacons",
+        "id": "08999558-63b1-5106-8c61-ac5989a9d5cd",
+        "name": "Manual.11",
+        "prov": "Companion",
+        "tUs": 2830000000
+      },
+      {
+        "class": "BCN",
+        "comment": "",
+        "flags": 77,
+        "group": "Beacons",
+        "id": "aa09f7c8-ea98-57fe-b129-27d2b931c4f2",
+        "name": "Manual.12",
+        "prov": "Companion",
+        "tUs": 3100000000
+      },
+      {
+        "class": "BCN",
+        "comment": "",
+        "flags": 77,
+        "group": "Beacons",
+        "id": "cee29552-6266-53cb-885d-bdc48c6ab01f",
+        "name": "Manual.13",
+        "prov": "Companion",
+        "tUs": 3370000000
+      },
+      {
+        "class": "EOL",
+        "comment": "",
+        "group": "",
+        "id": "7f7b28bf-9bff-5fcb-a3c8-267226c8462b",
+        "name": "",
+        "prov": "Derived",
+        "tUs": 3600000000
+      }
+    ]
+  }
+}

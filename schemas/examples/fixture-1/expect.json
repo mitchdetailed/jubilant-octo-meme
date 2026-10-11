@@ -1,0 +1,70 @@
+{
+  "channels-compared-empty.json": {
+    "pointer": "/channelsCompared",
+    "why": "a channel subset lists at least one channel"
+  },
+  "dialect-uppercase.json": {
+    "pointer": "/dialect",
+    "why": "dialect flags are lower case"
+  },
+  "export-oracle-public.json": {
+    "pointer": "/private",
+    "why": "a vendor-software export oracle needs a private fixture"
+  },
+  "input-not-input-stem.json": {
+    "pointer": "/input/file",
+    "why": "the input is input.<ext>"
+  },
+  "integer-tolerance-ulp.json": {
+    "pointer": "/oracle/tolerance/I32",
+    "why": "integers compare exactly"
+  },
+  "missing-oracle.json": {
+    "pointer": "",
+    "why": "oracle is required"
+  },
+  "missing-tolerance-key.json": {
+    "pointer": "/oracle/tolerance",
+    "why": "all four tolerances are stated"
+  },
+  "misspelt-member.json": {
+    "pointer": "",
+    "why": "fixture-1 is closed"
+  },
+  "placeholder-sha256.json": {
+    "pointer": "/input/sha256",
+    "why": "sha256 is 64 lower-case hex digits (the design examples' placeholder is not)"
+  },
+  "private-without-permission.json": {
+    "pointer": "",
+    "why": "a private fixture records its permission"
+  },
+  "provenance-unknown.json": {
+    "pointer": "/provenance",
+    "why": "provenance is one of the five classes"
+  },
+  "public-unknown-licence.json": {
+    "pointer": "/licence",
+    "why": "a public fixture needs a redistributable licence"
+  },
+  "remote-over-http.json": {
+    "pointer": "/input/remote/url",
+    "why": "remote inputs are fetched over https"
+  },
+  "shift-order-misspelt.json": {
+    "pointer": "/importOptions/ld/shiftOrder",
+    "why": "ld.shiftOrder is afterMul or beforeMul"
+  },
+  "tolerance-with-space.json": {
+    "pointer": "/oracle/tolerance/F32",
+    "why": "tolerances are exact or <n>ulp"
+  },
+  "unknown-oracle-kind.json": {
+    "pointer": "/oracle/kind",
+    "why": "oracle kinds are the five of 05 section 9.1"
+  },
+  "validity-unknown.json": {
+    "pointer": "/oracle/validity",
+    "why": "oracle validity is strict or finite-only"
+  }
+}

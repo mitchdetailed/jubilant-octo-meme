@@ -1,0 +1,51 @@
+{
+  "$schema": "urn:esses:probe-1",
+  "schemaVersion": 1,
+  "importerId": "motec.ld",
+  "importerVersion": "0.1.0",
+  "dialect": "sim-exporter",
+  "companions": ["bathurst_r1.ldx"],
+  "details": [
+    { "id": "Venue", "value": "Bathurst" },
+    { "id": "Driver", "value": "A. Driver" },
+    { "id": "Vehicle Id", "value": "GT3-07" },
+    { "id": "Log Date", "value": "09/10/2026" },
+    { "id": "Log Time", "value": "14:32:11" },
+    { "id": "Device Type", "value": "ADL" }
+  ],
+  "layers": [
+    {
+      "name": "Normal",
+      "durationUs": 1834560000,
+      "channels": [
+        {
+          "index": 0,
+          "loggedName": "Engine RPM",
+          "shortName": "RPM",
+          "vendorUnit": "rpm",
+          "vendorId": "12001",
+          "vendorDtype": "i16",
+          "dtype": "F32",
+          "kind": "Real",
+          "timing": { "rate": { "num": 50, "den": 1 } },
+          "sampleCount": 91728,
+          "t0Us": 0,
+          "dps": 0,
+          "flags": 0
+        }
+      ],
+      "markers": [
+        { "class": "BCN", "tUs": 83412340, "name": "Manual.1", "group": "Beacons", "comment": "", "flags": 77, "ordinal": 0 }
+      ]
+    }
+  ],
+  "enumTables": [],
+  "warnings": [
+    {
+      "level": "Warning",
+      "code": "ld.count_mismatch",
+      "message": "header declares 42 channels, list has 44",
+      "ctx": { "detail": "44" }
+    }
+  ]
+}

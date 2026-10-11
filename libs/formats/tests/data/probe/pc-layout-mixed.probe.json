@@ -1,0 +1,538 @@
+{
+  "$schema": "urn:esses:probe-1",
+  "schemaVersion": 1,
+  "companions": [],
+  "details": [
+    {
+      "id": "Device Type",
+      "value": "TESTLOG"
+    },
+    {
+      "id": "Device Serial",
+      "value": "12345"
+    },
+    {
+      "id": "Device Version",
+      "value": "7"
+    },
+    {
+      "id": "Log Date",
+      "value": "10/10/2026"
+    },
+    {
+      "id": "Log Time",
+      "value": "09:15:30"
+    },
+    {
+      "id": "Driver",
+      "value": "Test Driver"
+    },
+    {
+      "id": "Vehicle Id",
+      "value": "GT3-07"
+    },
+    {
+      "id": "Engine Id",
+      "value": "E-02"
+    },
+    {
+      "id": "Venue",
+      "value": "Test Circuit"
+    },
+    {
+      "id": "Session",
+      "value": "Practice 1"
+    },
+    {
+      "id": "Short Comment",
+      "value": "short"
+    },
+    {
+      "id": "Team",
+      "value": "Team Blue"
+    },
+    {
+      "id": "Event",
+      "value": "Club Day"
+    },
+    {
+      "id": "Long Comment",
+      "value": "A long comment"
+    },
+    {
+      "id": "Venue Length",
+      "value": {
+        "dps": 0,
+        "t": "number",
+        "unit": "m",
+        "v": 6213
+      }
+    },
+    {
+      "id": "Venue Category",
+      "value": "Club"
+    },
+    {
+      "id": "Vehicle Desc",
+      "value": "Test car"
+    },
+    {
+      "id": "Vehicle Weight",
+      "value": {
+        "dps": 0,
+        "t": "number",
+        "unit": "kg",
+        "v": 1250
+      }
+    },
+    {
+      "id": "Fuel Tank Capacity",
+      "value": {
+        "dps": 4,
+        "t": "number",
+        "unit": "m3",
+        "v": 0.065
+      }
+    },
+    {
+      "id": "Vehicle Type",
+      "value": "Saloon"
+    },
+    {
+      "id": "Vehicle Drive Type",
+      "value": "RWD"
+    },
+    {
+      "id": "Diff Ratio",
+      "value": {
+        "dps": 3,
+        "t": "number",
+        "unit": "ratio",
+        "v": 3.545
+      }
+    },
+    {
+      "id": "Gear 1",
+      "value": {
+        "dps": 3,
+        "t": "number",
+        "unit": "ratio",
+        "v": 3.2
+      }
+    },
+    {
+      "id": "Gear 2",
+      "value": {
+        "dps": 3,
+        "t": "number",
+        "unit": "ratio",
+        "v": 2.4
+      }
+    },
+    {
+      "id": "Gear 3",
+      "value": {
+        "dps": 3,
+        "t": "number",
+        "unit": "ratio",
+        "v": 1.9
+      }
+    },
+    {
+      "id": "Gear 4",
+      "value": {
+        "dps": 3,
+        "t": "number",
+        "unit": "ratio",
+        "v": 1.55
+      }
+    },
+    {
+      "id": "Gear 5",
+      "value": {
+        "dps": 3,
+        "t": "number",
+        "unit": "ratio",
+        "v": 1.3
+      }
+    },
+    {
+      "id": "Gear 6",
+      "value": {
+        "dps": 3,
+        "t": "number",
+        "unit": "ratio",
+        "v": 1.1
+      }
+    },
+    {
+      "id": "Vehicle Track",
+      "value": {
+        "dps": 3,
+        "t": "number",
+        "unit": "m",
+        "v": 1.6
+      }
+    },
+    {
+      "id": "Vehicle Wheelbase",
+      "value": {
+        "dps": 3,
+        "t": "number",
+        "unit": "m",
+        "v": 2.7
+      }
+    },
+    {
+      "id": "Vehicle Comment",
+      "value": "car comment"
+    },
+    {
+      "id": "Vehicle Number",
+      "value": "7"
+    },
+    {
+      "id": "Sky",
+      "value": "Sunny"
+    },
+    {
+      "id": "Air Temp",
+      "value": {
+        "dps": 1,
+        "t": "number",
+        "unit": "C",
+        "v": 23.5
+      }
+    },
+    {
+      "id": "Track Temp",
+      "value": {
+        "dps": 0,
+        "t": "number",
+        "unit": "C",
+        "v": 31
+      }
+    },
+    {
+      "id": "Baro Pressure",
+      "value": {
+        "dps": 1,
+        "t": "number",
+        "unit": "mbar",
+        "v": 1013.2
+      }
+    },
+    {
+      "id": "Rel Humidity",
+      "value": {
+        "dps": 0,
+        "t": "number",
+        "unit": "%",
+        "v": 55
+      }
+    },
+    {
+      "id": "Wind Speed",
+      "value": {
+        "dps": 0,
+        "t": "number",
+        "unit": "km/h",
+        "v": 12
+      }
+    },
+    {
+      "id": "Wind Direction",
+      "value": "NE"
+    },
+    {
+      "id": "Weather Comment",
+      "value": "dry"
+    }
+  ],
+  "dialect": "pc-layout",
+  "enumTables": [
+    {
+      "entries": [
+        {
+          "label": "Unknown",
+          "severity": 0,
+          "value": -1
+        },
+        {
+          "label": "Stopped",
+          "severity": 0,
+          "value": 0
+        },
+        {
+          "label": "Cranking",
+          "severity": 1,
+          "value": 1
+        },
+        {
+          "label": "Running",
+          "severity": 0,
+          "value": 2
+        },
+        {
+          "label": "Overheat",
+          "severity": 3,
+          "value": 3
+        }
+      ],
+      "id": 3
+    }
+  ],
+  "importerId": "motec.ld",
+  "importerVersion": "0.1.0",
+  "layers": [
+    {
+      "channels": [
+        {
+          "dps": 0,
+          "dtype": "I32",
+          "flags": 8,
+          "index": 0,
+          "kind": "Integer",
+          "loggedName": "Engine Speed",
+          "sampleCount": 500,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 50
+            }
+          },
+          "vendorDtype": "i16",
+          "vendorId": "20101",
+          "vendorUnit": "rpm"
+        },
+        {
+          "dps": 1,
+          "dtype": "F32",
+          "flags": 8,
+          "index": 1,
+          "kind": "Real",
+          "loggedName": "Gbox Oil Temp",
+          "sampleCount": 50,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 2
+            }
+          },
+          "vendorDtype": "i16",
+          "vendorId": "20102",
+          "vendorUnit": "F"
+        },
+        {
+          "dps": 0,
+          "dtype": "I32",
+          "flags": 0,
+          "index": 2,
+          "kind": "Integer",
+          "loggedName": "Gear",
+          "sampleCount": 250,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 10
+            }
+          },
+          "vendorDtype": "i32",
+          "vendorId": "20103",
+          "vendorUnit": ""
+        },
+        {
+          "dps": 3,
+          "dtype": "F32",
+          "flags": 8,
+          "index": 3,
+          "kind": "Real",
+          "loggedName": "Lambda",
+          "sampleCount": 200,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 20
+            }
+          },
+          "vendorDtype": "f32",
+          "vendorId": "20104",
+          "vendorUnit": "lambda"
+        },
+        {
+          "dps": 0,
+          "dtype": "I32",
+          "enumTable": 3,
+          "flags": 0,
+          "index": 4,
+          "kind": "Enum",
+          "loggedName": "Engine State",
+          "sampleCount": 100,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 10
+            }
+          },
+          "vendorDtype": "i16",
+          "vendorId": "20105",
+          "vendorUnit": ""
+        },
+        {
+          "dps": 0,
+          "dtype": "F32",
+          "flags": 8,
+          "index": 5,
+          "kind": "Real",
+          "loggedName": "A channel name far longer than thirty-two bytes",
+          "sampleCount": 60,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 1
+            }
+          },
+          "vendorDtype": "f32",
+          "vendorId": "20106",
+          "vendorUnit": "V"
+        },
+        {
+          "dps": 7,
+          "dtype": "F64",
+          "flags": 8,
+          "index": 6,
+          "kind": "Real",
+          "loggedName": "GPS Latitude",
+          "sampleCount": 100,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 10
+            }
+          },
+          "vendorDtype": "i32",
+          "vendorId": "20107",
+          "vendorUnit": "deg"
+        },
+        {
+          "dps": 1,
+          "dtype": "F32",
+          "flags": 0,
+          "index": 7,
+          "kind": "Real",
+          "loggedName": "Brake Bias",
+          "sampleCount": 100,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 10
+            }
+          },
+          "vendorDtype": "i16",
+          "vendorId": "20108",
+          "vendorUnit": "furlongs"
+        }
+      ],
+      "durationUs": 60000000,
+      "markers": [
+        {
+          "class": "DeviceEvent",
+          "comment": "",
+          "flags": 3,
+          "group": "DeviceEvents",
+          "name": "Logging on",
+          "ordinal": 0,
+          "tUs": 0
+        },
+        {
+          "class": "DeviceEvent",
+          "comment": "",
+          "flags": 17,
+          "group": "DeviceEvents",
+          "name": "Event 17",
+          "ordinal": 1,
+          "tUs": 0
+        },
+        {
+          "class": "DeviceEvent",
+          "comment": "",
+          "flags": 4,
+          "group": "DeviceEvents",
+          "name": "Logging off",
+          "ordinal": 0,
+          "tUs": 25000000
+        }
+      ],
+      "name": "Normal",
+      "utc": {
+        "assumedLocal": true,
+        "unixUs": 1791623730000000
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "code": "ld.name_unterminated",
+      "ctx": {
+        "channel": "A channel name far longer than t",
+        "offset": 14394
+      },
+      "level": "Info",
+      "message": "32-byte name field without NUL (possible truncation)"
+    },
+    {
+      "code": "ld.shift_mul_order",
+      "ctx": {
+        "channel": "Gbox Oil Temp",
+        "detail": "afterMul",
+        "offset": 13742
+      },
+      "level": "Info",
+      "message": "channel 'Gbox Oil Temp' has shift 32 and mul 9; decoded afterMul"
+    },
+    {
+      "code": "ld.shift_nonzero",
+      "ctx": {
+        "channel": "Gbox Oil Temp",
+        "offset": 13742
+      },
+      "level": "Info",
+      "message": "channels with shift != 0 present (first named)"
+    },
+    {
+      "code": "ld.string_encoding",
+      "ctx": {
+        "detail": "ascii",
+        "offset": 0
+      },
+      "level": "Info",
+      "message": "strings decoded as ascii"
+    },
+    {
+      "code": "ld.unit_from_short_name",
+      "ctx": {
+        "channel": "Engine Speed",
+        "offset": 13618,
+        "repeats": 5
+      },
+      "level": "Info",
+      "message": "unit taken from the 8-byte field at 0x40 (5 occurrences; first named)"
+    }
+  ]
+}

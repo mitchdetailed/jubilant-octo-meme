@@ -1,0 +1,12 @@
+{
+  "$schema": "urn:esses:sidecar-1",
+  "schemaVersion": 1,
+  "source": {
+    "path": "session.csv",
+    "size": 0,
+    "hash": "xxh3:00000000000000000000000000000000",
+    "importer": { "id": "text.profile:generic.csv", "version": "0.1.0" }
+  },
+  "edited": "2026-10-10T08:00:00Z",
+  "layers": {}
+}

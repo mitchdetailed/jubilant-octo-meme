@@ -1,0 +1,67 @@
+{
+  "$schema": "urn:esses:markers-1",
+  "schemaVersion": 1,
+  "layers": {
+    "Normal": [
+      {
+        "id": "1b4e28ba-2fa1-51d2-883f-0016d3cca427",
+        "class": "SOL",
+        "group": "",
+        "tUs": 0,
+        "name": "",
+        "comment": "",
+        "prov": "Derived"
+      },
+      {
+        "id": "2c5f39cb-3ab2-52e3-994a-1127e4ddb538",
+        "class": "DeviceEvent",
+        "group": "DeviceEvents",
+        "tUs": 0,
+        "name": "Logging on",
+        "comment": "",
+        "flags": 0,
+        "prov": "Logged"
+      },
+      {
+        "id": "3d6a4adc-4bc3-53f4-a55b-2238f5eec649",
+        "class": "BCN",
+        "group": "Beacons",
+        "tUs": 83412340,
+        "name": "Manual.1",
+        "comment": "",
+        "flags": 77,
+        "prov": "Companion"
+      },
+      {
+        "id": "4e7b5bed-5cd4-5405-b66c-3349a6ffd75a",
+        "class": "BCN",
+        "group": "Beacons",
+        "tUs": 166824680,
+        "name": "Manual.2",
+        "comment": "",
+        "flags": 77,
+        "prov": "Companion"
+      },
+      {
+        "id": "5f8c6cfe-6de5-5516-877d-445ab7a0e86b",
+        "class": "IGRDBCN",
+        "group": "Beacons",
+        "tUs": 170000000,
+        "name": "Pit lane",
+        "comment": "pit entry",
+        "flags": 77,
+        "prov": "Companion"
+      },
+      {
+        "id": "6a9d7d0f-7ef6-5627-988e-556bc8b1f97c",
+        "class": "EOL",
+        "group": "",
+        "tUs": 1834560000,
+        "name": "",
+        "comment": "",
+        "prov": "Derived"
+      }
+    ],
+    "Fastest": []
+  }
+}

@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 the Esses contributors
+# SPDX-License-Identifier: MIT
+# 08_REPO_AND_BUILD.md section 12: LF everywhere, binary formats untouched.
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+*.ld binary
+# .ldx is XML, but fixtures must round-trip byte-identical (AC-M0-03): never convert its line endings.
+*.ldx -text
+*.png binary
+*.jpg binary
+*.ico binary
+*.icns binary
+*.gz binary
+*.zip binary
+*.ttf binary
+*.otf binary
+*.pdf binary

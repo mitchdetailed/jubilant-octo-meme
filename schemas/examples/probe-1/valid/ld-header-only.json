@@ -1,0 +1,29 @@
+{
+  "$schema": "urn:esses:probe-1",
+  "schemaVersion": 1,
+  "companions": [],
+  "details": [
+    { "id": "Log Date", "value": "10/10/2026" },
+    { "id": "Log Time", "value": "09:15:00" }
+  ],
+  "dialect": "pc-layout",
+  "enumTables": [],
+  "importerId": "motec.ld",
+  "importerVersion": "0.1.0",
+  "layers": [
+    {
+      "channels": [],
+      "durationUs": 0,
+      "markers": [],
+      "name": "Normal"
+    }
+  ],
+  "warnings": [
+    {
+      "code": "ld.header_only",
+      "ctx": {},
+      "level": "Warning",
+      "message": "no channel list: the file holds a header and details only"
+    }
+  ]
+}

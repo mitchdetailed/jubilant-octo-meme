@@ -1,0 +1,25 @@
+{
+  "$schema": "urn:esses:sidecar-1",
+  "schemaVersion": 1,
+  "source": {
+    "path": "../logs/run2.ld",
+    "size": 1048576,
+    "hash": "xxh3:0123456789abcdef0123456789abcdef",
+    "importer": { "id": "motec.ld", "version": "0.1.0-dev+3" }
+  },
+  "edited": "2026-10-10T08:00:00.250-03:30",
+  "layers": {
+    "Normal": {
+      "details": [
+        { "id": "Log Date", "value": { "t": "datetime", "v": "2026-10-09T14:32:11+10:00" } },
+        { "id": "Venue", "value": "Short form text" }
+      ],
+      "annotations": [{ "id": "c1a2b3c4-d5e6-4f70-8a9b-0c1d2e3f4a5b", "tUs": -5000, "text": "before the first sample" }]
+    },
+    "Fastest": {
+      "rangeOverrides": [{ "group": "Outings:Laps:Track Sections:Default", "name": "Turn 3", "offsetM": -1.5 }]
+    }
+  },
+  "x-esses-legacy": { "oldField": 1 },
+  "futureMember": { "written by": "a newer minor version", "kept": true }
+}

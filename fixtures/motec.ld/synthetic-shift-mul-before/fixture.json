@@ -1,0 +1,34 @@
+{
+  "$schema": "urn:esses:fixture-1",
+  "schemaVersion": 1,
+  "channelsCompared": "all",
+  "dialect": "pc-layout",
+  "format": "motec.ld",
+  "importOptions": {
+    "ld": {
+      "shiftOrder": "beforeMul"
+    }
+  },
+  "input": {
+    "bytes": 14460,
+    "file": "input.ld",
+    "sha256": "366dabd3439bd488e8c19163fe522d4598ca0e9d10b344704463629991033f17"
+  },
+  "licence": "CC0-1.0",
+  "name": "synthetic-shift-mul-before",
+  "notes": "the same input bytes as synthetic-shift-mul-after; expectations from the oracle's beforeMul dump; afterMul is the default (D-037)",
+  "oracle": {
+    "kind": "ref-decode",
+    "ref": "tools/ld_ref_decode.py 0.1.0 (MIT), beforeMul",
+    "tolerance": {
+      "F32": "1ulp",
+      "F64": "1ulp",
+      "I32": "exact",
+      "timesUs": "exact"
+    },
+    "validity": "strict"
+  },
+  "private": false,
+  "provenance": "synthetic",
+  "source": "synthetic: channels with shift != 0 and mul != 1 (including the deg C -> deg F logger case) read with ld.shiftOrder beforeMul"
+}

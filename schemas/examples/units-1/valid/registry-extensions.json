@@ -1,0 +1,94 @@
+{
+  "$schema": "urn:esses:units-1",
+  "schemaVersion": 1,
+  "note": "unknown top-level members such as this note are preserved",
+  "quantities": [
+    {
+      "name": "Unitless",
+      "family": "Unitless",
+      "dim": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "base": "",
+      "note": "quantity 0; the empty symbol is unit 0 (kNoUnit)",
+      "units": [
+        {
+          "symbol": "",
+          "aliases": [
+            "unitless",
+            "-"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Length",
+      "aliases": [
+        "Distance"
+      ],
+      "family": "Length",
+      "dim": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "base": "m",
+      "units": [
+        {
+          "symbol": "m"
+        },
+        {
+          "symbol": "in",
+          "toBase": 0.0254,
+          "aliases": [
+            "inch"
+          ]
+        },
+        {
+          "symbol": "km",
+          "scalar": 0.001
+        }
+      ]
+    },
+    {
+      "name": "Acceleration",
+      "family": "Acceleration",
+      "dim": [
+        1,
+        0,
+        -2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "base": "m/s/s",
+      "units": [
+        {
+          "symbol": "m/s/s",
+          "aliases": [
+            "m/s2"
+          ]
+        },
+        {
+          "symbol": "G",
+          "toBase": 9.80665,
+          "caseSensitive": [
+            "G"
+          ],
+          "note": "standard gravity"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "$schema": "urn:esses:fixture-1",
+  "schemaVersion": 1,
+  "format": "motec.ld",
+  "name": "s1-real-file",
+  "input": {
+    "file": "input.ld",
+    "sha256": "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae",
+    "bytes": 21504
+  },
+  "source": "the user's own logger file",
+  "provenance": "user-device-log",
+  "licence": "LicenseRef-unknown",
+  "permission": "private: user-owned device log, nothing real is public for now (Q-04)",
+  "private": true,
+  "oracle": {
+    "kind": "ref-decode",
+    "ref": "tools/ld_ref_decode.py 0.1.0 (MIT)",
+    "validity": "gaps-ignored",
+    "tolerance": {
+      "F32": "1ulp",
+      "F64": "1ulp",
+      "I32": "exact",
+      "timesUs": "exact"
+    }
+  }
+}

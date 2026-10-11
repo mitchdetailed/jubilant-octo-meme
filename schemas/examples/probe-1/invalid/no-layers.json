@@ -1,0 +1,39 @@
+{
+  "$schema": "urn:esses:probe-1",
+  "schemaVersion": 1,
+  "importerId": "motec.ld",
+  "importerVersion": "0.1.0",
+  "dialect": "m1",
+  "companions": [
+    "run.ldx"
+  ],
+  "details": [
+    {
+      "id": "Venue",
+      "value": "Test Track"
+    }
+  ],
+  "layers": [],
+  "enumTables": [
+    {
+      "id": 1,
+      "entries": [
+        {
+          "value": 0,
+          "label": "Off",
+          "severity": 0
+        }
+      ]
+    }
+  ],
+  "warnings": [
+    {
+      "level": "Info",
+      "code": "ld.string_encoding",
+      "message": "ASCII",
+      "ctx": {
+        "detail": "ascii"
+      }
+    }
+  ]
+}

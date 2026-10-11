@@ -1,0 +1,75 @@
+{
+  "$schema": "urn:esses:laps-1",
+  "schemaVersion": 1,
+  "layers": {
+    "Normal": {
+      "durationUs": 25000000,
+      "markers": [
+        {
+          "id": "0b6f3a52-3c1d-5f2e-9a41-7d2c11e0a001",
+          "class": "SOL",
+          "group": "",
+          "tUs": 0,
+          "name": "SOL",
+          "comment": "",
+          "prov": "Derived"
+        },
+        {
+          "id": "0b6f3a52-3c1d-5f2e-9a41-7d2c11e0a004",
+          "class": "DeviceEvent",
+          "group": "DeviceEvents",
+          "tUs": 0,
+          "name": "Logging on",
+          "comment": "",
+          "flags": 3,
+          "prov": "Logged"
+        },
+        {
+          "id": "0b6f3a52-3c1d-5f2e-9a41-7d2c11e0a003",
+          "class": "BCN",
+          "group": "Beacons",
+          "tUs": 5000000,
+          "name": "Manual.1",
+          "comment": "",
+          "flags": 77,
+          "prov": "Companion"
+        },
+        {
+          "id": "0b6f3a52-3c1d-5f2e-9a41-7d2c11e0a002",
+          "class": "EOL",
+          "group": "",
+          "tUs": 25000000,
+          "name": "EOL",
+          "comment": "",
+          "prov": "Derived"
+        }
+      ],
+      "groups": [
+        {
+          "path": "Outings",
+          "name": "Outings",
+          "supportsTrackGeneration": false,
+          "supportsReporting": true,
+          "ranges": [
+            {
+              "id": "5e1d0c2b-8a7f-5b3e-8c21-4f0a9b8c7d01",
+              "kind": "Outing",
+              "lapClass": "None",
+              "number": 1,
+              "name": "input.ld",
+              "abbrev": "1",
+              "startUs": 0,
+              "endUs": 25000000,
+              "startMarker": "0b6f3a52-3c1d-5f2e-9a41-7d2c11e0a001",
+              "endMarker": "0b6f3a52-3c1d-5f2e-9a41-7d2c11e0a002",
+              "trusted": true,
+              "enabled": true
+            }
+          ],
+          "children": []
+        }
+      ]
+    }
+  },
+  "ranges": []
+}

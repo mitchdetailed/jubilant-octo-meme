@@ -1,0 +1,34 @@
+{
+  "$schema": "urn:esses:fixture-1",
+  "schemaVersion": 1,
+  "channelsCompared": "all",
+  "dialect": "pc-layout",
+  "format": "motec.ld",
+  "importOptions": {
+    "ld": {
+      "shiftOrder": "afterMul"
+    }
+  },
+  "input": {
+    "bytes": 102112,
+    "file": "input.ld",
+    "sha256": "127af85f695ef3734af2ccbd58b12154f5356dff44f23218a16f34a97e408c4f"
+  },
+  "licence": "CC0-1.0",
+  "name": "synthetic-multirate",
+  "notes": "timeAt(i) = floor((2 i 10^6 + rate) / (2 rate)); the layer lasts as long as its longest channel",
+  "oracle": {
+    "kind": "ref-decode",
+    "ref": "tools/ld_ref_decode.py 0.1.0 (MIT), afterMul",
+    "tolerance": {
+      "F32": "1ulp",
+      "F64": "1ulp",
+      "I32": "exact",
+      "timesUs": "exact"
+    },
+    "validity": "strict"
+  },
+  "private": false,
+  "provenance": "synthetic",
+  "source": "synthetic: 14 channels at rates from 1 Hz to 1 kHz (including 3, 7, 33 and 333 Hz, whose periods are not whole microseconds) with different lengths"
+}

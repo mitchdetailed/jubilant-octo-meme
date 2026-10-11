@@ -1,0 +1,212 @@
+{
+  "$schema": "urn:esses:units-1",
+  "schemaVersion": 1,
+  "quantities": [
+    {
+      "name": "Speed",
+      "family": "Speed",
+      "dim": [
+        1,
+        0,
+        -1,
+        0,
+        0,
+        0,
+        0
+      ],
+      "base": "m/s",
+      "units": [
+        {
+          "symbol": "m/s"
+        },
+        {
+          "symbol": "km/h",
+          "scalar": 3.6,
+          "aliases": [
+            "kph",
+            "KPH",
+            "km/hr"
+          ]
+        },
+        {
+          "symbol": "mph",
+          "scalar": 2.2369362920544,
+          "aliases": [
+            "mi/h",
+            "MPH"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Temperature",
+      "family": "Temperature",
+      "dim": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      "base": "K",
+      "deltaFamily": "Temperature Delta",
+      "units": [
+        {
+          "symbol": "K"
+        },
+        {
+          "symbol": "deg C",
+          "display": "°C",
+          "offset": -273.15,
+          "aliases": [
+            "C",
+            "°C",
+            "degC",
+            "øC"
+          ]
+        },
+        {
+          "symbol": "deg F",
+          "display": "°F",
+          "scalar": 1.8,
+          "offset": -459.67,
+          "aliases": [
+            "F",
+            "°F"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Temperature Delta",
+      "family": "Temperature Delta",
+      "dim": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      "base": "dK",
+      "isDelta": true,
+      "units": [
+        {
+          "symbol": "dK",
+          "display": "ΔK"
+        },
+        {
+          "symbol": "dC",
+          "display": "Δ°C"
+        },
+        {
+          "symbol": "dF",
+          "display": "Δ°F",
+          "scalar": 1.8
+        }
+      ]
+    },
+    {
+      "name": "Pressure",
+      "family": "Pressure",
+      "dim": [
+        -1,
+        1,
+        -2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "base": "Pa",
+      "deltaFamily": "Pressure Delta",
+      "units": [
+        {
+          "symbol": "Pa"
+        },
+        {
+          "symbol": "kPa a",
+          "scalar": 0.001,
+          "aliases": [
+            "kPa",
+            "kPaA"
+          ]
+        },
+        {
+          "symbol": "bar a",
+          "scalar": 1e-05,
+          "aliases": [
+            "bar"
+          ]
+        },
+        {
+          "symbol": "psi a",
+          "scalar": 0.000145037738,
+          "aliases": [
+            "psi"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Angle",
+      "family": "Angle",
+      "dim": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "base": "rad",
+      "units": [
+        {
+          "symbol": "rad"
+        },
+        {
+          "symbol": "deg",
+          "display": "°",
+          "scalar": 57.29577951308232
+        },
+        {
+          "symbol": "dBTDC",
+          "scalar": -57.29577951308232,
+          "compat": "legacy"
+        }
+      ]
+    },
+    {
+      "name": "Air Fuel Ratio",
+      "family": "Air Fuel Ratio",
+      "dim": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "base": "lambda",
+      "units": [
+        {
+          "symbol": "lambda",
+          "display": "λ",
+          "aliases": [
+            "LA"
+          ]
+        },
+        {
+          "symbol": "P A/F",
+          "scalar": 14.7,
+          "compat": "legacy"
+        }
+      ]
+    }
+  ]
+}

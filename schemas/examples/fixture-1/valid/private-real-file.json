@@ -1,0 +1,41 @@
+{
+  "$schema": "urn:esses:fixture-1",
+  "schemaVersion": 1,
+  "format": "motec.ld",
+  "name": "acc-bathurst-r1",
+  "input": {
+    "file": "input.ld",
+    "sha256": "9c56cc51b374c3ba189210d5b6d4bf57790d351c96c47c02190ecf1e430635ab",
+    "bytes": 10485760,
+    "remote": null
+  },
+  "companions": [
+    {
+      "file": "input.ldx",
+      "sha256": "4a44dc15364204a80fe80e9039455cc1608281820fe2b24f1e5233ade6af1dd5"
+    }
+  ],
+  "source": "ACC built-in export, Bathurst, 2026-10-01, own session",
+  "licence": "LicenseRef-unknown",
+  "permission": "private: third-party game output, nothing real is public for now (Q-04)",
+  "private": true,
+  "importOptions": {
+    "ld": {
+      "shiftOrder": "afterMul"
+    }
+  },
+  "dialect": "sim-exporter",
+  "oracle": {
+    "kind": "public-project",
+    "ref": "i3rs ld-file-format decode, pinned (MIT)",
+    "permitted": true,
+    "tolerance": {
+      "F32": "1ulp",
+      "F64": "1ulp",
+      "I32": "exact",
+      "timesUs": "exact"
+    }
+  },
+  "channelsCompared": "all",
+  "notes": "the header channel count disagrees with the list by 2"
+}

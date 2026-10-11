@@ -1,0 +1,113 @@
+{
+  "$schema": "urn:esses:probe-1",
+  "schemaVersion": 1,
+  "companions": [],
+  "details": [
+    {
+      "id": "Device Type",
+      "value": "ADL"
+    },
+    {
+      "id": "Device Serial",
+      "value": "8004"
+    },
+    {
+      "id": "Device Version",
+      "value": "420"
+    },
+    {
+      "id": "Log Date",
+      "value": "01/01/2026"
+    },
+    {
+      "id": "Log Time",
+      "value": "00:00:00"
+    },
+    {
+      "id": "Driver",
+      "value": "Sim Driver"
+    },
+    {
+      "id": "Venue",
+      "value": "Sim Track"
+    }
+  ],
+  "dialect": "sim-exporter",
+  "enumTables": [],
+  "importerId": "motec.ld",
+  "importerVersion": "0.1.0",
+  "layers": [
+    {
+      "channels": [
+        {
+          "dps": 0,
+          "dtype": "I32",
+          "flags": 8,
+          "index": 0,
+          "kind": "Integer",
+          "loggedName": "RPMS",
+          "sampleCount": 4,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 20
+            }
+          },
+          "vendorDtype": "i16",
+          "vendorId": "20101",
+          "vendorUnit": "rpm"
+        },
+        {
+          "dps": 0,
+          "dtype": "F32",
+          "flags": 8,
+          "index": 1,
+          "kind": "Real",
+          "loggedName": "SPEED",
+          "sampleCount": 4,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 20
+            }
+          },
+          "vendorDtype": "f32",
+          "vendorId": "20102",
+          "vendorUnit": "m/s"
+        }
+      ],
+      "durationUs": 200000,
+      "markers": [],
+      "name": "Normal",
+      "utc": {
+        "assumedLocal": true,
+        "unixUs": 1767225600000000
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "code": "ld.string_encoding",
+      "ctx": {
+        "detail": "ascii",
+        "offset": 0
+      },
+      "level": "Info",
+      "message": "strings decoded as ascii"
+    },
+    {
+      "code": "ld.unit_from_short_name",
+      "ctx": {
+        "channel": "RPMS",
+        "offset": 13384,
+        "repeats": 2
+      },
+      "level": "Info",
+      "message": "unit taken from the 8-byte field at 0x40 (2 occurrences; first named)"
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "$schema": "urn:esses:probe-1",
+  "schemaVersion": 1,
+  "companions": [],
+  "details": [
+    {
+      "id": "Device Type",
+      "value": "TESTLOG"
+    },
+    {
+      "id": "Device Serial",
+      "value": "12345"
+    },
+    {
+      "id": "Device Version",
+      "value": "7"
+    },
+    {
+      "id": "Log Date",
+      "value": "10/10/2026"
+    },
+    {
+      "id": "Log Time",
+      "value": "09:15:00"
+    }
+  ],
+  "dialect": "pc-layout",
+  "enumTables": [],
+  "importerId": "motec.ld",
+  "importerVersion": "0.1.0",
+  "layers": [
+    {
+      "channels": [],
+      "durationUs": 0,
+      "markers": [],
+      "name": "Normal",
+      "utc": {
+        "assumedLocal": true,
+        "unixUs": 1791623700000000
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "code": "ld.header_only",
+      "ctx": {
+        "offset": 8
+      },
+      "level": "Warning",
+      "message": "meta_ptr and data_ptr equal the file size: no channel list"
+    },
+    {
+      "code": "ld.string_encoding",
+      "ctx": {
+        "detail": "ascii",
+        "offset": 0
+      },
+      "level": "Info",
+      "message": "strings decoded as ascii"
+    }
+  ]
+}

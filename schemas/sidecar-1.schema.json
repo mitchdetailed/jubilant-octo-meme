@@ -1,0 +1,515 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:sidecar-1",
+  "title": "Esses sidecar document (sidecar-1)",
+  "description": "The per-log edit file <log>.<ext>.sidecar.json written next to a log (02_DATA_MODEL.md section 5, D-015). It holds the user's edits per data layer: details, user markers, marker edits, range overrides, local maths, annotations and video links, plus a source block that identifies the log. Unknown top-level members are allowed and preserved verbatim (02 section 6.1 Document<T>::unknown); every nested record is closed, because its unknown members could not survive a typed round trip. Optional members are omitted when absent; null is never written.",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "source", "edited", "layers"],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072). The urn:esses: form is written; the bare esses: form of earlier drafts and the later https form are accepted on load and normalised on save (02 section 6.6 rule 1).",
+      "type": "string",
+      "pattern": "^(urn:esses:sidecar-1|esses:sidecar-1|https://[^/\\s]+(/[^/\\s]+)*/sidecar-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "source": {
+      "$ref": "#/definitions/source"
+    },
+    "edited": {
+      "description": "Time of the last committed edit, ISO 8601 with a UTC offset.",
+      "$ref": "#/definitions/isoDateTime"
+    },
+    "layers": {
+      "description": "Edits keyed by data-layer name. The canonical name of the main layer is \"Normal\"; the empty alias \"\" is accepted on import from other formats only and is never a sidecar key (02 section 4.2 behaviour 4).",
+      "type": "object",
+      "propertyNames": {
+        "minLength": 1
+      },
+      "patternProperties": {
+        "^.+$": {
+          "$ref": "#/definitions/layerEdits"
+        }
+      },
+      "additionalProperties": false
+    },
+    "x-esses-legacy": {
+      "$ref": "#/definitions/legacyBag"
+    }
+  },
+  "definitions": {
+    "source": {
+      "description": "Identity of the log the edits belong to (02 section 5.3 rule 1). A quick-hash match applies the sidecar regardless of path; a mismatch applies it with the Import Log warning sidecar.source_changed.",
+      "type": "object",
+      "required": ["path", "size", "hash", "importer"],
+      "properties": {
+        "path": {
+          "description": "Path of the log relative to the sidecar's directory.",
+          "type": "string",
+          "minLength": 1
+        },
+        "size": {
+          "description": "Size of the log in bytes.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "hash": {
+          "description": "Quick content hash, the SourceId (05 section 1.1).",
+          "$ref": "#/definitions/hash128"
+        },
+        "contentHash": {
+          "description": "Full-content xxh3-128, added on the first save after the Background task has computed it.",
+          "$ref": "#/definitions/hash128"
+        },
+        "importer": {
+          "type": "object",
+          "required": ["id", "version"],
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/importerId"
+            },
+            "version": {
+              "$ref": "#/definitions/semver"
+            }
+          },
+          "additionalProperties": false
+        },
+        "companions": {
+          "description": "Companion file names found beside the log when the sidecar was written.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/fileName"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "layerEdits": {
+      "description": "SidecarLayer (02 section 5.1). Every member is optional; an empty layer may be omitted.",
+      "type": "object",
+      "properties": {
+        "details": {
+          "description": "User detail edits (prov User, not written).",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/detailEdit"
+          }
+        },
+        "markers": {
+          "description": "User markers only (prov User).",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/userMarker"
+          }
+        },
+        "markerEdits": {
+          "description": "Edits of logged and companion markers. Restore is a command, never a record: at most one offset and one ignore per marker id and at most one offsetDistance per layer (02 section 4.3 behaviours 7 and 7a; checked by the loader, not by this schema).",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/markerEdit"
+          }
+        },
+        "rangeOverrides": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/rangeOverride"
+          }
+        },
+        "localMaths": {
+          "$ref": "#/definitions/localMaths"
+        },
+        "annotations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/annotation"
+          }
+        },
+        "videoLinks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/videoLink"
+          }
+        },
+        "runs": {
+          "description": "Reserved for the drag profile (v1.0); preserved verbatim."
+        },
+        "stages": {
+          "description": "Reserved for the rally profile (v1.0); preserved verbatim."
+        }
+      },
+      "additionalProperties": false
+    },
+    "detailEdit": {
+      "type": "object",
+      "required": ["id", "value"],
+      "properties": {
+        "id": {
+          "description": "Detail id: a standard id of 02 section 4.2 behaviour 2 (\"Driver\", \"Diff Ratio\", ...) or a custom one.",
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "$ref": "#/definitions/detailValue"
+        },
+        "original": {
+          "description": "The file's (or companion's) value that this edit replaces.",
+          "$ref": "#/definitions/detailValue"
+        }
+      },
+      "additionalProperties": false
+    },
+    "userMarker": {
+      "description": "A marker in the shared vocabulary whose provenance is User (02 section 5.1).",
+      "allOf": [
+        {
+          "$ref": "#/definitions/marker"
+        },
+        {
+          "properties": {
+            "prov": {
+              "const": "User"
+            }
+          }
+        }
+      ]
+    },
+    "markerEdit": {
+      "description": "MarkerEdit (02 section 4.3). offset moves a marker by dtUs, ignore disables it, offsetDistance moves every BCN of the layer by a track distance and has no ref.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["ref", "op", "dtUs"],
+          "properties": {
+            "ref": {
+              "$ref": "#/definitions/uuid"
+            },
+            "op": {
+              "const": "offset"
+            },
+            "dtUs": {
+              "$ref": "#/definitions/micros"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["ref", "op"],
+          "properties": {
+            "ref": {
+              "$ref": "#/definitions/uuid"
+            },
+            "op": {
+              "const": "ignore"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["op", "dM"],
+          "properties": {
+            "op": {
+              "const": "offsetDistance"
+            },
+            "dM": {
+              "description": "Distance, positive = beacon further along the track.",
+              "$ref": "#/definitions/quantityValue"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "rangeOverride": {
+      "description": "RangeOverride (02 section 5.1, section 5.3 rule 5): matched by (group, startMarker), then by (group, name). It carries at least one of trusted, offsetUs and offsetM; an override with none of them is removed instead of written.",
+      "type": "object",
+      "required": ["group", "name"],
+      "properties": {
+        "group": {
+          "$ref": "#/definitions/groupPath"
+        },
+        "startMarker": {
+          "$ref": "#/definitions/uuid"
+        },
+        "name": {
+          "description": "Fallback key (\"Lap 3\").",
+          "type": "string",
+          "minLength": 1
+        },
+        "trusted": {
+          "type": "boolean"
+        },
+        "offsetUs": {
+          "description": "Alignment offset in the time domain.",
+          "$ref": "#/definitions/micros"
+        },
+        "offsetM": {
+          "description": "Alignment offset in the distance domain, metres.",
+          "type": "number"
+        }
+      },
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": ["trusted"]
+        },
+        {
+          "required": ["offsetUs"]
+        },
+        {
+          "required": ["offsetM"]
+        }
+      ]
+    },
+    "localMaths": {
+      "description": "A complete maths-1 module with id \"local\" (03 section 4.1). Only its envelope is checked here; the module body is validated against maths-1, which arrives in M2.",
+      "type": "object",
+      "required": ["$schema", "schemaVersion", "id"],
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "pattern": "^(urn:esses:maths-1|esses:maths-1|https://[^/\\s]+(/[^/\\s]+)*/maths-1(\\.schema)?\\.json)$"
+        },
+        "schemaVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "id": {
+          "const": "local"
+        }
+      }
+    },
+    "annotation": {
+      "description": "Annotation (02 section 5.1, section 5.3 rule 6): an absolute Main-source time, never range-relative.",
+      "type": "object",
+      "required": ["id", "tUs", "text"],
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/uuid"
+        },
+        "tUs": {
+          "$ref": "#/definitions/micros"
+        },
+        "text": {
+          "type": "string"
+        },
+        "channel": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "videoLink": {
+      "type": "object",
+      "required": ["file", "cameraView", "offsetUs", "syncPoints"],
+      "properties": {
+        "file": {
+          "description": "Media file path, relative to the sidecar's directory.",
+          "type": "string",
+          "minLength": 1
+        },
+        "cameraView": {
+          "type": "string"
+        },
+        "offsetUs": {
+          "$ref": "#/definitions/micros"
+        },
+        "syncPoints": {
+          "description": "Pairs [log time, media presentation time], both in microseconds.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "$ref": "#/definitions/micros"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "marker": {
+      "description": "One marker in the key vocabulary shared by sidecar-1, markers-1 and probe-1 (02 section 5.3 rule 8). An absent flags means 0. Device events are markers of class DeviceEvent in group DeviceEvents (02 section 4.3).",
+      "type": "object",
+      "required": ["id", "class", "group", "tUs", "name", "comment", "prov"],
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/uuid"
+        },
+        "class": {
+          "$ref": "#/definitions/markerClass"
+        },
+        "group": {
+          "description": "\"\" for intrinsic markers (SOL, EOL, RESET), \"Beacons\", \"StageMarkers\", \"DeviceEvents\" or a companion group name.",
+          "type": "string"
+        },
+        "tUs": {
+          "$ref": "#/definitions/micros"
+        },
+        "name": {
+          "type": "string"
+        },
+        "comment": {
+          "type": "string"
+        },
+        "flags": {
+          "$ref": "#/definitions/flags32"
+        },
+        "prov": {
+          "$ref": "#/definitions/provenance"
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": ["class"],
+        "properties": {
+          "class": {
+            "const": "DeviceEvent"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "group": {
+            "const": "DeviceEvents"
+          }
+        }
+      }
+    },
+    "markerClass": {
+      "description": "MarkerClass (02 section 4.3). Companion marker classes outside this list are not markers: they stay opaque (05 section 4 rule 1).",
+      "enum": ["SOL", "EOL", "BCN", "SPLTBCN", "IGRDBCN", "RESET", "STGSTRT", "STGEND", "DeviceEvent"]
+    },
+    "provenance": {
+      "enum": ["Logged", "Companion", "User", "Derived"]
+    },
+    "detailValue": {
+      "description": "DetailValue (02 section 4.2): text, a number with an optional unit symbol and display decimals, or a date-time. A bare string is the short form of a text value that probe-1 writes (05 section 1.2); sidecar-1 writes the tagged form (02 section 5.2).",
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "required": ["t", "v"],
+          "properties": {
+            "t": {
+              "const": "string"
+            },
+            "v": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["t", "v"],
+          "properties": {
+            "t": {
+              "const": "number"
+            },
+            "v": {
+              "type": "number"
+            },
+            "unit": {
+              "$ref": "#/definitions/unitSymbol"
+            },
+            "dps": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["t", "v"],
+          "properties": {
+            "t": {
+              "const": "datetime"
+            },
+            "v": {
+              "$ref": "#/definitions/isoDateTime"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "quantityValue": {
+      "description": "A persisted number with a physical unit (02 conventions): {\"v\": number, \"unit\": symbol}.",
+      "type": "object",
+      "required": ["v", "unit"],
+      "properties": {
+        "v": {
+          "type": "number"
+        },
+        "unit": {
+          "$ref": "#/definitions/unitSymbol"
+        }
+      },
+      "additionalProperties": false
+    },
+    "unitSymbol": {
+      "description": "A unit symbol or alias of the unit registry (units-1), without leading or trailing white space.",
+      "type": "string",
+      "pattern": "^\\S(.*\\S)?$"
+    },
+    "groupPath": {
+      "description": "Range-group path, colon-separated (\"Outings:Laps\", \"Outings:Laps:Track Sections:Default\").",
+      "type": "string",
+      "pattern": "^[^:]+(:[^:]+)*$"
+    },
+    "uuid": {
+      "description": "Canonical lower-case 8-4-4-4-12 UUID (Uuid::str()).",
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "hash128": {
+      "description": "xxh3-128 as \"xxh3:\" + 32 lower-case hex digits, high word first (Hash128::hex()).",
+      "type": "string",
+      "pattern": "^xxh3:[0-9a-f]{32}$"
+    },
+    "micros": {
+      "description": "Micros: signed 64-bit microseconds.",
+      "type": "integer"
+    },
+    "flags32": {
+      "description": "Unsigned 32-bit flag word, passed through uninterpreted.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "importerId": {
+      "description": "Importer id (D-028): \"motec.ld\", \"motec.csv\", \"text.profile:generic.csv\", ...",
+      "type": "string",
+      "pattern": "^[a-z0-9]+([._:-][a-z0-9]+)*$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$"
+    },
+    "fileName": {
+      "description": "A bare file name relative to the log's directory: no directory separators.",
+      "type": "string",
+      "pattern": "^[^/\\\\]+$"
+    },
+    "isoDateTime": {
+      "description": "ISO 8601 date-time with seconds and a UTC offset (or Z).",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "legacyBag": {
+      "description": "Fields removed by a migration, kept verbatim (02 section 6.6 rule 3).",
+      "type": "object"
+    }
+  }
+}

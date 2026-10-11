@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 the Esses contributors
+# SPDX-License-Identifier: MIT
+#
+# ctest fixtures.generator_deterministic: writes every family's inputs twice with esses-gen-fixtures and
+# requires byte-identical files (fixture.json pins the inputs by sha256, so the generator must be deterministic).
+#   cmake -DGEN=<esses-gen-fixtures> -DWORK=<dir> -P fixtures_determinism.cmake
+foreach(_var GEN WORK)
+  if(NOT DEFINED ${_var})
+    message(FATAL_ERROR "fixtures_determinism.cmake: -D${_var}=... is required")
+  endif()
+endforeach()
+file(REMOVE_RECURSE "${WORK}")
+foreach(_run a b)
+  execute_process(COMMAND "${GEN}" --inputs-only --out "${WORK}/${_run}" RESULT_VARIABLE _rc)
+  if(NOT _rc EQUAL 0)
+    message(FATAL_ERROR "esses-gen-fixtures failed (${_rc})")
+  endif()
+endforeach()
+file(GLOB_RECURSE _files RELATIVE "${WORK}/a" "${WORK}/a/*")
+list(LENGTH _files _count)
+if(_count EQUAL 0)
+  message(FATAL_ERROR "no input written")
+endif()
+foreach(_f IN LISTS _files)
+  file(SHA256 "${WORK}/a/${_f}" _ha)
+  if(NOT EXISTS "${WORK}/b/${_f}")
+    message(FATAL_ERROR "${_f}: missing in the second run")
+  endif()
+  file(SHA256 "${WORK}/b/${_f}" _hb)
+  if(NOT _ha STREQUAL _hb)
+    message(FATAL_ERROR "${_f}: the two runs differ")
+  endif()
+endforeach()
+file(REMOVE_RECURSE "${WORK}")
+message(STATUS "${_count} generated files identical across two runs")

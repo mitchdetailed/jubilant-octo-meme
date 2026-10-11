@@ -1,0 +1,54 @@
+{
+  "device-event-group.json": {
+    "pointer": "/layers/Normal/markers/1/group",
+    "why": "device events are in group DeviceEvents"
+  },
+  "group-path-empty-segment.json": {
+    "pointer": "/layers/Normal/groups/0/path",
+    "why": "group paths have no empty segment"
+  },
+  "group-version-member.json": {
+    "pointer": "/layers/Normal/groups/0",
+    "why": "range-group versions are runtime state"
+  },
+  "marker-unknown-class.json": {
+    "pointer": "/layers/Normal/markers/2/class",
+    "why": "unknown companion classes stay opaque"
+  },
+  "missing-groups.json": {
+    "pointer": "/layers/Normal",
+    "why": "a layer lists its groups (possibly none)"
+  },
+  "pit-stop-false.json": {
+    "pointer": "/layers/Normal/groups/0/ranges/0/pitStop",
+    "why": "pitStop is omitted when false"
+  },
+  "range-missing-end.json": {
+    "pointer": "/layers/Normal/groups/0/ranges/0",
+    "why": "a range states [startUs, endUs)"
+  },
+  "range-uppercase-id.json": {
+    "pointer": "/layers/Normal/groups/0/ranges/0/id",
+    "why": "ids are lower-case UUIDs"
+  },
+  "stint-zero.json": {
+    "pointer": "/layers/Normal/groups/0/ranges/0/stint",
+    "why": "an unknown stint is omitted, not 0"
+  },
+  "unknown-lap-class.json": {
+    "pointer": "/layers/Normal/groups/0/ranges/0/lapClass",
+    "why": "lap classes are those of 02 section 4.4"
+  },
+  "unknown-range-kind.json": {
+    "pointer": "/layers/Normal/groups/0/ranges/0/kind",
+    "why": "range kinds are those of 02 section 4.4"
+  },
+  "unknown-top-level-member.json": {
+    "pointer": "",
+    "why": "laps-1 is closed"
+  },
+  "wrong-schema-id.json": {
+    "pointer": "/$schema",
+    "why": "the $schema id names another schema"
+  }
+}

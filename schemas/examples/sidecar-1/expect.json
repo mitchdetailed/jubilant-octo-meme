@@ -1,0 +1,66 @@
+{
+  "detail-number-as-string.json": {
+    "pointer": "/layers/Normal/details/0/value",
+    "why": "a number detail whose v is a string matches no detail value form"
+  },
+  "device-event-wrong-group.json": {
+    "pointer": "/layers/Normal/markers/0/group",
+    "why": "a DeviceEvent marker must be in group DeviceEvents"
+  },
+  "edited-without-offset.json": {
+    "pointer": "/edited",
+    "why": "edited needs a UTC offset or Z"
+  },
+  "empty-layer-name.json": {
+    "pointer": "/layers",
+    "why": "the empty layer alias is never a sidecar key"
+  },
+  "fractional-time.json": {
+    "pointer": "/layers/Normal/annotations/0/tUs",
+    "why": "Micros are integers"
+  },
+  "hash-without-prefix.json": {
+    "pointer": "/source/hash",
+    "why": "hashes are written as xxh3:<32 hex digits>"
+  },
+  "local-maths-wrong-id.json": {
+    "pointer": "/layers/Normal/localMaths/id",
+    "why": "the local maths module has id local"
+  },
+  "marker-not-user.json": {
+    "pointer": "/layers/Normal/markers/0/prov",
+    "why": "sidecar markers are user markers only"
+  },
+  "missing-source.json": {
+    "pointer": "",
+    "why": "source is required"
+  },
+  "null-optional.json": {
+    "pointer": "/source/contentHash",
+    "why": "absent optionals are omitted, never null"
+  },
+  "offset-edit-without-dt.json": {
+    "pointer": "/layers/Normal/markerEdits/0",
+    "why": "an offset edit needs dtUs"
+  },
+  "range-override-without-fields.json": {
+    "pointer": "/layers/Normal/rangeOverrides/0",
+    "why": "an override carries at least one of trusted, offsetUs, offsetM"
+  },
+  "restore-edit-persisted.json": {
+    "pointer": "/layers/Normal/markerEdits/0",
+    "why": "restore is a command, never a persisted edit"
+  },
+  "unknown-layer-member.json": {
+    "pointer": "/layers/Normal",
+    "why": "layer records are closed"
+  },
+  "uppercase-uuid.json": {
+    "pointer": "/layers/Normal/markers/0/id",
+    "why": "UUIDs are written in canonical lower case"
+  },
+  "wrong-schema-id.json": {
+    "pointer": "/$schema",
+    "why": "the $schema id names another schema"
+  }
+}

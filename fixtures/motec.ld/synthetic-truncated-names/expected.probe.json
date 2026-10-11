@@ -1,0 +1,165 @@
+{
+  "$schema": "urn:esses:probe-1",
+  "schemaVersion": 1,
+  "companions": [],
+  "details": [
+    {
+      "id": "Device Type",
+      "value": "Esses"
+    },
+    {
+      "id": "Device Serial",
+      "value": "1"
+    },
+    {
+      "id": "Device Version",
+      "value": "100"
+    },
+    {
+      "id": "Log Date",
+      "value": "11/10/2026"
+    },
+    {
+      "id": "Log Time",
+      "value": "10:00:00"
+    },
+    {
+      "id": "Driver",
+      "value": "Synthetic Driver"
+    },
+    {
+      "id": "Vehicle Id",
+      "value": "SYN-01"
+    },
+    {
+      "id": "Venue",
+      "value": "Synthetic Circuit"
+    },
+    {
+      "id": "Session",
+      "value": "Fixture"
+    },
+    {
+      "id": "Short Comment",
+      "value": "synthetic-truncated-names"
+    }
+  ],
+  "dialect": "pc-layout",
+  "enumTables": [],
+  "importerId": "motec.ld",
+  "importerVersion": "0.1.0",
+  "layers": [
+    {
+      "channels": [
+        {
+          "dps": 3,
+          "dtype": "F32",
+          "flags": 0,
+          "index": 0,
+          "kind": "Real",
+          "loggedName": "Engine Coolant Temperature Sens1",
+          "sampleCount": 20,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 10
+            }
+          },
+          "vendorDtype": "f32",
+          "vendorId": "20101",
+          "vendorUnit": ""
+        },
+        {
+          "dps": 3,
+          "dtype": "F32",
+          "flags": 0,
+          "index": 1,
+          "kind": "Real",
+          "loggedName": "Brake Pressure Front Left Calipr",
+          "sampleCount": 20,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 10
+            }
+          },
+          "vendorDtype": "f32",
+          "vendorId": "20102",
+          "vendorUnit": ""
+        },
+        {
+          "dps": 3,
+          "dtype": "F32",
+          "flags": 0,
+          "index": 2,
+          "kind": "Real",
+          "loggedName": "Öltemperatur Getriebe Ausgang Re",
+          "sampleCount": 20,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 10
+            }
+          },
+          "vendorDtype": "f32",
+          "vendorId": "20103",
+          "vendorUnit": ""
+        },
+        {
+          "dps": 3,
+          "dtype": "F32",
+          "flags": 0,
+          "index": 3,
+          "kind": "Real",
+          "loggedName": "Δ Speed Front Rear Axle Diffrnc",
+          "sampleCount": 20,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 10
+            }
+          },
+          "vendorDtype": "f32",
+          "vendorId": "20104",
+          "vendorUnit": ""
+        }
+      ],
+      "durationUs": 2000000,
+      "markers": [],
+      "name": "Normal",
+      "utc": {
+        "assumedLocal": true,
+        "unixUs": 1791712800000000
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "code": "ld.name_unterminated",
+      "ctx": {
+        "channel": "Engine Coolant Temperature Sens1",
+        "offset": 13384,
+        "repeats": 4
+      },
+      "level": "Info",
+      "message": "32-byte name field without NUL (possible truncation) (4 occurrences; first named)"
+    },
+    {
+      "code": "ld.string_encoding",
+      "ctx": {
+        "detail": "mixed",
+        "offset": 0
+      },
+      "level": "Info",
+      "message": "strings decoded as mixed"
+    }
+  ]
+}

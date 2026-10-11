@@ -1,0 +1,34 @@
+{
+  "$schema": "urn:esses:fixture-1",
+  "schemaVersion": 1,
+  "channelsCompared": "all",
+  "dialect": "pc-layout",
+  "format": "motec.ld",
+  "importOptions": {
+    "ld": {
+      "shiftOrder": "afterMul"
+    }
+  },
+  "input": {
+    "bytes": 14096,
+    "file": "input.ld",
+    "sha256": "771061a610eced6c7e3c7658c1e404aac24584eb8a8d3b3e14fb6d29eaf71eb7"
+  },
+  "licence": "CC0-1.0",
+  "name": "synthetic-zero-rate",
+  "notes": "Esses does not make it a channel (ld.zero_rate); the oracle decodes it untimed, and fixture verify reports it as excluded by the reader",
+  "oracle": {
+    "kind": "ref-decode",
+    "ref": "tools/ld_ref_decode.py 0.1.0 (MIT), afterMul",
+    "tolerance": {
+      "F32": "1ulp",
+      "F64": "1ulp",
+      "I32": "exact",
+      "timesUs": "exact"
+    },
+    "validity": "strict"
+  },
+  "private": false,
+  "provenance": "synthetic",
+  "source": "synthetic: the middle of three records has rate 0 but samples"
+}

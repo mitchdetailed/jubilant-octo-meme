@@ -1,0 +1,166 @@
+# SPDX-FileCopyrightText: 2026 the Esses contributors
+# SPDX-License-Identifier: MIT
+#
+# CI (08_REPO_AND_BUILD.md section 4). Jobs: core (3 OSes, no Qt), lint, sanitize, fuzz-smoke.
+# The build itself uses only code vendored in third_party/ (pugixml, xxHash, nlohmann-json, json-schema-validator,
+# CLI11, fast_float, Catch2 v3; see third_party/README.md); CI fetches nothing but the toolchain (actions, apt
+# packages, the reuse tool). The vendored libraries replace the vcpkg manifest that 08 section 3.7.1 describes,
+# so the vcpkg cache steps of 08 section 4.2 are not needed. The qt-app job arrives with the first Qt code (M1).
+name: ci
+
+on:
+  pull_request: {}
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * *" # nightly
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    name: core (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, preset: ci-linux-gcc-core }
+          - { os: windows-2022, preset: ci-win-msvc-core }
+          - { os: macos-14, preset: ci-mac-clang-core }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: false } # fixtures/private only when the deploy-key secret exists (section 4.5)
+      - uses: lukka/get-cmake@latest # CMake and Ninja
+      - uses: ilammy/msvc-dev-cmd@v1 # no-op outside Windows
+      - name: Configure (ESSES_BUILD_QT=OFF, no Qt on the runner)
+        run: cmake --preset ${{ matrix.preset }}
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }}
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }} --parallel 4
+      # ctest above already ran fixtures.generate_inputs and fixtures.verify_public; this step repeats the fixture
+      # verification visibly (AC-M0-01..03). The synthetic inputs are generated, not committed (05 section 9.1).
+      - name: Fixture corpus (AC-M0-01..03)
+        shell: bash
+        run: |
+          bin=build/${{ matrix.preset }}/bin
+          "$bin/esses-gen-fixtures" --inputs-only --out build/fixture-inputs/motec.ld --fixtures fixtures/motec.ld \
+            --manifest build/fixture-inputs/manifest.json
+          "$bin/esses-cli" fixture verify fixtures/ --manifest build/fixture-inputs/manifest.json
+
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: lukka/get-cmake@latest
+      - name: Install LLVM tools
+        run: sudo apt-get update && sudo apt-get install -y clang-format-18 clang-tidy-18
+      - name: clang-format
+        run: git ls-files '*.c' '*.cpp' '*.h' '*.hpp' ':!:third_party/**' | xargs -r clang-format-18 --dry-run --Werror
+      - name: Vendor marks (D-003, D-125)
+        run: python3 -I tools/check_vendor_marks.py --self-test && python3 -I tools/check_vendor_marks.py
+      - name: Schemas and their examples (02 section 6.6, D-072)
+        run: python3 -I tools/check_schemas.py --self-test && python3 -I tools/check_schemas.py
+      - name: Forbidden paths (section 1)
+        shell: bash
+        run: |
+          bad=$(git ls-files | grep -E '^(research|help_text|conv_samples)/|\.(chm|i2wkb|i2wsp|mcs|mfs|mt2)$' | grep -v '^fixtures/private/' || true)
+          if [ -n "$bad" ]; then echo "Forbidden paths are tracked:"; echo "$bad"; exit 1; fi
+      - name: DCO sign-off
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          status=0
+          for c in $(git rev-list "origin/${{ github.base_ref }}..HEAD"); do
+            if ! git log -1 --format=%B "$c" | grep -q '^Signed-off-by: '; then echo "missing Signed-off-by: $c"; status=1; fi
+          done
+          exit $status
+      - name: Configure with clang-tidy on the Qt-free targets
+        run: cmake --preset ci-linux-lint -DCLANG_TIDY_EXE=$(command -v clang-tidy-18)
+      - name: Build (clang-tidy runs as part of the build)
+        run: cmake --build --preset ci-linux-lint
+      - name: Layering (section 2, 01 section 11 item 3)
+        run: python3 -I tools/check_layering.py --self-test && python3 -I tools/check_layering.py --build-dir build/ci-linux-lint
+      - name: Qt-free and layer-check negative tests (AC-M0-07)
+        run: ctest --preset ci-linux-lint
+      - name: REUSE / SPDX
+        run: pipx run reuse lint
+      - name: Schema validation of data/, schemas/ and fixtures/ (08 section 5, AC-M0-10)
+        shell: bash
+        run: ./build/ci-linux-lint/bin/esses-cli validate data fixtures schemas/*.schema.json
+      - name: Import Log codes documented (AC-M0-12)
+        run: python3 -I tools/check_importlog_codes.py --self-test && python3 -I tools/check_importlog_codes.py --root .
+
+  sanitize:
+    name: sanitize (${{ matrix.preset }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [linux-clang-asan, linux-clang-tsan] # TSan runs the esses_base and esses_store tests (test preset filter)
+    env:
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+      TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lukka/get-cmake@latest
+      - run: cmake --preset ${{ matrix.preset }}
+      - run: cmake --build --preset ${{ matrix.preset }}
+      - run: ctest --preset ${{ matrix.preset }} --parallel 2
+
+  fuzz-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25 # build with ASan + UBSan + coverage, generate the seeds, 2 x 60 s
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lukka/get-cmake@latest
+      - run: cmake --preset linux-clang-fuzz
+      - run: cmake --build --preset linux-clang-fuzz
+      - name: Seeds from the synthetic fixture families (tools/fuzz_seeds.py)
+        run: |
+          build/linux-clang-fuzz/bin/esses-gen-fixtures --inputs-only --out build/fuzz-inputs
+          python3 -I tools/fuzz_seeds.py --inputs build/fuzz-inputs --out build/fuzz-seeds --max-bytes 65536
+      - name: Run each fuzz target for 60 s (AC-M0-06)
+        shell: bash
+        run: |
+          for name in fuzz_ld_header fuzz_ldx; do
+            t=build/linux-clang-fuzz/bin/$name; corpus=build/fuzz-corpus/$name; mkdir -p "$corpus"
+            dict=(); [ -f "$t.dict" ] && dict=("-dict=$t.dict")
+            "$t" -max_total_time=60 -max_len=65536 -rss_limit_mb=2048 "${dict[@]}" "$corpus" "build/fuzz-seeds/$name"
+          done
+
+  # The same targets with MSVC's libFuzzer and ASan (preset win-msvc-fuzz: the libraries and the two targets only).
+  fuzz-smoke-windows:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lukka/get-cmake@latest
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Build the generator (Qt-free core, release)
+        run: |
+          cmake --preset win-msvc-core-rel -DESSES_BUILD_TESTS=OFF
+          cmake --build --preset win-msvc-core-rel --target esses_gen_fixtures
+      - run: cmake --preset win-msvc-fuzz
+      - run: cmake --build --preset win-msvc-fuzz
+      - name: Seeds and 60 s per target
+        shell: bash
+        run: |
+          build/win-msvc-core-rel/bin/esses-gen-fixtures --inputs-only --out build/fuzz-inputs
+          python -I tools/fuzz_seeds.py --inputs build/fuzz-inputs --out build/fuzz-seeds --max-bytes 65536
+          for name in fuzz_ld_header fuzz_ldx; do
+            t=build/win-msvc-fuzz/bin/$name.exe; corpus=build/fuzz-corpus/$name; mkdir -p "$corpus"
+            dict=(); [ -f "build/win-msvc-fuzz/bin/$name.dict" ] && dict=("-dict=build/win-msvc-fuzz/bin/$name.dict")
+            "$t" -max_total_time=60 -max_len=65536 -rss_limit_mb=4096 "${dict[@]}" "$corpus" "build/fuzz-seeds/$name"
+          done
