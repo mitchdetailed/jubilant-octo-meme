@@ -234,13 +234,37 @@ jobs:
         run: |
           bad=$(git ls-files | grep -E '^(research|help_text|conv_samples)/|\.(chm|i2wkb|i2wsp|mcs|mfs|mt2)$' | grep -v '^fixtures/private/' || true)
           if [ -n "$bad" ]; then echo "Forbidden paths are tracked:"; echo "$bad"; exit 1; fi
+      - name: Configure with clang-tidy on the Qt-free targets
+        run: cmake --preset ci-linux-lint -DCLANG_TIDY_EXE="$CLANG_TIDY"
+      - name: Build (clang-tidy runs as part of the build)
+        run: cmake --build --preset ci-linux-lint
+      - name: Layering (section 2, 01 section 11 item 3)
+        run: python3 -I tools/check_layering.py --self-test && python3 -I tools/check_layering.py --build-dir build/ci-linux-lint
+      - name: Qt-free and layer-check negative tests (AC-M0-07)
+        run: ctest --preset ci-linux-lint
+      - name: REUSE / SPDX
+        run: pipx run reuse lint
+      - name: Schema validation of data/, schemas/ and fixtures/ (08 section 5, AC-M0-10)
+        shell: bash
+        run: ./build/ci-linux-lint/bin/esses-cli validate data fixtures schemas/*.schema.json
+      - name: Import Log codes documented (AC-M0-12)
+        run: python3 -I tools/check_importlog_codes.py --self-test && python3 -I tools/check_importlog_codes.py --root .
+
+  # Separate from lint so a missing sign-off does not hide the remaining lint steps; still required (D-004).
+  dco:
+    name: DCO sign-off
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
       # Every commit of the pull request needs a Signed-off-by: line (CONTRIBUTING.md, DCO). On pull_request the
       # checkout is GitHub's synthetic merge of the PR into its base (refs/pull/<n>/merge), so HEAD is that merge
       # commit, which nobody authored or signed. The commits checked are the PR's own: reachable from the PR head
       # but not from the base branch, merge commits excluded (a merge of the base into the branch carries no change
       # of its own to certify).
       - name: DCO sign-off
-        if: github.event_name == 'pull_request'
         shell: bash
         env:
           BASE_REF: ${{ github.base_ref }}
@@ -265,21 +289,6 @@ jobs:
             fi
           done
           exit $status
-      - name: Configure with clang-tidy on the Qt-free targets
-        run: cmake --preset ci-linux-lint -DCLANG_TIDY_EXE="$CLANG_TIDY"
-      - name: Build (clang-tidy runs as part of the build)
-        run: cmake --build --preset ci-linux-lint
-      - name: Layering (section 2, 01 section 11 item 3)
-        run: python3 -I tools/check_layering.py --self-test && python3 -I tools/check_layering.py --build-dir build/ci-linux-lint
-      - name: Qt-free and layer-check negative tests (AC-M0-07)
-        run: ctest --preset ci-linux-lint
-      - name: REUSE / SPDX
-        run: pipx run reuse lint
-      - name: Schema validation of data/, schemas/ and fixtures/ (08 section 5, AC-M0-10)
-        shell: bash
-        run: ./build/ci-linux-lint/bin/esses-cli validate data fixtures schemas/*.schema.json
-      - name: Import Log codes documented (AC-M0-12)
-        run: python3 -I tools/check_importlog_codes.py --self-test && python3 -I tools/check_importlog_codes.py --root .
 
   sanitize:
     name: sanitize (${{ matrix.preset }})

@@ -4,6 +4,8 @@ All notable changes are recorded here, newest first. The project follows semanti
 
 ## Unreleased (M1)
 
+- CI: the DCO sign-off check moved from `lint` into its own `dco` job (pull requests only, still required), so a
+  missing sign-off no longer skips the remaining lint steps (clang-tidy, layering, REUSE, schema validation).
 - Pull request #1 CI fixes (run 38202115135; `docs/milestones/M1.md` §2.7): the `lint` DCO step checks the pull
   request's own commits (`--no-merges`, from the PR head, not from GitHub's synthetic merge commit) and still
   requires a `Signed-off-by:` line on each; `MappedFile::guarded()` on POSIX keeps the descriptor and fails with
