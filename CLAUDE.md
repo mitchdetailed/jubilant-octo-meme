@@ -22,7 +22,7 @@ Instructions for Claude Code in the Esses repository (D-128, D-151). The full gu
   `tools/ld_ref_decode.py` to agree with the reader, and never render or commit pixel goldens locally (they come
   from the ubuntu `qt-app` CI artefact, D-127).
 - **Never commit, push, reset or switch branches** unless the maintainer asked for it in this session. Commits
-  the maintainer asks for carry `Signed-off-by:` (`git commit -s`, DCO).
+  carry no `Signed-off-by:` while DCO is suspended (D-160); never sign off in the maintainer's name.
 
 ## The maintainer's machine
 

@@ -51,7 +51,7 @@ Each ADR has: Title · Context · Options considered (with the research facts th
 | D-035 | MVP scope and milestones | parity-first's MVP minus i2 file importers, index DB and GL (all v1.0); Lap/Details editors, Time Report and sections stay in MVP; ~30 weeks to 0.1, re-estimated ≈ 42 with contingency (D-045) | **yes** (scope cut; answered 2026-10-10) |
 | D-036 | Profiles | Circuit profile only in MVP; range kinds for Run/Stage exist in the model from M0; Drag/Rally rules and editors v1.0 | no |
 
-Addendum A (after the open questions) adds D-037–D-159: decisions proposed by the section writers of documents 00–08, by the 2026-10-10 review (A.1–A.8) and by the final cross-document revision (A.9), plus implementation decisions taken once M0 started (A.10: the user's instructions, and the reconciliation with spike S-1 and the converter port specification) the departures of M0 as built from the design (A.11) and those of M1 as built (A.12, proposed), with their own index. Where an addendum entry amends an ADR above, the ADR carries a one-line "Amended by" note.
+Addendum A (after the open questions) adds D-037–D-160: decisions proposed by the section writers of documents 00–08, by the 2026-10-10 review (A.1–A.8) and by the final cross-document revision (A.9), plus implementation decisions taken once M0 started (A.10: the user's instructions, and the reconciliation with spike S-1 and the converter port specification) the departures of M0 as built from the design (A.11) and those of M1 as built (A.12, proposed), with their own index. Where an addendum entry amends an ADR above, the ADR carries a one-line "Amended by" note.
 
 ---
 
@@ -83,6 +83,8 @@ Addendum A (after the open questions) adds D-037–D-159: decisions proposed by 
 If the user prefers the patent grant, Apache-2.0 is a drop-in substitute with no design change. If the user wants copyleft on the application, option 3 is viable but then the maths engine must be assigned to one tree before the first public tag and the C ABI must document that plugins are separate works communicating through a published interface.
 
 **Consequences.** `LICENSE` (MIT), `NOTICES.md` (Qt LGPL notices, source offer, third-party list), `REUSE.toml` + SPDX headers from the first commit. GPL sources never pasted; the `.ld` reader is written from the public layout notes (i3rs `docs/ld-file-format.md`, motec-i2, motorsport-telemetry-rs). Harvested converter parsers must be the user's own work or MIT-compatible (open question).
+
+**Amended by (A.12):** D-160 (DCO sign-off suspended while the maintainer is the only contributor).
 
 **User must confirm:** **confirmed by the user on 2026-10-10: MIT for the whole tree.** DCO, no CLA and the no-relicensing policy apply as decided above.
 
@@ -117,6 +119,8 @@ If the user prefers the patent grant, Apache-2.0 is a drop-in substitute with no
 **Amended by (A.9, proposed):** D-128 (AI-provenance rule, forbidden paths, text-overlap check, ported-code attribution, CLEANROOM category column).
 
 **Amended by (A.10):** D-143 (the `.ld` pro-logging field is never computed or written; working around a vendor licence check is out of scope) and D-145 (`CLEANROOM.md` categories user-contributed own work and user-owned device logs).
+
+**Amended by (A.12):** D-160 (DCO sign-off suspended while the maintainer is the only contributor).
 
 **User must confirm:** no.
 
@@ -759,6 +763,7 @@ Rewritten on 2026-10-10 after the review. The list is deduplicated across this d
 | D-157 | `DistanceIndex::timeAt` is exact between the 0.25 m steps (refines D-016) | no | M1 §5 deviation 5 |
 | D-158 | Marker order: at equal times `EOL` before `SOL` (amends 02 §4.3 behaviour 8) | no | M1 §3 review fix |
 | D-159 | Shipped data: `<exe dir>/data` first on every OS (amends 01 §9) | no | PR #1 CI (qt-app ubuntu) |
+| D-160 | DCO sign-off suspended while the maintainer is the only contributor (amends D-002, D-004) | no (user decision 2026-10-12) | PR #1 |
 
 ### A.1 Review amendments
 
@@ -1421,3 +1426,9 @@ These entries record where M1, as built and reviewed on the developer machine on
 **Decision.** After the `--data-dir` flag and `ESSES_DATA_DIR`, `esses::Paths` takes the first existing directory of: `<exe dir>/data` (build tree or portable layout, every OS); on Linux and on macOS outside a bundle `<exe dir>/../share/esses/data`; inside a macOS bundle `Contents/Resources/data`, then the `data/` next to the bundle. When none exists it returns the installed location so error messages name the expected path. Windows is unchanged.
 **Consequences.** Build trees, portable layouts and installs resolve the same way on all OSes; `libs/base/tests/paths_tests.cpp` covers each layout. Installed packages (08 §7) must put data under `share/esses/data` or `Resources/data`, as before.
 **User must confirm:** no.
+
+#### D-160 DCO sign-off suspended while the maintainer is the only contributor (amends D-002, D-004)
+**Context.** D-002 and D-004 require a `Signed-off-by:` line on every commit (DCO, no CLA). The sign-off is a personal certification, so an agent must not add it in the maintainer's name; PR #1 therefore failed the `dco` check on every commit. The maintainer is the only contributor today.
+**Decision.** By the user's instruction on 2026-10-12 ("drop dco for now"), the requirement is suspended. The `dco` CI job stays in `.github/workflows/ci.yml` but runs only when the repository variable `ESSES_REQUIRE_DCO` is `true`. CONTRIBUTING.md, GOVERNANCE.md, AGENTS.md, CLAUDE.md and the pull request template say so. Before outside contributions are accepted, the maintainer sets the variable and the requirement applies again; no CLA either way.
+**Consequences.** Commits made so far carry no sign-off and need no history rewrite. Re-enabling is one repository setting. The no-relicensing policy and the MIT licence are unchanged.
+**User must confirm:** no (decided by the user, 2026-10-12).

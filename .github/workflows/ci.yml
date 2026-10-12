@@ -251,10 +251,11 @@ jobs:
       - name: Import Log codes documented (AC-M0-12)
         run: python3 -I tools/check_importlog_codes.py --self-test && python3 -I tools/check_importlog_codes.py --root .
 
-  # Separate from lint so a missing sign-off does not hide the remaining lint steps; still required (D-004).
+  # Separate from lint so a missing sign-off does not hide the remaining lint steps. Suspended while the maintainer
+  # is the only contributor (D-160): it runs only when the repository variable ESSES_REQUIRE_DCO is 'true'.
   dco:
     name: DCO sign-off
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && vars.ESSES_REQUIRE_DCO == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

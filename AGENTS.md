@@ -43,7 +43,8 @@ These apply to every change, human or AI, and are checked in review and in CI.
 7. **The design is the contract.** Use the names in `ARCHITECTURE_OUTLINE.md` §1 and §4 verbatim; a new public
    name is added to the outline first. A departure from the design is recorded (an ADR in
    `docs/design/DECISIONS.md` Addendum A and the milestone note), never made silently.
-8. **Commits** carry a DCO sign-off (`git commit -s`); a pull request says which acceptance criterion
+8. **Commits** carry no DCO sign-off while it is suspended (D-160), and an agent never adds `Signed-off-by:` in the
+   maintainer's name; a pull request says which acceptance criterion
    (`AC-Mx-nn`) or decision (`D-nnn`) it serves and adds a `CHANGELOG.md` entry
    (`.github/PULL_REQUEST_TEMPLATE.md`).
 
@@ -224,7 +225,7 @@ Layout and `fixture-1` are defined in 05 §9.1; `fixtures/README.md` lists the f
 |---|---|---|
 | `core` | ubuntu-24.04, windows-2022, macos-14, no Qt | all Qt-free tests, `DrawList` goldens, fixture verification |
 | `qt-app` | windows-2022 and ubuntu-24.04 on every PR and push; macos-14 nightly and on manual dispatch | Qt 6.12.0 via install-qt-action; every test offscreen; pixel goldens (authoritative on ubuntu); layering with the Qt layers; golden diffs uploaded on failure |
-| `lint` | ubuntu-24.04 | clang-format, clang-tidy, vendor marks, schemas, keymap coverage, forbidden paths, DCO, layering, `reuse lint`, schema validation, Import Log codes |
+| `lint` | ubuntu-24.04 | clang-format, clang-tidy, vendor marks, schemas, keymap coverage, forbidden paths, layering, `reuse lint`, schema validation, Import Log codes |
 | `sanitize` | ubuntu-24.04 | ASan + UBSan; TSan on base, store, maths, plotcore |
 | `fuzz-smoke`, `fuzz-smoke-windows` | ubuntu-24.04, windows-2022 | 60 s per fuzz target |
 

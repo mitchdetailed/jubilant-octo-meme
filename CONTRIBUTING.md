@@ -20,8 +20,11 @@ On Windows `tools\dev\build-core.cmd` sets up the MSVC environment and runs all 
 ## Branches, pull requests and sign-off
 
 - Work on a branch and open a pull request against `main`; `main` is protected and merges are squashed.
-- **Every commit needs a `Signed-off-by:` line** (`git commit -s`), certifying the Developer Certificate of
-  Origin in `DCO`. There is no CLA; you keep your copyright and license your contribution under MIT.
+- **Sign-off (DCO) is suspended for now** (D-160, 2026-10-12): while the maintainer is the only contributor, commits
+  need no `Signed-off-by:` line. It becomes required again, by setting the repository variable `ESSES_REQUIRE_DCO`
+  to `true`, before outside contributions are accepted. Signing off already (`git commit -s`, certifying the
+  Developer Certificate of Origin in `DCO`) is welcome. There is no CLA; you keep your copyright and license your
+  contribution under MIT.
 - Say in the pull request which acceptance criterion (for example `AC-M0-08`) or decision (`D-nnn`) the
   change serves.
 - CI must be green: `core` on three operating systems, `qt-app` on Windows and Linux (from M1), `lint`,

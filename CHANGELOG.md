@@ -4,6 +4,8 @@ All notable changes are recorded here, newest first. The project follows semanti
 
 ## Unreleased (M1)
 
+- DCO sign-off suspended while the maintainer is the only contributor (D-160): the `dco` CI job runs only when the
+  repository variable `ESSES_REQUIRE_DCO` is `true`; contributor docs and the pull request template say so.
 - Pull request #1, first `qt-app` ubuntu run (Qt 6.12, offscreen): shipped data is found at `<exe dir>/data` on every OS
   before the installed location (D-159), which fixes `esses-render`, the bench smokes and render parity on Linux; the
   ADS backend sets `Qt::AA_DontCreateNativeWidgetSiblings` on Linux when the platform is not xcb, because ADS's
