@@ -4,6 +4,9 @@ All notable changes are recorded here, newest first. The project follows semanti
 
 ## Unreleased (M1)
 
+- Test fix: the AC-M0-11 priority-order test uses one worker, so a worker pre-empted between claiming an Interactive
+  task and recording its start cannot make Background tasks look earlier (flaky on a loaded windows-2022 runner); it
+  now also checks that every Interactive task starts before any queued Background task.
 - DCO sign-off suspended while the maintainer is the only contributor (D-160): the `dco` CI job runs only when the
   repository variable `ESSES_REQUIRE_DCO` is `true`; contributor docs and the pull request template say so.
 - Pull request #1, first `qt-app` ubuntu run (Qt 6.12, offscreen): shipped data is found at `<exe dir>/data` on every OS

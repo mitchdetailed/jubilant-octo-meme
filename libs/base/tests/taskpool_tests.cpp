@@ -100,7 +100,12 @@ TEST_CASE("taskpool: 10000 tasks across three priorities complete", "[unit][task
 TEST_CASE(
     "taskpool: Interactive tasks submitted after 1000 Background tasks start before the 20th Background task",
     "[unit][taskpool]") {
-    constexpr int kWorkers = 4;
+    // One worker: the start number is taken inside the task body, so with several workers a worker that has
+    // already claimed an Interactive task can be pre-empted before recording it while the others run hundreds
+    // of trivial Background tasks (seen on a loaded CI runner: last Interactive start 506). With one worker
+    // the start order is the claim order, so the check is exact. Multi-worker behaviour is covered by the
+    // 10,000-task test above.
+    constexpr int kWorkers = 1;
     constexpr int kBackground = 1'000;
     constexpr int kInteractive = 10;
     TaskPool pool(kWorkers);
@@ -137,6 +142,8 @@ TEST_CASE(
     const int lastInteractive = *std::max_element(interactiveStart.begin(), interactiveStart.end());
     INFO("last Interactive start " << lastInteractive << ", 20th Background start " << twentiethBackground);
     CHECK(lastInteractive < twentiethBackground);
+    // Stronger, and exact with one worker: every Interactive task starts before any queued Background task.
+    CHECK(lastInteractive < sortedBackground[kWorkers]);
 }
 
 TEST_CASE("taskpool: FIFO within a band", "[unit][taskpool]") {
