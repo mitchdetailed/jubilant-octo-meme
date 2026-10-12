@@ -4,6 +4,36 @@ All notable changes are recorded here, newest first. The project follows semanti
 
 ## Unreleased (M1)
 
+- Pull request #1 CI fixes (run 38202115135; `docs/milestones/M1.md` §2.7): the `lint` DCO step checks the pull
+  request's own commits (`--no-merges`, from the PR head, not from GitHub's synthetic merge commit) and still
+  requires a `Signed-off-by:` line on each; `MappedFile::guarded()` on POSIX keeps the descriptor and fails with
+  `Io` when the file is now shorter than the view, since POSIX leaves such reads unspecified and macOS serves
+  resident pages without `SIGBUS` (regression test for a truncation that touches no removed page); the
+  Messages and Channels filters use `beginFilterChange()`/`endFilterChange(Direction::Rows)` from Qt 6.10
+  (`invalidateRowsFilter()` is deprecated for 6.13 and warned about by 6.12), and the main-window drag test uses
+  Qt 6.12's `QPointF` constructor of `QDragEnterEvent`, both under `QT_VERSION_CHECK` so Qt 6.7 still builds;
+  `qt-app` installs Qt 6.12.0 with aqtinstall pinned to a commit of its master branch (`AQT_SOURCE`, py7zr
+  1.1.3), because aqtinstall 3.3.0 cannot read the per-toolchain Windows repository layout of Qt 6.11 and later;
+  on Windows `esses` attaches to the console of the terminal that started it before printing `--version`,
+  `--help`, `--dump-commands` or a parser error, and detaches before the GUI runs (new ctest
+  `app.version_console` runs it inside a pseudo console); `qtmodel.tst_source_loader` accepts the phase-2
+  replacement of the published snapshot that a fast build completes before its first check.
+- Qt Advanced Docking System (D-153, decided by the user on 2026-10-11; AC-M1-13, spike S-3): ADS 5.1.1 vendored
+  unmodified under `third_party/qtads` (LGPL-2.1-or-later; archive SHA-256 and tree digest in
+  `third_party/README.md`) and built by its own CMake project as the shared library `qtadvanceddocking-qt6`
+  (`esses::qtads`, `cmake/qtads.cmake`) into `<build>/bin`, beside every executable and test. `AdsBackend` is the
+  default `DockHost` backend: the worksheet area as ADS's central widget, tabbed registry areas, floating
+  windows, auto-hide side bars with the fly-out of 06 §3.3 (collapse on focus loss), perspectives, Reset Dock
+  Windows, and changes made with ADS's own controls. The `QDockWidget` backend stays: `ESSES_DOCK_BACKEND`
+  selects it at run time (environment) or builds without ADS (CMake option). New `IDockBackend::setCentral` and
+  `libraryVersion`, `DockHost::availableBackends`/`defaultBackendName`/`makeBackend`; `layout-1` writes
+  `adsVersion` for ADS perspectives; `DockHost::focus` activates the dock's window when another (a floating
+  dock) is active, on both backends. `widgets.tst_dock_host` runs every case on both backends. Only
+  `esses_widgets` and `esses` may link ADS (`cmake/qt-free-check.cmake`, `tools/check_layering.py` rule 5,
+  three new `lint.configure_check.ads_*` cases). CI: `qt-app` and the hosted bench install `libxcb1-dev`, and
+  `qt-app` checks that the library lands beside the executables. `NOTICES.md` (LGPL notice, source, how to
+  replace the library), `REUSE.toml`, `LICENSES/LGPL-2.1-or-later.txt`, `docs/spikes/S-3.md` (Windows passed;
+  Linux and macOS from CI), `DECISIONS.md` D-153 decided, 08 §3.7.3 as built.
 - First CI run fixes (`main` at 7c5b615, run 38163002936; `docs/milestones/M1.md` §2.5): the Clang and GCC
   warnings MSVC does not raise, in M0 and M1 code and tests (locals shadowing a field renamed, every implicit
   `float` to `double` widening written as a cast, GCC 13 `-Wdangling-reference` and

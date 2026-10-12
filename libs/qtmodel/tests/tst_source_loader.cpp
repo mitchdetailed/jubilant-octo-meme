@@ -109,13 +109,25 @@ private Q_SLOTS:
         w.loader.setUseSidecars(false);
         QSignalSpy published(&w.loader, &SourceLoader::sourcePublished);
         QSignalSpy logs(&w.loader, &SourceLoader::importLog);
+        QSignalSpy replaced(&w.loader, &SourceLoader::sourceReplaced);
         w.loader.open(ld);
         QCOMPARE(w.loader.pendingOpens(), 1);
         QTRY_COMPARE_WITH_TIMEOUT(published.count(), 1, 30000);
         QCOMPARE(w.loader.pendingOpens(), 0);
         QCOMPARE(logs.count(), 1);
         const auto src = published.first().at(0).value<std::shared_ptr<const model::DataSource>>();
-        QCOMPARE(w.loader.source(src->id), src);
+        // The loader holds the published snapshot or the newest replacement of it. The publication prefetches
+        // Corr Speed, and phase 2 (stint / pitStop, below) then replaces the snapshot; without the slow MSVC
+        // debug runtime (Clang, GCC) that whole chain can complete within the wait slice in which the
+        // publication arrived, before this line runs.
+        if (replaced.isEmpty()) {
+            QCOMPARE(w.loader.source(src->id), src);
+        } else {
+            const auto newest = replaced.last().at(0).value<std::shared_ptr<const model::DataSource>>();
+            QCOMPARE(w.loader.source(src->id), newest);
+            QCOMPARE(newest->id, src->id);
+            QVERIFY(newest->version > src->version);
+        }
         QCOMPARE(w.selection.sources().size(), std::size_t{1});
         // The beacons came back from the .ldx: an out lap, three flying laps and an in lap.
         QCOMPARE(rangeCount(*src), std::size_t{5});

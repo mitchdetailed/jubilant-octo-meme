@@ -14,7 +14,9 @@ Reads <build-dir>/esses_targets.json (written at configure time by cmake/esses_t
      the CLI) is declared Qt-free whenever its targets exist;
   4. a library or executable links only the Qt modules of its layer (01 section 2.2 rule 4): esses_qtmodel Qt
      Core; esses_qtrender and esses-render Qt Gui; esses_widgets and esses Qt Widgets (plus Svg, PrintSupport,
-     OpenGL); every other non-test target none; Qt Concurrent and Qt Sql nowhere (D-031).
+     OpenGL); every other non-test target none; Qt Concurrent and Qt Sql nowhere (D-031);
+  5. only esses_widgets and the esses application link the docking library (esses::qtads, the LGPL Qt Advanced
+     Docking System as a shared library, D-026, D-153); tests may link what their library links.
 
 Standard library only. `python -I tools/check_layering.py --build-dir build/<preset>`; `--self-test` runs the
 negative and positive cases (01 section 11 item 3). Exit status: 0 clean, 1 findings, 2 usage error.
@@ -42,6 +44,13 @@ QT_MODULES_ALLOWED = {
     "app": _WIDGET_MODULES,
 }
 QT_MODULES_NEVER = frozenset({"Concurrent", "Sql"})
+DOCKING_LIBRARY_USERS = frozenset({"widgets", "app"})
+
+
+def is_docking_library(dep: str, namespace: str) -> bool:
+    """The docking library under any name it can be linked by (our alias, ADS's aliases and target names)."""
+    return (dep in (f"{namespace}::qtads", f"{namespace}::ads") or dep.startswith("ads::")
+            or re.match(r"^qt[0-9]*advanceddocking", dep) is not None)
 TARGET_DIR_RE = re.compile(r"CMakeFiles[\\/]+([^\\/]+)\.dir[\\/]")
 HEADER_EXT = {".h", ".hh", ".hpp", ".hxx", ".inl", ".ipp"}
 
@@ -147,6 +156,15 @@ def check(build_dir: pathlib.Path) -> list[str]:
             elif allowed is not None and module not in allowed:
                 where = "a Qt-free target" if not allowed else "only " + ", ".join(sorted(allowed))
                 findings.append(f"{n} links {d}; its layer allows {where} (01 section 2.2 rule 4)")
+
+    # 5. the docking library (direct link edges)
+    for n, t in targets.items():
+        if t["kind"] == "test" or short_name(n, prefix) in DOCKING_LIBRARY_USERS:
+            continue
+        for d in t.get("deps", []) + t.get("privateDeps", []):
+            if is_docking_library(d, namespace):
+                findings.append(f"{n} links {d}; only esses_widgets and the esses application link the docking "
+                                f"library (D-026)")
     return findings
 
 
@@ -222,14 +240,34 @@ def self_test() -> int:
             "esses_qtmodel_tst_x links Qt6::Concurrent, which no target may use (D-031)"])
         ok = ok and findings == expected_qt
 
-        # Positive: the allowed modules per layer.
+        # Positive: the allowed modules per layer, and the docking library in esses_widgets (privately) and its
+        # tests.
+        widgets = qt_lib("widgets", 5, ["Qt6::Widgets", "Qt6::Gui", "Qt6::Svg"])
+        widgets["privateDeps"] = ["esses::qtads"]
         manifest["targets"] = base_targets + [
             qt_lib("qtmodel", 4, ["esses::low", "Qt6::Core"]),
             qt_lib("qtrender", 4, ["Qt6::Gui"]),
-            qt_lib("widgets", 5, ["Qt6::Widgets", "Qt6::Gui", "Qt6::Svg"]),
+            widgets,
+            {"name": "esses_widgets_tst_dock_host", "kind": "test", "layer": None,
+             "sourceDir": str(root / "libs" / "a"), "deps": ["esses::widgets", "esses::qtads"], "privateDeps": [],
+             "qtFree": False},
             qt_lib("plotcore", 3, ["esses::low"], qt_free=True)]
         (build / "esses_targets.json").write_text(json.dumps(manifest), encoding="utf-8")
         ok = ok and check(build) == []
+
+        # Negative: the docking library linked by another library and, under ADS's own name, by an executable.
+        manifest["targets"] = base_targets + [
+            qt_lib("qtrender", 4, ["Qt6::Gui", "esses::qtads"]),
+            {"name": "esses_plot_bench", "kind": "executable", "layer": 5, "sourceDir": str(root / "bench"),
+             "deps": ["ads::qtadvanceddocking-qt6"], "privateDeps": [], "qtFree": False}]
+        (build / "esses_targets.json").write_text(json.dumps(manifest), encoding="utf-8")
+        findings = sorted(check(build))
+        expected_ads = sorted([
+            "esses_qtrender links esses::qtads; only esses_widgets and the esses application link the docking "
+            "library (D-026)",
+            "esses_plot_bench links ads::qtadvanceddocking-qt6; only esses_widgets and the esses application link "
+            "the docking library (D-026)"])
+        ok = ok and findings == expected_ads
     print("check_layering self-test: " + ("passed" if ok else "FAILED"))
     return 0 if ok else 1
 

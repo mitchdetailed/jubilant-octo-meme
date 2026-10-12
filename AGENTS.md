@@ -62,8 +62,8 @@ These apply to every change, human or AI, and are checked in review and in CI.
 | `data/`, `schemas/` | Shipped data (all our own) and the JSON schemas with their examples |
 | `tools/` | Lint scripts, the reference decoder, fixture and timing tools, `dev/` build wrappers |
 | `bench/` | `workloads.md` (reference workloads RW-1..RW-5 and the reference machine); benchmarks from M1 |
-| `third_party/` | Every library dependency, vendored unchanged with its licence (`third_party/README.md`, D-147). Adding one needs the maintainer's approval for the download |
-| `cmake/` | `esses_targets.cmake` (`esses_add_library`, `esses_add_test`, `esses_add_qt_test_dir`, the layer check), `qt-free-check.cmake`, `third_party.cmake`, warnings, sanitizers |
+| `third_party/` | Every library dependency, vendored unchanged with its licence (`third_party/README.md`, D-147), including the Qt Advanced Docking System (`qtads/`, LGPL, a shared library built by its own CMake project; D-153). Adding one needs the maintainer's approval for the download |
+| `cmake/` | `esses_targets.cmake` (`esses_add_library`, `esses_add_test`, `esses_add_qt_test_dir`, the layer check), `qt-free-check.cmake`, `third_party.cmake`, `qtads.cmake` (ADS, `ESSES_DOCK_BACKEND`), warnings, sanitizers |
 
 The design documents are large: search them (`grep -n`) and read the section you need by line range.
 
@@ -72,7 +72,7 @@ The design documents are large: search them (`grep -n`) and read the section you
 Layers (01 §2, outline §1). An arrow means "may depend on"; no layer depends upward.
 
 ```
-5  esses (app) -> esses_widgets -> { esses_qtmodel, esses_qtrender }            Qt Widgets (+ ADS later)
+5  esses (app) -> esses_widgets -> { esses_qtmodel, esses_qtrender }            Qt Widgets + ADS (shared)
 4  esses-render -> { esses_qtmodel, esses_qtrender }                            Qt Gui, offscreen
    esses_qtmodel -> every Qt-free library                                     Qt Core only
    esses_qtrender -> esses_plotcore                                           Qt Gui only

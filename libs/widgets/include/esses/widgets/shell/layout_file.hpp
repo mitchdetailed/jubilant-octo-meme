@@ -13,7 +13,8 @@
 // the shell reads and writes it and the perspective bytes come from the widget-level DockHost. Without an
 // open project (`esses -l <log>`) the same document is kept at <config>/layout.json, because settings-1 has
 // only `window.geometry` for the no-project state. "dockBackend" records which DockHost backend wrote the
-// perspectives ("qdockwidget" until ADS is vendored; "adsVersion" is written by the ADS backend).
+// perspectives ("ads" or "qdockwidget", D-153), and "adsVersion" the ADS release when it was the ADS backend
+// (06 section 3.4; removed when another backend writes the file).
 #pragma once
 
 #include <QByteArray>
@@ -56,9 +57,12 @@ public:
     QJsonObject dock(const QString& id) const;
     void setDockOption(const QString& id, const QString& option, const QJsonValue& value);
 
-    void setVersions(const QString& appVersion, const QString& qtVersion, const QString& dockBackend);
+    // `adsVersion` empty: the member is removed (the perspectives were not written by ADS).
+    void setVersions(const QString& appVersion, const QString& qtVersion, const QString& dockBackend,
+                     const QString& adsVersion = {});
     QString appVersion() const;
     QString dockBackend() const;
+    QString adsVersion() const;
 
     const QJsonObject& json() const noexcept { return root_; }
 

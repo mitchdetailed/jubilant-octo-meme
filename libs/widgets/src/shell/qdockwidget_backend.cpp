@@ -108,6 +108,10 @@ QDockWidgetBackend::~QDockWidgetBackend() {
     }
 }
 
+void QDockWidgetBackend::setCentral(QWidget* central) {
+    host_.setCentralWidget(central);
+}
+
 void QDockWidgetBackend::addDock(const QString& id, const QString& title, QWidget* content, DockArea area,
                                  DockState state) {
     if (docks_.contains(id)) {
@@ -236,8 +240,10 @@ void QDockWidgetBackend::focus(const QString& id) {
     }
     QDockWidget* dock = it->dock;
     dock->raise();
-    if (dock->isFloating()) {
-        dock->activateWindow();
+    // The keyboard focus needs the dock's window to be the active one: a floating dock's own window, or the
+    // main window while a floating dock is active.
+    if (QWidget* window = dock->window(); !window->isActiveWindow()) {
+        window->activateWindow();
     }
     if (QWidget* w = dock->widget()) {
         w->setFocus(Qt::OtherFocusReason);

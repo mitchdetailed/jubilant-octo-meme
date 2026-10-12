@@ -963,7 +963,8 @@ bool MainWindow::saveLayout() {
     Impl& d = *impl_;
     d.layout.setVersions(
         QString::fromLatin1(versionString().data(), static_cast<qsizetype>(versionString().size())),
-        QString::fromLatin1(qVersion()), QString::fromLatin1(d.docks->backend().name()));
+        QString::fromLatin1(qVersion()), QString::fromLatin1(d.docks->backend().name()),
+        d.docks->backend().libraryVersion());
     const QScreen* s = screen();
     d.layout.setWindow(saveGeometry(), isMaximized(), s == nullptr ? QString() : s->name(),
                        devicePixelRatioF());

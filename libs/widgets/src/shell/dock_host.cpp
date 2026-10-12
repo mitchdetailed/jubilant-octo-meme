@@ -3,11 +3,19 @@
 
 #include <esses/widgets/shell/dock_host.hpp>
 #include <esses/widgets/shell/qdockwidget_backend.hpp>
+#if ESSES_HAVE_ADS
+#include <esses/widgets/shell/ads_backend.hpp>
+#endif
 
 #include <QApplication>
 #include <QMainWindow>
 #include <QWidget>
+#include <QtGlobal>
 #include <utility>
+
+#ifndef ESSES_DEFAULT_DOCK_BACKEND
+#define ESSES_DEFAULT_DOCK_BACKEND "qdockwidget"
+#endif
 
 namespace esses::widgets {
 
@@ -38,7 +46,7 @@ std::optional<DockState> parseDockState(const QString& name) {
 DockHost::DockHost(QMainWindow& host, QWidget* central, std::unique_ptr<IDockBackend> backend)
     : QObject(&host), host_(host), backend_(backend ? std::move(backend) : makeDefaultBackend(host)) {
     if (central != nullptr) {
-        host_.setCentralWidget(central);
+        backend_->setCentral(central);
     }
     backend_->setStateObserver([this](const QString& id, DockState) { announce(id); });
     if (qApp != nullptr) {
@@ -50,10 +58,45 @@ DockHost::~DockHost() {
     backend_->setStateObserver({});
 }
 
-// The ADS backend joins here once ADS is vendored (D-119): makeDefaultBackend then returns it unless
-// ESSES_DOCK_BACKEND=qdockwidget. Until then every OS uses the QDockWidget backend (AC-M1-13 runs on it).
+QStringList DockHost::availableBackends() {
+    QStringList names;
+#if ESSES_HAVE_ADS
+    names << QStringLiteral("ads");
+#endif
+    names << QStringLiteral("qdockwidget");
+    return names;
+}
+
+// The environment variable wins when it names a backend of this build; an unknown name is ignored with a
+// warning (the build's default runs).
+QString DockHost::defaultBackendName() {
+    const QString fromEnv = qEnvironmentVariable("ESSES_DOCK_BACKEND").trimmed().toLower();
+    if (!fromEnv.isEmpty()) {
+        if (availableBackends().contains(fromEnv)) {
+            return fromEnv;
+        }
+        qWarning("ESSES_DOCK_BACKEND=%s is not a dock backend of this build (%s); using %s",
+                 qPrintable(fromEnv), qPrintable(availableBackends().join(QStringLiteral(", "))),
+                 ESSES_DEFAULT_DOCK_BACKEND);
+    }
+    return QStringLiteral(ESSES_DEFAULT_DOCK_BACKEND);
+}
+
+std::unique_ptr<IDockBackend> DockHost::makeBackend(const QString& name, QMainWindow& host) {
+#if ESSES_HAVE_ADS
+    if (name == QLatin1String("ads")) {
+        return std::make_unique<AdsBackend>(host);
+    }
+#endif
+    if (name == QLatin1String("qdockwidget")) {
+        return std::make_unique<QDockWidgetBackend>(host);
+    }
+    return nullptr;
+}
+
 std::unique_ptr<IDockBackend> DockHost::makeDefaultBackend(QMainWindow& host) {
-    return std::make_unique<QDockWidgetBackend>(host);
+    std::unique_ptr<IDockBackend> backend = makeBackend(defaultBackendName(), host);
+    return backend != nullptr ? std::move(backend) : std::make_unique<QDockWidgetBackend>(host);
 }
 
 void DockHost::addDock(const QString& id, const QString& title, QWidget* content, DockArea defaultArea,

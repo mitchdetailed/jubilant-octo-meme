@@ -3,21 +3,24 @@
 //
 // DockHost (06 sections 3.1-3.5, D-026; AC-M1-13: save/restore perspective, auto-hide, float/dock pass
 // offscreen; for any OS on which spike S-3 failed the QDockWidget fallback passes the same test). A facade:
-// no docking library type appears outside the backend implementation. IDockBackend is the seam:
-// QDockWidgetBackend (QMainWindow::addDockWidget/saveState, AutoHide mapped to Closed plus a side toolbar
-// button) exists now; the Qt Advanced Docking System backend (CDockManager, CDockWidget,
-// CAutoHideDockContainer) is added when ADS is vendored (D-119) and becomes the default; the environment
-// variable ESSES_DOCK_BACKEND=qdockwidget then selects the fallback. Dock registry (06 section 3.2): data
+// no docking library type appears outside the backend implementation. IDockBackend is the seam (D-153):
+//   AdsBackend          the Qt Advanced Docking System (CDockManager, CDockWidget, CAutoHideDockContainer;
+//                       ads_backend.hpp), the default whenever the build has ADS (CMake ESSES_DOCK_BACKEND)
+//   QDockWidgetBackend  QMainWindow::addDockWidget/saveState, AutoHide emulated with a side tool bar button
+//                       (qdockwidget_backend.hpp), the fallback
+// makeDefaultBackend() takes the build's default; the environment variable ESSES_DOCK_BACKEND ("ads" or
+// "qdockwidget") selects another backend the build has at run time. Dock registry (06 section 3.2): data
 // (F8, Left), channels (C, Left tabbed under Data), values (V, Right), trackmap (M3), channelstatus (M2),
 // messages (Bottom, AutoHide); a dock registered in the same default area as an earlier one is tabbed with
 // it. Focus model: 06 section 3.3 (an AutoHide dock focused by command flies out and stays out until focus
 // leaves it).
 //
-// Additions to the 06 section 3.1 sketch: IDockBackend::resetDock/isFlownOut/container/dockIdOf/
-// setStateObserver (Reset Dock Windows, the fly-out of item 5, the focus chain of the KeyEventRouter, state
-// changes made with the dock's own buttons), DockHost::isVisible/dockIds/defaultArea/defaultState/
-// focusedDockId/dockIdOf/content and the stateChanged() signal; dockStateName/parseDockState give the
-// layout-1 spelling ("Docked", "Floating", "AutoHide", "Closed").
+// Additions to the 06 section 3.1 sketch: IDockBackend::setCentral/resetDock/isFlownOut/container/dockIdOf/
+// setStateObserver/libraryVersion (the worksheet area, Reset Dock Windows, the fly-out of item 5, the focus
+// chain of the KeyEventRouter, state changes made with the dock's own buttons, layout-1 "adsVersion"),
+// DockHost::isVisible/dockIds/defaultArea/defaultState/focusedDockId/dockIdOf/content, the stateChanged()
+// signal and the backend choice (availableBackends/defaultBackendName/makeBackend); dockStateName/
+// parseDockState give the layout-1 spelling ("Docked", "Floating", "AutoHide", "Closed").
 #pragma once
 
 #include <QByteArray>
@@ -49,6 +52,9 @@ public:
     using StateObserver = std::function<void(const QString& id, DockState state)>;
 
     virtual ~IDockBackend() = default;
+    // The worksheet area (06 section 2.1), set once before the first addDock: the host's central widget, or
+    // the docking library's central area that docks surround and never cover.
+    virtual void setCentral(QWidget* central) = 0;
     virtual void addDock(const QString& id, const QString& title, QWidget* content, DockArea area,
                          DockState state) = 0;
     virtual void setState(const QString& id, DockState state) = 0;
@@ -67,6 +73,9 @@ public:
     virtual QWidget* focusedDock() const = 0;                  // nullptr when no dock has focus
     virtual void setStateObserver(StateObserver observer) = 0;
     virtual const char* name() const = 0; // "qdockwidget", "ads"
+    // The docking library's version ("5.1.1" for ADS), empty for the QDockWidget backend (layout-1
+    // "adsVersion").
+    virtual QString libraryVersion() const { return {}; }
 
 protected:
     IDockBackend() = default;
@@ -102,8 +111,12 @@ public:
     IDockBackend& backend() noexcept { return *backend_; }
     const IDockBackend& backend() const noexcept { return *backend_; }
 
-    // The backend of this build: the QDockWidget backend until ADS is vendored (ESSES_DOCK_BACKEND is
-    // honoured once there is a choice).
+    // Backend choice (D-153): the names this build has ("ads" first when ADS is built, then "qdockwidget"),
+    // the default (the environment variable ESSES_DOCK_BACKEND when it names one of them, else the build's
+    // ESSES_DOCK_BACKEND), and a backend by name (nullptr for a name this build does not have).
+    static QStringList availableBackends();
+    static QString defaultBackendName();
+    static std::unique_ptr<IDockBackend> makeBackend(const QString& name, QMainWindow& host);
     static std::unique_ptr<IDockBackend> makeDefaultBackend(QMainWindow& host);
 
 Q_SIGNALS:

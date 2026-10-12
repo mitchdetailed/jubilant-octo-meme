@@ -3,15 +3,16 @@
 Layer 5, Qt Widgets (01 §2.1, 04 §7, 06; D-026, D-027, D-030). The shell widgets, the dock facade, the worksheet
 canvas, the component framework with the M1 components and the M1 docks. Built only with `ESSES_BUILD_QT=ON`.
 
-Namespace `esses::widgets` (06 §3.1). Links `esses_qtmodel`, `esses_qtrender` (and the Qt-free libraries) and Qt
-Widgets. Compiled with `QT_NO_KEYWORDS` (PUBLIC): write `Q_SIGNALS`, `Q_SLOTS`, `Q_EMIT`. Never calls `TaskPool`
+Namespace `esses::widgets` (06 §3.1). Links `esses_qtmodel`, `esses_qtrender` (and the Qt-free libraries), Qt
+Widgets and, privately, `esses::qtads` (the Qt Advanced Docking System, a shared library under LGPL-2.1-or-later;
+only with `ESSES_DOCK_BACKEND=ads`, the default; `cmake/qtads.cmake`). No other library may link ADS. Compiled with `QT_NO_KEYWORDS` (PUBLIC): write `Q_SIGNALS`, `Q_SLOTS`, `Q_EMIT`. Never calls `TaskPool`
 directly: builds go through `qt::RenderService` (06 §1).
 
 Three independent glob roots (AUTOMOC on), so two agents can work here without touching a shared file:
 
 | Root | Headers | Contents |
 |---|---|---|
-| `src/shell/` | `include/esses/widgets/shell/` | `DockHost` + `IDockBackend` + `QDockWidgetBackend` (`dock_host.hpp`, `qdockwidget_backend.hpp`), `MainWindow`, `WorksheetCanvas`, `CommandActions`, `KeyEventRouter` |
+| `src/shell/` | `include/esses/widgets/shell/` | `DockHost` + `IDockBackend` + `AdsBackend` + `QDockWidgetBackend` (`dock_host.hpp`, `ads_backend.hpp`, `qdockwidget_backend.hpp`; `ads_backend.cpp` is the only file that includes ADS and is compiled only when ADS is built), `MainWindow`, `WorksheetCanvas`, `CommandActions`, `KeyEventRouter` |
 | `src/docks/` | `include/esses/widgets/docks/` | `DataWindow` (F8), `ChannelsWindow` (C), `ValuesWindow` (V), `MessagesWindow` |
 | `src/components/` | `include/esses/widgets/components/` | `WorksheetContext`, `ExportOptions`, `ExportSink`, `ComponentWidget` (+ factory, `registerBuiltinComponents`), `TimeDistanceGraph` (`time_distance`), `ValuesList` (`values_list`), `PlaceholderComponent` |
 
@@ -32,15 +33,30 @@ None left in `src/`. `tests/tst_widgets_contract.cpp` is replaced by the real te
 
 ## Shell and docks (M1)
 
-- **DockHost.** ADS is not vendored (`third_party/qtads` absent), so every OS uses `QDockWidgetBackend`
-  (`DockHost::makeDefaultBackend`); the ADS backend is pending (D-119; `ESSES_DOCK_BACKEND` selects once there
-  is a choice). Registry: a dock registered in the same default area as an earlier one is tabbed under it
-  (Channels under Data). AutoHide = hidden plus a checkable button on a side tool bar of its area
-  (`esses.autohide.<side>`); the button or `DockHost::focus` flies it out (shown docked, state still AutoHide)
-  until the focus leaves it. The dock's own close/float buttons and title-bar drags reach the state through
-  `IDockBackend::setStateObserver`. `toggle` (V) returns to the last visible state. The perspective is a JSON
-  envelope `{"backend": "qdockwidget", "version": 1, "mainWindow": <base64 QMainWindow::saveState>, "docks":
-  {id: state}}`; a perspective of another backend or a damaged one is refused (`restorePerspective` false).
+- **DockHost** (D-153). Two backends behind `IDockBackend`: `AdsBackend` (the Qt Advanced Docking System, the
+  default whenever the build has ADS) and `QDockWidgetBackend` (the fallback). `DockHost::makeDefaultBackend`
+  takes `defaultBackendName()`: the environment variable `ESSES_DOCK_BACKEND` (`ads`, `qdockwidget`) when it
+  names a backend of the build, else the build's CMake option `ESSES_DOCK_BACKEND`;
+  `availableBackends()`/`makeBackend(name, host)` serve the tests. Registry: a dock registered in the same
+  default area as an earlier one is tabbed under it (Channels under Data), the earlier one staying the current
+  tab. `IDockBackend::setCentral` puts the worksheet area in the host: `QMainWindow::setCentralWidget`, or ADS's
+  central dock widget (`esses.worksheetArea`; not closable, movable, floatable or pinnable) inside the
+  `CDockManager` that is the host's central widget. The dock's own controls (close and float buttons,
+  title-bar drags, ADS's pin and side tabs) reach the state through `IDockBackend::setStateObserver`. `toggle`
+  (V) returns to the last visible state. `focus` activates the dock's window when another one is active.
+  - ADS: the state is read from ADS each time (closed, auto-hide, floating container, docked). AutoHide =
+    pinned to ADS's side bar (the side of the area the dock was registered or reset in; while the window is
+    shown, the side ADS's own pin button would choose); `focus` or the side tab flies it out, and it collapses
+    when the focus leaves it (06 §3.3 item 5) or on a click outside (ADS). Floating = in a floating container.
+    The ADS configuration is its default with opaque splitters and auto-hide. Perspective: `{"backend": "ads",
+    "version": 1, "adsVersion": "5.1.1", "state": <base64 CDockManager::saveState(1)>}`; a dock the perspective
+    does not know goes to its registered area and state.
+  - QDockWidget: AutoHide = hidden plus a checkable button on a side tool bar of its area
+    (`esses.autohide.<side>`); the button or `DockHost::focus` flies it out (shown docked, state still
+    AutoHide) until the focus leaves it. Perspective: `{"backend": "qdockwidget", "version": 1, "mainWindow":
+    <base64 QMainWindow::saveState>, "docks": {id: state}}`.
+  - A perspective of the other backend or a damaged one is refused (`restorePerspective` false; the shell then
+    resets the docks with an Info row).
 - **Layout persistence (`LayoutFile`, `layout-1`).** `<project>/.local/layout.json`, or `<config>/layout.json`
   without a project. `MainWindow::restoreLayout` (constructor, `openProject`): window geometry, the active
   workbook's perspective (else `_default`), Values "All channels", the active worksheet (`active`, else the
@@ -85,7 +101,7 @@ None left in `src/`. `tests/tst_widgets_contract.cpp` is replaced by the real te
 
 | Test | Covers |
 |---|---|
-| `tests/shell/tst_dock_host` | AC-M1-13 on the QDockWidget backend: registry and tabbing, float/dock by command and by the dock's own buttons, auto-hide side button and fly-out collapse on focus loss, V toggle and the close button, save/restore in the same and in a fresh window (states, floating, moved area), refused foreign/damaged perspectives, `LayoutFile` round trip, unknown members kept, bad files refused |
+| `tests/shell/tst_dock_host` | AC-M1-13 on every backend of the build (Qt Test global data rows `ads` and `qdockwidget`; a probe per backend reads its widgets and drives its own controls): registry and tabbing, the worksheet area, float/dock by command and by the dock's own controls, auto-hide side button and fly-out collapse on focus loss, V toggle and the close buttons, save/restore in the same and in a fresh window (states, floating, moved area), refused foreign/damaged perspectives and the other backend's, `ESSES_DOCK_BACKEND`, `LayoutFile` round trip (with `adsVersion`), unknown members kept, bad files refused |
 | `tests/shell/tst_main_window` | assembly (menus in order with key text and no QAction shortcuts, toolbar, every keymap command registered, planned ones greyed, docks, worksheet tabs); F8, ESC, V, C, F11/F12, 1/2/9 through the router, plain keys kept by the Channels search; session restore without a project and per project (layout file content, workbook id keys), Reset Dock Windows; damaged and foreign layouts; `-l` open into the Data window, Import Log rows, CTRL+F, F9, F4 and the toolbar's checked states; Channels ENTER to the focused component; ESC ends a rubber band first; F12/F11 keep the worksheet's components; one Budget row per cache warning with two windows on one runtime; every runtime marks the GUI thread NoBlock (AC-M1-12) |
 | `tests/docks/tst_data_window` | ENTER / keypad ENTER, CTRL+ENTER, ALT+ENTER (compact renumbering), DELETE on source vs range rows, arrows and letters stay in the tree, CTRL+F from the dock with the highlight following Main and N/P, M/O/1 clicks and double-click, Trusted checkbox (italic), slot colours and tool tips |
 | `tests/docks/tst_values_window` | rows follow the focused component (kept when none), Main and Overlay 1 cells update on a cursor move, time vs distance alignment when the active worksheet changes, "All channels", Copy Row |
@@ -153,18 +169,19 @@ speeds and throttle, component specs and a `World` with the qtmodel services of 
 
 ## Deviations from the design text
 
-- `DockHost(QMainWindow&, QWidget* central, unique_ptr<IDockBackend> = {})`: the backend seam asked for in M1
-  (`IDockBackend`); ADS is not vendored yet, so `QDockWidgetBackend` (06 §3.1's `QDockWidgetHost`, renamed to
-  the backend role) is the default on every OS until it is (07 §4.1 builds the fallback only where S-3 fails;
-  AC-M1-13 therefore runs on the fallback; S-3 not run, `docs/spikes/S-3.md`; D-153, proposed, asks the user to
-  approve the ADS download or accept the fallback for 0.1). `DockHost::backend()` exposes it for AC-M1-13 on
-  both backends.
-  Additions to 06 §3.1: `IDockBackend::resetDock/isFlownOut/container/dockIdOf/setStateObserver`,
-  `DockHost::isVisible/dockIds/defaultArea/defaultState/focusedDockId/dockIdOf/content`, `stateChanged()`,
-  `dockStateName/parseDockState`; `ESSES_DOCK_BACKEND` is an environment variable, not a build option.
+- `DockHost(QMainWindow&, QWidget* central, unique_ptr<IDockBackend> = {})`: the backend seam (`IDockBackend`,
+  D-153). The ADS code 06 §3.1 puts in `DockHost.cpp` is `AdsBackend` (`ads_backend.cpp`); 06 §3.1's
+  `QDockWidgetHost` is `QDockWidgetBackend`, and it is built on every OS, not only where S-3 fails (07 §4.1).
+  `DockHost::backend()` exposes the backend for AC-M1-13 on both.
+  Additions to 06 §3.1: `IDockBackend::setCentral/resetDock/isFlownOut/container/dockIdOf/setStateObserver/
+  libraryVersion`, `DockHost::isVisible/dockIds/defaultArea/defaultState/focusedDockId/dockIdOf/content/
+  availableBackends/defaultBackendName/makeBackend`, `stateChanged()`, `dockStateName/parseDockState`,
+  `AdsBackend::dockManager`. `ESSES_DOCK_BACKEND` is both a CMake option (the build's default; `qdockwidget`
+  builds without ADS) and an environment variable (a run-time choice among the backends the build has), where
+  06 §3.1 has a build-time switch only. ADS is linked as `esses::qtads` (08 §3.7.3 has `esses::ads`).
 - `LayoutFile` (`layout-1`) lives in `esses_widgets` (the outline places `.local/layout.json` under
-  `esses_qtmodel`); it writes `dockBackend` (the backend that wrote the perspectives) where 06 §3.4 has
-  `adsVersion`; the perspective member stays `ads`. Without a project the layout is kept in
+  `esses_qtmodel`); besides 06 §3.4's `adsVersion` (written only when ADS wrote the perspectives) it writes
+  `dockBackend`; the perspective member stays `ads` whatever backend wrote it. Without a project the layout is kept in
   `<config>/layout.json` (settings-1 has only `window.geometry`). There is no `schemas/layout-1.schema.json`
   yet.
 - Menus: items show the key as "Title<TAB>Key" text (no `QAction` shortcut, so the KeyEventRouter stays the

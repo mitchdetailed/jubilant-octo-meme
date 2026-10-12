@@ -166,11 +166,16 @@ void LayoutFile::setDockOption(const QString& id, const QString& option, const Q
     root_.insert(key("docks"), docks);
 }
 
-void LayoutFile::setVersions(const QString& appVersion, const QString& qtVersion,
-                             const QString& dockBackend) {
+void LayoutFile::setVersions(const QString& appVersion, const QString& qtVersion, const QString& dockBackend,
+                             const QString& adsVersion) {
     root_.insert(key("appVersion"), appVersion);
     root_.insert(key("qtVersion"), qtVersion);
     root_.insert(key("dockBackend"), dockBackend);
+    if (adsVersion.isEmpty()) {
+        root_.remove(key("adsVersion"));
+    } else {
+        root_.insert(key("adsVersion"), adsVersion);
+    }
 }
 
 QString LayoutFile::appVersion() const {
@@ -179,6 +184,10 @@ QString LayoutFile::appVersion() const {
 
 QString LayoutFile::dockBackend() const {
     return root_.value(key("dockBackend")).toString();
+}
+
+QString LayoutFile::adsVersion() const {
+    return root_.value(key("adsVersion")).toString();
 }
 
 } // namespace esses::widgets

@@ -469,7 +469,12 @@ private Q_SLOTS:
             mime.setData(QString::fromLatin1(ChannelsWindow::kMimeType),
                          qt::ChannelsModel::channelsMime({QStringLiteral("Wheel Speed FL")}, false));
             const QPoint at = focused->rect().center();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 12, 0)
+            // Qt 6.12 adds this QPointF constructor and deprecates the QPoint one (for 6.16).
+            QDragEnterEvent enter(QPointF(at), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
+#else
             QDragEnterEvent enter(at, Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);
+#endif
             QApplication::sendEvent(focused, &enter);
             QVERIFY(enter.isAccepted());
             QDropEvent drop(QPointF(at), Qt::CopyAction, &mime, Qt::LeftButton, Qt::NoModifier);

@@ -42,6 +42,13 @@ one executable and one ctest entry (`<lib>.tst_<name>`, label `qt`), registered 
 (`cmake/esses_targets.cmake`), with `QT_QPA_PLATFORM=offscreen` and the kit on `PATH`. The Qt targets compile
 with `QT_NO_KEYWORDS`: write `Q_SIGNALS`, `Q_SLOTS`, `Q_EMIT`.
 
+Dock backend (D-153): the Qt builds compile the Qt Advanced Docking System from `third_party/qtads` as a shared
+library (`qtadvanceddocking-qt6d.dll` in Debug) into `<build>\bin`, next to every executable and test, and
+`DockHost` uses it by default. `set ESSES_CMAKE_ARGS=-DESSES_DOCK_BACKEND=qdockwidget` configures a build
+without ADS (the `QDockWidget` backend only); in a build with ADS, the environment variable
+`ESSES_DOCK_BACKEND=qdockwidget` runs `esses` or a test on the fallback instead. `widgets.tst_dock_host` runs on
+every backend of the build.
+
 ## Presets
 
 | Preset | Use |

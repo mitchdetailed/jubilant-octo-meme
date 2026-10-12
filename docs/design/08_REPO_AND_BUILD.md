@@ -346,6 +346,8 @@ Updating a vendored library is a PR that touches only `third_party/<lib>/`, `thi
 
 #### 3.7.3 ADS acquisition
 
+**As built (D-153, 2026-10-11).** ADS 5.1.1 is vendored unmodified under `third_party/qtads` (D-147; the user approved the download) and built by its own CMake project from `cmake/qtads.cmake`: `add_subdirectory(third_party/qtads ... SYSTEM)` with ADS's options `BUILD_STATIC OFF`, `BUILD_EXAMPLES OFF` and `QT_VERSION_MAJOR` from our `find_package(Qt6)`, set inside a function. ADS 5 names the shared library `qtadvanceddocking-qt6` (`qtadvanceddocking-qt6d` in Debug); the tree links it as `esses::qtads`, privately from `esses_widgets`; its output directories are redirected to `<build>/bin` as below; it is built without warnings. The CMake option `ESSES_DOCK_BACKEND` (`ads`, default, or `qdockwidget`) leaves it out. The FetchContent text below is the original plan.
+
 `cmake/FindOrFetchADS.cmake` uses `FetchContent_Declare(ads GIT_REPOSITORY … GIT_TAG <pinned>)` with `BUILD_STATIC OFF`, `BUILD_EXAMPLES OFF`, `ADS_VERSION` from the tag. ADS 4.x names its library `qt${QT_VERSION_MAJOR}advanceddocking`, so against Qt 6 the target is `qt6advanceddocking` (its own alias `ads::qt6advanceddocking`) and the DLL is `qt6advanceddocking.dll`; there is no `ads::qtadvanceddocking`. After `FetchContent_MakeAvailable(ads)`:
 
 ```cmake

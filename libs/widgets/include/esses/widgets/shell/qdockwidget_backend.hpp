@@ -1,9 +1,11 @@
 // SPDX-FileCopyrightText: 2026 the Esses contributors
 // SPDX-License-Identifier: MIT
 //
-// QDockWidgetBackend (06 section 3.1, D-026): the DockHost backend over QMainWindow::addDockWidget and
-// saveState/restoreState. The fallback for an OS on which spike S-3 fails, and the only backend until ADS is
-// vendored (AC-M1-13 runs on it).
+// QDockWidgetBackend (06 section 3.1, D-026, D-153): the DockHost backend over QMainWindow::addDockWidget and
+// saveState/restoreState. The fallback: selected with the environment variable
+// ESSES_DOCK_BACKEND=qdockwidget, and the only backend of a build configured with
+// -DESSES_DOCK_BACKEND=qdockwidget (an OS on which spike S-3 fails). AC-M1-13 runs on it as on the ADS
+// backend.
 //   Docked    a QDockWidget in its area (tabbed with the first dock registered in the same area)
 //   Floating  QDockWidget::setFloating(true)
 //   AutoHide  hidden, plus a checkable button on a side tool bar of the dock's area (objectName
@@ -39,6 +41,7 @@ public:
     explicit QDockWidgetBackend(QMainWindow& host);
     ~QDockWidgetBackend() override;
 
+    void setCentral(QWidget* central) override; // QMainWindow::setCentralWidget
     void addDock(const QString& id, const QString& title, QWidget* content, DockArea area,
                  DockState state) override;
     void setState(const QString& id, DockState state) override;

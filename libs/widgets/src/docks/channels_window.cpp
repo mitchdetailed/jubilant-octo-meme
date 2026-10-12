@@ -32,8 +32,16 @@ public:
     QString query;
 
     void setQuery(const QString& q) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
+        // invalidateRowsFilter() is deprecated for Qt 6.13 (and warned about from 6.12);
+        // endFilterChange(Direction) exists from 6.10.
+        beginFilterChange();
+        query = q.trimmed();
+        endFilterChange(QSortFilterProxyModel::Direction::Rows);
+#else
         query = q.trimmed();
         invalidateRowsFilter();
+#endif
     }
 
     bool filterAcceptsRow(int row, const QModelIndex& parent) const override {

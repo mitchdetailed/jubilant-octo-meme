@@ -11,18 +11,23 @@
 #   (3) every target of ESSES_QT_FREE_REQUIRED that exists is marked QT_FREE, so a library cannot leave the Qt-free
 #       set by dropping the flag;
 #   (4) the Qt layers link only their allowed Qt modules: esses_qtmodel no Qt Gui/Widgets (Qt Core only),
-#       esses_qtrender and esses-render no Qt Widgets, nothing but esses_widgets/esses_app the docking library,
-#       and no target Qt Concurrent or Qt Sql (D-031, 01 section 2.1).
+#       esses_qtrender and esses-render no Qt Widgets and no docking library anywhere in their link closure,
+#       no target Qt Concurrent or Qt Sql (D-031, 01 section 2.1), and nothing but esses_widgets and esses_app
+#       links the docking library (esses::qtads, LGPL, D-026) directly; tests are not registered here.
 include_guard(GLOBAL)
 
 # Short names (without ${ESSES_PREFIX}_) of the targets that must stay Qt-free whenever they are defined.
 set(ESSES_QT_FREE_REQUIRED base units store model formats analysis maths project plotcore cli_core cli)
+# The docking library under every name it can be linked by: our alias, ADS's own aliases and target names.
+set(ESSES_DOCKING_LIBRARY_REGEX "ads::.*|${ESSES_NAMESPACE}::qtads|${ESSES_NAMESPACE}::ads|qt[0-9]*advanceddocking.*")
 # <short name>|<regex of forbidden link-closure entries> (01 section 2.2 rule 4).
 set(ESSES_QT_FORBIDDEN_LINKS
-    "qtmodel|^(Qt[0-9]*::(Gui|Widgets|OpenGL|OpenGLWidgets|Svg|SvgWidgets|PrintSupport)|ads::.*|${ESSES_NAMESPACE}::ads)$"
-    "qtrender|^(Qt[0-9]*::(Widgets|OpenGLWidgets|SvgWidgets|PrintSupport)|ads::.*|${ESSES_NAMESPACE}::ads)$"
-    "render|^(Qt[0-9]*::(Widgets|OpenGLWidgets|SvgWidgets|PrintSupport)|ads::.*|${ESSES_NAMESPACE}::ads)$"
+    "qtmodel|^(Qt[0-9]*::(Gui|Widgets|OpenGL|OpenGLWidgets|Svg|SvgWidgets|PrintSupport)|${ESSES_DOCKING_LIBRARY_REGEX})$"
+    "qtrender|^(Qt[0-9]*::(Widgets|OpenGLWidgets|SvgWidgets|PrintSupport)|${ESSES_DOCKING_LIBRARY_REGEX})$"
+    "render|^(Qt[0-9]*::(Widgets|OpenGLWidgets|SvgWidgets|PrintSupport)|${ESSES_DOCKING_LIBRARY_REGEX})$"
     "*|^Qt[0-9]*::(Concurrent|Sql)$")
+# Targets that may link the docking library directly (everything else gets it, if at all, through them).
+set(ESSES_DOCKING_LIBRARY_USERS widgets app)
 
 function(esses_mark_qt_free target)
   set_property(TARGET ${target} PROPERTY ESSES_QT_FREE TRUE)
@@ -59,7 +64,7 @@ function(esses_qt_free_check)
         continue()
       endif()
       list(APPEND seen ${cur})
-      if(cur MATCHES "^(Qt[0-9]*::|Qt[0-9]*[A-Z]|ads::|${ESSES_NAMESPACE}::ads$|qt[0-9]*advanceddocking)")
+      if(cur MATCHES "^(Qt[0-9]*::|Qt[0-9]*[A-Z]|(${ESSES_DOCKING_LIBRARY_REGEX})$)")
         message(FATAL_ERROR "qt-free-check: ${t} links ${cur} (via ${seen})")
       endif()
       if(TARGET ${cur})
@@ -110,6 +115,16 @@ function(esses_qt_free_check)
   get_property(all GLOBAL PROPERTY ESSES_ALL_TARGETS)
   foreach(t IN LISTS all)
     string(REGEX REPLACE "^${ESSES_PREFIX}_" "" short "${t}")
+    get_target_property(kind ${t} ESSES_KIND)
+    if(NOT kind STREQUAL "test" AND NOT short IN_LIST ESSES_DOCKING_LIBRARY_USERS)
+      _esses_links_of(${t} direct)
+      foreach(cur IN LISTS direct)
+        if(cur MATCHES "^(${ESSES_DOCKING_LIBRARY_REGEX})$")
+          message(FATAL_ERROR "qt-free-check: ${t} must not link ${cur}; only esses_widgets and the esses "
+                              "application link the docking library (01 section 2.2 rule 4, D-026)")
+        endif()
+      endforeach()
+    endif()
     set(rules "")
     foreach(entry IN LISTS ESSES_QT_FORBIDDEN_LINKS)
       string(FIND "${entry}" "|" bar)

@@ -52,10 +52,12 @@ foreach(_case IN LISTS _esses_reject_cases)
 endforeach()
 
 # Qt-free check and layer check negative tests (AC-M0-07, 01 section 11 items 2 and 3), the ESSES_WITH_<LIB>
-# switch message of the layer check, and (M1) the required Qt-free set and the Qt module rules of the Qt layers.
+# switch message of the layer check, (M1) the required Qt-free set and the Qt module rules of the Qt layers, and
+# who may link the docking library (D-026).
 set(_esses_cfg_cases include_QString include_QtCore include_qglobal use_QString link_Qt6Core positive
                      layer_upward layer_forbidden_pair layer_downward layer_switched_off
-                     required_qt_free qt_module_qtmodel_gui qt_module_concurrent qt_module_qtmodel_core)
+                     required_qt_free qt_module_qtmodel_gui qt_module_concurrent qt_module_qtmodel_core
+                     ads_qtrender ads_other_library ads_widgets)
 foreach(_case IN LISTS _esses_cfg_cases)
   add_test(NAME lint.configure_check.${_case}
            COMMAND "${CMAKE_COMMAND}"

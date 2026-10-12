@@ -20,6 +20,7 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <array>
+#include <utility>
 
 namespace esses::widgets {
 
@@ -62,7 +63,19 @@ public:
     std::array<bool, 3> shown{true, true, true};
     QString text;
 
-    void refilter() { invalidateRowsFilter(); }
+    // Applies a change of shown or text and refilters the rows.
+    template <class Change> void changeFilter(Change&& change) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
+        // invalidateRowsFilter() is deprecated for Qt 6.13 (and warned about from 6.12);
+        // endFilterChange(Direction) exists from 6.10.
+        beginFilterChange();
+        std::forward<Change>(change)();
+        endFilterChange(QSortFilterProxyModel::Direction::Rows);
+#else
+        std::forward<Change>(change)();
+        invalidateRowsFilter();
+#endif
+    }
 
     bool filterAcceptsRow(int row, const QModelIndex& parent) const override {
         const QModelIndex i = sourceModel()->index(row, 0, parent);
@@ -190,8 +203,7 @@ MessagesWindow::MessagesWindow(qt::MessagesModel& model, qt::CommandRegistry& co
 
     connect(filter_, &QLineEdit::textChanged, this, [this](const QString& text) {
         auto* p = static_cast<MessagesFilterProxy*>(proxy_);
-        p->text = text.trimmed();
-        p->refilter();
+        p->changeFilter([p, &text] { p->text = text.trimmed(); });
     });
     connect(clear, &QToolButton::clicked, &model_, &qt::MessagesModel::clear);
     connect(copy, &QToolButton::clicked, this, [this] { QApplication::clipboard()->setText(logText()); });
@@ -221,12 +233,11 @@ void MessagesWindow::setSeverityShown(Severity severity, bool shown) {
     if (p->shown[i] == shown) {
         return;
     }
-    p->shown[i] = shown;
+    p->changeFilter([p, i, shown] { p->shown[i] = shown; });
     if (QToolButton* b = severityButtons_[static_cast<int>(severity)];
         b != nullptr && b->isChecked() != shown) {
         b->setChecked(shown);
     }
-    p->refilter();
 }
 
 bool MessagesWindow::severityShown(Severity severity) const {

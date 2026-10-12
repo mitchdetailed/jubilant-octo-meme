@@ -14,6 +14,11 @@
 //     into fail(Io): EXCEPTION_IN_PAGE_ERROR via __try/__except on Windows, SIGBUS via a handler and
 //     per-thread sigsetjmp on POSIX. The routine must not own objects with destructors (a fault unwinds by
 //     longjmp on POSIX). Faults outside the view are not intercepted.
+//   * POSIX leaves reads of a mapping whose file shrank unspecified (mmap(): only pages beyond the end of the
+//     object at the time of the access must raise SIGBUS). Linux raises SIGBUS; macOS keeps serving pages
+//     that were already resident without any signal. So on POSIX the descriptor stays open with the view and
+//     guarded() also fstat()s it after the routine returns: a file now shorter than the view is fail(Io), on
+//     every POSIX system, whether or not the routine touched a removed page.
 #pragma once
 
 #include <esses/base/config.hpp>
@@ -69,6 +74,8 @@ private:
 #if defined(ESSES_OS_WINDOWS)
     void* fileHandle_ = nullptr;    // HANDLE
     void* mappingHandle_ = nullptr; // HANDLE
+#else
+    int fd_ = -1; // kept open with the view: guarded() fstat()s it to detect a truncation
 #endif
 };
 
