@@ -13,8 +13,12 @@
 //            logs ~/Library/Logs/<dir>/   data <App>.app/Contents/Resources/data/ (or
 //            <prefix>/share/<dir>/data/)
 // Portable mode: a file named portable.marker next to the executable puts config, cache and logs under
-// <exe dir>/config, /cache and /logs. <dir> is ESSES_DIR_NAME of cmake/naming.cmake. Directories are
-// resolved, not created.
+// <exe dir>/config, /cache and /logs. <dir> is ESSES_DIR_NAME of cmake/naming.cmake; <prefix> is
+// <exe dir>/.. . Directories are resolved, not created.
+// Shipped data without an override: the first existing directory of <exe dir>/data (on every OS: a build
+// tree, where CMake copies data/ beside the executables, or a portable layout), then the installed location
+// above (a macOS bundle then also tries the data/ beside <App>.app, as in the build tree); when none exists,
+// the installed location.
 #pragma once
 
 #include <esses/base/config.hpp>

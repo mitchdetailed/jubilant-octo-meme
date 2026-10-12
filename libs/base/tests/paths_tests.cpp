@@ -11,6 +11,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <fstream>
+#include <system_error>
 
 namespace fs = std::filesystem;
 using esses::Paths;
@@ -113,9 +114,174 @@ TEST_CASE("paths: OS defaults", "[unit][paths]") {
     CHECK(p.logDir().is_absolute());
     CHECK(p.projectsDir().filename() == "Projects");
     CHECK(p.projectsDir().parent_path().filename() == "esses");
+    // The build tree: CMake copies data/ beside every executable (apps/cli, libs/project), on every OS.
+    std::error_code ec;
+    if (fs::is_directory(p.exeDir() / "data", ec)) {
+        CHECK(p.dataDir() == p.exeDir() / "data");
+    }
 #if defined(ESSES_OS_WINDOWS)
     CHECK(p.dataDir() == p.exeDir() / "data");
     CHECK(p.logDir() == p.configDir() / "logs");
     CHECK(p.cacheDir().filename() == "cache");
 #endif
 }
+
+// Shipped data without an override (01 section 9): <exe dir>/data first on every OS (a build tree or a
+// portable layout), then the installed location; the installed location when none exists. Each case fakes the
+// layout in a temp directory and points exeDir at it.
+namespace {
+
+// ESSES_DIR_NAME: the last element of the default configuration directory (not portable, no override).
+fs::path dirName(const fs::path& exe) {
+    esses::PathOverrides o;
+    o.exeDir = exe;
+    const esses::Result<Paths> r = Paths::resolve(o);
+    REQUIRE(r.ok());
+    REQUIRE_FALSE(r.value().portable());
+    return r.value().configDir().filename();
+}
+
+esses::Result<Paths> resolveFrom(const fs::path& exe) {
+    esses::PathOverrides o;
+    o.exeDir = exe;
+    return Paths::resolve(o);
+}
+
+// The installed shipped-data location of this OS for an executable in `exe` (outside a macOS bundle).
+fs::path installedData(const fs::path& exe, const fs::path& dir) {
+#if defined(ESSES_OS_WINDOWS)
+    static_cast<void>(dir);
+    return exe / "data";
+#else
+    return (exe / ".." / "share" / dir / "data").lexically_normal();
+#endif
+}
+
+} // namespace
+
+TEST_CASE("paths: shipped data beside the executable wins on every OS", "[unit][paths]") {
+    EnvGuard guard;
+    EnvGuard::clear();
+    esses::test::TempDir tmp("data-beside");
+    const fs::path exe = tmp.path() / "bin";
+    const fs::path dir = dirName(exe);
+    fs::create_directories(exe / "data");
+    fs::create_directories(tmp.path() / "share" / dir / "data"); // an installed copy loses to the build tree
+    const esses::Result<Paths> r = resolveFrom(exe);
+    REQUIRE(r.ok());
+    CHECK(r.value().dataDir() == exe / "data");
+    CHECK_FALSE(r.value().portable());
+}
+
+TEST_CASE("paths: a portable layout finds its shipped data beside the executable", "[unit][paths]") {
+    EnvGuard guard;
+    EnvGuard::clear();
+    esses::test::TempDir tmp("data-portable");
+    const fs::path exe = tmp.path() / "esses";
+    fs::create_directories(exe / "data");
+    std::ofstream(exe / "portable.marker") << "";
+    const esses::Result<Paths> r = resolveFrom(exe);
+    REQUIRE(r.ok());
+    CHECK(r.value().portable());
+    CHECK(r.value().dataDir() == exe / "data");
+    CHECK(r.value().configDir() == exe / "config");
+}
+
+TEST_CASE("paths: shipped data falls back to the installed location", "[unit][paths]") {
+    EnvGuard guard;
+    EnvGuard::clear();
+    esses::test::TempDir tmp("data-installed");
+    const fs::path exe = tmp.path() / "bin";
+    fs::create_directories(exe);
+    const fs::path dir = dirName(exe);
+    const fs::path installed = installedData(exe, dir);
+    fs::create_directories(installed);
+    const esses::Result<Paths> r = resolveFrom(exe);
+    REQUIRE(r.ok());
+    CHECK(r.value().dataDir().lexically_normal() == installed);
+#if !defined(ESSES_OS_WINDOWS)
+    CHECK(r.value().dataDir().lexically_normal() == (tmp.path() / "share" / dir / "data").lexically_normal());
+#endif
+}
+
+TEST_CASE("paths: without any shipped data directory the installed location is named", "[unit][paths]") {
+    EnvGuard guard;
+    EnvGuard::clear();
+    esses::test::TempDir tmp("data-none");
+    const fs::path exe = tmp.path() / "bin";
+    fs::create_directories(exe);
+    const fs::path dir = dirName(exe);
+    const esses::Result<Paths> r = resolveFrom(exe);
+    REQUIRE(r.ok());
+    CHECK(r.value().dataDir().lexically_normal() == installedData(exe, dir));
+    CHECK_FALSE(fs::exists(r.value().dataDir())); // resolved, not created
+}
+
+TEST_CASE("paths: the data flag and the environment still beat data beside the executable", "[unit][paths]") {
+    EnvGuard guard;
+    EnvGuard::clear();
+    esses::test::TempDir tmp("data-override");
+    const fs::path exe = tmp.path() / "bin";
+    fs::create_directories(exe / "data");
+    REQUIRE(esses::setEnv(esses::envName("DATA_DIR"), esses::pathToUtf8(tmp.path() / "env-data")));
+    esses::PathOverrides o;
+    o.exeDir = exe;
+    {
+        const esses::Result<Paths> r = Paths::resolve(o);
+        REQUIRE(r.ok());
+        CHECK(r.value().dataDir() == tmp.path() / "env-data");
+    }
+    o.dataDir = tmp.path() / "flag-data";
+    const esses::Result<Paths> r = Paths::resolve(o);
+    REQUIRE(r.ok());
+    CHECK(r.value().dataDir() == tmp.path() / "flag-data");
+}
+
+TEST_CASE("paths: a data directory that is a file is not taken", "[unit][paths]") {
+    EnvGuard guard;
+    EnvGuard::clear();
+    esses::test::TempDir tmp("data-file");
+    const fs::path exe = tmp.path() / "bin";
+    fs::create_directories(exe);
+    std::ofstream(exe / "data") << "not a directory";
+#if defined(ESSES_OS_WINDOWS)
+    const esses::Result<Paths> r = resolveFrom(exe);
+    REQUIRE(r.ok());
+    CHECK(r.value().dataDir() == exe / "data"); // the installed location, named even though unusable
+#else
+    const fs::path dir = dirName(exe);
+    fs::create_directories(installedData(exe, dir));
+    const esses::Result<Paths> r = resolveFrom(exe);
+    REQUIRE(r.ok());
+    CHECK(r.value().dataDir().lexically_normal() == installedData(exe, dir));
+#endif
+}
+
+#if defined(ESSES_OS_MACOS)
+TEST_CASE("paths: a macOS bundle reads Resources, then the data beside the bundle", "[unit][paths]") {
+    EnvGuard guard;
+    EnvGuard::clear();
+    esses::test::TempDir tmp("data-bundle");
+    const fs::path contents = tmp.path() / "bin" / "Esses.app" / "Contents";
+    const fs::path exe = contents / "MacOS";
+    fs::create_directories(exe);
+    // Neither exists: the bundle's Resources is the installed location.
+    {
+        const esses::Result<Paths> r = resolveFrom(exe);
+        REQUIRE(r.ok());
+        CHECK(r.value().dataDir() == (contents / "Resources" / "data").lexically_normal());
+    }
+    // A bundle in the build tree: <bin>/Esses.app beside <bin>/data.
+    fs::create_directories(tmp.path() / "bin" / "data");
+    {
+        const esses::Result<Paths> r = resolveFrom(exe);
+        REQUIRE(r.ok());
+        CHECK(r.value().dataDir() == (tmp.path() / "bin" / "data").lexically_normal());
+    }
+    // An installed bundle: its own Resources wins over anything beside it.
+    fs::create_directories(contents / "Resources" / "data");
+    const esses::Result<Paths> r = resolveFrom(exe);
+    REQUIRE(r.ok());
+    CHECK(r.value().dataDir() == (contents / "Resources" / "data").lexically_normal());
+}
+#endif

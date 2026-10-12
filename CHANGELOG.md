@@ -4,6 +4,13 @@ All notable changes are recorded here, newest first. The project follows semanti
 
 ## Unreleased (M1)
 
+- Pull request #1, first `qt-app` ubuntu run (Qt 6.12, offscreen): shipped data is found at `<exe dir>/data` on every OS
+  before the installed location (D-159), which fixes `esses-render`, the bench smokes and render parity on Linux; the
+  ADS backend sets `Qt::AA_DontCreateNativeWidgetSiblings` on Linux when the platform is not xcb, because ADS's
+  floating container calls `winId()` there, which made the main window's widgets native and crashed Qt's offscreen
+  backing store on destruction (vendored ADS unchanged); static strips paint into the shared buffer with a clip
+  instead of a translated strip image, so text keeps one-pass coordinates under FreeType's subpixel positioning
+  (strips equal one pass exactly; new `subpixelTextEqualsOnePass` test).
 - CI: the DCO sign-off check moved from `lint` into its own `dco` job (pull requests only, still required), so a
   missing sign-off no longer skips the remaining lint steps (clang-tidy, layering, REUSE, schema validation).
 - Pull request #1 CI fixes (run 38202115135; `docs/milestones/M1.md` §2.7): the `lint` DCO step checks the pull

@@ -127,6 +127,17 @@ struct AdsBackend::Impl {
 };
 
 AdsBackend::AdsBackend(QMainWindow& host) : d_(std::make_unique<Impl>(host)) {
+#if defined(Q_OS_UNIX) && !defined(Q_OS_MACOS)
+    // ADS's Linux floating window takes its native window id each time it is shown, for window properties it
+    // then sets only on X11 (CFloatingDockContainer::show). Outside Wayland that window is a child of the
+    // dock manager, so by default Qt makes its siblings, and with them the dock manager's whole tree, native
+    // windows. Off X11 that is never wanted: the offscreen platform cannot reparent native child windows, and
+    // destroying a main window whose dock had floated crashed in its backing store. X11 keeps ADS's
+    // behaviour; on Wayland ADS's floating windows have no parent, so the attribute changes nothing there.
+    if (QGuiApplication::platformName() != QLatin1String("xcb")) {
+        QCoreApplication::setAttribute(Qt::AA_DontCreateNativeWidgetSiblings); // application-wide
+    }
+#endif
     // Global ADS configuration, read when the manager and its dock widgets are created: ADS's defaults with
     // opaque splitters, and auto-hide (pin button per dock area, minimise button, collapse on a click
     // outside).

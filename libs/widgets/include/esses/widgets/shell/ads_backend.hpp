@@ -27,6 +27,9 @@
 // <base64 of CDockManager::saveState(kStateVersion)>}. A perspective of another backend, a damaged one or
 // one ADS rejects (its own dry run first) is refused (restoreState() false) and nothing changes; a dock
 // the perspective does not know (registered after it was saved) goes to its registered area and state.
+// On Linux off X11 (offscreen, Wayland, ...) the constructor sets Qt::AA_DontCreateNativeWidgetSiblings for
+// the whole application, so that ADS's floating windows never turn the main window's widgets into native
+// windows (see ads_backend.cpp).
 #pragma once
 
 #include <esses/widgets/shell/dock_host.hpp>

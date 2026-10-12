@@ -50,7 +50,10 @@ None left in `src/`. `tests/tst_widgets_contract.cpp` is replaced by the real te
     when the focus leaves it (06 §3.3 item 5) or on a click outside (ADS). Floating = in a floating container.
     The ADS configuration is its default with opaque splitters and auto-hide. Perspective: `{"backend": "ads",
     "version": 1, "adsVersion": "5.1.1", "state": <base64 CDockManager::saveState(1)>}`; a dock the perspective
-    does not know goes to its registered area and state.
+    does not know goes to its registered area and state. On Linux off X11 (offscreen, Wayland, ...) `AdsBackend`
+    sets `Qt::AA_DontCreateNativeWidgetSiblings` for the application: ADS's Linux floating window takes its
+    native window id on every show, which would otherwise make the dock manager's whole tree native windows, and
+    the offscreen platform crashed destroying such a main window once a dock had floated.
   - QDockWidget: AutoHide = hidden plus a checkable button on a side tool bar of its area
     (`esses.autohide.<side>`); the button or `DockHost::focus` flies it out (shown docked, state still
     AutoHide) until the focus leaves it. Perspective: `{"backend": "qdockwidget", "version": 1, "mainWindow":
@@ -101,7 +104,7 @@ None left in `src/`. `tests/tst_widgets_contract.cpp` is replaced by the real te
 
 | Test | Covers |
 |---|---|
-| `tests/shell/tst_dock_host` | AC-M1-13 on every backend of the build (Qt Test global data rows `ads` and `qdockwidget`; a probe per backend reads its widgets and drives its own controls): registry and tabbing, the worksheet area, float/dock by command and by the dock's own controls, auto-hide side button and fly-out collapse on focus loss, V toggle and the close buttons, save/restore in the same and in a fresh window (states, floating, moved area), refused foreign/damaged perspectives and the other backend's, `ESSES_DOCK_BACKEND`, `LayoutFile` round trip (with `adsVersion`), unknown members kept, bad files refused |
+| `tests/shell/tst_dock_host` | AC-M1-13 on every backend of the build (Qt Test global data rows `ads` and `qdockwidget`; a probe per backend reads its widgets and drives its own controls): registry and tabbing, the worksheet area, float/dock by command and by the dock's own controls (off X11 leaving no native window inside the main window), auto-hide side button and fly-out collapse on focus loss, V toggle and the close buttons, save/restore in the same and in a fresh window (states, floating, moved area), refused foreign/damaged perspectives and the other backend's, `ESSES_DOCK_BACKEND`, `LayoutFile` round trip (with `adsVersion`), unknown members kept, bad files refused |
 | `tests/shell/tst_main_window` | assembly (menus in order with key text and no QAction shortcuts, toolbar, every keymap command registered, planned ones greyed, docks, worksheet tabs); F8, ESC, V, C, F11/F12, 1/2/9 through the router, plain keys kept by the Channels search; session restore without a project and per project (layout file content, workbook id keys), Reset Dock Windows; damaged and foreign layouts; `-l` open into the Data window, Import Log rows, CTRL+F, F9, F4 and the toolbar's checked states; Channels ENTER to the focused component; ESC ends a rubber band first; F12/F11 keep the worksheet's components; one Budget row per cache warning with two windows on one runtime; every runtime marks the GUI thread NoBlock (AC-M1-12) |
 | `tests/docks/tst_data_window` | ENTER / keypad ENTER, CTRL+ENTER, ALT+ENTER (compact renumbering), DELETE on source vs range rows, arrows and letters stay in the tree, CTRL+F from the dock with the highlight following Main and N/P, M/O/1 clicks and double-click, Trusted checkbox (italic), slot colours and tool tips |
 | `tests/docks/tst_values_window` | rows follow the focused component (kept when none), Main and Overlay 1 cells update on a cursor move, time vs distance alignment when the active worksheet changes, "All channels", Copy Row |

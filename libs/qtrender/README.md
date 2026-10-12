@@ -54,17 +54,24 @@ Internal (`src/`): `font_cache.*` (the one QFont construction rule, the style ->
   clear, pool)` is the Static raster of the widgets' worker build (04 §6.3 step 2 "worker build + raster"): on a
   TaskPool worker it measures the columns every command reaches (in parallel slices: `commandBounds`, and whether
   a polyline is x-monotonic), then paints up to 32 vertical strips (twice the workers, edges on whole logical
-  pixels and 16-pixel cache-line multiples) as sub-tasks joined with Rule W. Each strip is a `QImage` over its
-  columns of the shared buffer (painter translated by its left edge) plus the direct rasteriser clipped to them;
-  it paints, in list order, only the commands that reach it, and walks only the part of an opaque x-monotonic
-  polyline that reaches it (binary search; translucent or gapped polylines are walked whole, clipped). The
-  picture equals one `LayerCache::rasteriseStatic` pass pixel for pixel (`tst_static_strips`, tolerance 0, and
-  `tests/ui/tst_render_parity`, where esses-render still paints in one pass). A non-integer DPR, a NoBlock thread
-  or no pool paint one strip. Buffers: `LayerCache::storeStatic` hands the replaced image back when it has the
-  same size (at most two process-wide spare buffers, 04 §6.5 item 3 "QImage reuse"); `rasteriseStatic` takes
-  one of the list's size before allocating. Measured on the reference machine (RelWithDebInfo, 20 noisy 1 kHz
-  traces, 3,800 px trace area, DPR 1): 16.3 ms in one pass, about 4.4 ms in strips with reuse; the zoom/pan
-  step of `bench/plot_bench` went from 27.9 to 13.0 ms (with the parallel emit of `esses_plotcore`).
+  pixels and 16-pixel cache-line multiples) as sub-tasks joined with Rule W. Each strip paints a `QImage` over
+  the whole shared buffer clipped to its columns, in exactly the coordinates of one pass, plus the direct
+  rasteriser clipped to them; it paints, in list order, only the commands that reach it (a text run counts one
+  line height either side of its box, since glyph ink can pass the advance box), and walks only the part of an
+  opaque x-monotonic polyline that reaches it (binary search; translucent or gapped polylines are walked whole,
+  clipped). The picture equals one `LayerCache::rasteriseStatic` pass pixel for pixel (`tst_static_strips`,
+  tolerance 0, and `tests/ui/tst_render_parity`, where esses-render still paints in one pass). A strip is never
+  a translated view of its columns: `QPainter::drawStaticText` truncates a run's device position to 26.6 fixed
+  point toward zero, so a run starting left of a translated origin moved 1/64 px right and, where glyphs are
+  positioned at subpixel offsets (FreeType with fontconfig's slight hinting on Linux, CoreText; not Windows'
+  fully hinted FreeType), took another glyph image. `tst_static_strips` checks text across every strip edge
+  with the application font's hinting preference set to none, which gives subpixel glyph positions on every
+  OS. A non-integer DPR, a NoBlock thread or no pool paint one strip. Buffers: `LayerCache::storeStatic` hands
+  the replaced image back when it has the same size (at most two process-wide spare buffers, 04 §6.5 item 3
+  "QImage reuse"); `rasteriseStatic` takes one of the list's size before allocating. Measured on the reference
+  machine (RelWithDebInfo, 20 noisy 1 kHz traces, 3,800 px trace area, DPR 1): 16.3 ms in one pass, about 4.4 ms
+  in strips with reuse; the zoom/pan step of `bench/plot_bench` went from 27.9 to 13.0 ms (with the parallel
+  emit of `esses_plotcore`).
 - **LayerCache.** The Static image survives `resize`/`invalidate` (the previous frame stays on screen until the
   rebuild lands); `rasteriseStatic` reuses its buffer at constant size (and skips the initial fill when the list starts with a
   Clear of the layer). `dynamicDamage` is the union of the
@@ -93,6 +100,7 @@ the pixel references in `tests/reference/` are geometry-only scenes and therefor
 | Test | Covers |
 |---|---|
 | `tst_raster_backend` | layer life cycle and free-list; every command at DPR 1 and 2 (exact pixels); slices, gaps, dashes; text anchors, elision, background, rotation, DPR scaling against `QtTextMetrics`; compose order; straight-alpha readback; Static rasteriser == QPainter picture, single blend of translucent strokes, scissor clipping of huge coordinates; `geometry_scene@{1,1.5,2}x.png` references |
+| `tst_static_strips` | `RasterBackend::rasteriseStatic` in strips == one `LayerCache::rasteriseStatic` pass (tolerance 0): geometry scene, split traces and text at DPR 1, 2 and 1.5, text across every strip edge at subpixel glyph positions, the eight `time_distance` golden cases; clear colour; one strip on a NoBlock thread; spare-buffer reuse |
 | `tst_layer_cache` | the ChangeMask table of 04 §2.2 bit by bit (recomposition only on the right masks); resize; buffer reuse; damage = cursor strips + key column at DPR 1 and 2; `paint` == `RasterBackend::compose`; exposed-region clipping |
 | `tst_text_metrics_concurrency` | 8 threads measuring while the GUI thread swaps schemes (200 snapshots); per-snapshot caches; metrics == `SchemeFonts` fonts |
 | `tst_scheme_fonts` | style -> role table, QFont attributes, caption fallback, golden font registration |

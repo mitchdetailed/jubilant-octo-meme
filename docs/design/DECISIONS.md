@@ -51,7 +51,7 @@ Each ADR has: Title · Context · Options considered (with the research facts th
 | D-035 | MVP scope and milestones | parity-first's MVP minus i2 file importers, index DB and GL (all v1.0); Lap/Details editors, Time Report and sections stay in MVP; ~30 weeks to 0.1, re-estimated ≈ 42 with contingency (D-045) | **yes** (scope cut; answered 2026-10-10) |
 | D-036 | Profiles | Circuit profile only in MVP; range kinds for Run/Stage exist in the model from M0; Drag/Rally rules and editors v1.0 | no |
 
-Addendum A (after the open questions) adds D-037–D-158: decisions proposed by the section writers of documents 00–08, by the 2026-10-10 review (A.1–A.8) and by the final cross-document revision (A.9), plus implementation decisions taken once M0 started (A.10: the user's instructions, and the reconciliation with spike S-1 and the converter port specification) the departures of M0 as built from the design (A.11) and those of M1 as built (A.12, proposed), with their own index. Where an addendum entry amends an ADR above, the ADR carries a one-line "Amended by" note.
+Addendum A (after the open questions) adds D-037–D-159: decisions proposed by the section writers of documents 00–08, by the 2026-10-10 review (A.1–A.8) and by the final cross-document revision (A.9), plus implementation decisions taken once M0 started (A.10: the user's instructions, and the reconciliation with spike S-1 and the converter port specification) the departures of M0 as built from the design (A.11) and those of M1 as built (A.12, proposed), with their own index. Where an addendum entry amends an ADR above, the ADR carries a one-line "Amended by" note.
 
 ---
 
@@ -758,6 +758,7 @@ Rewritten on 2026-10-10 after the review. The list is deduplicated across this d
 | D-156 | The shell (`MainWindow`, `LayoutFile`) lives in `esses_widgets` (amends 01 §2.1) | no | M1 §5 deviation 4 |
 | D-157 | `DistanceIndex::timeAt` is exact between the 0.25 m steps (refines D-016) | no | M1 §5 deviation 5 |
 | D-158 | Marker order: at equal times `EOL` before `SOL` (amends 02 §4.3 behaviour 8) | no | M1 §3 review fix |
+| D-159 | Shipped data: `<exe dir>/data` first on every OS (amends 01 §9) | no | PR #1 CI (qt-app ubuntu) |
 
 ### A.1 Review amendments
 
@@ -1413,4 +1414,10 @@ These entries record where M1, as built and reviewed on the developer machine on
 **Context.** 02 §4.3 behaviour 8 sorts a layer's markers by `(t, cls, id)` with the classes in declaration order, so a `SOL` sorts before an `EOL` at the same time. When one outing ends exactly where the next starts (companion or user markers), the whole-outing rule then emitted a zero-length second outing and left the rest of it outside any outing, and the beacon-pair rule dropped the first outing's in lap and the second's out lap.
 **Decision.** At equal `t` the order is `EOL`, then `SOL`, then the other classes in declaration order; ties within a class are broken by `id` as before. Separately, the beacon-pair rule closes an outing that is still open when a new `SOL` arrives (an implied `EOL` at that time, with a nil end marker), and a missing final `EOL` is placed at the layer duration rather than at the latest marker of any kind.
 **Consequences.** Only layers with coincident `EOL`/`SOL` markers sort differently; no public fixture has any. `markerSetHash` follows the new order for those layers.
+**User must confirm:** no.
+
+#### D-159 Shipped data: `<exe dir>/data` first on every OS (amends 01 §9)
+**Context.** 01 §9 gives one shipped-data location per OS: `<exe dir>\data\` on Windows, `<prefix>/share/esses/data/` on Linux, `Contents/Resources/data/` in a macOS bundle. The build copies `data/` to `<build>/bin/data` on every OS, so Linux and macOS build trees could not find `units.json` (PR #1 `qt-app` ubuntu run: `esses-render`, both bench smokes and render parity failed).
+**Decision.** After the `--data-dir` flag and `ESSES_DATA_DIR`, `esses::Paths` takes the first existing directory of: `<exe dir>/data` (build tree or portable layout, every OS); on Linux and on macOS outside a bundle `<exe dir>/../share/esses/data`; inside a macOS bundle `Contents/Resources/data`, then the `data/` next to the bundle. When none exists it returns the installed location so error messages name the expected path. Windows is unchanged.
+**Consequences.** Build trees, portable layouts and installs resolve the same way on all OSes; `libs/base/tests/paths_tests.cpp` covers each layout. Installed packages (08 §7) must put data under `share/esses/data` or `Resources/data`, as before.
 **User must confirm:** no.

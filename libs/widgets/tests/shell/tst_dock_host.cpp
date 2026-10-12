@@ -72,6 +72,18 @@ void settle() {
     }
 }
 
+// The widgets under `window` (windows themselves excluded) that have a native window of their own.
+QStringList nativeChildren(const QWidget& window) {
+    QStringList found;
+    for (const QWidget* w : window.findChildren<QWidget*>()) {
+        if (!w->isWindow() && w->internalWinId() != 0) {
+            found.append(QString::fromLatin1(w->metaObject()->className()) + QLatin1Char(' ') +
+                         w->objectName());
+        }
+    }
+    return found;
+}
+
 // A main window with the four M1 docks of 06 section 3.2 (contents: line edits, so focus can land in them) on
 // the named backend.
 struct Shell {
@@ -550,6 +562,13 @@ private Q_SLOTS:
         QVERIFY(!s.floatingWindow(kValues));
         QCOMPARE(p->side(kValues), std::optional<DockArea>(DockArea::Right));
         QTRY_VERIFY(!changed.isEmpty());
+
+        // Off X11 floating leaves no native window inside the main window. ADS's Linux floating window
+        // used to make the dock manager's whole tree native, and the offscreen platform's backing store then
+        // crashed when this main window was destroyed.
+        if (QGuiApplication::platformName() != QLatin1String("xcb")) {
+            QCOMPARE(nativeChildren(s.host), QStringList());
+        }
     }
 
     void autoHideFliesOutAndCollapses() {

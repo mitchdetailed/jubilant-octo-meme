@@ -83,10 +83,11 @@ public:
     // that size is reused, see LayerCache::storeStatic), cleared to `clear` unless the list starts with a
     // Clear. On a worker of a TaskPool (`pool`, else the calling worker's pool,
     // TaskPool::currentWorkerPool()) the image is painted in vertical strips in parallel (sub-tasks joined
-    // with Rule W): each strip paints, in list order, the commands whose bounds reach its columns, clipped to
-    // them, and walks only the part of an opaque x-monotonic trace polyline that reaches it, so the picture
-    // equals one LayerCache::rasteriseStatic pass pixel for pixel. Strip edges lie on whole logical pixels: a
-    // non-integer DPR, a NoBlock thread or no pool paint one strip. Null for an empty list size.
+    // with Rule W): each strip paints, in list order and in the layer's own coordinates, the commands whose
+    // bounds reach its columns, clipped to them, and walks only the part of an opaque x-monotonic trace
+    // polyline that reaches it, so the picture equals one LayerCache::rasteriseStatic pass pixel for pixel on
+    // every platform. Strip edges lie on whole logical pixels: a non-integer DPR, a NoBlock thread or no pool
+    // paint one strip. Null for an empty list size.
     static QImage rasteriseStatic(const plot::DrawList& list, const SchemeFonts& fonts, plot::Rgba clear = 0,
                                   TaskPool* pool = nullptr);
     static constexpr int kMaxStaticStrips = 32;

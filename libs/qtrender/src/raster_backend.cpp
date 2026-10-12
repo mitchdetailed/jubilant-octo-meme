@@ -505,9 +505,11 @@ struct StripCommand {
 };
 
 struct StripFilter {
-    int x0 = 0; // the strip's columns [x0, x1)
+    int x0 = 0; // the strip's columns [x0, x1) of rows [0, height), device px of the whole layer
     int x1 = 0;
+    int height = 0;
     const std::vector<StripCommand>* commands = nullptr;
+    QRect columns() const { return QRect(x0, 0, x1 - x0, height); }
     bool skips(std::size_t index) const {
         const StripCommand& c = (*commands)[index];
         return !c.every && (c.x1 < c.x0 || c.x1 < static_cast<float>(x0) || c.x0 >= static_cast<float>(x1));
@@ -612,6 +614,15 @@ void paintCommands(QPainter& painter, const plot::DrawList& list, const SchemeFo
     painter.setWorldTransform(device);
     painter.setRenderHint(QPainter::TextAntialiasing, true);
     painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+    if (strip != nullptr) {
+        // A strip paints in the whole layer's coordinates, exactly those of one pass, clipped to its columns
+        // (device px under `device`). Never a translated view of the columns: QPainter::drawStaticText
+        // converts the run's device position to 26.6 fixed point by truncation toward zero, so a run that
+        // starts left of a translated origin lands 1/64 px further right, and with subpixel glyph positioning
+        // (FreeType with slight or no hinting, as fontconfig sets on Linux, in quarter pixels; CoreText) can
+        // take another glyph image than in one pass.
+        painter.setClipRect(strip->columns(), Qt::ReplaceClip);
+    }
 
     for (std::size_t index = 0; index < list.cmds.size(); ++index) {
         const plot::DrawCmd& cmd = list.cmds[index];
@@ -630,15 +641,22 @@ void paintCommands(QPainter& painter, const plot::DrawList& list, const SchemeFo
             break;
         }
         case plot::CmdKind::Scissor:
-            painter.setWorldTransform(base);
-            if (baseClipping) {
-                painter.setClipRegion(baseClip);
+            if (strip != nullptr) {
+                const QRect columns = strip->columns();
+                painter.setClipRect(cmd.rect.w > 0.0F ? columns.intersected(snapRect(cmd.rect)) : columns,
+                                    Qt::ReplaceClip);
             } else {
-                painter.setClipping(false);
-            }
-            painter.setWorldTransform(device);
-            if (cmd.rect.w > 0.0F) {
-                painter.setClipRect(snapRect(cmd.rect), baseClipping ? Qt::IntersectClip : Qt::ReplaceClip);
+                painter.setWorldTransform(base);
+                if (baseClipping) {
+                    painter.setClipRegion(baseClip);
+                } else {
+                    painter.setClipping(false);
+                }
+                painter.setWorldTransform(device);
+                if (cmd.rect.w > 0.0F) {
+                    painter.setClipRect(snapRect(cmd.rect),
+                                        baseClipping ? Qt::IntersectClip : Qt::ReplaceClip);
+                }
             }
             if (fast != nullptr) {
                 fast->clip = cmd.rect.w > 0.0F ? fast->bounds.intersected(snapRect(cmd.rect)) : fast->bounds;
@@ -737,30 +755,39 @@ void measureStripCommands(const plot::DrawList& list, const SchemeFonts& fonts, 
         if (b.wholeLayer) {
             c.every = true;
         } else if (!b.rect.isEmpty()) {
-            c.x0 = static_cast<float>(std::floor(b.rect.left()));
-            c.x1 = static_cast<float>(std::ceil(b.rect.right()));
+            // A text run's box is its advance by ascent + descent, but glyph ink may reach past it (negative
+            // side bearings, accents, an unhinted glyph's antialiased edge at a subpixel offset): a run is
+            // also painted, clipped, by the strips within one line height of its box.
+            qreal spill = 0.0;
+            if (cmd.kind == plot::CmdKind::TextRun) {
+                const plot::TextRun& run = list.texts[cmd.textIndex]; // in range: the bounds are not empty
+                const qreal dpr = list.dpr > 0.0F ? static_cast<qreal>(list.dpr) : 1.0;
+                spill = std::ceil(schemeFontEntry(fonts, run.style, run.quarterTurns == 1).metrics.height() *
+                                  dpr);
+            }
+            c.x0 = static_cast<float>(std::floor(b.rect.left() - spill));
+            c.x1 = static_cast<float>(std::ceil(b.rect.right() + spill));
         }
     }
 }
 
 } // namespace
 
-// Columns [x0, x1) of a Static layer whose pixels start at `bits`: a QImage over those columns (the painter's
-// origin moved left by x0 device px, a whole logical pixel) and the direct rasteriser clipped to them in the
-// layer's own coordinates; the commands outside the columns are skipped.
-void paintStaticStrip(uchar* bits, qsizetype bytesPerLine, int x0, int x1, int height, qreal dpr,
+// Columns [x0, x1) of a Static layer of `width` x `height` device px whose pixels start at `bits`: a QImage
+// over the whole layer (no copy; the painter's coordinates are those of one pass) clipped to the columns, and
+// the direct rasteriser clipped to them; the commands outside the columns are skipped. Strips running at once
+// share the pixels but each reads and writes only its own columns.
+void paintStaticStrip(uchar* bits, qsizetype bytesPerLine, int width, int height, int x0, int x1, qreal dpr,
                       const plot::DrawList& list, const SchemeFonts& fonts,
                       const std::vector<StripCommand>& commands) {
-    QImage view(bits + static_cast<qsizetype>(x0) * 4, x1 - x0, height, bytesPerLine,
-                QImage::Format_ARGB32_Premultiplied);
+    QImage view(bits, width, height, bytesPerLine, QImage::Format_ARGB32_Premultiplied);
     view.setDevicePixelRatio(dpr);
     FastTarget fast;
     fast.bits = bits;
     fast.bytesPerLine = bytesPerLine;
     fast.bounds = QRect(x0, 0, x1 - x0, height);
-    const StripFilter filter{x0, x1, &commands};
+    const StripFilter filter{x0, x1, height, &commands};
     QPainter painter(&view);
-    painter.translate(-static_cast<qreal>(x0) / dpr, 0.0);
     paintCommands(painter, list, fonts, &fast, &filter);
 }
 
@@ -857,7 +884,9 @@ QImage RasterBackend::rasteriseStatic(const plot::DrawList& list, const SchemeFo
         detail::paintStaticList(image, list, fonts);
         return image;
     }
-    // Strip edges on whole logical pixels and 64-byte cache lines (16 device px per logical pixel unit).
+    // Strip edges on 64-byte cache lines (16 device px per logical pixel unit, so also on whole logical
+    // pixels); every strip paints in the layer's own coordinates (paintStaticStrip), so the edges never move
+    // what is drawn.
     const int align = 16 * static_cast<int>(unitD);
     const int columns = ((width + strips - 1) / strips + align - 1) / align * align;
     // The commands' columns, measured in parallel slices of about equal work (a text run's bounds need its
@@ -908,7 +937,7 @@ QImage RasterBackend::rasteriseStatic(const plot::DrawList& list, const SchemeFo
                         QImage::Format_ARGB32_Premultiplied);
             view.fill(fill);
         }
-        detail::paintStaticStrip(bits, bpl, x0, x1, height, dpr, list, fonts, commands);
+        detail::paintStaticStrip(bits, bpl, width, height, x0, x1, dpr, list, fonts, commands);
     };
     std::vector<Future<int>> parts;
     for (int x0 = columns; x0 < width; x0 += columns) {
