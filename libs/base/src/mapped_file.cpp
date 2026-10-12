@@ -143,7 +143,7 @@ void installBusHandler() {
 
 int runGuarded(void (*decode)(void*), void* ctx, const std::byte* begin, const std::byte* end) noexcept {
     std::call_once(gBusHandlerOnce, installBusHandler);
-    GuardFrame frame;
+    GuardFrame frame{}; // value-initialised; sigsetjmp fills frame.jump below
     frame.begin = begin;
     frame.end = end;
     frame.previous = tlsGuard;

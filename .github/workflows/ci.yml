@@ -237,7 +237,8 @@ jobs:
       - name: Configure with clang-tidy on the Qt-free targets
         run: cmake --preset ci-linux-lint -DCLANG_TIDY_EXE="$CLANG_TIDY"
       - name: Build (clang-tidy runs as part of the build)
-        run: cmake --build --preset ci-linux-lint
+        # -k 0: keep going after a failing file so one run reports every clang-tidy finding.
+        run: cmake --build --preset ci-linux-lint -- -k 0
       - name: Layering (section 2, 01 section 11 item 3)
         run: python3 -I tools/check_layering.py --self-test && python3 -I tools/check_layering.py --build-dir build/ci-linux-lint
       - name: Qt-free and layer-check negative tests (AC-M0-07)
