@@ -17,3 +17,7 @@
 *.ttf binary
 *.otf binary
 *.pdf binary
+
+# Vendored code is stored byte-for-byte so the SHA-256 records in third_party/README.md and
+# third_party/qtads/UPSTREAM.md match on every checkout (no line-ending normalisation).
+third_party/** -text
