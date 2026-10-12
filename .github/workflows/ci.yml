@@ -175,8 +175,9 @@ jobs:
       # Every rendered image is written to <build>/**/artefacts/ (with <name>.actual.png and <name>.diff.png on a
       # mismatch); DrawList mismatches write *.actual.json. New pixel goldens are taken only from the ubuntu
       # artefact, never rendered locally (D-127).
+      # The ubuntu renders are uploaded on every run, so new pixel goldens can be taken from a passing run too.
       - name: Upload golden diffs
-        if: failure()
+        if: failure() || matrix.os == 'ubuntu-24.04'
         uses: actions/upload-artifact@v4
         with:
           name: golden-diffs-${{ matrix.os }}
