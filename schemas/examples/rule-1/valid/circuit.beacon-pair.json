@@ -1,0 +1,102 @@
+{
+  "$schema": "urn:esses:rule-1",
+  "schemaVersion": 1,
+  "annotations": {
+    "enabled": true,
+    "phase": 2,
+    "pitStop": {
+      "speedChannel": "Corr Speed",
+      "stationaryBelow": {
+        "unit": "km/h",
+        "v": 1.0
+      },
+      "stationarySec": 15
+    },
+    "stint": {
+      "counterChannel": "Lap Number",
+      "dataGapUs": 10000000
+    }
+  },
+  "classes": {
+    "flying": {
+      "abbrev": "L{n}",
+      "name": "Lap {n}",
+      "numbered": true,
+      "trusted": true
+    },
+    "in": {
+      "abbrev": "In",
+      "name": "In Lap",
+      "number": "n+1",
+      "trusted": false
+    },
+    "out": {
+      "abbrev": "Out",
+      "name": "Out Lap",
+      "number": 0,
+      "trusted": false
+    },
+    "partial": {
+      "abbrev": "P{n}",
+      "name": "Lap {n} (partial)",
+      "numbered": false,
+      "trusted": false
+    }
+  },
+  "groupFlags": {
+    "supportsReporting": true,
+    "supportsTrackGeneration": true
+  },
+  "id": "circuit.beacon-pair",
+  "ignoreClasses": [
+    "IGRDBCN",
+    "SPLTBCN"
+  ],
+  "kind": "beacon-pair",
+  "layers": [
+    "Normal",
+    "Fastest"
+  ],
+  "markerGroups": [
+    "",
+    "Beacons"
+  ],
+  "numbering": {
+    "default": 1,
+    "startDetail": "Start Lap"
+  },
+  "parent": "Outings",
+  "produces": "Outings:Laps",
+  "transitions": [
+    {
+      "class": "out",
+      "from": "SOL",
+      "to": "BCN"
+    },
+    {
+      "class": "flying",
+      "from": "BCN",
+      "to": "BCN"
+    },
+    {
+      "class": "in",
+      "from": "BCN",
+      "to": "EOL"
+    },
+    {
+      "class": "out",
+      "from": "SOL",
+      "to": "EOL"
+    },
+    {
+      "class": "partial",
+      "from": "*",
+      "to": "RESET"
+    },
+    {
+      "class": "out",
+      "from": "RESET",
+      "to": "BCN"
+    }
+  ]
+}

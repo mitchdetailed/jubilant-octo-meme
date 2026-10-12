@@ -15,6 +15,8 @@
 #include <esses/base/future.hpp>
 #include <esses/base/hash.hpp>
 #include <esses/base/int128.hpp>
+#include <esses/base/json_depth.hpp>
+#include <esses/base/json_doc.hpp>
 #include <esses/base/log.hpp>
 #include <esses/base/mapped_file.hpp>
 #include <esses/base/paths.hpp>

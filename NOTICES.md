@@ -30,6 +30,14 @@ Vendored under `third_party/`, unchanged; provenance (local copies, and the down
 Catch2 2.13.10 (BSL-1.0, 2022 Two Blue Cubes Ltd) was used by the phase-A tests and removed from the
 repository in phase B.
 
+## Test-only assets
+
+Used by the tests only and never part of a distributed program.
+
+| Component | Version | Licence | Copyright | Used by | In distributed programs |
+|---|---|---|---|---|---|
+| Noto Sans (Regular, Bold) | 2.015 | OFL-1.1 | 2022 The Noto Project Authors | `tests/golden/fonts/`: the only fonts of the golden images and the `esses_qtrender` text tests (D-127) | no |
+
 ## Data derived from public standards
 
 `libs/base/src/casefold.cpp` contains case-folding and compatibility mapping tables written from the Unicode

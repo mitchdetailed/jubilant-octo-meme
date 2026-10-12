@@ -1,0 +1,5 @@
+{
+  "$schema": "urn:esses:builtin-esses.corrected_speed_distance-1",
+  "schemaVersion": 1,
+  "method": "fastestWheel"
+}

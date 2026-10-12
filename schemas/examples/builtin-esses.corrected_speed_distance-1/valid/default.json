@@ -1,0 +1,51 @@
+{
+  "method": "fastestWheel",
+  "fastestWheel": {
+    "channels": [
+      "Wheel Speed FL",
+      "Wheel Speed FR"
+    ]
+  },
+  "alternateList": {
+    "channels": [
+      "Ground Speed",
+      "Wheel Speed FL",
+      "Wheel Speed FR",
+      "Wheel Speed Front",
+      "Wheel Speed",
+      "Wheel Speed RL",
+      "Wheel Speed RR",
+      "Wheel Speed Rear",
+      "Drive Speed",
+      "GPS Speed",
+      "Speed"
+    ]
+  },
+  "gCorrection": {
+    "speedChannel": "Wheel Speed FL",
+    "longGChannel": "G Force Long",
+    "lockThreshold": {
+      "v": 2.0,
+      "unit": "m/s"
+    },
+    "recoverSeconds": 0.5
+  },
+  "clamp": {
+    "min": {
+      "v": 0,
+      "unit": "km/h"
+    },
+    "minInvalidate": false,
+    "max": null,
+    "maxInvalidate": false
+  },
+  "distance": {
+    "source": "integrate",
+    "loggedChannel": "Lap Distance",
+    "integration": "trapezoid"
+  },
+  "outputs": {
+    "speed": "Corr Speed",
+    "distance": "Corr Dist"
+  }
+}

@@ -9,8 +9,8 @@
 //   channels  the channel table after the open pipeline (units resolved to the quantity's base unit unless
 //             --no-units; vendor unit from the probe).
 //   laps      markers (.ld device events, .ldx markers, synthesised SOL/EOL) and the range-group tree of the
-//             phase-1 rules (M0: whole-outing ranges); --json prints laps-1. --no-sidecar gives the
-//             expected.laps.json view.
+//             circuit rules (whole-outing, beacon-pair laps with the phase-2 stint and pitStop annotations,
+//             AC-M1-07); --json prints laps-1. --no-sidecar gives the expected.laps.json view.
 #pragma once
 
 #include "app_context.hpp"
@@ -54,10 +54,19 @@ struct ProbeOutcome {
 Result<ProbeOutcome> probeFile(AppContext& ctx, const std::filesystem::path& file,
                                const formats::ImportOptions& options);
 
-// The open pipeline on the calling thread.
+// The open pipeline on the calling thread, with the circuit rules (AppContext::rules) as step 6. With
+// `rangePhase2` the beacon-pair annotations follow (runRangePhase2), as the application's phase-2 task does
+// after publication.
 Result<formats::OpenedSource> openFile(AppContext& ctx, const std::filesystem::path& file,
                                        const formats::ImportOptions& options, bool withUnits,
-                                       bool loadSidecar);
+                                       bool loadSidecar, bool rangePhase2 = true);
+
+// Phase 2 of the range rules (02 section 4.4 rule 13) on the calling thread: for every layer holding a
+// beacon-pair laps group, Corr Speed from the built-in algorithm with the default settings
+// (analysis::CorrectedSpeed; channel units converted through ctx.units() when they have one) feeds
+// RuleRunner::runPhase2, and the annotated tree replaces the layer's. A layer without a usable speed channel
+// keeps pitStop false. Replaces opened.source with the annotated snapshot.
+Result<void> runRangePhase2(AppContext& ctx, formats::OpenedSource& opened);
 
 // markers-1 marker record (02 section 5.3 rule 8): id, class, group, tUs, name, comment, flags (omitted when
 // 0), prov.

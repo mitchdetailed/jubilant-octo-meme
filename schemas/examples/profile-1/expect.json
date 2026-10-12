@@ -1,0 +1,30 @@
+{
+  "bad-detail-type.json": {
+    "pointer": "/details/1/type",
+    "why": "detail types are string or number"
+  },
+  "bad-rule-id.json": {
+    "pointer": "/rules/0",
+    "why": "rule ids are dotted lower-case names"
+  },
+  "missing-id.json": {
+    "pointer": "",
+    "why": "a profile has an id"
+  },
+  "string-detail-with-unit.json": {
+    "pointer": "/details/0",
+    "why": "string details carry no unit"
+  },
+  "uppercase-id.json": {
+    "pointer": "/id",
+    "why": "profile ids are lower case"
+  },
+  "view-without-tree.json": {
+    "pointer": "/dataViews/0",
+    "why": "a data view has a tree"
+  },
+  "wrong-schema-id.json": {
+    "pointer": "/$schema",
+    "why": "the $schema id names another schema"
+  }
+}

@@ -1,0 +1,110 @@
+{
+  "$schema": "urn:esses:project-1",
+  "schemaVersion": 1,
+  "builtinMaths": {
+    "esses.corrected_speed_distance": {
+      "enabled": true,
+      "settings": {
+        "fastestWheel": {
+          "channels": ["Wheel Speed FL", "Wheel Speed FR"]
+        },
+        "method": "fastestWheel"
+      },
+      "version": 1
+    }
+  },
+  "dataWindow": {
+    "applyToAllSources": false,
+    "filters": {
+      "default": {
+        "kind": "all"
+      },
+      "xxh3:9f3c0a1b2c3d4e5f60718293a4b5c6d7": {
+        "kind": "lapNumbers",
+        "laps": "3,5-7"
+      }
+    }
+  },
+  "futureMember": [1, 2],
+  "lastSelection": {
+    "main": {
+      "groupPath": "Outings:Laps",
+      "layer": "Normal",
+      "name": "Lap 7",
+      "source": {
+        "hash": "xxh3:9f3c0a1b2c3d4e5f60718293a4b5c6d7",
+        "path": "../logs/bathurst_r1.ld"
+      },
+      "startMarker": "7c0e9a2b-1d3f-5a6c-8e9f-0a1b2c3d4e5f"
+    },
+    "overlay0": {
+      "groupPath": "Outings:Laps",
+      "layer": "Normal",
+      "name": "Lap 5",
+      "source": {
+        "hash": "xxh3:9f3c0a1b2c3d4e5f60718293a4b5c6d7",
+        "path": "../logs/bathurst_r1.ld"
+      },
+      "startMarker": "a1b2c3d4-e5f6-5a7b-8c9d-0e1f2a3b4c5d"
+    },
+    "overlays": [],
+    "overlaysHidden": false,
+    "singleColourMain": false
+  },
+  "mathsOrder": ["esses-circuit", "user"],
+  "name": "Bathurst 2026",
+  "options": {
+    "animation": {
+      "rate": 1
+    },
+    "autoCentreCursor": false,
+    "autoscale": {
+      "includeOverlays": true,
+      "includeUntrusted": false
+    },
+    "distanceUnit": "km",
+    "fastLapTolerancePct": 1,
+    "general": {
+      "autoShowMessagesOnError": true,
+      "autosaveMinutes": 2,
+      "loadPreviousData": true,
+      "looseChannelSearch": false,
+      "reduceCpuDuringAnimation": false,
+      "saveOnExit": true,
+      "selectFastestOnLoad": false
+    },
+    "lapStretch": {
+      "enabled": true,
+      "tolerancePct": 5
+    },
+    "lapTimeFormat": "m:ss.fff",
+    "maths": {
+      "compat": {
+        "unaryMinusAbovePower": false
+      },
+      "precision": "single"
+    },
+    "reports": {
+      "includeUntrusted": false,
+      "probeSec": 5
+    },
+    "timeFormat": "m:ss.fff",
+    "trackMaps": {
+      "autoGenerateOnOpen": true
+    }
+  },
+  "profile": "circuit",
+  "recentSources": [
+    {
+      "hash": "xxh3:9f3c0a1b2c3d4e5f60718293a4b5c6d7",
+      "importer": "motec.ld",
+      "openedAt": "2026-10-09T20:50:00+10:00",
+      "path": "../logs/bathurst_r1.ld"
+    }
+  ],
+  "ui": {
+    "layoutLocked": false,
+    "theme": "dark"
+  },
+  "workbooks": ["General", "Chassis"]
+}

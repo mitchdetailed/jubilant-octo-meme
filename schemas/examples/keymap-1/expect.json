@@ -1,0 +1,38 @@
+{
+  "args-not-array.json": {
+    "pointer": "/bindings/0/args",
+    "why": "args is an array"
+  },
+  "bad-command.json": {
+    "pointer": "/bindings/0/command",
+    "why": "command ids are <area>.<verb_noun> snake_case"
+  },
+  "bad-context.json": {
+    "pointer": "/bindings/0/context",
+    "why": "contexts are the CommandContext names"
+  },
+  "bad-milestone.json": {
+    "pointer": "/bindings/0/milestone",
+    "why": "milestones are M1..M4, v1.0 or later"
+  },
+  "empty-key.json": {
+    "pointer": "/bindings/0/keys/0",
+    "why": "key sequences are not empty"
+  },
+  "missing-bindings.json": {
+    "pointer": "",
+    "why": "a keymap has bindings"
+  },
+  "planned-without-milestone.json": {
+    "pointer": "/bindings/0",
+    "why": "a planned or implemented row names its milestone"
+  },
+  "unbind-extra-member.json": {
+    "pointer": "/unbind/0",
+    "why": "unbind rows name only command and context"
+  },
+  "wrong-schema-id.json": {
+    "pointer": "/$schema",
+    "why": "the $schema id names another schema"
+  }
+}

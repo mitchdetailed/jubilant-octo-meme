@@ -1,0 +1,26 @@
+{
+  "method": "alternateList",
+  "alternateList": {
+    "channels": [
+      "GPS Speed",
+      "Ground Speed"
+    ]
+  },
+  "clamp": {
+    "min": null,
+    "max": {
+      "v": 350,
+      "unit": "km/h"
+    },
+    "maxInvalidate": true
+  },
+  "distance": {
+    "source": "logged",
+    "loggedChannel": "Lap Distance",
+    "integration": "rectangle"
+  },
+  "outputs": {
+    "speed": "Speed (corrected)",
+    "distance": "Distance (corrected)"
+  }
+}

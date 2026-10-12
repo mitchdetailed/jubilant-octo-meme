@@ -531,6 +531,24 @@ TaskPool::Stats TaskPool::stats() const {
     return s;
 }
 
+std::vector<TaskPool::QueuedTask> TaskPool::queuedTasks(std::string_view keyPrefix) const {
+    std::lock_guard lock(impl_->mutex);
+    std::vector<QueuedTask> out;
+    for (const auto& q : impl_->queues) {
+        for (const Impl::QueueEntry& e : q) {
+            if (e.node->queueGeneration != e.generation ||
+                e.node->stage.load(std::memory_order_relaxed) != detail::TaskStage::Queued) {
+                continue; // a stale entry (raised, cancelled or run inline)
+            }
+            if (!e.node->key.text.starts_with(keyPrefix)) {
+                continue;
+            }
+            out.push_back(QueuedTask{e.node->key.text, e.node->priority});
+        }
+    }
+    return out;
+}
+
 void TaskPool::run(Priority priority, TaskKey key, CancelToken token, std::function<void(CancelToken)> fn) {
     static_cast<void>(submit(priority, std::move(key), std::move(token), [f = std::move(fn)](CancelToken t) {
         if (f) {

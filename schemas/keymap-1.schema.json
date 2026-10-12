@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:keymap-1",
+  "title": "Esses key bindings (keymap-1)",
+  "description": "Key bindings (06 section 14.3): the shipped data/keymaps/default.json (every row of the 06 section 14.4 table with status, milestone and doc; inherits null) and the per-user <config>/keymap.json (inherits \"default\"; it adds, replaces or unbinds rows). Rows are identified by (command, context, args). Two rows binding the same key sequence in one context are a conflict, reported and disabled at load (06 section 14.2 rule 7). Unknown top-level members are allowed and preserved; rows are closed.",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "name", "bindings"],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072). The urn:esses: form is written; the bare esses: form of earlier drafts and the later https form are accepted on load and normalised on save (02 section 6.6 rule 1).",
+      "type": "string",
+      "pattern": "^(urn:esses:keymap-1|esses:keymap-1|https://[^/\\s]+(/[^/\\s]+)*/keymap-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "inherits": {
+      "description": "The keymap this one modifies (\"default\"), null for a complete keymap.",
+      "type": ["string", "null"]
+    },
+    "bindings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/binding"
+      }
+    },
+    "unbind": {
+      "description": "Inherited rows removed, by command and context.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/unbind"
+      }
+    },
+    "x-esses-legacy": {
+      "$ref": "#/definitions/legacyBag"
+    }
+  },
+  "definitions": {
+    "command": {
+      "description": "Command id <area>.<verb_noun> in snake_case (06 section 14.4).",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+    },
+    "context": {
+      "description": "The snake_case CommandContext (06 section 14.1).",
+      "enum": ["global", "worksheet", "component", "graph", "summary", "track", "data_window", "channels_window", "values_window"]
+    },
+    "binding": {
+      "description": "One binding row (06 section 14.3). status, milestone and doc are carried by the shipped default on every row and ignored in user files; a planned or implemented row names its milestone.",
+      "type": "object",
+      "required": ["command", "keys", "context"],
+      "properties": {
+        "command": {
+          "$ref": "#/definitions/command"
+        },
+        "keys": {
+          "description": "Qt portable-text key sequences; empty for menu-only commands.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "context": {
+          "$ref": "#/definitions/context"
+        },
+        "args": {
+          "description": "Arguments passed to the command (view.worksheet_n: [n]).",
+          "type": "array"
+        },
+        "status": {
+          "enum": ["implemented", "planned", "reserved"]
+        },
+        "milestone": {
+          "enum": ["M1", "M2", "M3", "M4", "v1.0", "later"]
+        },
+        "doc": {
+          "description": "One-line behaviour text for the palette tooltip and the generated docs.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": ["status"],
+        "properties": {
+          "status": {
+            "enum": ["implemented", "planned"]
+          }
+        }
+      },
+      "then": {
+        "required": ["milestone"]
+      }
+    },
+    "unbind": {
+      "type": "object",
+      "required": ["command", "context"],
+      "properties": {
+        "command": {
+          "$ref": "#/definitions/command"
+        },
+        "context": {
+          "$ref": "#/definitions/context"
+        }
+      },
+      "additionalProperties": false
+    },
+    "legacyBag": {
+      "description": "Fields removed by a migration, kept verbatim (02 section 6.6 rule 3).",
+      "type": "object"
+    }
+  }
+}

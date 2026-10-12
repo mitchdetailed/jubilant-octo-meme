@@ -1,0 +1,29 @@
+{
+  "$schema": "urn:esses:rule-1",
+  "schemaVersion": 1,
+  "categoryChild": "{set}:{categoryGroup}",
+  "categoryGroups": {
+    "*": "{category}",
+    "corner": "Corners",
+    "straight": "Straights"
+  },
+  "groupFlags": {
+    "supportsReporting": true,
+    "supportsTrackGeneration": false
+  },
+  "id": "circuit.track-sections",
+  "kind": "track-sections",
+  "parent": "Outings:Laps",
+  "phase": 2,
+  "produces": "Outings:Laps:Track Sections:{set}",
+  "requires": {
+    "channel": "Corr Dist",
+    "trackMap": true
+  },
+  "sets": {
+    "always": [
+      "Default"
+    ],
+    "from": "trackMap"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "urn:esses:rule-1",
+  "schemaVersion": 1,
+  "classes": {
+    "flying": {
+      "abbrev": "L{n}",
+      "name": "Lap {n}",
+      "numbered": true
+    }
+  },
+  "id": "test.minimal",
+  "kind": "beacon-pair",
+  "produces": "Laps",
+  "transitions": [
+    {
+      "class": "flying",
+      "from": "BCN",
+      "to": "BCN"
+    }
+  ]
+}

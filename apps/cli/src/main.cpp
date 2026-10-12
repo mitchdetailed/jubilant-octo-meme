@@ -64,7 +64,7 @@ int run(const std::vector<std::string>& args) {
     CLI::App* channels = app.add_subcommand("channels", "the channel table after the open pipeline");
     addInspect(channels, true);
     CLI::App* laps =
-        app.add_subcommand("laps", "markers and ranges (whole-outing in M0); --json prints laps-1");
+        app.add_subcommand("laps", "markers and ranges (outings, beacon-pair laps); --json prints laps-1");
     addInspect(laps, true);
 
     // validate

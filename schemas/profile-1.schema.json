@@ -1,0 +1,174 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:profile-1",
+  "title": "Esses analysis profile (profile-1)",
+  "description": "An analysis profile (02 section 6.9, D-036): data/profiles/circuit.profile.json in 0.1. Its range kinds, the rule-1 ids run in order (data/rules/<id>.rule.json), the Data-window views, report headings, default maths modules and workbook, the details it defines and its terms. At most one view is the default (checked by the loader). Unknown top-level members are allowed and preserved; views and details are closed.",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "id", "name"],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072). The urn:esses: form is written; the bare esses: form of earlier drafts and the later https form are accepted on load and normalised on save (02 section 6.6 rule 1).",
+      "type": "string",
+      "pattern": "^(urn:esses:profile-1|esses:profile-1|https://[^/\\s]+(/[^/\\s]+)*/profile-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rangeKinds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "primaryRanges": {
+      "description": "Group path of the primary ranges.",
+      "type": "string",
+      "minLength": 1
+    },
+    "primaryMarkers": {
+      "description": "Marker group of the primary markers.",
+      "type": "string",
+      "minLength": 1
+    },
+    "rules": {
+      "description": "rule-1 ids, run in order.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$"
+      }
+    },
+    "dataViews": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/dataView"
+      }
+    },
+    "reportHeadings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "defaultMaths": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "defaultWorkbook": {
+      "description": "File stem of the shipped workbook new projects start from.",
+      "type": "string"
+    },
+    "details": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/profileDetail"
+      }
+    },
+    "terms": {
+      "description": "UI words for the primary ranges.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "x-esses-legacy": {
+      "$ref": "#/definitions/legacyBag"
+    }
+  },
+  "definitions": {
+    "dataView": {
+      "description": "A Data-window view: its range-group tree, outermost first.",
+      "type": "object",
+      "required": ["title", "tree"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "default": {
+          "type": "boolean"
+        },
+        "tree": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "outingDetail": {
+          "description": "Detail expression labelling outings.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "profileDetail": {
+      "description": "A detail the profile defines (02 section 4.2); string details carry no unit, dps or default.",
+      "type": "object",
+      "required": ["id", "type"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "enum": ["string", "number"]
+        },
+        "unit": {
+          "type": "string"
+        },
+        "dps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15
+        },
+        "default": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "enum": ["string"]
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {
+              "required": ["unit"]
+            },
+            {
+              "required": ["dps"]
+            },
+            {
+              "required": ["default"]
+            }
+          ]
+        }
+      }
+    },
+    "legacyBag": {
+      "description": "Fields removed by a migration, kept verbatim (02 section 6.6 rule 3).",
+      "type": "object"
+    }
+  }
+}

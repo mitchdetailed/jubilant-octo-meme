@@ -1,0 +1,160 @@
+{
+  "$schema": "urn:esses:scheme-1",
+  "schemaVersion": 1,
+  "background": "dark",
+  "channelPalette": ["#ff5252", "#40c4ff", "#69f0ae", "#ffd740", "#ea80fc", "#ffab40", "#18ffff", "#b2ff59", "#ff80ab", "#8c9eff", "#ccff90", "#ffe57f"],
+  "fonts": {
+    "axis": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 8,
+      "weight": 400
+    },
+    "axisRotated": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 8,
+      "weight": 400
+    },
+    "caption": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 9,
+      "weight": 600
+    },
+    "colourBands": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 7,
+      "weight": 400
+    },
+    "dataHeader": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 9,
+      "weight": 600
+    },
+    "dataRange": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 9,
+      "weight": 400
+    },
+    "equation": {
+      "family": "Noto Sans",
+      "italic": true,
+      "pointSize": 8,
+      "weight": 400
+    },
+    "gauge": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 14,
+      "weight": 600
+    },
+    "key": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 8,
+      "weight": 400
+    },
+    "keyStrikeout": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 8,
+      "strikeOut": true,
+      "weight": 400
+    },
+    "reportHeading": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 9,
+      "weight": 700
+    },
+    "reportTable": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 9,
+      "weight": 400
+    },
+    "small": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 7,
+      "weight": 400
+    },
+    "trackLabel": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 8,
+      "weight": 600
+    },
+    "valuesHeader": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 9,
+      "weight": 600
+    },
+    "valuesItem": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 9,
+      "weight": 400
+    }
+  },
+  "name": "Esses Dark",
+  "overlayPalette": ["#4fc3f7", "#aed581", "#ffb74d", "#ba68c8", "#4db6ac", "#f06292", "#fff176", "#90a4ae", "#a1887f"],
+  "overlayStyle": {
+    "colourSource": "channel",
+    "dash": "solid",
+    "lightness": 0,
+    "widthScale": 1
+  },
+  "print": {
+    "channelPalette": ["#c62828", "#1565c0", "#2e7d32", "#f9a825", "#6a1b9a", "#ef6c00", "#00838f", "#558b2f", "#ad1457", "#283593"],
+    "roles": {
+      "cptBackground": "#ffffff",
+      "cptForeground": "#000000",
+      "dataGrid": "#c8c8c8",
+      "windowBackground": "#ffffff"
+    }
+  },
+  "roles": {
+    "annotationMark": "#ffb000",
+    "cptBackground": "#141517",
+    "cptCaptionBackground": "#2b2d31",
+    "cptCaptionForeground": "#e6e6e6",
+    "cptFocusBorder": "#4c9aff",
+    "cptForeground": "#e6e6e6",
+    "cptForeground2": "#9aa0a6",
+    "cptFrame": "#3a3d41",
+    "cursorDatum": "#ffd60a",
+    "cursorMain": "#ff3b30",
+    "cursorZoom": "#4c9aff",
+    "dataBackground": "#1e1f22",
+    "dataError": "#ff6b6b",
+    "dataForeground": "#e6e6e6",
+    "dataForeground2": "#9aa0a6",
+    "dataGrid": "#33363a",
+    "dataHeadingBackground": "#2b2d31",
+    "dataHeadingForeground": "#ffffff",
+    "dataHighlightBackground": "#264f78",
+    "dataHighlightForeground": "#ffffff",
+    "dataUnknown": "#9aa0a6",
+    "deviceEvent": "#8e8e93",
+    "keyBackground": "#1a1b1e",
+    "mainSingleColour": "#ffffff",
+    "markerBand": "#2b2d31",
+    "overlay0": "#bdbdbd",
+    "pendingHatch": "#3a3d41",
+    "rangeMark": "#6e7681",
+    "sectionCorner": "#5a3d7a",
+    "sectionStraight": "#2f5f3a",
+    "statusError": "#ff3b30",
+    "statusOk": "#34c759",
+    "statusWarn": "#ffb000",
+    "trackLine": "#8e8e93",
+    "varianceZero": "#6e7681",
+    "windowBackground": "#1e1f22"
+  }
+}

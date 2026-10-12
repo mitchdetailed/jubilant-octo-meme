@@ -1,0 +1,38 @@
+{
+  "bad-background.json": {
+    "pointer": "/background",
+    "why": "background is light or dark"
+  },
+  "bad-colour.json": {
+    "pointer": "/roles",
+    "why": "colours are #rrggbb or #rrggbbaa (reported at the map)"
+  },
+  "bad-dash.json": {
+    "pointer": "/overlayStyle/dash",
+    "why": "dash is solid, dash, dot or dashDot"
+  },
+  "font-missing-weight.json": {
+    "pointer": "/fonts",
+    "why": "a font names its weight (reported at the map)"
+  },
+  "overlay-palette-eight.json": {
+    "pointer": "/overlayPalette",
+    "why": "overlayPalette has exactly 9 colours"
+  },
+  "print-unknown-member.json": {
+    "pointer": "/print",
+    "why": "print overrides roles, palettes and fonts only"
+  },
+  "role-name-with-space.json": {
+    "pointer": "/roles",
+    "why": "role names are camelCase identifiers"
+  },
+  "short-channel-palette.json": {
+    "pointer": "/channelPalette",
+    "why": "channelPalette has at least 10 colours"
+  },
+  "wrong-schema-id.json": {
+    "pointer": "/$schema",
+    "why": "the $schema id names another schema"
+  }
+}

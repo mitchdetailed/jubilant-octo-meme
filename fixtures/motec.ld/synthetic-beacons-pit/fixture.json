@@ -1,0 +1,41 @@
+{
+  "$schema": "urn:esses:fixture-1",
+  "schemaVersion": 1,
+  "channelsCompared": "all",
+  "companions": [
+    {
+      "bytes": 659,
+      "file": "input.ldx",
+      "sha256": "7a099770727e605ad25cd9983ea9dcf1c2317cf1e72723f96ffcb13b8c5196e6"
+    }
+  ],
+  "dialect": "pc-layout",
+  "format": "motec.ld",
+  "importOptions": {
+    "ld": {
+      "shiftOrder": "afterMul"
+    }
+  },
+  "input": {
+    "bytes": 74144,
+    "file": "input.ld",
+    "sha256": "f196b4279a3e2f083cba7db9df5f22808001a551a963013999aa52d3c8a59d7f"
+  },
+  "licence": "CC0-1.0",
+  "name": "synthetic-beacons-pit",
+  "notes": "AC-M1-07 / D-075, D-132: >= 15 s below 1 km/h of Corr Speed (fastest of the front wheels, clamped at 0) inside a lap sets only pitStop (class, number and trust unchanged); after a pit stop the next lap starts a new stint unless the car had not moved yet; a lap counter decrease starts a stint; beacon intervals never do",
+  "oracle": {
+    "kind": "ref-decode",
+    "ref": "tools/ld_ref_decode.py 0.1.0 (MIT), afterMul",
+    "tolerance": {
+      "F32": "1ulp",
+      "F64": "1ulp",
+      "I32": "exact",
+      "timesUs": "exact"
+    },
+    "validity": "strict"
+  },
+  "private": false,
+  "provenance": "synthetic",
+  "source": "synthetic: four wheel speeds and a lap counter with BCN beacons; a 20 s wait in the pit box before the out lap, a 10 s stop in Lap 1, a 20 s pit stop in Lap 2, a counter reset in Lap 3, a locking front-left wheel and front wheels reading below zero while stationary"
+}

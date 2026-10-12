@@ -1,0 +1,1460 @@
+{
+  "$schema": "urn:esses:keymap-1",
+  "schemaVersion": 1,
+  "bindings": [
+    {
+      "command": "view.data_window",
+      "context": "global",
+      "doc": "Show and focus the Data dock (range tree).",
+      "keys": ["F8"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "view.channels_window",
+      "context": "worksheet",
+      "doc": "Show and focus the Channels dock with the caret in its search box.",
+      "keys": ["C"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "view.values_window",
+      "context": "worksheet",
+      "doc": "Toggle the Values dock; the focus stays where it is.",
+      "keys": ["V"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "view.return_focus",
+      "context": "global",
+      "doc": "From a dock, return the focus to the remembered component; also closes a clean modeless dialog, restores a maximised component and leaves full screen.",
+      "keys": ["Esc"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "view.select_worksheet",
+      "context": "global",
+      "doc": "Open the Select Worksheet dialog (workbook and worksheet).",
+      "keys": ["F7"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "layout.editor",
+      "context": "global",
+      "doc": "Open the Layout Editor.",
+      "keys": ["Ctrl+F7"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "args": [1],
+      "command": "view.worksheet_n",
+      "context": "worksheet",
+      "doc": "Select worksheet tab n (key 0 selects the tenth); nothing happens when it does not exist.",
+      "keys": ["1"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "args": [2],
+      "command": "view.worksheet_n",
+      "context": "worksheet",
+      "doc": "Select worksheet tab n (key 0 selects the tenth); nothing happens when it does not exist.",
+      "keys": ["2"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "args": [3],
+      "command": "view.worksheet_n",
+      "context": "worksheet",
+      "doc": "Select worksheet tab n (key 0 selects the tenth); nothing happens when it does not exist.",
+      "keys": ["3"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "args": [4],
+      "command": "view.worksheet_n",
+      "context": "worksheet",
+      "doc": "Select worksheet tab n (key 0 selects the tenth); nothing happens when it does not exist.",
+      "keys": ["4"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "args": [5],
+      "command": "view.worksheet_n",
+      "context": "worksheet",
+      "doc": "Select worksheet tab n (key 0 selects the tenth); nothing happens when it does not exist.",
+      "keys": ["5"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "args": [6],
+      "command": "view.worksheet_n",
+      "context": "worksheet",
+      "doc": "Select worksheet tab n (key 0 selects the tenth); nothing happens when it does not exist.",
+      "keys": ["6"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "args": [7],
+      "command": "view.worksheet_n",
+      "context": "worksheet",
+      "doc": "Select worksheet tab n (key 0 selects the tenth); nothing happens when it does not exist.",
+      "keys": ["7"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "args": [8],
+      "command": "view.worksheet_n",
+      "context": "worksheet",
+      "doc": "Select worksheet tab n (key 0 selects the tenth); nothing happens when it does not exist.",
+      "keys": ["8"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "args": [9],
+      "command": "view.worksheet_n",
+      "context": "worksheet",
+      "doc": "Select worksheet tab n (key 0 selects the tenth); nothing happens when it does not exist.",
+      "keys": ["9"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "args": [10],
+      "command": "view.worksheet_n",
+      "context": "worksheet",
+      "doc": "Select worksheet tab n (key 0 selects the tenth); nothing happens when it does not exist.",
+      "keys": ["0"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "args": [1],
+      "command": "view.workbook_n",
+      "context": "global",
+      "doc": "Select workbook n (Ctrl+0 selects the tenth) and restore its dock perspective.",
+      "keys": ["Ctrl+1"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "args": [2],
+      "command": "view.workbook_n",
+      "context": "global",
+      "doc": "Select workbook n (Ctrl+0 selects the tenth) and restore its dock perspective.",
+      "keys": ["Ctrl+2"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "args": [3],
+      "command": "view.workbook_n",
+      "context": "global",
+      "doc": "Select workbook n (Ctrl+0 selects the tenth) and restore its dock perspective.",
+      "keys": ["Ctrl+3"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "args": [4],
+      "command": "view.workbook_n",
+      "context": "global",
+      "doc": "Select workbook n (Ctrl+0 selects the tenth) and restore its dock perspective.",
+      "keys": ["Ctrl+4"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "args": [5],
+      "command": "view.workbook_n",
+      "context": "global",
+      "doc": "Select workbook n (Ctrl+0 selects the tenth) and restore its dock perspective.",
+      "keys": ["Ctrl+5"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "args": [6],
+      "command": "view.workbook_n",
+      "context": "global",
+      "doc": "Select workbook n (Ctrl+0 selects the tenth) and restore its dock perspective.",
+      "keys": ["Ctrl+6"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "args": [7],
+      "command": "view.workbook_n",
+      "context": "global",
+      "doc": "Select workbook n (Ctrl+0 selects the tenth) and restore its dock perspective.",
+      "keys": ["Ctrl+7"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "args": [8],
+      "command": "view.workbook_n",
+      "context": "global",
+      "doc": "Select workbook n (Ctrl+0 selects the tenth) and restore its dock perspective.",
+      "keys": ["Ctrl+8"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "args": [9],
+      "command": "view.workbook_n",
+      "context": "global",
+      "doc": "Select workbook n (Ctrl+0 selects the tenth) and restore its dock perspective.",
+      "keys": ["Ctrl+9"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "args": [10],
+      "command": "view.workbook_n",
+      "context": "global",
+      "doc": "Select workbook n (Ctrl+0 selects the tenth) and restore its dock perspective.",
+      "keys": ["Ctrl+0"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "view.prev_worksheet",
+      "context": "global",
+      "doc": "Previous worksheet tab, wrapping at the ends.",
+      "keys": ["F11"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "view.next_worksheet",
+      "context": "global",
+      "doc": "Next worksheet tab, wrapping at the ends.",
+      "keys": ["F12"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "view.prev_workbook",
+      "context": "global",
+      "doc": "Previous workbook, wrapping at the ends.",
+      "keys": ["Ctrl+F11"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "view.next_workbook",
+      "context": "global",
+      "doc": "Next workbook, wrapping at the ends.",
+      "keys": ["Ctrl+F12"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "view.channel_status",
+      "context": "global",
+      "doc": "Alias of tools.channel_status, which carries Ctrl+U: show and focus the Channel Status dock.",
+      "keys": [],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "view.messages_window",
+      "context": "global",
+      "doc": "Toggle the Messages dock.",
+      "keys": [],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "view.track_map_window",
+      "context": "global",
+      "doc": "Toggle the Track Map dock.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "view.command_palette",
+      "context": "global",
+      "doc": "Open the command palette.",
+      "keys": ["Ctrl+Shift+P"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "view.reset_docks",
+      "context": "global",
+      "doc": "Reset the dock windows to the default perspective.",
+      "keys": [],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "view.fullscreen",
+      "context": "global",
+      "doc": "Toggle full screen.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "file.open_log",
+      "context": "global",
+      "doc": "Open Log File dialog (multi-select, a details pane probing the selected file); the last folder is remembered per user.",
+      "keys": ["Ctrl+O"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "file.close_all",
+      "context": "global",
+      "doc": "Close every source without a prompt.",
+      "keys": ["Ctrl+A"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "file.reload_source",
+      "context": "data_window",
+      "doc": "Reload the highlighted stale source through the open pipeline; disabled unless the source is stale.",
+      "keys": [],
+      "milestone": "M4",
+      "status": "planned"
+    },
+    {
+      "command": "file.save_project",
+      "context": "global",
+      "doc": "Save every changed project document atomically, keep a backup copy and clear the journal.",
+      "keys": ["Ctrl+S"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "file.print",
+      "context": "global",
+      "doc": "Print the worksheet.",
+      "keys": ["Ctrl+P"],
+      "milestone": "v1.0",
+      "status": "planned"
+    },
+    {
+      "command": "help.contents",
+      "context": "global",
+      "doc": "Open the user documentation.",
+      "keys": ["F1"],
+      "milestone": "M4",
+      "status": "planned"
+    },
+    {
+      "command": "file.unload_device",
+      "context": "global",
+      "doc": "Reserved (logger unload); registered, never available.",
+      "keys": ["Ctrl+F8"],
+      "status": "reserved"
+    },
+    {
+      "command": "file.import_usb",
+      "context": "global",
+      "doc": "Reserved (logger import); registered, never available.",
+      "keys": ["Ctrl+I"],
+      "status": "reserved"
+    },
+    {
+      "command": "edit.undo",
+      "context": "global",
+      "doc": "Undo the last document edit.",
+      "keys": ["Ctrl+Z"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "edit.redo",
+      "context": "global",
+      "doc": "Redo the last undone edit (no Ctrl+Shift+Z alias: that chord is channel.zero_at_cursor).",
+      "keys": ["Ctrl+Y"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "file.new_project",
+      "context": "global",
+      "doc": "Create a project folder.",
+      "keys": [],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "file.open_project",
+      "context": "global",
+      "doc": "Open a project folder.",
+      "keys": [],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "file.close_project",
+      "context": "global",
+      "doc": "Close the project.",
+      "keys": [],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "file.import_data",
+      "context": "global",
+      "doc": "Import data into the open project.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "file.export_data",
+      "context": "global",
+      "doc": "Export data from the open project.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "component.cut",
+      "context": "worksheet",
+      "doc": "Copy the selected components to the clipboard and delete them, as one command.",
+      "keys": ["Ctrl+X"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "component.copy",
+      "context": "worksheet",
+      "doc": "Copy the selected components.",
+      "keys": ["Ctrl+C"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "component.paste",
+      "context": "worksheet",
+      "doc": "Paste components at their stored rectangles, offset per successive paste.",
+      "keys": ["Ctrl+V"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "component.delete",
+      "context": "worksheet",
+      "doc": "Delete the selected components (undoable, no confirmation).",
+      "keys": ["Delete"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "component.select_all",
+      "context": "worksheet",
+      "doc": "Select every component of the worksheet.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "data.toggle_domain",
+      "context": "global",
+      "doc": "Toggle the active worksheet between time and distance with the zoom preserved; works from any dock.",
+      "keys": ["F9"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "data.overlays_toggle",
+      "context": "global",
+      "doc": "Hide or show the overlays without deselecting them.",
+      "keys": ["F4"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "data.overlays_clear",
+      "context": "global",
+      "doc": "Clear Overlay 0 and every numbered overlay.",
+      "keys": ["Shift+F4"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "data.single_colour_main",
+      "context": "worksheet",
+      "doc": "Toggle single-colour Main.",
+      "keys": ["J"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "data.next_range",
+      "context": "worksheet",
+      "doc": "Move Main to the next displayed range of its source, zoom preserved.",
+      "keys": ["N"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "data.prev_range",
+      "context": "worksheet",
+      "doc": "Move Main to the previous displayed range of its source, zoom preserved.",
+      "keys": ["P"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "data.select_fastest",
+      "context": "global",
+      "doc": "The fastest lap of the Main source becomes Main (trusted flying laps if any, else flying or partial laps; never in, out or pit laps).",
+      "keys": ["Ctrl+F"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "data.select_all_fast",
+      "context": "global",
+      "doc": "The fastest lap becomes Main and every other candidate within the fast-lap tolerance an overlay.",
+      "keys": ["Ctrl+Alt+F"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "data.swap_main_overlay0",
+      "context": "worksheet",
+      "doc": "Swap Main and Overlay 0.",
+      "keys": ["Q"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "data.animate",
+      "context": "worksheet",
+      "doc": "Start or stop the cursor animation of the active worksheet.",
+      "keys": ["A"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "data.lap_stretch_toggle",
+      "context": "global",
+      "doc": "Toggle lap-distance stretching.",
+      "keys": [],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "data.filter_all_sources",
+      "context": "global",
+      "doc": "Apply the Main source's Data-window lap filter to every source.",
+      "keys": [],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "data.select_main",
+      "context": "data_window",
+      "doc": "The highlighted range becomes Main.",
+      "keys": ["Return", "Enter"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "data.toggle_overlay0",
+      "context": "data_window",
+      "doc": "Toggle Overlay 0 on the highlighted range.",
+      "keys": ["Ctrl+Return", "Ctrl+Enter"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "data.toggle_overlay",
+      "context": "data_window",
+      "doc": "Toggle the highlighted range as a numbered overlay.",
+      "keys": ["Alt+Return", "Alt+Enter"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "data.close_file",
+      "context": "data_window",
+      "doc": "Close the highlighted source.",
+      "keys": ["Delete"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "tools.details",
+      "context": "global",
+      "doc": "Open the Details editor.",
+      "keys": ["Ctrl+D"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "tools.channel_editor",
+      "context": "global",
+      "doc": "Open the Channel Editor.",
+      "keys": ["Ctrl+E"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "tools.channel_status",
+      "context": "global",
+      "doc": "Show and focus the Channel Status dock.",
+      "keys": ["Ctrl+U"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "tools.maths_editor",
+      "context": "global",
+      "doc": "Open the Maths Editor at the last item.",
+      "keys": ["Ctrl+M"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "tools.setup_sheets",
+      "context": "global",
+      "doc": "Reserved; registered, greyed with a tooltip.",
+      "keys": ["Ctrl+T"],
+      "status": "reserved"
+    },
+    {
+      "command": "tools.lap_editor",
+      "context": "global",
+      "doc": "Open the Lap Editor.",
+      "keys": [],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "tools.track_editor",
+      "context": "global",
+      "doc": "Open the Track Editor.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "tools.corrected_speed",
+      "context": "global",
+      "doc": "Open the Corrected Speed and Distance dialog.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "tools.aliases",
+      "context": "global",
+      "doc": "Open the channel aliases editor.",
+      "keys": [],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "tools.mappings",
+      "context": "global",
+      "doc": "Open the channel mappings editor.",
+      "keys": [],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "tools.units_list",
+      "context": "global",
+      "doc": "Show the units list.",
+      "keys": [],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "tools.options",
+      "context": "global",
+      "doc": "Open the Options dialog.",
+      "keys": [],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "channel.next_active",
+      "context": "component",
+      "doc": "Move the active-channel square to the next trace of the component, wrapping.",
+      "keys": ["PgDown"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "channel.prev_active",
+      "context": "component",
+      "doc": "Move the active-channel square to the previous trace of the component, wrapping.",
+      "keys": ["PgUp"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "channel.hide",
+      "context": "component",
+      "doc": "Hide the active trace (a component edit).",
+      "keys": ["Ctrl+H"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "channel.remove",
+      "context": "component",
+      "doc": "Remove the active trace from the component (a component edit).",
+      "keys": ["Ctrl+Delete"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "channel.edit_maths",
+      "context": "component",
+      "doc": "Open the Maths Editor at the item defining the active channel; a hint for a logged channel.",
+      "keys": ["Ctrl+Shift+M"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "channel.status",
+      "context": "component",
+      "doc": "Show the Channel Status dock with the active channel's row selected.",
+      "keys": ["Ctrl+Shift+S"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "channel.filter",
+      "context": "component",
+      "doc": "Filter dialog: a transient maths item shadowing the active channel for this session.",
+      "keys": ["Ctrl+Shift+F"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "channel.scale_offset",
+      "context": "component",
+      "doc": "Scale and offset dialog: a local maths item in the sidecar.",
+      "keys": ["Ctrl+Shift+O"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "channel.zero_at_cursor",
+      "context": "component",
+      "doc": "Offset the active channel by minus its value at the cursor (a local maths item).",
+      "keys": ["Ctrl+Shift+Z"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "channel.properties",
+      "context": "component",
+      "doc": "Open the properties dialog on the Channels tab at the active channel.",
+      "keys": ["Ctrl+N"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "component.properties",
+      "context": "component",
+      "doc": "Open or raise the component's properties dialog.",
+      "keys": ["F5"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "component.focus_next",
+      "context": "worksheet",
+      "doc": "Focus the next component in z order.",
+      "keys": ["Tab"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "component.focus_prev",
+      "context": "worksheet",
+      "doc": "Focus the previous component in z order.",
+      "keys": ["Shift+Tab"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "component.legend",
+      "context": "component",
+      "doc": "Toggle the channel legend.",
+      "keys": ["L"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "component.colour_legend",
+      "context": "component",
+      "doc": "Toggle the colour-channel legend.",
+      "keys": ["K"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "component.cycle_layout",
+      "context": "component",
+      "doc": "Cycle the layout (graph: panels and overlapped; summary components: their layouts).",
+      "keys": ["G"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "component.cycle_style",
+      "context": "component",
+      "doc": "Cycle the trace or bar style.",
+      "keys": ["S"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "args": [0],
+      "command": "component.colour_band",
+      "context": "component",
+      "doc": "Toggle colour band n of the component's band axis.",
+      "keys": ["Alt+0"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "args": [1],
+      "command": "component.colour_band",
+      "context": "component",
+      "doc": "Toggle colour band n of the component's band axis.",
+      "keys": ["Alt+1"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "args": [2],
+      "command": "component.colour_band",
+      "context": "component",
+      "doc": "Toggle colour band n of the component's band axis.",
+      "keys": ["Alt+2"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "args": [3],
+      "command": "component.colour_band",
+      "context": "component",
+      "doc": "Toggle colour band n of the component's band axis.",
+      "keys": ["Alt+3"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "args": [4],
+      "command": "component.colour_band",
+      "context": "component",
+      "doc": "Toggle colour band n of the component's band axis.",
+      "keys": ["Alt+4"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "args": [5],
+      "command": "component.colour_band",
+      "context": "component",
+      "doc": "Toggle colour band n of the component's band axis.",
+      "keys": ["Alt+5"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "args": [6],
+      "command": "component.colour_band",
+      "context": "component",
+      "doc": "Toggle colour band n of the component's band axis.",
+      "keys": ["Alt+6"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "args": [7],
+      "command": "component.colour_band",
+      "context": "component",
+      "doc": "Toggle colour band n of the component's band axis.",
+      "keys": ["Alt+7"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "args": [8],
+      "command": "component.colour_band",
+      "context": "component",
+      "doc": "Toggle colour band n of the component's band axis.",
+      "keys": ["Alt+8"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "args": [9],
+      "command": "component.colour_band",
+      "context": "component",
+      "doc": "Toggle colour band n of the component's band axis.",
+      "keys": ["Alt+9"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "component.maximise",
+      "context": "component",
+      "doc": "Maximise or restore the focused component.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "component.send_to_background",
+      "context": "component",
+      "doc": "Paint the component below every other one.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "component.bring_to_front",
+      "context": "component",
+      "doc": "Paint the component above every other one.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "component.export_data",
+      "context": "component",
+      "doc": "Export the component's data (CSV).",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "component.print_clipboard",
+      "context": "component",
+      "doc": "Copy an image of the component to the clipboard.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "graph.status_errors",
+      "context": "graph",
+      "doc": "Toggle the status and errors strip.",
+      "keys": ["E"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "graph.device_events",
+      "context": "graph",
+      "doc": "Hide or show device events in the marker band.",
+      "keys": ["Shift+E"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "graph.variance",
+      "context": "graph",
+      "doc": "Toggle the variance panel (drawn while an overlay is visible).",
+      "keys": ["F3"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "graph.measurements",
+      "context": "graph",
+      "doc": "Toggle min, max and mean over the visible span.",
+      "keys": ["M"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "graph.copy_cursor_values",
+      "context": "graph",
+      "doc": "Copy name, value and unit rows of every channel at the Main cursor.",
+      "keys": ["Ctrl+Shift+C"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "cursor.add_annotation",
+      "context": "graph",
+      "doc": "Add an annotation at the cursor.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "zoom.in",
+      "context": "graph",
+      "doc": "Horizontal zoom in, half the span, about the cursor.",
+      "keys": ["Up"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "zoom.in",
+      "context": "summary",
+      "doc": "Zoom in on the linked span; the summary recomputes.",
+      "keys": ["Up"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "zoom.out",
+      "context": "graph",
+      "doc": "Horizontal zoom out, twice the span, about the cursor.",
+      "keys": ["Down"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "zoom.out",
+      "context": "summary",
+      "doc": "Zoom out on the linked span; the summary recomputes.",
+      "keys": ["Down"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "zoom.full",
+      "context": "global",
+      "doc": "Show the whole Main outing on the shared zoom; works from any dock.",
+      "keys": ["F2"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "zoom.default_range",
+      "context": "graph",
+      "doc": "Zoom to the Main range; the cursor is pulled inside when it is outside.",
+      "keys": ["W"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "zoom.default_range",
+      "context": "summary",
+      "doc": "Zoom the linked span to the Main range.",
+      "keys": ["W"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "zoom.datum_main",
+      "context": "graph",
+      "doc": "Zoom to the span between the datum and the main cursor.",
+      "keys": ["Z"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "zoom.v_in",
+      "context": "graph",
+      "doc": "Vertical zoom in on the active group.",
+      "keys": ["Alt+Up"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "zoom.v_out",
+      "context": "graph",
+      "doc": "Vertical zoom out on the active group.",
+      "keys": ["Alt+Down"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "zoom.v_full",
+      "context": "graph",
+      "doc": "Vertical full scale for the active group.",
+      "keys": ["Alt+F2"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "zoom.rubber_band",
+      "context": "graph",
+      "doc": "Mouse: double-click, move, click zooms horizontally; Alt vertically, Ctrl both axes.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "zoom.full_axis",
+      "context": "graph",
+      "doc": "Mouse: double-click a scrollbar for full zoom on that axis.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "zoom.wheel",
+      "context": "graph",
+      "doc": "Mouse wheel: horizontal zoom about the pointer.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "zoom.wheel",
+      "context": "summary",
+      "doc": "Mouse wheel: box zoom about the pointer.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "zoom.wheel",
+      "context": "track",
+      "doc": "Mouse wheel: zoom the track view about the pointer.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "zoom.extend",
+      "context": "global",
+      "doc": "Mouse: Shift+click in the zoom summary bar extends the span.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "zoom.outing_rect",
+      "context": "graph",
+      "doc": "Mouse (outing graph): drag the rectangle or its ends to set the linked span.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "pan.left",
+      "context": "graph",
+      "doc": "Pan left by a tenth of the span.",
+      "keys": ["Shift+Left"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "pan.right",
+      "context": "graph",
+      "doc": "Pan right by a tenth of the span.",
+      "keys": ["Shift+Right"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "pan.up",
+      "context": "graph",
+      "doc": "Pan the vertically zoomed active group up.",
+      "keys": ["Shift+Up"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "pan.down",
+      "context": "graph",
+      "doc": "Pan the vertically zoomed active group down.",
+      "keys": ["Shift+Down"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "pan.back",
+      "context": "graph",
+      "doc": "Pan back by nine tenths of the span.",
+      "keys": ["B"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "pan.forward",
+      "context": "graph",
+      "doc": "Pan forward by nine tenths of the span.",
+      "keys": ["F"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "pan.centre_cursor",
+      "context": "graph",
+      "doc": "Centre the view on the cursor.",
+      "keys": ["H"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "pan.drag_axis",
+      "context": "graph",
+      "doc": "Mouse: drag an axis or a scrollbar to pan.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "cursor.left",
+      "context": "graph",
+      "doc": "Move the cursor one screen pixel's worth of samples left.",
+      "keys": ["Left"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "cursor.left",
+      "context": "summary",
+      "doc": "Move the cursor to the previous Main point.",
+      "keys": ["Left"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "cursor.right",
+      "context": "graph",
+      "doc": "Move the cursor one screen pixel's worth of samples right.",
+      "keys": ["Right"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "cursor.right",
+      "context": "summary",
+      "doc": "Move the cursor to the next Main point.",
+      "keys": ["Right"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "cursor.left_fast",
+      "context": "graph",
+      "doc": "Move the cursor ten steps left.",
+      "keys": ["Ctrl+Left"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "cursor.left_fast",
+      "context": "summary",
+      "doc": "Move the cursor ten points back.",
+      "keys": ["Ctrl+Left"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "cursor.right_fast",
+      "context": "graph",
+      "doc": "Move the cursor ten steps right.",
+      "keys": ["Ctrl+Right"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "cursor.right_fast",
+      "context": "summary",
+      "doc": "Move the cursor ten points forward.",
+      "keys": ["Ctrl+Right"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "cursor.home",
+      "context": "graph",
+      "doc": "Cursor to the left edge of the visible span.",
+      "keys": ["Home"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "cursor.end",
+      "context": "graph",
+      "doc": "Cursor to the right edge of the visible span.",
+      "keys": ["End"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "cursor.style",
+      "context": "graph",
+      "doc": "Cycle the cursor style: line, crosshair, values only.",
+      "keys": ["Y"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "cursor.style",
+      "context": "summary",
+      "doc": "Cycle the cursor style.",
+      "keys": ["Y"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "cursor.insert_marker",
+      "context": "graph",
+      "doc": "Insert a beacon marker at the cursor into the sidecar; the laps rebuild.",
+      "keys": ["Shift+F7"],
+      "milestone": "M2",
+      "status": "planned"
+    },
+    {
+      "command": "cursor.place",
+      "context": "graph",
+      "doc": "Mouse: click places the cursor on the nearest Main sample of the active channel.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "datum.toggle",
+      "context": "graph",
+      "doc": "Datum cursor off or on; it keeps its position while off.",
+      "keys": ["D"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "datum.place",
+      "context": "graph",
+      "doc": "Place the datum at the main cursor.",
+      "keys": ["Space"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "datum.swap",
+      "context": "graph",
+      "doc": "Swap the positions of the datum and the main cursor.",
+      "keys": ["X"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "command": "offset.axis_toggle",
+      "context": "graph",
+      "doc": "Offset axis on or off; turning it off zeroes the offsets of the selected ranges.",
+      "keys": ["O"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "offset.main_left",
+      "context": "graph",
+      "doc": "Offset the Main range one offset step back.",
+      "keys": ["Ctrl+Shift+Left"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "offset.main_right",
+      "context": "graph",
+      "doc": "Offset the Main range one offset step forward.",
+      "keys": ["Ctrl+Shift+Right"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "offset.main_down",
+      "context": "graph",
+      "doc": "Offset the Main range ten offset steps back.",
+      "keys": ["Ctrl+Shift+Down"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "offset.main_up",
+      "context": "graph",
+      "doc": "Offset the Main range ten offset steps forward.",
+      "keys": ["Ctrl+Shift+Up"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "offset.overlay_left",
+      "context": "graph",
+      "doc": "Offset the reference overlay one offset step back.",
+      "keys": ["Alt+Shift+Left"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "offset.overlay_right",
+      "context": "graph",
+      "doc": "Offset the reference overlay one offset step forward.",
+      "keys": ["Alt+Shift+Right"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "offset.overlay_down",
+      "context": "graph",
+      "doc": "Offset the reference overlay ten offset steps back.",
+      "keys": ["Alt+Shift+Down"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "offset.overlay_up",
+      "context": "graph",
+      "doc": "Offset the reference overlay ten offset steps forward.",
+      "keys": ["Alt+Shift+Up"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "offset.drag",
+      "context": "graph",
+      "doc": "Mouse: drag the Main or overlay sub-axis to offset it.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "track.zoom_in",
+      "context": "track",
+      "doc": "Zoom the track view in about its centre.",
+      "keys": ["+", "="],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "track.zoom_out",
+      "context": "track",
+      "doc": "Zoom the track view out about its centre.",
+      "keys": ["-"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "track.fit",
+      "context": "track",
+      "doc": "Fit the whole track.",
+      "keys": [],
+      "milestone": "M3",
+      "status": "planned"
+    }
+  ],
+  "inherits": null,
+  "name": "default",
+  "unbind": []
+}

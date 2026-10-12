@@ -43,6 +43,17 @@ TEST_CASE("marker: model order is (t, class, id)", "[unit]") {
     CHECK(m[3].cls == MarkerClass::BCN);
     CHECK(m[2].id < m[3].id);
     CHECK(m[4].cls == MarkerClass::EOL);
+    // At equal times an EOL comes before a SOL (one outing ends where the next starts, D-158), then the rest
+    // in declaration order.
+    std::vector<Marker> joint{makeLoggedMarker(MarkerClass::BCN, 200, "Beacons", "B3"),
+                              makeLoggedMarker(MarkerClass::SOL, 200, "", ""),
+                              makeLoggedMarker(MarkerClass::RESET, 200, "", "Reset"),
+                              makeLoggedMarker(MarkerClass::EOL, 200, "", "")};
+    sortMarkers(joint);
+    CHECK(joint[0].cls == MarkerClass::EOL);
+    CHECK(joint[1].cls == MarkerClass::SOL);
+    CHECK(joint[2].cls == MarkerClass::BCN);
+    CHECK(joint[3].cls == MarkerClass::RESET);
 }
 
 TEST_CASE("marker: logged ids count ordinals per (class, group, logged time) in file order", "[unit]") {

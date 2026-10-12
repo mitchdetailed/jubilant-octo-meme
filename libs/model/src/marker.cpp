@@ -90,12 +90,29 @@ MarkerId markerIdLogged(MarkerClass cls, Micros loggedT, std::string_view group,
     return MarkerId{uuidFromHash(hash128({"marker", markerClassName(cls), t, group, ord}))};
 }
 
+namespace {
+
+// The tie rank at equal times: an outing's EOL first, then the next outing's SOL, then the other classes in
+// declaration order (D-158), so an outing that ends where the next one starts never yields an empty outing.
+int tieRank(MarkerClass c) noexcept {
+    switch (c) {
+    case MarkerClass::EOL:
+        return 0;
+    case MarkerClass::SOL:
+        return 1;
+    default:
+        return 2 + static_cast<int>(c);
+    }
+}
+
+} // namespace
+
 bool markerOrderLess(const Marker& a, const Marker& b) noexcept {
     if (a.t != b.t) {
         return a.t < b.t;
     }
     if (a.cls != b.cls) {
-        return a.cls < b.cls;
+        return tieRank(a.cls) < tieRank(b.cls);
     }
     return a.id < b.id;
 }

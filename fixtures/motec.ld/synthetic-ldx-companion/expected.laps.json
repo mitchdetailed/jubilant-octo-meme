@@ -6,7 +6,62 @@
       "durationUs": 25000000,
       "groups": [
         {
-          "children": [],
+          "children": [
+            {
+              "children": [],
+              "name": "Laps",
+              "path": "Outings:Laps",
+              "ranges": [
+                {
+                  "abbrev": "Out",
+                  "enabled": true,
+                  "endMarker": "795a7dc4-b7c4-5db8-ab31-c66928cbd34f",
+                  "endUs": 5000000,
+                  "id": "b1cca993-a885-5807-9e5c-73dd7fa1a7e9",
+                  "kind": "Lap",
+                  "lapClass": "Out",
+                  "name": "Out Lap",
+                  "number": 0,
+                  "startMarker": "4a220465-0e86-5534-8b34-1cae5de4ee3b",
+                  "startUs": 0,
+                  "stint": 1,
+                  "trusted": false
+                },
+                {
+                  "abbrev": "L1",
+                  "enabled": true,
+                  "endMarker": "4e53d113-b9c4-51ee-b582-f55583d43f01",
+                  "endUs": 15000000,
+                  "id": "05e3e745-288a-59eb-8a14-d4cb039eaf6a",
+                  "kind": "Lap",
+                  "lapClass": "Flying",
+                  "name": "Lap 1",
+                  "number": 1,
+                  "startMarker": "795a7dc4-b7c4-5db8-ab31-c66928cbd34f",
+                  "startUs": 5000000,
+                  "stint": 1,
+                  "trusted": true
+                },
+                {
+                  "abbrev": "In",
+                  "enabled": true,
+                  "endMarker": "7855b47b-3635-5402-a05b-a9082332b08a",
+                  "endUs": 25000000,
+                  "id": "aa541ab1-0333-58b5-89bc-cbc57a0f5fc2",
+                  "kind": "Lap",
+                  "lapClass": "In",
+                  "name": "In Lap",
+                  "number": 2,
+                  "startMarker": "4e53d113-b9c4-51ee-b582-f55583d43f01",
+                  "startUs": 15000000,
+                  "stint": 1,
+                  "trusted": false
+                }
+              ],
+              "supportsReporting": true,
+              "supportsTrackGeneration": true
+            }
+          ],
           "name": "Outings",
           "path": "Outings",
           "ranges": [

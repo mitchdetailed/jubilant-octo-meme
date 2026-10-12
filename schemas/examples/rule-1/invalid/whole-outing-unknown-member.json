@@ -1,0 +1,18 @@
+{
+  "$schema": "urn:esses:rule-1",
+  "schemaVersion": 1,
+  "abbrev": "{outingIndex}",
+  "colour": "red",
+  "groupFlags": {
+    "supportsReporting": true,
+    "supportsTrackGeneration": false
+  },
+  "id": "circuit.whole-outing",
+  "kind": "whole-outing",
+  "layers": [
+    "*"
+  ],
+  "name": "'File Name'",
+  "produces": "Outings",
+  "trusted": true
+}

@@ -1,0 +1,549 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:rule-1",
+  "title": "Esses declarative range rule (rule-1)",
+  "description": "A range rule of data/rules/<id>.rule.json (02 section 4.5, D-014, D-132): the state machine, numbering and annotation parameters an esses_analysis IRangeRule reads, keyed by kind. A profile names its rules by id in order (analysis::RuleRunner::fromRuleIds). Phase-1 rules (beacon-pair transitions and numbering, whole-outing, detail-group) read markers and details only; phase-2 work (beacon-pair annotations, track-sections) reads pinned columns on a worker (02 section 4.4 rule 13). Each kind is closed; unit values are {v, unit} and are converted to base units on load.",
+  "type": "object",
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "id",
+    "kind"
+  ],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072). The urn:esses: form is written; the bare esses: form and the https form are accepted on load (02 section 6.6 rule 1).",
+      "type": "string",
+      "pattern": "^(urn:esses:rule-1|esses:rule-1|https://[^/\\s]+(/[^/\\s]+)*/rule-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "id": {
+      "description": "The rule id, also the file name stem (circuit.beacon-pair.rule.json).",
+      "type": "string",
+      "pattern": "^[a-z0-9]+([.-][a-z0-9]+)*$"
+    },
+    "kind": {
+      "description": "The IRangeRule implementation: beacon-pair and whole-outing (M1), track-sections (M3), detail-group (later).",
+      "enum": [
+        "beacon-pair",
+        "whole-outing",
+        "track-sections",
+        "detail-group"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "beacon-pair"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/definitions/ruleBeaconPair"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "whole-outing"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/definitions/ruleWholeOuting"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "track-sections"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/definitions/ruleTrackSections"
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "detail-group"
+          }
+        }
+      },
+      "then": {
+        "$ref": "#/definitions/ruleDetailGroup"
+      }
+    }
+  ],
+  "definitions": {
+    "ruleGroupPath": {
+      "description": "A range-group path: colon-separated non-empty segments (\"Outings:Laps\").",
+      "type": "string",
+      "pattern": "^[^:]+(:[^:]+)*$"
+    },
+    "ruleRootPath": {
+      "description": "A root group path (one segment).",
+      "type": "string",
+      "pattern": "^[^:]+$"
+    },
+    "ruleLayers": {
+      "description": "The data layers the rule applies to (\"Normal\", \"Fastest\", ...); \"*\" is every layer. Default [\"*\"].",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "ruleMarkerClass": {
+      "description": "A marker class of 02 section 4.3.",
+      "enum": [
+        "SOL",
+        "EOL",
+        "BCN",
+        "SPLTBCN",
+        "IGRDBCN",
+        "RESET",
+        "STGSTRT",
+        "STGEND",
+        "DeviceEvent"
+      ]
+    },
+    "ruleTransitionClass": {
+      "description": "A marker class, or \"*\" for any class.",
+      "enum": [
+        "*",
+        "SOL",
+        "EOL",
+        "BCN",
+        "SPLTBCN",
+        "IGRDBCN",
+        "RESET",
+        "STGSTRT",
+        "STGEND",
+        "DeviceEvent"
+      ]
+    },
+    "ruleDetailTemplate": {
+      "description": "A name taken from a detail, written '<detail id>' (\"'File Name'\").",
+      "type": "string",
+      "pattern": "^'[^']+'$"
+    },
+    "ruleGroupFlags": {
+      "description": "The RangeGroup flags of the produced groups.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "supportsTrackGeneration": {
+          "type": "boolean"
+        },
+        "supportsReporting": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ruleQuantity": {
+      "description": "A value with its unit (units-1 symbol); converted to base units on load.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "v",
+        "unit"
+      ],
+      "properties": {
+        "v": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ruleLapClassSpec": {
+      "description": "Name and abbreviation templates ({n} = the lap number), default trust and numbering of one lap class: numbered takes the running flying-lap number; number is a fixed integer or \"n+1\" (the next flying number); neither (partial) takes the next flying number without consuming it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "abbrev"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "abbrev": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trusted": {
+          "type": "boolean"
+        },
+        "numbered": {
+          "type": "boolean"
+        },
+        "number": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "const": "n+1"
+            }
+          ]
+        }
+      }
+    },
+    "ruleBeaconPair": {
+      "description": "kind beacon-pair: circuit laps between beacons (02 section 4.5).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "produces",
+        "transitions",
+        "classes"
+      ],
+      "properties": {
+        "$schema": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "phase": {
+          "const": 1
+        },
+        "produces": {
+          "$ref": "#/definitions/ruleGroupPath"
+        },
+        "parent": {
+          "$ref": "#/definitions/ruleGroupPath"
+        },
+        "layers": {
+          "$ref": "#/definitions/ruleLayers"
+        },
+        "markerGroups": {
+          "description": "The marker groups the transitions read (\"\" = intrinsic SOL/EOL/RESET).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ignoreClasses": {
+          "description": "Marker classes skipped as if absent (ignored and split beacons).",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ruleMarkerClass"
+          }
+        },
+        "transitions": {
+          "description": "Evaluated in order over consecutive markers; the first match classifies the range between them.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "from",
+              "to",
+              "class"
+            ],
+            "properties": {
+              "from": {
+                "$ref": "#/definitions/ruleTransitionClass"
+              },
+              "to": {
+                "$ref": "#/definitions/ruleTransitionClass"
+              },
+              "class": {
+                "enum": [
+                  "flying",
+                  "out",
+                  "in",
+                  "partial",
+                  "pit"
+                ]
+              }
+            }
+          }
+        },
+        "classes": {
+          "description": "One entry per lap class a transition names.",
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "enum": [
+              "flying",
+              "out",
+              "in",
+              "partial",
+              "pit"
+            ]
+          },
+          "additionalProperties": {
+            "$ref": "#/definitions/ruleLapClassSpec"
+          }
+        },
+        "numbering": {
+          "description": "Flying laps are numbered per outing from the numeric startDetail when present, else from default.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "startDetail": {
+              "type": "string"
+            },
+            "default": {
+              "type": "integer"
+            }
+          }
+        },
+        "annotations": {
+          "description": "Phase-2 stint and pitStop annotations (D-075, D-132); they never change class, number or trust.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "phase": {
+              "const": 2
+            },
+            "stint": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "counterChannel": {
+                  "type": "string"
+                },
+                "dataGapUs": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "pitStop": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "stationarySec": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "speedChannel": {
+                  "type": "string"
+                },
+                "stationaryBelow": {
+                  "$ref": "#/definitions/ruleQuantity"
+                }
+              }
+            }
+          }
+        },
+        "groupFlags": {
+          "$ref": "#/definitions/ruleGroupFlags"
+        }
+      }
+    },
+    "ruleWholeOuting": {
+      "description": "kind whole-outing: one range per logged session (02 section 4.5).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "$schema": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "phase": {
+          "const": 1
+        },
+        "produces": {
+          "$ref": "#/definitions/ruleRootPath"
+        },
+        "layers": {
+          "$ref": "#/definitions/ruleLayers"
+        },
+        "name": {
+          "description": "The outing name: a detail ('File Name') or a literal.",
+          "type": "string",
+          "minLength": 1
+        },
+        "abbrev": {
+          "const": "{outingIndex}"
+        },
+        "trusted": {
+          "type": "boolean"
+        },
+        "groupFlags": {
+          "$ref": "#/definitions/ruleGroupFlags"
+        }
+      }
+    },
+    "ruleTrackSections": {
+      "description": "kind track-sections: laps x track-map sections per set and category (02 section 4.5; M3).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "produces"
+      ],
+      "properties": {
+        "$schema": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "phase": {
+          "const": 2
+        },
+        "produces": {
+          "type": "string",
+          "minLength": 1
+        },
+        "categoryChild": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parent": {
+          "$ref": "#/definitions/ruleGroupPath"
+        },
+        "layers": {
+          "$ref": "#/definitions/ruleLayers"
+        },
+        "sets": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "from": {
+              "type": "string"
+            },
+            "always": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "categoryGroups": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "requires": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "trackMap": {
+              "type": "boolean"
+            },
+            "channel": {
+              "type": "string"
+            }
+          }
+        },
+        "groupFlags": {
+          "$ref": "#/definitions/ruleGroupFlags"
+        }
+      }
+    },
+    "ruleDetailGroup": {
+      "description": "kind detail-group: one [SOL, EOL) range per layer named by a detail (02 section 4.5; later).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "groups"
+      ],
+      "properties": {
+        "$schema": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "phase": {
+          "const": 1
+        },
+        "layers": {
+          "$ref": "#/definitions/ruleLayers"
+        },
+        "anchor": {
+          "$ref": "#/definitions/ruleMarkerClass"
+        },
+        "sortDetails": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "groups": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "produces",
+              "name"
+            ],
+            "properties": {
+              "produces": {
+                "$ref": "#/definitions/ruleRootPath"
+              },
+              "name": {
+                "$ref": "#/definitions/ruleDetailTemplate"
+              },
+              "missing": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "groupFlags": {
+          "$ref": "#/definitions/ruleGroupFlags"
+        }
+      }
+    }
+  }
+}

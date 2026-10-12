@@ -1,0 +1,10 @@
+{
+  "$schema": "urn:esses:project-1",
+  "schemaVersion": 1,
+  "name": "Scratch",
+  "worksheets": [
+    {
+      "name": "Sheet 1"
+    }
+  ]
+}

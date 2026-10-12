@@ -24,7 +24,10 @@ On Windows `tools\dev\build-core.cmd` sets up the MSVC environment and runs all 
   Origin in `DCO`. There is no CLA; you keep your copyright and license your contribution under MIT.
 - Say in the pull request which acceptance criterion (for example `AC-M0-08`) or decision (`D-nnn`) the
   change serves.
-- CI must be green: `core` on three operating systems, `lint`, `sanitize` and `fuzz-smoke`.
+- CI must be green: `core` on three operating systems, `qt-app` on Windows and Linux (from M1), `lint`,
+  `sanitize` and `fuzz-smoke`. `qt-app` on macOS runs nightly and does not block a merge.
+- AI-assisted contributors: `AGENTS.md` (and `CLAUDE.md` for Claude Code) summarise the architecture, the
+  build and test conventions and the rules below.
 
 ## Coding standards
 
@@ -40,7 +43,9 @@ On Windows `tools\dev\build-core.cmd` sets up the MSVC environment and runs all 
 - Names never contain vendor marks (`TRADEMARK.md`); code handling a vendor format uses neutral names
   (`Cfg*`, `Legacy*`).
 - Every source file starts with the SPDX header:
+<!-- REUSE-IgnoreStart -->
   `// SPDX-FileCopyrightText: 2026 the Esses contributors` and `// SPDX-License-Identifier: MIT`.
+<!-- REUSE-IgnoreEnd -->
 
 ## Tests
 

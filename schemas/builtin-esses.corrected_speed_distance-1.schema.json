@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:builtin-esses.corrected_speed_distance-1",
+  "title": "Corrected speed and distance settings",
+  "description": "The settings object of the built-in maths module esses.corrected_speed_distance, version 1 (03_MATHS_ENGINE.md section 9.1, D-016): project.json builtinMaths[\"esses.corrected_speed_distance\"].settings and the settings of a builtin item in a sidecar's localMaths. It is a member of those documents, not a document, so it carries no $schema or schemaVersion. Every member is optional and an absent member takes the module default; quantities are {v, unit} with a unit of the units-1 table, converted to base units on load.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "method": {
+      "description": "How Corr Speed is formed: the faster of two wheel speeds, the first available channel of a list, or wheel speed corrected by longitudinal acceleration (gCorrection, M3).",
+      "enum": ["fastestWheel", "alternateList", "gCorrection"]
+    },
+    "fastestWheel": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "channels": {
+          "description": "The two wheel-speed channels; a missing one falls back to alternateList (W-CSD-FALLBACK).",
+          "type": "array",
+          "items": {"$ref": "#/definitions/csdChannelName"},
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    },
+    "alternateList": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "channels": {
+          "description": "Candidate speed channels in order; the first one the layer has is used as-is.",
+          "type": "array",
+          "items": {"$ref": "#/definitions/csdChannelName"},
+          "minItems": 1
+        }
+      }
+    },
+    "gCorrection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "speedChannel": {"$ref": "#/definitions/csdChannelName"},
+        "longGChannel": {"$ref": "#/definitions/csdChannelName"},
+        "lockThreshold": {"$ref": "#/definitions/csdQuantity"},
+        "recoverSeconds": {"type": "number", "minimum": 0}
+      }
+    },
+    "clamp": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min": {"anyOf": [{"type": "null"}, {"$ref": "#/definitions/csdQuantity"}]},
+        "minInvalidate": {"type": "boolean"},
+        "max": {"anyOf": [{"type": "null"}, {"$ref": "#/definitions/csdQuantity"}]},
+        "maxInvalidate": {"type": "boolean"}
+      }
+    },
+    "distance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "description": "integrate: the cumulative integral of Corr Speed; logged: the unwrapped logged lap distance.",
+          "enum": ["integrate", "logged"]
+        },
+        "loggedChannel": {"$ref": "#/definitions/csdChannelName"},
+        "integration": {"enum": ["trapezoid", "rectangle"]}
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "speed": {"$ref": "#/definitions/csdChannelName"},
+        "distance": {"$ref": "#/definitions/csdChannelName"}
+      }
+    }
+  },
+  "definitions": {
+    "csdChannelName": {
+      "description": "A channel name as the layer spells it (looked up case-insensitively).",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "csdQuantity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "unit"],
+      "properties": {
+        "v": {"type": "number"},
+        "unit": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

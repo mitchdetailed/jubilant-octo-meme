@@ -630,7 +630,7 @@ Each output is an ordinary node in the chain (shadowing rules apply), shows in C
   "settings": {
     "method": "fastestWheel",
     "fastestWheel":  { "channels": ["Wheel Speed FL", "Wheel Speed FR"] },
-    "alternateList": { "channels": ["Ground Speed", "Wheel Speed FL", "Wheel Speed FR", "Wheel Speed Front", "Wheel Speed", "Wheel Speed RL", "Wheel Speed RR", "Wheel Speed Rear", "Drive Speed", "GPS Speed"] },
+    "alternateList": { "channels": ["Ground Speed", "Wheel Speed FL", "Wheel Speed FR", "Wheel Speed Front", "Wheel Speed", "Wheel Speed RL", "Wheel Speed RR", "Wheel Speed Rear", "Drive Speed", "GPS Speed", "Speed"] },
     "gCorrection":   { "speedChannel": "Wheel Speed FL", "longGChannel": "G Force Long", "lockThreshold": { "v": 2.0, "unit": "m/s" }, "recoverSeconds": 0.5 },
     "clamp": { "min": { "v": 0, "unit": "km/h" }, "minInvalidate": false, "max": null, "maxInvalidate": false },
     "distance": { "source": "integrate", "loggedChannel": "Lap Distance", "integration": "trapezoid" },
@@ -640,7 +640,7 @@ Each output is an ordinary node in the chain (shadowing rules apply), shows in C
 Behaviour (numbered, implemented by `analysis::CorrectedSpeed::compute` and `analysis::CorrectedDistance::integrate`):
 
 1. `fastestWheel`: per sample `max(a, b)` of the two channels (resampled `Linear` to the higher rate); one invalid → the other; both invalid → invalid. Missing channel → fall back to `alternateList` with `W-CSD-FALLBACK`.
-2. `alternateList`: the first channel of the list that exists in the layer (after mappings/aliases) is used as-is. None → outputs `Error E-CSD-NO-SPEED`; the graph shows the "no distance data" banner for that source (D-016).
+2. `alternateList`: the first channel of the list that exists in the layer (after mappings/aliases) is used as-is. The default list ends with `Speed` (D-154, 2026-10-11: the sim-exporter dialect logs its road speed as `SPEED`; lookups are case-insensitive and a channel whose unit is not a speed is skipped). None → outputs `Error E-CSD-NO-SPEED`; the graph shows the "no distance data" banner for that source (D-016).
 3. `gCorrection`: `v_pred[i] = v_corr[i−1] + a_long[i]·dt`; if `v_wheel[i] < v_pred[i] − lockThreshold` (wheel lock) or `v_wheel[i] > v_pred[i] + lockThreshold` (wheel spin) the output follows `v_pred`; otherwise it blends back to `v_wheel` linearly over `recoverSeconds`. Stateful kernel, F64. Documented as a method whose numbers are not bit-identical to i2 (outline §9 risk).
 4. `clamp`: below `min` → `min` or invalid (`minInvalidate`); above `max` → `max` or invalid. Clamp values are stored with units and shown in the channel's display unit.
 5. `Corr Speed`: quantity Speed, result unit `m/s`, display unit inherited from the first source channel's display unit; dtype F32; `interp Linear`.

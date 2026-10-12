@@ -48,7 +48,7 @@ public:
     // False for a default-constructed token, which can never fire.
     bool canBeCancelled() const noexcept { return state_ != nullptr; }
 
-    static CancelToken none() noexcept { return CancelToken(); }
+    static CancelToken none() noexcept { return {}; }
 
 private:
     std::shared_ptr<const detail::CancelState> state_;

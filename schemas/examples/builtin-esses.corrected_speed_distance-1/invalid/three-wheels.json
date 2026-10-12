@@ -1,0 +1,9 @@
+{
+  "fastestWheel": {
+    "channels": [
+      "Wheel Speed FL",
+      "Wheel Speed FR",
+      "Wheel Speed RL"
+    ]
+  }
+}

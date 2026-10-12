@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 //
 // sidecar-1 reading and writing (02 section 5.2, schemas/sidecar-1.schema.json).
-#include "json_canonical.hpp"
 #include "json_read.hpp"
 #include "marker_json.hpp"
 
@@ -36,7 +35,7 @@ bool isKnownTopLevel(std::string_view key) noexcept {
 }
 
 OpaqueJson opaqueOrViolate(const json& j, const std::string& pointer) {
-    auto o = detail::toOpaque(j);
+    auto o = jsonio::toDoc(j);
     if (!o) {
         violate(pointer, o.error().message);
     }
@@ -378,7 +377,7 @@ json layerToJson(const SidecarLayer& l) {
         j["rangeOverrides"] = std::move(overrides);
     }
     if (l.localMaths) {
-        j["localMaths"] = detail::fromOpaque(*l.localMaths);
+        j["localMaths"] = jsonio::fromDoc(*l.localMaths);
     }
     if (!l.annotations.empty()) {
         json a = json::array();
@@ -411,10 +410,10 @@ json layerToJson(const SidecarLayer& l) {
         j["videoLinks"] = std::move(a);
     }
     if (l.runs) {
-        j["runs"] = detail::fromOpaque(*l.runs);
+        j["runs"] = jsonio::fromDoc(*l.runs);
     }
     if (l.stages) {
-        j["stages"] = detail::fromOpaque(*l.stages);
+        j["stages"] = jsonio::fromDoc(*l.stages);
     }
     return j;
 }
@@ -472,11 +471,11 @@ Result<SidecarDocument> SidecarDocument::parse(std::string_view text) {
         s.closed();
 
         const std::string editedPtr = r.child("edited");
-        const std::string& edited = asString(r.required("edited"), editedPtr);
-        const auto dt = DateTime::parseIso(edited);
+        const std::string& editedText = asString(r.required("edited"), editedPtr);
+        const auto dt = DateTime::parseIso(editedText);
         if (!dt) {
-            violate(editedPtr,
-                    "expected an ISO 8601 date-time with seconds and a UTC offset, found '" + edited + "'");
+            violate(editedPtr, "expected an ISO 8601 date-time with seconds and a UTC offset, found '" +
+                                   editedText + "'");
         }
         doc.edited = *dt;
 
@@ -530,10 +529,10 @@ Result<std::string> SidecarDocument::toJson() const {
     root["layers"] = std::move(layers);
     for (const auto& [key, value] : unknown) {
         if (!isKnownTopLevel(key)) {
-            root[key] = detail::fromOpaque(value);
+            root[key] = jsonio::fromDoc(value);
         }
     }
-    return detail::canonicalJson(root);
+    return jsonio::canonicalJson(root);
 }
 
 } // namespace esses::model

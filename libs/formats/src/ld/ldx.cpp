@@ -380,6 +380,45 @@ std::vector<LdxAttribute> merged(const std::vector<LdxAttribute>& original,
     return out;
 }
 
+// Replaces each placeholder "<?esses-opaque <index>?>" of the writer's skeleton by the verbatim text of
+// opaque[index], in one pass. The skeleton holds only what the writer produced: fixed element names,
+// attribute names, attribute values escaped by pugixml ('<' becomes "&lt;") and the placeholders, so every
+// "<?esses-opaque " in it is a placeholder. The verbatim texts are appended to the output and never searched
+// again: an element whose own text contains the reserved instruction (as a processing instruction, in a
+// comment, in CDATA or in an attribute value) is copied through unchanged and cannot capture the placeholder
+// of another element (a fuzz_ldx finding; the output then stopped being well-formed).
+std::string spliceOpaque(const std::string& skeleton, const std::vector<LdxOpaque>& opaque) {
+    const std::string open = "<?" + std::string(kPlaceholder) + " ";
+    const std::string close = "?>";
+    std::size_t total = skeleton.size();
+    for (const LdxOpaque& o : opaque) {
+        total += o.xml.size();
+    }
+    std::string out;
+    out.reserve(total);
+    std::size_t from = 0;
+    for (std::size_t at = skeleton.find(open); at != std::string::npos; at = skeleton.find(open, from)) {
+        const std::size_t digits = at + open.size();
+        const std::size_t end = skeleton.find(close, digits);
+        if (end == std::string::npos) {
+            break;
+        }
+        std::size_t index = 0;
+        const auto r = std::from_chars(skeleton.data() + digits, skeleton.data() + end, index);
+        if (r.ec != std::errc() || r.ptr != skeleton.data() + end || index >= opaque.size()) {
+            // Not a placeholder (cannot happen, see above): keep the text as it is.
+            out.append(skeleton, from, digits - from);
+            from = digits;
+            continue;
+        }
+        out.append(skeleton, from, at - from);
+        out += opaque[index].xml;
+        from = end + close.size();
+    }
+    out.append(skeleton, from, std::string::npos);
+    return out;
+}
+
 } // namespace
 
 bool isKnownMarkerClass(std::string_view cls) noexcept {
@@ -571,7 +610,7 @@ std::string writeLdx(const LdxDocument& doc) {
         }
     }
 
-    // Opaque elements: placeholders at their recorded positions, replaced by the verbatim text below.
+    // Opaque elements: placeholders at their recorded positions; spliceOpaque puts the verbatim texts in.
     std::vector<std::size_t> order(doc.opaque.size());
     for (std::size_t i = 0; i < order.size(); ++i) {
         order[i] = i;
@@ -592,15 +631,7 @@ std::string writeLdx(const LdxDocument& doc) {
 
     std::ostringstream os;
     x.save(os, " ", pugi::format_indent, pugi::encoding_utf8);
-    std::string text = os.str();
-    for (std::size_t i = 0; i < doc.opaque.size(); ++i) {
-        const std::string token = "<?" + std::string(kPlaceholder) + " " + std::to_string(i) + "?>";
-        const std::size_t at = text.find(token);
-        if (at != std::string::npos) {
-            text.replace(at, token.size(), doc.opaque[i].xml);
-        }
-    }
-    return text;
+    return spliceOpaque(os.str(), doc.opaque);
 }
 
 Result<void> writeLdxFile(const std::filesystem::path& path, const LdxDocument& doc) {

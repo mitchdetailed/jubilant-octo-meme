@@ -1,0 +1,37 @@
+{
+  "$schema": "urn:esses:scheme-1",
+  "schemaVersion": 1,
+  "background": "dark",
+  "fonts": {
+    "caption": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 9,
+      "weight": 700
+    },
+    "keyStrikeout": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 9,
+      "strikeOut": true,
+      "weight": 400
+    }
+  },
+  "name": "Night Session",
+  "overlayStyle": {
+    "colourSource": "overlayPalette",
+    "dash": "dash",
+    "lightness": -0.2,
+    "widthScale": 1.5
+  },
+  "print": {
+    "roles": {
+      "cptBackground": "#ffffff"
+    }
+  },
+  "roles": {
+    "cptBackground": "#000000",
+    "cursorMain": "red",
+    "overlay0": "#bdbdbd80"
+  }
+}

@@ -24,22 +24,45 @@ Environment: `ESSES_CMAKE_ARGS` passes extra configure arguments (use it for `-D
 splits positional arguments at `=`); `ESSES_SKIP_TESTS=1` configures and builds only; `ESSES_CTEST_ARGS` adds
 ctest arguments (for example `-L property` or `-R taskpool`).
 
+## Building with Qt on Windows (M1 onwards)
+
+`build-qt.cmd` is the Qt counterpart of `build-core.cmd`: same arguments and environment overrides, default preset
+`win-msvc-qt` (Qt 6.7.2 MSVC kit at `C:\Qt\6.7.2\msvc2019_64`, Debug). It puts the kit's `bin` first on `PATH`
+and sets `QT_QPA_PLATFORM=offscreen`, so the Qt Test executables, `esses-render` and `esses` run from the build
+tree without deployment. `ESSES_QT_DIR` selects another kit (passed as `CMAKE_PREFIX_PATH`).
+
+```
+tools\dev\build-qt.cmd                                     # win-msvc-qt in build\win-msvc-qt
+tools\dev\build-qt.cmd ci-win-msvc-qt build\m1-ci            # warnings as errors, as the qt-app CI job
+set ESSES_SKIP_TESTS=1 & tools\dev\build-qt.cmd win-msvc-qt-rel build\m1-rel
+```
+
+Qt Test executables: every `tst_<name>.cpp` under `libs/<qt lib>/tests`, `tests/ui` or `tests/golden/images` is
+one executable and one ctest entry (`<lib>.tst_<name>`, label `qt`), registered by `esses_add_qt_test_dir`
+(`cmake/esses_targets.cmake`), with `QT_QPA_PLATFORM=offscreen` and the kit on `PATH`. The Qt targets compile
+with `QT_NO_KEYWORDS`: write `Q_SIGNALS`, `Q_SLOTS`, `Q_EMIT`.
+
 ## Presets
 
 | Preset | Use |
 |---|---|
 | `win-msvc-core`, `win-msvc-core-rel` | Qt-free core with MSVC, Debug / RelWithDebInfo (M0) |
 | `win-msvc-debug`, `win-msvc-release` | with Qt (M1 onwards; needs `CMAKE_PREFIX_PATH` from `CMakeUserPresets.json`) |
+| `win-msvc-qt`, `win-msvc-qt-rel`, `ci-win-msvc-qt` | with Qt 6.7.2 from `C:/Qt/6.7.2/msvc2019_64` (M1), Debug / RelWithDebInfo / CI (`/WX`) |
 | `linux-gcc-core`, `mac-clang-core` | Qt-free core on Linux and macOS |
-| `linux-clang-asan`, `linux-clang-tsan`, `linux-clang-fuzz` | sanitizers and fuzzing (Linux, Clang) |
+| `linux-gcc-qt`, `mac-clang-qt` (+ `ci-*`) | with Qt on Linux and macOS, Debug; the kit comes from `CMAKE_PREFIX_PATH` (`-D`, a user preset, or `install-qt-action` in the `qt-app` CI job) |
+| `win-msvc-bench`, `linux-gcc-bench` | Release with `ESSES_BUILD_BENCH=ON`, tests off: the reference-machine gate and the hosted alarm of `.github/workflows/bench.yml` (D-042); their test presets run the ctest label `bench` one at a time |
+| `linux-clang-asan`, `linux-clang-tsan`, `linux-clang-fuzz` | sanitizers and fuzzing (Linux, Clang); the TSan test preset runs the `base`, `store`, `maths` and `plotcore` tests |
 | `ci-*` | the CI variants: warnings as errors and assertions on |
 
 `CMakeUserPresets.json` (git-ignored) holds machine-specific presets such as the Qt kit path (08 section 3.6).
 
 ## Leaving out an unfinished library
 
-`ESSES_WITH_UNITS`, `ESSES_WITH_MODEL`, `ESSES_WITH_FORMATS` and `ESSES_WITH_CLI` (all ON by default) let a
-configure skip `libs/units`, `libs/model`, `libs/formats` or `apps/cli` while it is being written, so work on a
+`ESSES_WITH_UNITS`, `ESSES_WITH_MODEL`, `ESSES_WITH_FORMATS`, `ESSES_WITH_ANALYSIS`, `ESSES_WITH_MATHS`,
+`ESSES_WITH_PROJECT`, `ESSES_WITH_PLOTCORE`, `ESSES_WITH_CLI` and, with Qt, `ESSES_WITH_QTMODEL`,
+`ESSES_WITH_QTRENDER`, `ESSES_WITH_WIDGETS`, `ESSES_WITH_RENDER` (`apps/render`) and `ESSES_WITH_APP` (`apps/app`)
+(all ON by default) let a configure skip a library or application while it is being written, so work on a
 sibling is not blocked. A component that DEPS on a switched-off one fails the layer check with a message naming
 the switch to add:
 
@@ -108,3 +131,18 @@ build\fuzz\bin\fuzz_ldx.exe -max_total_time=60 -dict=build\fuzz\bin\fuzz_ldx.dic
 ```
 
 On Linux the same targets build with `linux-clang-fuzz` (the `fuzz-smoke` CI job).
+
+## M1 budget benchmarks
+
+`esses-plot-bench` (AC-M1-02) and `esses-open-bench` (AC-M1-03) build with the Qt layers (`bench/`); time them in
+a RelWithDebInfo tree on the reference machine, with nothing else running:
+
+```
+set ESSES_SKIP_TESTS=1 & tools\dev\build-qt.cmd win-msvc-qt-rel build\m1-rel
+build\m1-rel\bin\esses-plot-bench --runs 5 --stages --gate
+build\m1-rel\bin\esses-open-bench --runs 5 --gate
+```
+
+They write their logs with `esses-gen-fixtures --bench <file> [--bench-channels N] [--bench-mb M |
+--bench-seconds S] [--bench-lap-seconds L]` into `<build>\bench-data` on first use. Results and the reference
+numbers: `bench/workloads.md` ("M1 budget rows").

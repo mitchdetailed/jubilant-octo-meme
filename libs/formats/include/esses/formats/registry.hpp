@@ -14,7 +14,9 @@
 //   * Step 4 resolves each channel's vendor unit with the UnitRegistry of OpenContext (no dictionary, no
 //     unit-mapping profile and no ChannelResolver mappings exist in M0) and converts samples to the
 //     quantity's base unit at decode (D-010). Without a registry the channels open unitless in vendor units.
-//   * Step 6 is the whole-outing rule (model::rebuildWholeOutingRanges), the only range rule of M0.
+//   * Step 6 runs OpenContext::rangeRebuild: from M1 the profile's rules (esses_analysis' RuleRunner, passed
+//     in by the caller because formats never links analysis); without one, the whole-outing rule
+//     (model::rebuildWholeOutingRanges), the only range rule of M0.
 #pragma once
 
 #include <esses/base/cancel.hpp>
@@ -56,6 +58,8 @@ struct OpenContext {
     TaskPool* pool = nullptr;                   // chunk tasks; null: TaskPool::installed() when needed
     bool loadSidecar = true;                    // step 5: <log>.<ext>.sidecar.json when it exists
     bool mergeCompanion = true;                 // step 5: the companion's details, markers, unknown elements
+    // Step 6, phase-1 ranges: analysis::RuleRunner::rebuildFunction() from M1; empty: the whole-outing rule.
+    model::DataSource::RangeRebuild rangeRebuild;
 };
 
 struct OpenedSource {

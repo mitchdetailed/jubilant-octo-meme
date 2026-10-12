@@ -1,0 +1,85 @@
+{
+  "$schema": "urn:esses:profile-1",
+  "schemaVersion": 1,
+  "dataViews": [
+    {
+      "default": true,
+      "outingDetail": "'File Name'",
+      "title": "Laps",
+      "tree": ["Events", "Vehicles", "Sessions", "Outings", "Outings:Laps"]
+    },
+    {
+      "title": "Outings",
+      "tree": ["Events", "Vehicles", "Sessions", "Outings"]
+    }
+  ],
+  "defaultMaths": ["esses-circuit"],
+  "defaultWorkbook": "circuit-default",
+  "details": [
+    {
+      "id": "Driver",
+      "type": "string"
+    },
+    {
+      "id": "Venue",
+      "type": "string"
+    },
+    {
+      "dps": 3,
+      "id": "Venue Length",
+      "type": "number",
+      "unit": "km"
+    },
+    {
+      "dps": 0,
+      "id": "Start Lap",
+      "type": "number"
+    },
+    {
+      "dps": 3,
+      "id": "Vehicle Wheelbase",
+      "type": "number",
+      "unit": "m"
+    },
+    {
+      "dps": 3,
+      "id": "Vehicle Track",
+      "type": "number",
+      "unit": "m"
+    },
+    {
+      "dps": 0,
+      "id": "Vehicle Weight",
+      "type": "number",
+      "unit": "kg"
+    },
+    {
+      "dps": 2,
+      "id": "Diff Ratio",
+      "type": "number",
+      "unit": "ratio"
+    },
+    {
+      "default": 14.7,
+      "dps": 1,
+      "id": "Stoich Ratio",
+      "type": "number",
+      "unit": "ratio"
+    }
+  ],
+  "futureMember": {
+    "x": 1
+  },
+  "id": "circuit",
+  "name": "Circuit",
+  "primaryMarkers": "Beacons",
+  "primaryRanges": "Outings:Laps",
+  "rangeKinds": ["Outing", "Lap", "Section"],
+  "reportHeadings": ["Events", "Vehicles", "Sessions", "Driver", "Vehicle Id", "Vehicle Number", "Outings", "Outings:Laps", "Outings:Laps:Track Sections:Default", "Outings:Laps:Track Sections:Default:Corners", "Outings:Laps:Track Sections:Default:Straights"],
+  "rules": ["circuit.detail-groups", "circuit.whole-outing", "circuit.beacon-pair", "circuit.track-sections"],
+  "terms": {
+    "editor": "Lap Editor",
+    "range": "Lap",
+    "ranges": "Laps"
+  }
+}

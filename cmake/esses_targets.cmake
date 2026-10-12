@@ -5,6 +5,8 @@
 #   esses_add_library(<name> LAYER <n> [QT_FREE] [HEADER_ONLY] SOURCES ... DEPS ... PRIVATE_DEPS ...)
 #   esses_add_executable(<name> LAYER <n> [QT_FREE] SOURCES ... DEPS ... [OUTPUT_NAME <exe>])
 #   esses_add_test(<name> [QT_FREE] [CUSTOM_MAIN] SOURCES ... DEPS ... [LABELS ...] [TIMEOUT <s>] [PREFIX <p>])
+#   esses_add_qt_test(<name> SOURCES ... DEPS ... [TEST_NAME <ctest name>] [LABELS ...] [TIMEOUT <s>])
+#   esses_add_qt_test_dir(<prefix> DIR <dir> DEPS ... [LABELS ...] [TIMEOUT <s>])
 #   esses_component_enabled(<component> <out-var>)
 # Library targets are ${ESSES_PREFIX}_<name> with the alias ${ESSES_NAMESPACE}::<name>. The layer check
 # (01 section 2.3) fails configure on an upward esses:: dependency or a forbidden pair of 01 section 2.2, and
@@ -20,10 +22,13 @@ if(ESSES_ENABLE_CLANG_TIDY)
 endif()
 
 # 01 section 2.2 rule 1 and 08 section 2 rule 3: pairs that are forbidden regardless of layer numbers.
+# analysis>project closes the same-layer cycle project -> analysis; plotcore>maths is D-048 as amended by D-122
+# (maths outputs reach the plot as Columns through the ChunkCache, never through a link).
 set(ESSES_FORBIDDEN_EDGES
     "formats>maths" "formats>analysis" "formats>project"
-    "analysis>maths"
+    "analysis>maths" "analysis>project" "analysis>formats"
     "maths>project" "maths>formats"
+    "plotcore>maths"
     "qtrender>qtmodel")
 
 function(_esses_short_name target out)
@@ -191,6 +196,76 @@ function(esses_add_test name)
   endif()
   esses_catch_discover(${t} ${discover_args})
   _esses_register(${t} test "")
+endfunction()
+
+# ---- Qt Test executables (08 section 6.2: Qt Test for the Qt layers; run offscreen) ------------------------
+# esses_add_qt_test(<name> SOURCES ... DEPS ... [TEST_NAME <ctest name>] [LABELS ...] [TIMEOUT <s>])
+# One executable ${ESSES_PREFIX}_<name> (AUTOMOC on, linked with Qt6::Test) = one ctest entry (default name
+# <name> with the first '_' turned into '.'). The test runs with QT_QPA_PLATFORM=offscreen and the Qt kit's bin
+# directory prepended to PATH, so it needs no deployment. Only with ESSES_BUILD_QT and ESSES_BUILD_TESTS.
+function(esses_add_qt_test name)
+  if(NOT ESSES_BUILD_TESTS OR NOT ESSES_BUILD_QT)
+    return()
+  endif()
+  cmake_parse_arguments(A "" "TIMEOUT;TEST_NAME" "SOURCES;DEPS;LABELS" ${ARGN})
+  set(t ${ESSES_PREFIX}_${name})
+  if(NOT A_TEST_NAME)
+    string(REGEX REPLACE "^([^_]+)_" "\\1." A_TEST_NAME "${name}")   # qtmodel_dispatcher -> qtmodel.dispatcher
+  endif()
+  if(NOT A_TIMEOUT)
+    set(A_TIMEOUT 300)
+  endif()
+  add_executable(${t} ${A_SOURCES})
+  target_link_libraries(${t} PRIVATE ${A_DEPS} Qt6::Test)
+  target_compile_definitions(${t} PRIVATE "ESSES_TEST_SOURCE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}\""
+                                          "ESSES_TEST_BINARY_DIR=\"${CMAKE_CURRENT_BINARY_DIR}\""
+                                          "ESSES_TEST_REPO_ROOT=\"${CMAKE_SOURCE_DIR}\"")
+  esses_apply_warnings(${t})
+  set_target_properties(${t} PROPERTIES AUTOMOC ON FOLDER "tests" ESSES_DEPS "${A_DEPS}")
+  add_test(NAME ${A_TEST_NAME} COMMAND ${t})
+  set_tests_properties(${A_TEST_NAME} PROPERTIES
+                       ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+                       ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
+                       LABELS "qt;${A_LABELS}" TIMEOUT ${A_TIMEOUT})
+  _esses_register(${t} test "")
+endfunction()
+
+# esses_add_qt_test_dir(<prefix> DIR <dir> DEPS ... [LABELS ...] [TIMEOUT <s>])
+# Every <dir>/**/tst_<name>.cpp becomes its own Qt Test executable ${ESSES_PREFIX}_<prefix>_tst_<name> (ctest
+# <prefix>.tst_<name>); every other .cpp under <dir> is a shared helper compiled into each of them. The glob is
+# CONFIGURE_DEPENDS, so adding a test file needs no CMakeLists edit (parallel M1 work, 07 section 4).
+function(esses_add_qt_test_dir prefix)
+  if(NOT ESSES_BUILD_TESTS OR NOT ESSES_BUILD_QT)
+    return()
+  endif()
+  cmake_parse_arguments(A "" "DIR;TIMEOUT" "DEPS;LABELS" ${ARGN})
+  if(NOT IS_ABSOLUTE "${A_DIR}")
+    set(A_DIR "${CMAKE_CURRENT_SOURCE_DIR}/${A_DIR}")
+  endif()
+  file(GLOB_RECURSE all_cpp CONFIGURE_DEPENDS "${A_DIR}/*.cpp")
+  file(GLOB_RECURSE all_hpp CONFIGURE_DEPENDS "${A_DIR}/*.hpp" "${A_DIR}/*.h")
+  set(tests "")
+  set(helpers "")
+  foreach(f IN LISTS all_cpp)
+    get_filename_component(stem "${f}" NAME_WE)
+    if(stem MATCHES "^tst_")
+      list(APPEND tests "${f}")
+    else()
+      list(APPEND helpers "${f}")
+    endif()
+  endforeach()
+  set(extra "")
+  if(A_TIMEOUT)
+    set(extra TIMEOUT ${A_TIMEOUT})
+  endif()
+  foreach(f IN LISTS tests)
+    get_filename_component(stem "${f}" NAME_WE)
+    esses_add_qt_test(${prefix}_${stem} TEST_NAME "${prefix}.${stem}" SOURCES "${f}" ${helpers} ${all_hpp}
+                      DEPS ${A_DEPS} LABELS ${A_LABELS} ${extra})
+    if(TARGET ${ESSES_PREFIX}_${prefix}_${stem})
+      target_include_directories(${ESSES_PREFIX}_${prefix}_${stem} PRIVATE "${A_DIR}")
+    endif()
+  endforeach()
 endfunction()
 
 # ---- esses_targets.json (consumed by tools/check_layering.py) ------------------------------------------

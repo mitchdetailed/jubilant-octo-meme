@@ -1,0 +1,158 @@
+{
+  "$schema": "urn:esses:scheme-1",
+  "schemaVersion": 1,
+  "background": "light",
+  "channelPalette": ["#d32f2f", "#1565c0", "#2e7d32", "#ef6c00", "#6a1b9a", "#00838f", "#c2185b", "#558b2f", "#4527a0", "#9e7700", "#00695c", "#5d4037"],
+  "fonts": {
+    "axis": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 8,
+      "weight": 400
+    },
+    "axisRotated": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 8,
+      "weight": 400
+    },
+    "caption": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 9,
+      "weight": 600
+    },
+    "colourBands": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 7,
+      "weight": 400
+    },
+    "dataHeader": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 9,
+      "weight": 600
+    },
+    "dataRange": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 9,
+      "weight": 400
+    },
+    "equation": {
+      "family": "Noto Sans",
+      "italic": true,
+      "pointSize": 8,
+      "weight": 400
+    },
+    "gauge": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 14,
+      "weight": 600
+    },
+    "key": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 8,
+      "weight": 400
+    },
+    "keyStrikeout": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 8,
+      "strikeOut": true,
+      "weight": 400
+    },
+    "reportHeading": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 9,
+      "weight": 700
+    },
+    "reportTable": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 9,
+      "weight": 400
+    },
+    "small": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 7,
+      "weight": 400
+    },
+    "trackLabel": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 8,
+      "weight": 600
+    },
+    "valuesHeader": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 9,
+      "weight": 600
+    },
+    "valuesItem": {
+      "family": "Noto Sans",
+      "italic": false,
+      "pointSize": 9,
+      "weight": 400
+    }
+  },
+  "name": "Esses Light",
+  "overlayPalette": ["#0277bd", "#689f38", "#e65100", "#7b1fa2", "#00897b", "#c2185b", "#827717", "#546e7a", "#8d6e63"],
+  "overlayStyle": {
+    "colourSource": "channel",
+    "dash": "solid",
+    "lightness": 0,
+    "widthScale": 1
+  },
+  "print": {
+    "roles": {
+      "cptBackground": "#ffffff",
+      "dataGrid": "#c8c8c8",
+      "windowBackground": "#ffffff"
+    }
+  },
+  "roles": {
+    "annotationMark": "#e37400",
+    "cptBackground": "#ffffff",
+    "cptCaptionBackground": "#e8eaed",
+    "cptCaptionForeground": "#1f1f1f",
+    "cptFocusBorder": "#1a73e8",
+    "cptForeground": "#1f1f1f",
+    "cptForeground2": "#5f6368",
+    "cptFrame": "#c8c8c8",
+    "cursorDatum": "#9a7400",
+    "cursorMain": "#e3261c",
+    "cursorZoom": "#1a73e8",
+    "dataBackground": "#ffffff",
+    "dataError": "#d93025",
+    "dataForeground": "#1f1f1f",
+    "dataForeground2": "#5f6368",
+    "dataGrid": "#dadce0",
+    "dataHeadingBackground": "#e8eaed",
+    "dataHeadingForeground": "#000000",
+    "dataHighlightBackground": "#cce0ff",
+    "dataHighlightForeground": "#000000",
+    "dataUnknown": "#80868b",
+    "deviceEvent": "#80868b",
+    "keyBackground": "#f8f9fa",
+    "mainSingleColour": "#000000",
+    "markerBand": "#eceff1",
+    "overlay0": "#7a7a7a",
+    "pendingHatch": "#dadce0",
+    "rangeMark": "#80868b",
+    "sectionCorner": "#e6d7f2",
+    "sectionStraight": "#d7efdc",
+    "statusError": "#d93025",
+    "statusOk": "#188038",
+    "statusWarn": "#e37400",
+    "trackLine": "#5f6368",
+    "varianceZero": "#9aa0a6",
+    "windowBackground": "#f3f3f3"
+  }
+}

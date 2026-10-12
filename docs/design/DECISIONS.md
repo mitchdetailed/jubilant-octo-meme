@@ -51,7 +51,7 @@ Each ADR has: Title · Context · Options considered (with the research facts th
 | D-035 | MVP scope and milestones | parity-first's MVP minus i2 file importers, index DB and GL (all v1.0); Lap/Details editors, Time Report and sections stay in MVP; ~30 weeks to 0.1, re-estimated ≈ 42 with contingency (D-045) | **yes** (scope cut; answered 2026-10-10) |
 | D-036 | Profiles | Circuit profile only in MVP; range kinds for Run/Stage exist in the model from M0; Drag/Rally rules and editors v1.0 | no |
 
-Addendum A (after the open questions) adds D-037–D-152: decisions proposed by the section writers of documents 00–08, by the 2026-10-10 review (A.1–A.8) and by the final cross-document revision (A.9), plus implementation decisions taken once M0 started (A.10: the user's instructions, and the reconciliation with spike S-1 and the converter port specification) and the departures of M0 as built from the design (A.11), with their own index. Where an addendum entry amends an ADR above, the ADR carries a one-line "Amended by" note.
+Addendum A (after the open questions) adds D-037–D-158: decisions proposed by the section writers of documents 00–08, by the 2026-10-10 review (A.1–A.8) and by the final cross-document revision (A.9), plus implementation decisions taken once M0 started (A.10: the user's instructions, and the reconciliation with spike S-1 and the converter port specification) the departures of M0 as built from the design (A.11) and those of M1 as built (A.12, proposed), with their own index. Where an addendum entry amends an ADR above, the ADR carries a one-line "Amended by" note.
 
 ---
 
@@ -300,6 +300,7 @@ No custom software rasteriser: golden images come from `RasterBackend` run offsc
 **Consequences.** Distance-domain decimation runs per lap with no resampled channel copies; variance is O(pixels); the module appears in Channel Status like any maths item (no hidden plugin). The maths engine therefore must exist by the milestone that ships distance mode (outline M1 ships a *minimal* engine: `MathGraph`, `PlanProvider` and the built-in module; the parser, expression evaluation and the full language follow in M2 — amended by D-044).
 
 **Amended by (A.9, proposed):** D-134 (`DistanceChain`) and D-140 (`DistanceIndex` key).
+**Amended by (A.12, proposed):** D-154 (the default `alternateList` ends with `Speed`) and D-157 (`timeAt` exact between the 0.25 m steps).
 
 **User must confirm:** no (tolerance default is an open question).
 
@@ -440,6 +441,8 @@ No custom software rasteriser: golden images come from `RasterBackend` run offsc
 **Decision.** ADS as a **shared library** (LGPL compliance) via vcpkg or FetchContent, wrapped by a `DockHost` facade (`addDock(id, widget, area)`, `savePerspective()/restorePerspective()`, `setAutoHide(id)`, `resetToDefault()`). Fallback `QDockWidget` implementation of the same facade for macOS if ADS proves unusable. Fly-out = ADS auto-hide; pop-up = floating.
 
 **Consequences.** Dock state persists per user (D-019); the facade keeps the ADS API out of components.
+
+**Amended by (A.12, proposed):** D-153 (the `QDockWidget` backend is the default until ADS is vendored and S-3 has run).
 
 **User must confirm:** no.
 
@@ -749,6 +752,12 @@ Rewritten on 2026-10-10 after the review. The list is deduplicated across this d
 | D-150 | The `qt-app` CI job starts in M1 (amends D-034, D-124) | no | M0 §5 deviation 1 |
 | D-151 | `CLAUDE.md` and `AGENTS.md` are written in M1 (amends D-128) | no | M0 §5 deviation 3 |
 | D-152 | `esses-cli fixture add` defaults (applies D-040, D-041) | no | M0 §3, §5 deviation 4 |
+| D-153 | Dock backend: `QDockWidget` until ADS is vendored and S-3 has run (amends D-026, D-044, D-119) | **yes** | M1 §5 deviation 1 |
+| D-154 | The default `alternateList` ends with `Speed`; M1 uses the `alternateList` fallback (amends D-016, D-044) | no | M1 §5 deviation 2 |
+| D-155 | Budget rows from the benchmark executables; no `esses-cli bench` (amends 07 §4.5) | no | M1 §5 deviation 3 |
+| D-156 | The shell (`MainWindow`, `LayoutFile`) lives in `esses_widgets` (amends 01 §2.1) | no | M1 §5 deviation 4 |
+| D-157 | `DistanceIndex::timeAt` is exact between the 0.25 m steps (refines D-016) | no | M1 §5 deviation 5 |
+| D-158 | Marker order: at equal times `EOL` before `SOL` (amends 02 §4.3 behaviour 8) | no | M1 §3 review fix |
 
 ### A.1 Review amendments
 
@@ -792,6 +801,7 @@ Rewritten on 2026-10-10 after the review. The list is deduplicated across this d
 **Context.** M0 packed the whole Qt-free foundation plus the CSV engine into 100 h; M1 built most of the shell, the full parser and three corrected-speed methods, with 37 h for about twelve UI classes. D-016 requires the built-in Corr Speed/Dist module when distance mode ships, and 03 §14.4 put the parser in M1.
 **Decision.** M0 keeps the `.ld/.ldx` reader and writer, store, units, model, sidecar, CLI `info/channels/laps/validate/fixture add|verify`, the synthetic generator with the reference decoder, the macOS core runner (D-034) and a TSan job on `esses_base`. `TextEngine`, `motec.csv`, `generic.csv`, `Dictionary`, `UnitMappingProfile`, their schemas and fuzz targets, and `fixture diff` move to M2. M1 keeps D-016's built-in module with only the engine it needs (`MathGraph` define/require/version, `PlanProvider`, `EvalContext`, `fastestWheel` with clamps). `Parser`, `TypeChecker`, `esses-cli eval`, the elementwise budget and `LapStretch` move to M2; `alternateList` and `gCorrection` move to M3 with the dialog. The `QDockWidget` fallback is built only for an OS where spike S-3 fails (D-026's wording). `PropertiesDialog` first appears in M3, Data-window filters and Channels-window i2 search move to M2, and overlapped mode moves to M3. The review's alternative, computing Corr Speed directly in `esses_analysis` and wrapping it in M2, is rejected because D-016 makes the module the single data path for distance consumers. **Conflict** with 03 §14.4 (parser in M1) resolved by this entry.
 **User must confirm:** no.
+*Amended by D-154 (A.12, proposed): the `alternateList` fallback is used from M1 and its default list ends with `Speed`; D-153: the `QDockWidget` backend is the default until ADS is vendored.*
 
 #### D-045 0.1 re-baseline: test share and contingency (amends D-035's timing)
 **Context.** The 30-week / 750 h plan applied ×1.2 where the judges estimated parity-first at ~1.5× optimistic, held tests near 20 % and had no contingency, while documents 01–08 added infrastructure and test obligations; the review estimated 1,100–1,300 h for the design as written.
@@ -1182,6 +1192,7 @@ Rewritten on 2026-10-10 after the review. The list is deduplicated across this d
 **Context.** D-026 allows vcpkg or FetchContent. vcpkg's ADS port depends on vcpkg's own `qtbase`, against D-006.
 **Decision.** FetchContent at a pinned tag, built as a shared library.
 **User must confirm:** no.
+*Amended by D-153 (A.12, proposed): ADS is vendored under D-147 only after the user approves the download; until then the `QDockWidget` backend is the default.*
 
 #### D-120 Build and repository conventions
 **Context.** 08 needed details that D-034 leaves open. They do not change any ADR.
@@ -1361,4 +1372,44 @@ These entries record where M0, as built and accepted on the developer machine on
 **Context.** The 07 §3.6 step-4 command as first written had no `--licence`, and `fixture add` defaulted to the licence `LicenseRef-unknown` and to strict validity. The M0 acceptance review found that a public fixture could be added without a licence, that a refused command left a directory behind, and that an input with gap blocks failed its own `fixture verify`, because the reference decoder cannot see gap blocks (D-041; `docs/milestones/M0.md` §3 and §5 deviation 4).
 **Decision.** (a) A public fixture needs `--licence`, checked before anything is written, so a refused command leaves nothing behind. (b) With `--oracle ref-decode`, `oracle.validity` defaults to `finite-only`; the synthetic-fixture generator passes `--validity strict` because it supplies the validity itself. 07 §3.6 step 4 carries `--licence`.
 **Consequences.** Every public fixture states its licence (D-040), and a fixture made with the reference decoder verifies whatever gap blocks its input holds. `cli.demo_script` covers both rules.
+**User must confirm:** no.
+
+### A.12 M1 as built (proposed, 2026-10-11)
+
+These entries record where M1, as built and reviewed on the developer machine on 2026-10-11 (`docs/milestones/M1.md`), departs from what a design document or an acceptance criterion says. Each states the ADRs it amends; those ADRs carry an "Amended by" line. Lower-level departures (added accessors, argument types, helper classes the documents name without declaring) are recorded in the "Deviations from the design text" section of each library's `README.md` and summarised in M1.md §5.
+
+#### D-153 Dock backend: `QDockWidget` until ADS is vendored and S-3 has run (amends D-026, D-044, D-119)
+**Context.** D-026 wraps ADS in `DockHost` with a `QDockWidget` fallback for an OS on which ADS proves unusable; D-044 and 07 §4.1 build that fallback only for an OS on which spike S-3 fails; D-119 fetches ADS at a pinned tag. D-147 vendors every dependency and makes each download subject to the user's approval. No download was approved for ADS in M1, so ADS is not in the tree and S-3 has not run (`docs/spikes/S-3.md`).
+**Decision.** (a) `DockHost` has a backend seam (`IDockBackend`). `QDockWidgetBackend` implements the 06 §3 contract: docked, pop-up (floating), fly-out (auto-hide emulated by the backend), perspectives, Reset Dock Windows, and ESC returning the focus. It is the default backend on every OS until ADS is vendored and S-3 has passed. (b) AC-M1-13 runs on this backend; `ESSES_DOCK_BACKEND` selects the backend at run time once ADS exists. (c) ADS is vendored, as a shared library at a pinned tag under D-147's rules, only after the user approves the download. S-3 then runs, AC-M1-13 runs on both backends, and ADS becomes the default on each OS where S-3 passes.
+**Consequences.** Until then the fly-out is the fallback's emulation, without ADS's auto-hide side bars. `layout-1` records the backend that wrote a perspective (`dockBackend`). A perspective that the other backend cannot read is replaced by the default layout, and an Info row in Messages names the backend that wrote it. 07 §4.1's widgets row, AC-M1-13 and R-10 read with this entry.
+**User must confirm:** **yes.** Either approve the ADS download (D-147), so that S-3 and AC-M1-13 run on ADS in M2, or accept the `QDockWidget` backend for 0.1.
+
+#### D-154 The default `alternateList` ends with `Speed`; M1 uses the `alternateList` fallback (amends D-016, D-044)
+**Context.** D-044 moves `alternateList` and `gCorrection` to M3. The public ACC stand-in (`fixtures/motec.ld/synthetic-acc-dialect`, the sim-exporter dialect) logs its road speed as `SPEED` and has no wheel speeds. None of 03 §9.1's default channel lists names that channel, so the M1 data path (ACC `.ld` → Corr Speed/Corr Dist → distance mode; AC-M1-01, -09 and -10) showed "no distance data".
+**Decision.** (a) From M1, `fastestWheel` falls back to `alternateList` (`W-CSD-FALLBACK`) when one of its channels is unusable, as 03 §9.1 item 1 describes. The `alternateList` method (chosen in the dialog) and `gCorrection` stay in M3. (b) The module's default `alternateList` is 03 §9.1's list with `"Speed"` appended (11 entries). Lookups are case-insensitive and a channel whose unit is not a speed is skipped, so the entry has no effect on a file without such a channel. An importer `Dictionary` (M2) or a project alias can override it.
+**Consequences.** The ACC stand-in has Corr Speed and Corr Dist, and AC-M1-01, -09 and -10 pass on it. The schema example `default.json` lists the 11 entries. 03 §9.1's default object and item 2 and 07 §4.1's analysis and maths rows are updated.
+**User must confirm:** no.
+
+#### D-155 Budget rows come from the benchmark executables; there is no `esses-cli bench` (amends 07 §4.5)
+**Context.** 07 §4.5's demo prints the budget rows with `esses-cli bench --suite plot --json`. The measured paths need Qt Gui (the raster backend and `TimeDistanceGraph`), which the Qt-free `esses-cli` may not link (01 §2.2). The benchmarks are therefore separate executables under `bench/`: `esses-plot-bench` (AC-M1-02) and `esses-open-bench` (AC-M1-03). Each takes `--runs`, `--json`, `--gate` and `--smoke`, and they run under ctest (`bench.*`) and in the `bench` workflow.
+**Decision.** The demo and CI use the benchmark executables. No `esses-cli bench` subcommand is planned while the measured paths need Qt. `tools/bench_compare.py` (08 §6.9) will read their JSON when it is written, and until then the `bench` workflow skips the steps that need it with a notice.
+**Consequences.** 07 §4.5 names the two executables, and `apps/cli/README.md` lists no `bench` subcommand.
+**User must confirm:** no.
+
+#### D-156 The shell (`MainWindow`, `LayoutFile`) lives in `esses_widgets` (amends 01 §2.1)
+**Context.** 01 §2.1 places `MainWindow` in `esses_app` and the outline places `.local/layout.json` handling under `esses_qtmodel`. 07 §4.1 lists `MainWindow` under `esses_widgets`, the `tests/ui` suites must construct the real shell from a library, and the perspectives `LayoutFile` stores are produced by `DockHost` (a widget).
+**Decision.** `MainWindow`, `DockHost`, `KeyEventRouter`, `CommandActions` and `LayoutFile` (`layout-1`) live in `esses_widgets`. `apps/app` contains only `main()` (start-up order, command line, `AppRuntime`).
+**Consequences.** `tests/ui` links `esses_widgets` and drives the same window the application shows. `esses_app` stays a thin executable. `schemas/layout-1.schema.json` is still to be written (M2).
+**User must confirm:** no.
+
+#### D-157 `DistanceIndex::timeAt` is exact between the 0.25 m steps (refines D-016)
+**Context.** D-016 defines `tAtD[]` at 0.25 m as the first time each distance is reached, so that stopped-car plateaus are handled, and 04 §3.1 reads `timeAt(d)` from that table. Interpolating linearly between two steps places a distance inside a step in which the car stopped up to the whole stop later than its first reach. AC-M1-08's plateau rule therefore held only at the grid points.
+**Decision.** `tAtD[]` stays the 0.25 m table (seconds, D-099). `timeAt(d)` uses it to find the sample segment that first reaches `d` (a binary search over the segments that start in that step) and interpolates on that segment. At the grid points the result equals `tAtD[k]`.
+**Consequences.** The first-reach rule holds for every distance. A query costs O(log s) for the s sample segments in its step, which is usually one or two. `DistanceChain`, F9, variance and the distance-mode cursor values inherit the exact rule.
+**User must confirm:** no.
+
+#### D-158 Marker order: at equal times `EOL` before `SOL` (amends 02 §4.3 behaviour 8)
+**Context.** 02 §4.3 behaviour 8 sorts a layer's markers by `(t, cls, id)` with the classes in declaration order, so a `SOL` sorts before an `EOL` at the same time. When one outing ends exactly where the next starts (companion or user markers), the whole-outing rule then emitted a zero-length second outing and left the rest of it outside any outing, and the beacon-pair rule dropped the first outing's in lap and the second's out lap.
+**Decision.** At equal `t` the order is `EOL`, then `SOL`, then the other classes in declaration order; ties within a class are broken by `id` as before. Separately, the beacon-pair rule closes an outing that is still open when a new `SOL` arrives (an implied `EOL` at that time, with a nil end marker), and a missing final `EOL` is placed at the layer duration rather than at the latest marker of any kind.
+**Consequences.** Only layers with coincident `EOL`/`SOL` markers sort differently; no public fixture has any. `markerSetHash` follows the new order for those layers.
 **User must confirm:** no.

@@ -27,6 +27,7 @@ struct Rational {
 
 struct Dimension {
     // Index of each base dimension in exp.
+    // NOLINTNEXTLINE(performance-enum-size): an index into exp, so it needs no cast.
     enum Base : std::size_t {
         Length = 0,      // L, metre
         Mass = 1,        // M, kilogram

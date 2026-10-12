@@ -244,6 +244,38 @@ TEST_CASE("taskpool: coalescing and raise move a queued task to a higher band", 
     CHECK(order == std::vector<std::string>{"a", "c", "b"});
 }
 
+TEST_CASE("taskpool: queuedTasks lists the runnable tasks of a key prefix with their bands",
+          "[unit][taskpool]") {
+    TaskPool pool(1);
+    Gate gate;
+    auto blockers = blockWorkers(pool, gate, 1);
+    const auto noop = [](CancelToken) { return 0; };
+    auto a = pool.submit(Priority::Background, TaskKey{"maths/s1/a"}, CancelToken{}, noop);
+    auto b = pool.submit(Priority::Visible, TaskKey{"maths/s1/b"}, CancelToken{}, noop);
+    auto c = pool.submit(Priority::Background, TaskKey{"maths/s2/c"}, CancelToken{}, noop);
+    auto d = pool.submit(Priority::Interactive, TaskKey{}, CancelToken{}, noop);
+    pool.raise(TaskKey{"maths/s1/a"}, Priority::Interactive); // the stale Background entry is not listed
+
+    const std::vector<TaskPool::QueuedTask> s1 = pool.queuedTasks("maths/s1/");
+    REQUIRE(s1.size() == 2u);
+    CHECK(s1[0].key == "maths/s1/a");
+    CHECK(s1[0].priority == Priority::Interactive);
+    CHECK(s1[1].key == "maths/s1/b");
+    CHECK(s1[1].priority == Priority::Visible);
+    CHECK(pool.queuedTasks("maths/").size() == 3u);
+    CHECK(pool.queuedTasks("").size() == 4u); // "" includes the unkeyed task
+    CHECK(pool.queuedTasks("trace/").empty());
+
+    pool.cancelAll("maths/s2/");
+    CHECK(pool.queuedTasks("maths/s2/").empty());
+    gate.open();
+    for (auto* f : {&a, &b, &d}) {
+        REQUIRE(f->get().ok());
+    }
+    CHECK(c.get().error().code == ErrorCode::Cancelled);
+    CHECK(pool.queuedTasks("").empty());
+}
+
 TEST_CASE("taskpool: replace keys keep one running and one pending task", "[unit][taskpool]") {
     TaskPool pool(2);
     Gate gate;

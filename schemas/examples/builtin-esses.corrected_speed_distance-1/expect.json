@@ -1,0 +1,30 @@
+{
+  "blank-output-name.json": {
+    "pointer": "/outputs/speed",
+    "why": "an output needs a name"
+  },
+  "clamp-without-unit.json": {
+    "pointer": "/clamp/min",
+    "why": "a clamp value is null or a {v, unit} quantity"
+  },
+  "document-envelope.json": {
+    "pointer": "",
+    "why": "the settings are a member of a document, not a document"
+  },
+  "negative-recover.json": {
+    "pointer": "/gCorrection/recoverSeconds",
+    "why": "the recovery time is not negative"
+  },
+  "three-wheels.json": {
+    "pointer": "/fastestWheel/channels",
+    "why": "fastestWheel compares exactly two channels"
+  },
+  "unknown-distance-source.json": {
+    "pointer": "/distance/source",
+    "why": "Corr Dist integrates Corr Speed or unwraps a logged distance"
+  },
+  "unknown-method.json": {
+    "pointer": "/method",
+    "why": "the methods are fastestWheel, alternateList and gCorrection"
+  }
+}

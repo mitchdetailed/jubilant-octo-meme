@@ -14,7 +14,7 @@ the document code and no JSON type appears in a public header.
 | `ids.hpp` | `SourceId` (= `Hash128`, the quick hash), `ChannelId`, `MarkerId`, `RangeId`, `EnumTableId`, `std::hash` for each, `kNormalLayer`, `canonicalLayerName` |
 | `channel.hpp` | `SampleKind` (store's enum, re-exported), `ChannelSource`, `EnumEntry` (with `severity`), `EnumTable`, `SourceEncoding`, `ChannelDescriptor`, `ChannelStatus`, `Channel`; `channelIdLogged`, `channelIdMathsModule`, `channelIdMathsLocal`, `channelIdOther` |
 | `detail.hpp` | `Provenance`, `DateTime`, `Quantityd`, `DetailValue`, `Detail`, the standard detail table, `overlayDetails`, `mergeDetails`, unit resolution |
-| `marker.hpp` | `MarkerClass` (the eight D-014 classes + `DeviceEvent`), `Marker`, `MarkerEditOp`, `MarkerEdit`, `markerIdLogged`, model order, `assignLoggedIds`, device events, `mergeMarkers`, `applyMarkerEdits`, `markerSetHash` |
+| `marker.hpp` | `MarkerClass` (the eight D-014 classes + `DeviceEvent`), `Marker`, `MarkerEditOp`, `MarkerEdit`, `markerIdLogged`, model order (at equal times EOL before SOL, D-158), `assignLoggedIds`, device events, `mergeMarkers`, `applyMarkerEdits`, `markerSetHash` |
 | `range.hpp` | `RangeKind`, `LapClass`, `Range`, `RangeGroup`, `RangeGroupTree` (per-path versions, `inheritVersions`), `RangeRef`, `rangeId` |
 | `layer.hpp` | `DataLayer` with its case-folded indexes |
 | `sidecar.hpp` | `Annotation`, `VideoLink`, `RangeOverride`, `SidecarLayer`, `SidecarDocument`, `SidecarApplyReport`, `hashText` |
@@ -22,7 +22,7 @@ the document code and no JSON type appears in a public header.
 | `resolver.hpp` | `ResolutionStep`, `ResolutionTrace`, `MappingRow/Table`, `AliasCandidate/Row/Table`, `ChannelResolver`, `makeAliasDescriptor`, `applyMappings` |
 | `whole_outing.hpp` | `WholeOutingOptions`, `buildWholeOutingGroup`, `rebuildWholeOutingRanges` |
 | `markers_document.hpp` | `MarkersDocument` (`markers-1`) |
-| `opaque_json.hpp` | `OpaqueJson`, the stand-in for `JsonDoc` |
+| `opaque_json.hpp` | `OpaqueJson`, an alias of `esses_base`'s `JsonDoc` (M1) |
 | `notes.hpp` | `ModelNote` and its codes |
 
 ## Open pipeline order (05 section 2 steps 3 to 6)
@@ -52,10 +52,11 @@ A published source is `std::shared_ptr<const DataSource>`; an edit produces a ne
 
 ## Deviations from the design text
 
-- `OpaqueJson` holds `localMaths`, `runs`, `stages`, unknown top-level members and `probe` where 02 writes
-  `JsonDoc`: `esses_base`'s `JsonDoc` is still a reserved name in M0. The value is its compact canonical text,
-  so equality is value equality. The canonical writer (02 section 6.5 rule 1) is private to this library
-  (`src/json_canonical.*`) until `JsonDoc::canonical()` exists; both must stay one algorithm.
+- `OpaqueJson` (`localMaths`, `runs`, `stages`, unknown top-level members, `probe`) is spelled where 02 writes
+  `JsonDoc`; since M1 it is an alias of `esses_base`'s `JsonDoc`, whose compact canonical text makes equality
+  value equality. The one canonical writer (02 section 6.5 rule 1) and the typed JSON readers live in
+  `esses_base` (`json_doc.hpp`, `json_nlohmann.hpp`); `src/json_read.hpp` only brings the readers into
+  `model::detail`.
 - `DataLayer::baseMarkers` and `DataSource::baseDetails` are additions: the merged file + companion state that
   every sidecar re-application starts from, so restore and removal edits need no inverse operation.
 - `Quantityd` carries the unit `symbol` as written (D-074) next to the resolved `unit`; a document loaded from

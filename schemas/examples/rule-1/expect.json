@@ -1,0 +1,38 @@
+{
+  "annotations-phase-1.json": {
+    "pointer": "/annotations/phase",
+    "why": "beacon-pair annotations run in phase 2"
+  },
+  "class-unknown-lap-class.json": {
+    "pointer": "/classes",
+    "why": "lap classes are those of 02 section 4.4"
+  },
+  "missing-schema-version.json": {
+    "pointer": "",
+    "why": "every document states its schemaVersion"
+  },
+  "stationary-below-without-unit.json": {
+    "pointer": "/annotations/pitStop/stationaryBelow",
+    "why": "unit values carry their unit"
+  },
+  "transition-unknown-marker-class.json": {
+    "pointer": "/transitions/0/from",
+    "why": "transitions name marker classes or *"
+  },
+  "unknown-kind.json": {
+    "pointer": "/kind",
+    "why": "kinds are beacon-pair, whole-outing, track-sections and detail-group"
+  },
+  "whole-outing-nested-path.json": {
+    "pointer": "/produces",
+    "why": "a whole-outing rule produces a root group"
+  },
+  "whole-outing-unknown-member.json": {
+    "pointer": "",
+    "why": "each kind is closed"
+  },
+  "wrong-schema-id.json": {
+    "pointer": "/$schema",
+    "why": "the $schema id names another schema"
+  }
+}

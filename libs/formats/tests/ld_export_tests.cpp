@@ -302,7 +302,7 @@ TEST_CASE("ld export: an in-memory source is quantised with its encodings", "[un
         INFO(i);
         CHECK(oilBack.valid[i] == static_cast<bool>(oilValid[i]));
         if (oilValid[i]) {
-            CHECK(floatUlps(oilBack.values[i], oilK[i]) <= 1);
+            CHECK(floatUlps(oilBack.values[i], static_cast<double>(oilK[i])) <= 1);
         }
     }
     const ColumnDump speedBack = dumpColumn(columnOf(channelNamed(*back->source, "Speed")));

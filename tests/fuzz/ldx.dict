@@ -52,3 +52,9 @@
 "-->"
 "&amp;"
 "&#x0;"
+# The writer's reserved placeholder instruction (a processing instruction; kept verbatim inside unknown
+# elements, never interpreted).
+"<?esses-opaque 0?>"
+"<?esses-opaque "
+"<?"
+"?>"

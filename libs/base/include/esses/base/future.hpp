@@ -93,7 +93,7 @@ public:
         if (taken_) {
             ESSES_FATAL("Future result read after take()");
         }
-        return *result_;
+        return published();
     }
 
     Result<T> takeResult() {
@@ -102,7 +102,7 @@ public:
             ESSES_FATAL("Future::take() called twice on one shared state");
         }
         taken_ = true;
-        return std::move(*result_);
+        return std::move(published());
     }
 
     void addContinuation(Continuation fn) {
@@ -113,10 +113,24 @@ public:
                 return;
             }
         }
-        fn(*result_);
+        fn(published());
     }
 
 private:
+    // The result set() emplaced before it published ready_; reaching it earlier is a programming error.
+    const Result<T>& published() const {
+        if (!result_) {
+            ESSES_FATAL("Future result read before it is ready");
+        }
+        return *result_;
+    }
+    Result<T>& published() {
+        if (!result_) {
+            ESSES_FATAL("Future result read before it is ready");
+        }
+        return *result_;
+    }
+
     std::optional<Result<T>> result_;
     std::vector<Continuation> continuations_;
 };

@@ -1,0 +1,307 @@
+// SPDX-FileCopyrightText: 2026 the Esses contributors
+// SPDX-License-Identifier: MIT
+//
+// SourceLoader (ARCHITECTURE_OUTLINE section 2.1, 01 section 4.1; AC-M1-01, AC-M1-10, AC-M1-12): a .ld + .ldx
+// written by the motec.ld writer opens on the TaskPool, publishes through the Dispatcher with its laps from
+// the circuit rules, registers the built-in maths (Corr Speed / Corr Dist prefetched without a request) and
+// the distance indexes, runs the phase-2 annotations, reports its Import Log and failures to Messages,
+// commits sidecar edits (trust) to disk, closes cleanly, and never blocks a NoBlock (GUI) thread. The public
+// ACC stand-in fixture opens (with distance data) when its generated input is present.
+
+#include "qtmodel_test_support.hpp"
+
+#include <esses/base/assert.hpp>
+#include <esses/base/casefold.hpp>
+#include <esses/base/thread_role.hpp>
+#include <esses/base/utf8.hpp>
+#include <esses/formats/registry.hpp>
+#include <esses/qtmodel/app_runtime.hpp>
+#include <esses/qtmodel/data_selection_model.hpp>
+#include <esses/qtmodel/distance_service.hpp>
+#include <esses/qtmodel/maths_service.hpp>
+#include <esses/qtmodel/messages_model.hpp>
+#include <esses/qtmodel/source_loader.hpp>
+
+#include <QSignalSpy>
+#include <QTest>
+#include <atomic>
+
+using namespace esses;
+using namespace esses::qt;
+using namespace esses::qt::test;
+
+Q_DECLARE_METATYPE(std::shared_ptr<const esses::model::DataSource>)
+Q_DECLARE_METATYPE(esses::model::SourceId)
+Q_DECLARE_METATYPE(std::vector<esses::formats::ImportLogEntry>)
+
+namespace {
+
+std::atomic<int> gAsserts{0};
+void recordingHandler(const char*, const char*, int, const char*) {
+    gAsserts.fetch_add(1);
+}
+
+AppRuntimeOptions runtimeOptions() {
+    AppRuntimeOptions o;
+    o.workers = 4;
+    o.cacheBudget = std::size_t{256} << 20;
+    return o;
+}
+
+// The application wiring of one workspace (06 section 1): loader -> maths, distance, selection, messages.
+struct Workspace {
+    AppRuntime& rt;
+    MathsService maths;
+    DistanceService distance;
+    DataSelectionModel selection;
+    MessagesModel messages;
+    SourceLoader loader;
+
+    explicit Workspace(AppRuntime& runtime)
+        : rt(runtime), maths(rt.pool(), rt.dispatcher(), shippedUnits()), distance(maths, rt.dispatcher()),
+          loader(rt.pool(), rt.dispatcher(), shippedUnits()) {
+        static_cast<void>(maths.loadSettingsSchema(repoRoot() / "data"));
+        loader.setRuleRunner(analysis::RuleRunner::circuitDefault());
+        loader.setMathsService(&maths);
+        loader.setDistanceService(&distance);
+        connectSourceLoader(loader, selection, &messages);
+    }
+};
+
+std::filesystem::path writeSynthetic(const std::string& dirName, store::ChunkCache& cache) {
+    SyntheticOptions o;
+    o.path = "written.ld";
+    o.lapSeconds = {40.0, 50.0, 48.0, 49.0, 30.0};
+    const auto src = makeSource(o, cache);
+    return writeLd(*src, scratchDir(dirName), "session");
+}
+
+std::filesystem::path accFixture() {
+    const std::filesystem::path rel =
+        std::filesystem::path("motec.ld") / "synthetic-acc-dialect" / "input.ld";
+    for (const std::filesystem::path& base :
+         {pathFromUtf8(ESSES_TEST_BINARY_DIR) / ".." / ".." / "fixture-inputs", repoRoot() / "fixtures"}) {
+        std::error_code ec;
+        if (std::filesystem::exists(base / rel, ec)) {
+            return base / rel;
+        }
+    }
+    return {};
+}
+
+} // namespace
+
+class TstSourceLoader : public QObject {
+    Q_OBJECT
+private Q_SLOTS:
+    void initTestCase() {
+        qRegisterMetaType<std::shared_ptr<const model::DataSource>>(
+            "std::shared_ptr<const esses::model::DataSource>");
+        qRegisterMetaType<model::SourceId>("esses::model::SourceId");
+        qRegisterMetaType<std::vector<formats::ImportLogEntry>>(
+            "std::vector<esses::formats::ImportLogEntry>");
+    }
+
+    void opensPublishesAndPrefetches() {
+        AppRuntime rt(runtimeOptions());
+        const std::filesystem::path ld = writeSynthetic("open", rt.cache());
+        Workspace w(rt);
+        w.loader.setUseSidecars(false);
+        QSignalSpy published(&w.loader, &SourceLoader::sourcePublished);
+        QSignalSpy logs(&w.loader, &SourceLoader::importLog);
+        w.loader.open(ld);
+        QCOMPARE(w.loader.pendingOpens(), 1);
+        QTRY_COMPARE_WITH_TIMEOUT(published.count(), 1, 30000);
+        QCOMPARE(w.loader.pendingOpens(), 0);
+        QCOMPARE(logs.count(), 1);
+        const auto src = published.first().at(0).value<std::shared_ptr<const model::DataSource>>();
+        QCOMPARE(w.loader.source(src->id), src);
+        QCOMPARE(w.selection.sources().size(), std::size_t{1});
+        // The beacons came back from the .ldx: an out lap, three flying laps and an in lap.
+        QCOMPARE(rangeCount(*src), std::size_t{5});
+        QCOMPARE(rangeAt(*src, 1).lapClass, model::LapClass::Flying);
+        QVERIFY(w.selection.hasMain());
+        // AC-M1-10: Corr Speed / Corr Dist registered and evaluated without a request; every lap indexed.
+        QVERIFY(w.maths.isMathsChannel(src->id, "Normal", "Corr Dist"));
+        QTRY_COMPARE_WITH_TIMEOUT(w.distance.state(src->id), DistanceState::Ready, 30000);
+        QTRY_VERIFY_WITH_TIMEOUT(
+            w.distance.chain(rangeRef(*w.loader.source(src->id), 2), Priority::Interactive) != nullptr &&
+                w.distance.chain(rangeRef(*w.loader.source(src->id), 2), Priority::Interactive)->complete(),
+            30000);
+        // Phase 2 (stint / pitStop) annotated the laps once Corr Speed was evaluated: stint 1 everywhere.
+        QTRY_COMPARE_WITH_TIMEOUT(rangeAt(*w.loader.source(src->id), 1).stint, std::uint16_t{1}, 30000);
+        QCOMPARE(w.selection.source(src->id), w.loader.source(src->id));
+        QVERIFY(!rangeAt(*w.loader.source(src->id), 2).pitStop);
+        // CTRL+F on the opened file: the fastest trusted flying lap (Lap 2, 48 s).
+        w.selection.selectFastest();
+        QCOMPARE(w.selection.snapshot().main, rangeRef(*w.loader.source(src->id), 2));
+    }
+
+    // 02 section 4.4 rule 13: a sidecar commit (trust override) that publishes a newer snapshot while the
+    // phase-2 run is on a worker neither loses the annotations nor the override. The run's result belongs to
+    // an older snapshot with the same marker set: its stint/pitStop are merged by (range id, start, end) into
+    // the newest snapshot instead of being dropped (or replacing that snapshot's tree).
+    void phase2SurvivesACommitWhileItRuns() {
+        AppRuntime rt(runtimeOptions());
+        const std::filesystem::path ld = writeSynthetic("phase2-commit", rt.cache());
+        Workspace w(rt);
+        w.loader.setUseSidecars(false);
+        bool committed = false;
+        model::RangeRef lap1;
+        const std::string corrSpeed = caseFold("Corr Speed");
+        // Connected after the loader's own handler (Workspace), so phase 2 has just been submitted when this
+        // runs; its result can only be delivered after this handler returns (it is posted to this thread).
+        QObject::connect(&w.maths, &MathsService::channelReady, &w.maths, [&](const maths::ChannelKey& key) {
+            if (committed || key.nameCf != corrSpeed || w.loader.sources().empty()) {
+                return;
+            }
+            const auto src = w.loader.sources().front();
+            QCOMPARE(rangeAt(*src, 1).stint, std::uint16_t{0}); // not annotated yet
+            lap1 = rangeRef(*src, 1);
+            committed = true;
+            w.selection.setTrusted(lap1, false);
+        });
+        w.loader.open(ld);
+        QTRY_VERIFY_WITH_TIMEOUT(committed, 30000);
+        const model::SourceId id = lap1.src;
+        QVERIFY(!rangeAt(*w.loader.source(id), 1).trusted);
+        // The annotations land on the committed snapshot (stint 1 on every lap) and the override survives.
+        QTRY_COMPARE_WITH_TIMEOUT(rangeAt(*w.loader.source(id), 1).stint, std::uint16_t{1}, 30000);
+        QCOMPARE(rangeAt(*w.loader.source(id), 3).stint, std::uint16_t{1});
+        QVERIFY(!rangeAt(*w.loader.source(id), 1).trusted);
+        QVERIFY(!w.selection.resolve(lap1)->trusted);
+        QCOMPARE(w.selection.source(id), w.loader.source(id));
+    }
+
+    void secondOpenOfTheSameFile() {
+        AppRuntime rt(runtimeOptions());
+        const std::filesystem::path ld = writeSynthetic("twice", rt.cache());
+        Workspace w(rt);
+        w.loader.setUseSidecars(false);
+        QSignalSpy published(&w.loader, &SourceLoader::sourcePublished);
+        w.loader.open(ld);
+        QTRY_COMPARE_WITH_TIMEOUT(published.count(), 1, 30000);
+        const int rows = w.messages.rowCount();
+        w.loader.open(ld);
+        QTRY_COMPARE_WITH_TIMEOUT(w.loader.pendingOpens(), 0, 30000);
+        QCOMPARE(published.count(), 1);
+        QCOMPARE(w.loader.sources().size(), std::size_t{1});
+        QCOMPARE(w.messages.rowCount(), rows + 1);
+        QCOMPARE(w.messages.at(w.messages.rowCount() - 1).code, QStringLiteral("open.already_open"));
+    }
+
+    void failuresReachMessages() {
+        AppRuntime rt(runtimeOptions());
+        Workspace w(rt);
+        QSignalSpy failed(&w.loader, &SourceLoader::openFailed);
+        QSignalSpy firstError(&w.messages, &MessagesModel::firstError);
+        w.loader.open(scratchDir("missing") / "nothing-here.ld");
+        QTRY_COMPARE_WITH_TIMEOUT(failed.count(), 1, 30000);
+        QCOMPARE(w.loader.pendingOpens(), 0);
+        QCOMPARE(w.messages.count(Message::Severity::Error), 1);
+        QCOMPARE(firstError.count(), 1);
+        QVERIFY(w.loader.sources().empty());
+    }
+
+    // setTrusted -> commitSidecar: the snapshot is rebuilt, the sidecar is written next to the log, and a new
+    // open reads it back (D-015 precedence).
+    void sidecarEditsPersist() {
+        AppRuntime rt(runtimeOptions());
+        const std::filesystem::path ld = writeSynthetic("sidecar", rt.cache());
+        model::SourceId id;
+        {
+            Workspace w(rt);
+            QSignalSpy published(&w.loader, &SourceLoader::sourcePublished);
+            QSignalSpy replaced(&w.loader, &SourceLoader::sourceReplaced);
+            w.loader.open(ld);
+            QTRY_COMPARE_WITH_TIMEOUT(published.count(), 1, 30000);
+            const auto src = w.loader.source(
+                published.first().at(0).value<std::shared_ptr<const model::DataSource>>()->id);
+            id = src->id;
+            const model::RangeRef lap1 = rangeRef(*src, 1);
+            QVERIFY(w.selection.resolve(lap1)->trusted);
+            w.selection.setTrusted(lap1, false);
+            QVERIFY(replaced.count() >= 1);
+            QVERIFY(!w.selection.resolve(lap1)->trusted);
+            QVERIFY(!rangeAt(*w.loader.source(id), 1).trusted);
+            QVERIFY(std::filesystem::exists(model::SidecarDocument::pathFor(ld)));
+            QVERIFY(w.loader.commitSidecar(nullptr, {}).error().code == ErrorCode::NotFound);
+            QSignalSpy closed(&w.loader, &SourceLoader::sourceClosed);
+            w.loader.close(id);
+            QCOMPARE(closed.count(), 1);
+            QVERIFY(w.selection.sources().empty());
+            QVERIFY(!w.maths.isMathsChannel(id, "Normal", "Corr Dist"));
+            QCOMPARE(w.distance.state(id), DistanceState::Unknown);
+        }
+        Workspace again(rt);
+        QSignalSpy published(&again.loader, &SourceLoader::sourcePublished);
+        again.loader.open(ld);
+        QTRY_COMPARE_WITH_TIMEOUT(published.count(), 1, 30000);
+        QVERIFY(!rangeAt(*again.loader.source(id), 1).trusted); // read back from the sidecar
+    }
+
+    // AC-M1-12: the open pipeline, publication, maths and distance work on a NoBlock thread without a wait.
+    void theGuiThreadNeverBlocks() {
+#if ESSES_ASSERTS_ENABLED
+        std::filesystem::path ld;
+        {
+            store::ChunkCache cache(std::size_t{64}
+                                    << 20); // the writer reads columns: not on a NoBlock thread
+            ld = writeSynthetic("noblock", cache);
+        }
+        const AssertHandler previous = setAssertHandler(&recordingHandler);
+        gAsserts.store(0);
+        {
+            AppRuntimeOptions o = runtimeOptions();
+            o.markGuiThreadNoBlock = true;
+            AppRuntime rt(o);
+            Workspace w(rt);
+            w.loader.setUseSidecars(false);
+            QSignalSpy published(&w.loader, &SourceLoader::sourcePublished);
+            w.loader.open(ld);
+            QTRY_COMPARE_WITH_TIMEOUT(published.count(), 1, 30000);
+            const auto id = published.first().at(0).value<std::shared_ptr<const model::DataSource>>()->id;
+            QTRY_COMPARE_WITH_TIMEOUT(w.distance.state(id), DistanceState::Ready, 30000);
+            w.loader.closeAll();
+        }
+        ThreadRole::set(ThreadRole::Normal);
+        setAssertHandler(previous);
+        QCOMPARE(gAsserts.load(), 0);
+#else
+        QSKIP("assertions are compiled out in this configuration");
+#endif
+    }
+
+    // The public stand-in of the M1 data path (fixtures/motec.ld/synthetic-acc-dialect): out lap, 12 flying
+    // laps, in lap; CTRL+F picks a trusted flying lap.
+    void accDialectFixtureOpens() {
+        const std::filesystem::path ld = accFixture();
+        if (ld.empty()) {
+            QSKIP("synthetic-acc-dialect/input.ld is not generated (esses-gen-fixtures --inputs-only)");
+        }
+        AppRuntime rt(runtimeOptions());
+        Workspace w(rt);
+        w.loader.setUseSidecars(false);
+        QSignalSpy published(&w.loader, &SourceLoader::sourcePublished);
+        w.loader.open(ld);
+        QTRY_COMPARE_WITH_TIMEOUT(published.count(), 1, 60000);
+        const auto src = published.first().at(0).value<std::shared_ptr<const model::DataSource>>();
+        QCOMPARE(rangeCount(*src), std::size_t{14});
+        QCOMPARE(rangeAt(*src, 0).lapClass, model::LapClass::Out);
+        QCOMPARE(rangeAt(*src, 13).lapClass, model::LapClass::In);
+        w.selection.selectFastest();
+        const model::Range* main = w.selection.resolve(w.selection.snapshot().main);
+        QVERIFY(main != nullptr);
+        QCOMPARE(main->lapClass, model::LapClass::Flying);
+        QVERIFY(main->trusted);
+        // Corr Speed comes from SPEED through the default alternate list ("Speed"), so the distance indexes
+        // exist without any request (AC-M1-01's F9 step on this file).
+        QTRY_VERIFY_WITH_TIMEOUT(w.distance.state(src->id) == DistanceState::Ready ||
+                                     w.distance.state(src->id) == DistanceState::NoDistance,
+                                 60000);
+        QCOMPARE(w.distance.state(src->id), DistanceState::Ready);
+    }
+};
+
+QTEST_GUILESS_MAIN(TstSourceLoader)
+#include "tst_source_loader.moc"

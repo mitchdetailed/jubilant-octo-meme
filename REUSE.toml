@@ -66,6 +66,15 @@ precedence = "override"
 SPDX-FileCopyrightText = "Catch2 Authors"
 SPDX-License-Identifier = "BSL-1.0"
 
+# Test-only font for the golden images (04 section 6.7 item 2, 08 section 6.4, D-127): Noto Sans 2.015,
+# unmodified, never distributed with the programs; tests/golden/fonts/OFL.txt and LICENSES/OFL-1.1.txt hold the
+# licence text.
+[[annotations]]
+path = "tests/golden/fonts/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2022 The Noto Project Authors (https://github.com/notofonts/latin-greek-cyrillic)"
+SPDX-License-Identifier = "OFL-1.1"
+
 # Synthetic fixtures written by our own generator (esses-gen-fixtures) and their expectations are CC0-1.0
 # (08 section 10); LICENSES/CC0-1.0.txt holds the licence text.
 [[annotations]]

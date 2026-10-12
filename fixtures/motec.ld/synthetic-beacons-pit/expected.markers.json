@@ -1,0 +1,76 @@
+{
+  "$schema": "urn:esses:markers-1",
+  "schemaVersion": 1,
+  "layers": {
+    "Normal": [
+      {
+        "class": "SOL",
+        "comment": "",
+        "group": "",
+        "id": "4a220465-0e86-5534-8b34-1cae5de4ee3b",
+        "name": "",
+        "prov": "Derived",
+        "tUs": 0
+      },
+      {
+        "class": "BCN",
+        "comment": "",
+        "flags": 77,
+        "group": "Beacons",
+        "id": "7776acec-e4f4-57e2-9550-a91b547dbe75",
+        "name": "B1",
+        "prov": "Companion",
+        "tUs": 60000000
+      },
+      {
+        "class": "BCN",
+        "comment": "",
+        "flags": 77,
+        "group": "Beacons",
+        "id": "acc8417a-1938-5099-98d3-27392a00bfa8",
+        "name": "B2",
+        "prov": "Companion",
+        "tUs": 120000000
+      },
+      {
+        "class": "BCN",
+        "comment": "",
+        "flags": 77,
+        "group": "Beacons",
+        "id": "90d6e410-bf93-577b-909e-2f8148e021d8",
+        "name": "B3",
+        "prov": "Companion",
+        "tUs": 190000000
+      },
+      {
+        "class": "BCN",
+        "comment": "",
+        "flags": 77,
+        "group": "Beacons",
+        "id": "9e60dd24-2fda-5ab6-9bdf-b14b20e8c314",
+        "name": "B4",
+        "prov": "Companion",
+        "tUs": 240000000
+      },
+      {
+        "class": "BCN",
+        "comment": "",
+        "flags": 77,
+        "group": "Beacons",
+        "id": "0d8a5ae5-ffcd-5f8c-b93d-7871ac7fbb81",
+        "name": "B5",
+        "prov": "Companion",
+        "tUs": 270000000
+      },
+      {
+        "class": "EOL",
+        "comment": "",
+        "group": "",
+        "id": "681b35c0-7733-5f6e-b98c-7615faeb3924",
+        "name": "",
+        "prov": "Derived",
+        "tUs": 300000000
+      }
+    ]
+  }
+}
