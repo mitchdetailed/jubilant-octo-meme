@@ -1,0 +1,203 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:workbook-1",
+  "title": "Esses workbook (workbook-1)",
+  "description": "A workbook: workbooks/<name>.workbook.json in a project and data/workbooks/circuit-default.workbook.json shipped (02 section 6.4, 04 section 7.3, 06 section 4, D-019). Ordered worksheets whose components sit on free fractional rectangles. The id keys the per-user dock perspective (D-019, D-071); a file without one gets uuidFromHash(hash128({\"workbook\", file name})) on load. Worksheet names are unique within the workbook and component ids within a worksheet (checked by the loader). Unknown top-level members are allowed and preserved verbatim (02 section 6.1); worksheets and component headers are closed.",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "name", "worksheets"],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072). The urn:esses: form is written; the bare esses: form of earlier drafts and the later https form are accepted on load and normalised on save (02 section 6.6 rule 1).",
+      "type": "string",
+      "pattern": "^(urn:esses:workbook-1|esses:workbook-1|https://[^/\\s]+(/[^/\\s]+)*/workbook-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "id": {
+      "description": "Workbook UUID, set when the workbook is created.",
+      "$ref": "#/definitions/uuid"
+    },
+    "name": {
+      "type": "string"
+    },
+    "profile": {
+      "description": "Profile id (\"circuit\").",
+      "type": "string",
+      "minLength": 1
+    },
+    "activeWorksheet": {
+      "description": "Worksheet shown on the first open when .local/layout.json has no entry (06 section 4.1 item 5).",
+      "type": "string"
+    },
+    "worksheets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/worksheet"
+      }
+    },
+    "x-i2": {
+      "description": "Imported workbook attributes that are not implemented (D-019).",
+      "type": "object"
+    },
+    "x-esses-legacy": {
+      "$ref": "#/definitions/legacyBag"
+    }
+  },
+  "definitions": {
+    "uuid": {
+      "description": "Canonical lower-case 8-4-4-4-12 UUID (Uuid::str()).",
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "fraction": {
+      "description": "A fraction of the worksheet, 0 at the left or top edge, 1 at the right or bottom.",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "component": {
+      "description": "One component (04 section 7.3 header). Esses writes every header member; body and x-i2 when present. A type that is not one of the ten MVP types, or a newer version of one, is preserved verbatim and drawn as a placeholder (D-019); its body is never re-serialised from a typed struct. The body is validated by the component's own schema (schemas/components/<type>-<version>.schema.json), not here.",
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "id": {
+          "description": "Component UUID; derived from the worksheet id and the index when absent (the workbook is then dirty).",
+          "$ref": "#/definitions/uuid"
+        },
+        "type": {
+          "description": "Component type: time_distance, outing, scatter, histogram, channel_report, time_report, track_position, values_list, gauge_numeric, gauge_bar, or a later type.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "version": {
+          "description": "Version of the type's body.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "rect": {
+          "description": "[l, t, r, b] fractions of the worksheet, l < r and t < b (checked by the loader); components may overlap.",
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/definitions/fraction"
+          }
+        },
+        "z": {
+          "description": "Paint order, ascending; equal z paints in array order.",
+          "type": "integer"
+        },
+        "caption": {
+          "type": "object",
+          "properties": {
+            "show": {
+              "type": "boolean"
+            },
+            "auto": {
+              "type": "boolean"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "links": {
+          "description": "Which shared view state the component follows (D-018).",
+          "type": "object",
+          "properties": {
+            "zoom": {
+              "type": "boolean"
+            },
+            "cursor": {
+              "type": "boolean"
+            },
+            "datum": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "legend": {
+          "type": "object",
+          "properties": {
+            "channels": {
+              "type": "boolean"
+            },
+            "colour": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "activeChannel": {
+          "description": "Channel name of the active-channel square; empty for none.",
+          "type": "string"
+        },
+        "body": {
+          "description": "Type-specific persistence record (04 sections 8.14-17); channel references are names.",
+          "type": "object"
+        },
+        "x-i2": {
+          "description": "Imported attributes that are not implemented, kept for a round trip (D-019).",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "worksheet": {
+      "description": "One worksheet (06 section 4): its components on free fractional rectangles.",
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "id": {
+          "description": "Worksheet UUID; derived from the workbook id and the index when absent.",
+          "$ref": "#/definitions/uuid"
+        },
+        "name": {
+          "description": "Unique within the workbook.",
+          "type": "string",
+          "minLength": 1
+        },
+        "linkTo": {
+          "description": "Title of the profile data view the worksheet follows (\"Laps\", \"Outings\").",
+          "type": "string"
+        },
+        "domain": {
+          "description": "Initial x domain of the worksheet (F9 toggles it per worksheet).",
+          "enum": ["time", "distance"]
+        },
+        "grid": {
+          "description": "Snap grid [columns, rows] (06 section 4.3 item 2).",
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "integer",
+            "minimum": 20,
+            "maximum": 200
+          }
+        },
+        "components": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/component"
+          }
+        },
+        "hotkey": {
+          "description": "Reserved worksheet hot key.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "legacyBag": {
+      "description": "Fields removed by a migration, kept verbatim (02 section 6.6 rule 3).",
+      "type": "object"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "$schema": "urn:esses:keymap-1",
+  "schemaVersion": 1,
+  "inherits": "default",
+  "name": "user",
+  "unbind": [
+    {
+      "command": "file.print",
+      "context": "global"
+    }
+  ]
+}

@@ -11,7 +11,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(naming)          # the only place the codename appears as a prefix (D-003)
 
 # ---- options (08 section 3.2) -------------------------------------------------------------------
-option(ESSES_BUILD_QT "Build the Qt layers 4-5 and the GUI (no Qt code exists in M0)" OFF)
+option(ESSES_BUILD_QT "Build the Qt layers 4-5, esses-render and the GUI (M1 onwards)" OFF)
 option(ESSES_BUILD_TESTS "Build the Catch2 test executables and enable ctest" ON)
 option(ESSES_BUILD_BENCH "Build Google Benchmark targets (phase B: not vendored yet)" OFF)
 option(ESSES_BUILD_FUZZ "Build libFuzzer targets (Clang only)" OFF)
@@ -21,6 +21,12 @@ option(ESSES_ENABLE_CLANG_TIDY "Run clang-tidy on Qt-free targets" OFF)
 option(ESSES_LTO "Interprocedural optimisation" OFF)
 option(ESSES_FORCE_ASSERTS "Keep ESSES_ASSERT active in optimised builds (CI release-with-asserts)" OFF)
 set(ESSES_SANITIZE "" CACHE STRING "Sanitizers for Clang/GCC: address,undefined or thread")
+# DockHost backend of the Qt build (D-026, D-153): "ads" builds the Qt Advanced Docking System from third_party/qtads
+# as a shared library (esses::qtads, cmake/qtads.cmake) and makes it the default, the QDockWidget backend staying
+# selectable at run time (environment ESSES_DOCK_BACKEND=qdockwidget); "qdockwidget" builds without ADS, for an OS
+# on which ADS is unusable (D-026's fallback rule).
+set(ESSES_DOCK_BACKEND "ads" CACHE STRING "Default DockHost backend: ads or qdockwidget (the fallback; ADS not built)")
+set_property(CACHE ESSES_DOCK_BACKEND PROPERTY STRINGS ads qdockwidget)
 # Per-component switches (default ON): a configure can leave out a library or application that is still being
 # written, so work on its siblings is not blocked. Honoured by the guarded add_subdirectory() calls below and in
 # libs/CMakeLists.txt; a component that DEPS on a switched-off one fails the layer check naming the switch.
@@ -28,6 +34,16 @@ option(ESSES_WITH_UNITS "Build libs/units (esses_units)" ON)
 option(ESSES_WITH_MODEL "Build libs/model (esses_model)" ON)
 option(ESSES_WITH_FORMATS "Build libs/formats (esses_formats)" ON)
 option(ESSES_WITH_CLI "Build the command-line application esses-cli (apps/cli)" ON)
+option(ESSES_WITH_ANALYSIS "Build libs/analysis (esses_analysis)" ON)
+option(ESSES_WITH_MATHS "Build libs/maths (esses_maths)" ON)
+option(ESSES_WITH_PROJECT "Build libs/project (esses_project)" ON)
+option(ESSES_WITH_PLOTCORE "Build libs/plotcore (esses_plotcore)" ON)
+# The Qt layers (built only with ESSES_BUILD_QT=ON).
+option(ESSES_WITH_QTMODEL "Build libs/qtmodel (esses_qtmodel, Qt Core)" ON)
+option(ESSES_WITH_QTRENDER "Build libs/qtrender (esses_qtrender, Qt Gui)" ON)
+option(ESSES_WITH_WIDGETS "Build libs/widgets (esses_widgets, Qt Widgets)" ON)
+option(ESSES_WITH_RENDER "Build the offscreen renderer esses-render (apps/render)" ON)
+option(ESSES_WITH_APP "Build the GUI application esses (apps/app)" ON)
 
 # ---- global settings (08 section 3.1) -----------------------------------------------------------
 set(CMAKE_CXX_STANDARD 20)
@@ -69,6 +85,8 @@ include(qt-free-check)    # deferred configure-time check over every QT_FREE tar
 if(ESSES_BUILD_QT)
   # Qt is found only here; with ESSES_BUILD_QT=OFF there is no find_package(Qt6) at all (D-007).
   find_package(Qt6 6.7 REQUIRED COMPONENTS Core Gui Widgets Svg PrintSupport Test)
+  message(STATUS "Qt ${Qt6_VERSION} from ${Qt6_DIR}")
+  include(qtads)          # esses::qtads, the docking library (shared, LGPL), when ESSES_DOCK_BACKEND is "ads"
 endif()
 
 if(ESSES_BUILD_TESTS)
@@ -96,11 +114,35 @@ if(TARGET ${ESSES_PREFIX}_cli_core AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools
   add_subdirectory(tools)
 endif()
 if(ESSES_BUILD_QT)
-  foreach(_esses_app_dir apps/render apps/app)
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_esses_app_dir}/CMakeLists.txt")
-      add_subdirectory(${_esses_app_dir})
+  # apps/render -> esses_render (switch ESSES_WITH_RENDER), apps/app -> esses_app (switch ESSES_WITH_APP).
+  foreach(_esses_app render app)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/apps/${_esses_app}/CMakeLists.txt")
+      esses_component_enabled(${_esses_app} _esses_app_enabled)
+      if(_esses_app_enabled)
+        add_subdirectory(apps/${_esses_app})
+      else()
+        string(TOUPPER "${_esses_app}" _esses_app_upper)
+        message(STATUS "apps/${_esses_app}: switched off (ESSES_WITH_${_esses_app_upper}=OFF)")
+      endif()
     endif()
   endforeach()
+  # bench/: the M1 budget benchmarks (07 section 4.2 AC-M1-02/03), Qt executables built with the Qt layers; with
+  # ESSES_BUILD_BENCH they are also ctest entries labelled `bench` (the bench presets build without tests).
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/bench/CMakeLists.txt" AND TARGET ${ESSES_PREFIX}_widgets)
+    if(ESSES_BUILD_BENCH AND NOT ESSES_BUILD_TESTS)
+      enable_testing()
+    endif()
+    add_subdirectory(bench)
+  endif()
+  # Qt Test suites that span the Qt layers (07 section 4.2: tests/ui walkthrough, F9, render parity; tests/golden
+  # pixel goldens). Added after every library and application so their targets exist.
+  if(ESSES_BUILD_TESTS)
+    foreach(_esses_qt_test_dir tests/ui tests/golden)
+      if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_esses_qt_test_dir}/CMakeLists.txt")
+        add_subdirectory(${_esses_qt_test_dir})
+      endif()
+    endforeach()
+  endif()
 endif()
 if(ESSES_BUILD_FUZZ AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/fuzz/CMakeLists.txt")
   add_subdirectory(tests/fuzz)

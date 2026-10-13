@@ -106,6 +106,20 @@ TEST_CASE("whole outing: several outings, restarts and disabled markers", "[unit
     CHECK_FALSE(g.ranges[1].trusted);
 }
 
+TEST_CASE("whole outing: an outing that ends where the next one starts", "[unit]") {
+    DataLayer layer;
+    layer.duration = 100;
+    layer.markers = {intrinsic(MarkerClass::SOL, 0), intrinsic(MarkerClass::SOL, 50, 1),
+                     intrinsic(MarkerClass::EOL, 50), intrinsic(MarkerClass::EOL, 100, 1)};
+    sortMarkers(layer.markers); // EOL(50) before SOL(50)
+    const RangeGroup g = buildWholeOutingGroup(layer, fileName("joint.ld"));
+    REQUIRE(g.ranges.size() == 2);
+    CHECK(g.ranges[0].start == 0);
+    CHECK(g.ranges[0].end == 50);
+    CHECK(g.ranges[1].start == 50);
+    CHECK(g.ranges[1].end == 100); // not a zero-length outing at 50
+}
+
 TEST_CASE("whole outing: rebuild applies overrides and keeps versions per path", "[unit]") {
     DataSource src;
     src.layers.resize(1);

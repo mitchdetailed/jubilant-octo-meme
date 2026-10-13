@@ -11,7 +11,9 @@
 // the 212-byte record + aux case), gap blocks, truncated names, a header channel count off by one, device
 // events, a header-only file, a zero-rate record, a truncated data array, non-finite floats, the dialects of
 // docs/formats/ld.md (m1, c-series, converter-legacy, pc-layout) and the public sim/converter writers'
-// fingerprints (sim-gotzl, sim-mi2), and synthetic-acc-dialect (05 section 9.1, 08 section 6.7). What the
+// fingerprints (sim-gotzl, sim-mi2), synthetic-acc-dialect (05 section 9.1, 08 section 6.7) and the beacon
+// families of AC-M1-07 (synthetic-beacons-*: out/in/partial laps, RESET, IGRDBCN, Start Lap numbering, a
+// four-wheel log with a pit stop, a locking wheel and a clamped span). What the
 // IWriter cannot express (a wrong header count, a zero rate, a truncated array, another writer's header
 // constants) is applied afterwards as documented byte edits, named in each family's README.md.
 //
@@ -21,10 +23,17 @@
 // are marked invalid from the generator's own declaration (fixture-1 oracle.validity "strict"), since the
 // oracle does not decode gap blocks.
 //
+// Families with beacons carry a hand-checked lap table (Family::expectedLaps, reasoned from the beacon-pair
+// rule of 02 section 4.5 and the annotation rules of D-075/D-132): after `fixture add`, the generator writes
+// the Outings:Laps group of expected.laps.json from that table, never from the code under test (AC-M1-07),
+// and reports when esses-cli disagrees.
+//
 // Usage:
 //   esses-gen-fixtures [--out fixtures/motec.ld] [--family NAME ...] [--list]
 //   esses-gen-fixtures --inputs-only --out <dir> [--fixtures <dir> --manifest <file>]
 //   esses-gen-fixtures --large <file.ld> [--large-mb 500]
+//   esses-gen-fixtures --bench <file.ld> [--bench-channels 8] [--bench-mb 100 | --bench-seconds S]
+//                      [--bench-lap-seconds L]
 #include "cli_common.hpp"
 #include "expect_channels.hpp"
 #include "process.hpp"
@@ -33,6 +42,7 @@
 #include <esses/base/hash.hpp>
 #include <esses/base/rate.hpp>
 #include <esses/base/utf8.hpp>
+#include <esses/base/uuid.hpp>
 #include <esses/formats/ld_importer.hpp>
 #include <esses/model/model.hpp>
 #include <esses/store/chunk_cache.hpp>
@@ -93,6 +103,20 @@ struct GenChannel {
     std::optional<std::uint32_t> enumTable;
 };
 
+// One row of a hand-checked lap table: the laps of the Outings:Laps group of layer Normal in time order.
+// Markers are named by their `name` (SOL and EOL, which have none, by their class).
+struct ExpectedLap {
+    std::string start;
+    std::string end;
+    std::string lapClass; // laps-1 spelling: "Flying", "Out", "In", "Partial"
+    int number = 0;
+    std::string name;
+    std::string abbrev;
+    bool trusted = true;
+    std::uint16_t stint = 0; // phase-2 annotation; 0 = unknown (omitted)
+    bool pitStop = false;
+};
+
 struct Family {
     std::string name;
     std::string summary;               // README and fixture.json source
@@ -104,9 +128,11 @@ struct Family {
     std::vector<model::EnumTable> enumTables;
     std::function<void(std::vector<std::byte>&)> patch; // byte edits after the writer
     std::string patchNote;
-    std::optional<std::string> ldxText; // a hand-written .ldx replacing the writer's
-    std::string importOptions;          // JSON; "" = the default {"ld":{"shiftOrder":"afterMul"}}
-    std::vector<std::string> compared;  // oracle subset; empty = every channel
+    std::optional<std::string> ldxText;    // a hand-written .ldx replacing the writer's
+    std::string importOptions;             // JSON; "" = the default {"ld":{"shiftOrder":"afterMul"}}
+    std::vector<std::string> compared;     // oracle subset; empty = every channel
+    std::vector<ExpectedLap> expectedLaps; // non-empty: the Outings:Laps golden (AC-M1-07)
+    std::string lapsNote;                  // README: how the lap table was reasoned
 };
 
 LdEncoding encoding(std::string name, std::uint16_t code, std::uint16_t width, std::uint16_t rate) {
@@ -957,6 +983,18 @@ Family ldxCompanion() {
     f.patch = pinDeviceVersion;
     f.patchNote =
         "the .ldx is hand-written (unknown elements cannot come from a DataSource); device version pinned";
+    // Beacon-pair over groups "" and Beacons: SOL(0) Manual.1(5) Manual.2(15.00000025 -> 15 s) EOL(25 s);
+    // Split.1 and Ignored are skipped; the RESET and the stage markers sit in group Stages, which the rule
+    // does not read. Ground Speed (alternateList) never stays below 1 km/h for 15 s; Lap Number never
+    // decreases: one stint.
+    f.expectedLaps = {
+        {"SOL", "Manual.1", "Out", 0, "Out Lap", "Out", false, 1, false},
+        {"Manual.1", "Manual.2", "Flying", 1, "Lap 1", "L1", true, 1, false},
+        {"Manual.2", "EOL", "In", 2, "In Lap", "In", false, 1, false},
+    };
+    f.lapsNote =
+        "out lap, Lap 1, in lap 2; SPLTBCN and IGRDBCN skipped; the RESET in MarkerGroup Stages is not "
+        "in the rule's marker groups";
     return f;
 }
 
@@ -1019,6 +1057,191 @@ Family accDialect() {
                                             "Manual." + std::to_string(lap + 1), 77, ordinal));
     }
     f.compared = {"GEAR", "FUEL"};
+    // SOL -> Manual.1 out lap, Manual.k -> Manual.k+1 flying laps 1..12, Manual.13 -> EOL in lap 13. Corr
+    // Speed is SPEED (the default alternate list's "Speed"): a 270 s triangle 0..280 km/h that is below 1
+    // km/h for under a second per lap, so no pit stop; no lap counter, no RESET: stint 1 everywhere.
+    f.expectedLaps.push_back({"SOL", "Manual.1", "Out", 0, "Out Lap", "Out", false, 1, false});
+    for (int lap = 1; lap <= 12; ++lap) {
+        const std::string n = std::to_string(lap);
+        f.expectedLaps.push_back({"Manual." + n, "Manual." + std::to_string(lap + 1), "Flying", lap,
+                                  "Lap " + n, "L" + n, true, 1, false});
+    }
+    f.expectedLaps.push_back({"Manual.13", "EOL", "In", 13, "In Lap", "In", false, 1, false});
+    f.lapsNote = "out lap, flying laps 1 to 12 (Start Lap absent: numbering from 1), in lap 13; one stint";
+    return f;
+}
+
+// AC-M1-07: Start Lap numbering with out, flying and in laps; split and ignored beacons and a device event
+// never create or break a lap.
+Family beaconsNumbering() {
+    Family f;
+    f.name = "synthetic-beacons-numbering";
+    f.summary = "synthetic: BCN beacons for an out lap, three flying laps and an in lap, numbered from the "
+                "Start Lap detail 7, with an SPLTBCN, an IGRDBCN and a device event inside laps";
+    f.notes =
+        "AC-M1-07 / 02 section 4.5: flying laps are numbered from Start Lap (7, 8, 9), the out lap is 0 and "
+        "the in lap takes the next number (10); SPLTBCN and IGRDBCN (ignoreClasses) and the device event "
+        "(group DeviceEvents) create no lap; in and out laps are untrusted";
+    f.details = baseDetails(f.name);
+    f.details.push_back(text("Start Lap", "7", Provenance::Companion));
+    f.channels.push_back(floatChannel("Throttle Pos", kFloat, 4, 10, triangle(1000, 200, 100, 1.0)));
+    f.markers.push_back(companionMarker(model::MarkerClass::BCN, 12'000'000, "Beacons", "B1", 77));
+    f.markers.push_back(companionMarker(model::MarkerClass::SPLTBCN, 20'000'000, "Beacons", "S1", 5));
+    f.markers.push_back(companionMarker(model::MarkerClass::BCN, 30'000'000, "Beacons", "B2", 77));
+    f.markers.push_back(companionMarker(model::MarkerClass::IGRDBCN, 31'000'000, "Beacons", "I1", 77));
+    f.markers.push_back(model::makeDeviceEventMarker(3, 40'000'000, 0));
+    f.markers.push_back(companionMarker(model::MarkerClass::BCN, 50'500'000, "Beacons", "B3", 77));
+    f.markers.push_back(companionMarker(model::MarkerClass::BCN, 70'000'000, "Beacons", "B4", 77));
+    f.patch = pinDeviceVersion;
+    f.patchNote = "device version pinned to 100 at 0x052";
+    // Filtered sequence SOL(0) B1(12) B2(30) B3(50.5) B4(70) EOL(100 s); Start Lap 7. No speed or counter
+    // channel: stint 1, no pit stop.
+    f.expectedLaps = {
+        {"SOL", "B1", "Out", 0, "Out Lap", "Out", false, 1, false},
+        {"B1", "B2", "Flying", 7, "Lap 7", "L7", true, 1, false},
+        {"B2", "B3", "Flying", 8, "Lap 8", "L8", true, 1, false},
+        {"B3", "B4", "Flying", 9, "Lap 9", "L9", true, 1, false},
+        {"B4", "EOL", "In", 10, "In Lap", "In", false, 1, false},
+    };
+    f.lapsNote =
+        "SOL-B1 out (0), B1-B2, B2-B3, B3-B4 flying 7, 8, 9 (Start Lap 7), B4-EOL in (10); S1 (SPLTBCN), "
+        "I1 (IGRDBCN) and the device event at 40 s are skipped; one stint";
+    return f;
+}
+
+// AC-M1-07: a device RESET inside a flying lap closes it as a partial lap (untrusted, numbered as the flying
+// lap it interrupted without consuming the number); the range after the RESET is an out lap; the RESET starts
+// stint 2.
+Family beaconsReset() {
+    Family f;
+    f.name = "synthetic-beacons-reset";
+    f.summary =
+        "synthetic: BCN beacons with a RESET marker (group \"\") inside the second flying lap, then an out "
+        "lap, two flying laps and an in lap";
+    f.notes =
+        "AC-M1-07 / 02 section 4.4 rules 11-13: BCN->RESET is a partial lap (Lap 2 (partial), untrusted, "
+        "number 2 not consumed), RESET->BCN an out lap, the next flying lap is Lap 2; the RESET starts "
+        "stint 2 and ordinary beacon intervals never split a stint";
+    f.details = baseDetails(f.name);
+    f.channels.push_back(floatChannel("Throttle Pos", kFloat, 4, 10, triangle(1200, 240, 100, 1.0)));
+    f.markers.push_back(companionMarker(model::MarkerClass::BCN, 10'000'000, "Beacons", "B1", 77));
+    f.markers.push_back(companionMarker(model::MarkerClass::BCN, 30'000'000, "Beacons", "B2", 77));
+    f.markers.push_back(companionMarker(model::MarkerClass::RESET, 45'000'000, "", "R1", 0));
+    f.markers.push_back(companionMarker(model::MarkerClass::BCN, 52'000'000, "Beacons", "B3", 77));
+    f.markers.push_back(companionMarker(model::MarkerClass::BCN, 71'000'000, "Beacons", "B4", 77));
+    f.markers.push_back(companionMarker(model::MarkerClass::BCN, 92'000'000, "Beacons", "B5", 77));
+    f.patch = pinDeviceVersion;
+    f.patchNote = "device version pinned to 100 at 0x052";
+    // Sequence SOL(0) B1(10) B2(30) R1(45) B3(52) B4(71) B5(92) EOL(120 s). The RESET at 45 s starts stint 2
+    // at the first lap starting at or after it (R1-B3).
+    f.expectedLaps = {
+        {"SOL", "B1", "Out", 0, "Out Lap", "Out", false, 1, false},
+        {"B1", "B2", "Flying", 1, "Lap 1", "L1", true, 1, false},
+        {"B2", "R1", "Partial", 2, "Lap 2 (partial)", "P2", false, 1, false},
+        {"R1", "B3", "Out", 0, "Out Lap", "Out", false, 2, false},
+        {"B3", "B4", "Flying", 2, "Lap 2", "L2", true, 2, false},
+        {"B4", "B5", "Flying", 3, "Lap 3", "L3", true, 2, false},
+        {"B5", "EOL", "In", 4, "In Lap", "In", false, 2, false},
+    };
+    f.lapsNote =
+        "SOL-B1 out, B1-B2 Lap 1, B2-R1 partial P2 (not consumed), R1-B3 out, B3-B4 Lap 2, B4-B5 Lap 3, "
+        "B5-EOL in (4); stint 1 up to the RESET at 45 s, stint 2 from R1-B3; the fastest trusted flying "
+        "lap is Lap 2 (19 s)";
+    return f;
+}
+
+// AC-M1-07 and the AC-M1-11 data path: four wheel speeds (m/s, 10 Hz) and an I32 lap counter. The car waits
+// 20 s in the pit box at the start (the out lap gets pitStop but no new stint: it had not moved yet), stops
+// 10 s in Lap 1 (no pit stop: < 15 s) and 20 s in Lap 2 (pitStop; the next lap starts stint 2); FL locks for
+// 2 s in Lap 1 (Corr Speed follows FR); both fronts read -0.5 m/s during the pit stop (the default min clamp
+// makes it 0); RL spins at the pit exit (not a Corr Speed input by default); the counter resets in Lap 3
+// (stint 3 from Lap 4); the in lap ends with a 10 s stop.
+Family beaconsPit() {
+    Family f;
+    f.name = "synthetic-beacons-pit";
+    f.summary =
+        "synthetic: four wheel speeds and a lap counter with BCN beacons; a 20 s wait in the pit box "
+        "before the out lap, a 10 s stop in Lap 1, a 20 s pit stop in Lap 2, a counter reset in Lap 3, a "
+        "locking front-left wheel and front wheels reading below zero while stationary";
+    f.notes =
+        "AC-M1-07 / D-075, D-132: >= 15 s below 1 km/h of Corr Speed (fastest of the front wheels, clamped "
+        "at 0) inside a lap sets only pitStop (class, number and trust unchanged); after a pit stop the next "
+        "lap starts a new stint unless the car had not moved yet; a lap counter decrease starts a stint; "
+        "beacon intervals never do";
+    f.details = baseDetails(f.name);
+    constexpr std::size_t kSamples = 3000; // 300 s at 10 Hz
+    // Stopped: the pit box (0 - 20 s), a 10 s stop in Lap 1 (80 - 90 s), the pit stop in Lap 2 (140 - 160 s)
+    // and the end of the in lap (290 - 300 s).
+    const auto stopped = [](std::size_t i) {
+        return i < 200 || (i >= 800 && i < 900) || (i >= 1400 && i < 1600) || i >= 2900;
+    };
+    std::vector<double> fr(kSamples, 40.0);
+    for (std::size_t i = 0; i < kSamples; ++i) {
+        if (stopped(i)) {
+            fr[i] = 0.0;
+        } else if (i < 280) {
+            fr[i] = static_cast<double>(i - 200) * 0.5; // 20 - 28 s: 0.5 -> 39.5 m/s
+        } else if (i >= 1000 && i < 1020) {
+            fr[i] = 30.0; // 100 - 102 s: braking
+        }
+    }
+    std::vector<double> fl = fr;
+    std::vector<double> rl = fr;
+    for (std::size_t i = 1000; i < 1020; ++i) {
+        fl[i] = 0.0; // FL locked while braking
+    }
+    for (std::size_t i = 1400; i < 1600; ++i) {
+        fl[i] = -0.5; // sensor offset while stationary: clamped to 0
+        fr[i] = -0.5;
+    }
+    for (std::size_t i = 1600; i < 1620; ++i) {
+        rl[i] = 42.0; // RL spins at the pit exit
+    }
+    const auto wheel = [](std::string name, std::vector<double> v) {
+        auto g = floatChannel(std::move(name), kFloat, 4, 10, std::move(v));
+        g.enc.unit = "m/s";
+        return g;
+    };
+    f.channels.push_back(wheel("Wheel Speed FL", fl));
+    f.channels.push_back(wheel("Wheel Speed FR", fr));
+    f.channels.push_back(wheel("Wheel Speed RL", rl));
+    f.channels.push_back(wheel("Wheel Speed RR", f.channels[1].values));
+    // The counter steps at the beacons and resets to 0 at 215 s: (first sample, value) in time order.
+    const std::pair<std::size_t, double> counterSteps[] = {{0, 0.0},    {600, 1.0},  {1200, 2.0}, {1900, 3.0},
+                                                           {2150, 0.0}, {2400, 1.0}, {2700, 2.0}};
+    std::vector<double> counter(kSamples, 0.0);
+    for (std::size_t i = 0; i < kSamples; ++i) {
+        for (const auto& [from, value] : counterSteps) {
+            if (i >= from) {
+                counter[i] = value;
+            }
+        }
+    }
+    f.channels.push_back(intChannel("Lap Number", kInt5, 4, 10, std::move(counter)));
+    const Micros beacons[] = {60'000'000, 120'000'000, 190'000'000, 240'000'000, 270'000'000};
+    for (std::size_t k = 0; k < std::size(beacons); ++k) {
+        f.markers.push_back(
+            companionMarker(model::MarkerClass::BCN, beacons[k], "Beacons", "B" + std::to_string(k + 1), 77));
+    }
+    f.patch = pinDeviceVersion;
+    f.patchNote = "device version pinned to 100 at 0x052";
+    // Sequence SOL(0) B1(60) B2(120) B3(190) B4(240) B5(270) EOL(300 s). Stationary runs of Corr Speed: 0
+    // - 20.1 s (sample 200 is 0 m/s too) in the out lap (no movement before: no new stint), 80 - 90 s in Lap
+    // 1 (10 s), 140
+    // - 160 s in Lap 2 (20 s, moved before: stint 2 from B3), 290 - 300 s in the in lap (10 s). Counter
+    // decrease between 214.9 s and 215.0 s: stint 3 from the first lap starting after 214.9 s (B4).
+    f.expectedLaps = {
+        {"SOL", "B1", "Out", 0, "Out Lap", "Out", false, 1, true},
+        {"B1", "B2", "Flying", 1, "Lap 1", "L1", true, 1, false},
+        {"B2", "B3", "Flying", 2, "Lap 2", "L2", true, 1, true},
+        {"B3", "B4", "Flying", 3, "Lap 3", "L3", true, 2, false},
+        {"B4", "B5", "Flying", 4, "Lap 4", "L4", true, 3, false},
+        {"B5", "EOL", "In", 5, "In Lap", "In", false, 3, false},
+    };
+    f.lapsNote =
+        "out lap (pitStop: 20 s in the pit box, still stint 1), Lap 1 (10 s stop: no pitStop), Lap 2 "
+        "(pitStop, trusted, still flying), Lap 3 stint 2, Lap 4 stint 3 (counter reset at 215 s), in lap "
+        "5 (10 s stop: no pitStop)";
     return f;
 }
 
@@ -1045,6 +1268,9 @@ std::vector<Family> allFamilies() {
     out.push_back(nonFinite());
     out.push_back(ldxCompanion());
     out.push_back(accDialect());
+    out.push_back(beaconsNumbering());
+    out.push_back(beaconsReset());
+    out.push_back(beaconsPit());
     return out;
 }
 
@@ -1172,8 +1398,123 @@ std::string readme(const Family& f) {
         s += "; the valid column of integer gap ranges comes from the generator's declaration";
     }
     s += ". `expected.probe.json`, `expected.markers.json` and `expected.laps.json` are `esses-cli` output "
-         "(regression goldens).\n";
+         "(regression goldens)";
+    if (!f.expectedLaps.empty()) {
+        s += ", except the `Outings:Laps` group of `expected.laps.json`, which the generator writes from a "
+             "hand-checked lap table (AC-M1-07): " +
+             f.lapsNote;
+    }
+    s += ".\n";
     return s;
+}
+
+// The laps-1 spelling of a range of the hand-checked table, with ids from the markers esses-cli reported.
+Result<nlohmann::json> expectedLapsGroup(const Family& f, const nlohmann::json& markers) {
+    std::map<std::string, std::pair<std::string, std::int64_t>> byName; // name -> (id, tUs)
+    for (const auto& m : markers) {
+        const std::string name = m.value("name", "");
+        const std::string key = name.empty() ? m.value("class", "") : name;
+        byName.emplace(key, std::make_pair(m.value("id", ""), m.value("tUs", std::int64_t{0})));
+    }
+    const std::string path = "Outings:Laps";
+    nlohmann::json ranges = nlohmann::json::array();
+    for (const ExpectedLap& lap : f.expectedLaps) {
+        const auto a = byName.find(lap.start);
+        const auto b = byName.find(lap.end);
+        if (a == byName.end() || b == byName.end()) {
+            return fail(ErrorCode::Internal, f.name + ": the lap table names an unknown marker (" +
+                                                 lap.start + " or " + lap.end + ")");
+        }
+        const model::MarkerId startId{Uuid::parse(a->second.first)};
+        nlohmann::json r = nlohmann::json::object();
+        r["abbrev"] = lap.abbrev;
+        r["enabled"] = true;
+        r["endMarker"] = b->second.first;
+        r["endUs"] = b->second.second;
+        r["id"] = model::rangeId(path, startId).v.str();
+        r["kind"] = "Lap";
+        r["lapClass"] = lap.lapClass;
+        r["name"] = lap.name;
+        r["number"] = lap.number;
+        if (lap.pitStop) {
+            r["pitStop"] = true;
+        }
+        r["startMarker"] = a->second.first;
+        r["startUs"] = a->second.second;
+        if (lap.stint != 0) {
+            r["stint"] = lap.stint;
+        }
+        r["trusted"] = lap.trusted;
+        ranges.push_back(std::move(r));
+    }
+    return nlohmann::json{{"children", nlohmann::json::array()},
+                          {"name", "Laps"},
+                          {"path", path},
+                          {"ranges", std::move(ranges)},
+                          {"supportsReporting", true},
+                          {"supportsTrackGeneration", true}};
+}
+
+// Replaces the Outings:Laps group of expected.laps.json (layer Normal) with the hand-checked table and
+// reports a difference from what esses-cli wrote.
+int writeExpectedLaps(const Family& f, const fs::path& dir) {
+    const fs::path file = dir / "expected.laps.json";
+    auto text = cli::readFile(file);
+    if (!text) {
+        std::cerr << "esses-gen-fixtures: " << text.error().toString() << "\n";
+        return 2;
+    }
+    auto doc = cli::parseJson(*text);
+    if (!doc || !doc->contains("layers") || !(*doc)["layers"].contains("Normal")) {
+        std::cerr << "esses-gen-fixtures: " << f.name << ": expected.laps.json has no layer Normal\n";
+        return 2;
+    }
+    nlohmann::json& layer = (*doc)["layers"]["Normal"];
+    auto group = expectedLapsGroup(f, layer["markers"]);
+    if (!group) {
+        std::cerr << "esses-gen-fixtures: " << group.error().toString() << "\n";
+        return 2;
+    }
+    nlohmann::json* outings = nullptr;
+    for (auto& g : layer["groups"]) {
+        if (g.value("path", "") == "Outings") {
+            outings = &g;
+        }
+    }
+    if (outings == nullptr) {
+        std::cerr << "esses-gen-fixtures: " << f.name << ": expected.laps.json has no Outings group\n";
+        return 2;
+    }
+    nlohmann::json children = nlohmann::json::array();
+    bool replaced = false;
+    for (auto& c : (*outings)["children"]) {
+        if (c.value("path", "") == "Outings:Laps") {
+            if (c != *group) {
+                std::cerr << "esses-gen-fixtures: note: " << f.name
+                          << ": esses-cli's Outings:Laps differs from the hand-checked table (fixture verify "
+                             "will fail until the code agrees)\n";
+            }
+            children.push_back(*group);
+            replaced = true;
+        } else {
+            children.push_back(c);
+        }
+    }
+    if (!replaced) {
+        std::cerr << "esses-gen-fixtures: note: " << f.name << ": esses-cli produced no Outings:Laps group\n";
+        children.push_back(*group);
+    }
+    (*outings)["children"] = std::move(children);
+    auto out = cli::canonicalText(*doc);
+    if (!out) {
+        std::cerr << "esses-gen-fixtures: " << out.error().toString() << "\n";
+        return 2;
+    }
+    if (auto w = cli::writeFile(file, *out); !w) {
+        std::cerr << "esses-gen-fixtures: " << w.error().toString() << "\n";
+        return 2;
+    }
+    return 0;
 }
 
 std::string exeName(std::string base) {
@@ -1195,6 +1536,11 @@ struct Options {
     std::string manifest;
     std::string large;
     std::uint64_t largeMb = 500;
+    std::string bench;
+    std::uint32_t benchChannels = 8;
+    std::uint64_t benchMb = 100;
+    std::uint64_t benchSeconds = 0;
+    std::uint64_t benchLapSeconds = 0;
 };
 
 int addExpectations(const Options& o, const Family& f, const fs::path& dir) {
@@ -1273,6 +1619,9 @@ int addExpectations(const Options& o, const Family& f, const fs::path& dir) {
         std::cerr << "esses-gen-fixtures: " << w.error().toString() << "\n";
         return 2;
     }
+    if (!f.expectedLaps.empty()) {
+        return writeExpectedLaps(f, dir);
+    }
     return 0;
 }
 
@@ -1328,6 +1677,80 @@ int writeLarge(const fs::path& path, std::uint64_t megabytes) {
     return 0;
 }
 
+// AC-M1-02 / AC-M1-03 (bench/plot_bench, bench/open_bench): `channels` float channels at 1 kHz (4 bytes per
+// sample) for `seconds`, or for as long as `megabytes` of samples need when `seconds` is 0. Channel 0 is
+// "Ground Speed" (km/h, so the built-in Corr Speed / Corr Dist evaluate as on a real log), then the usual
+// circuit names, then "Bench Channel <k>"; every signal is a triangle with deterministic noise (an LCG, exact
+// integer arithmetic), so the M4 columns carry a real min/max spread. `lapSeconds` > 0 adds BCN beacons every
+// lapSeconds (the first after half a lap: an out lap); 0 = no .ldx markers (one outing: the full extent is
+// the Main range).
+int writeBench(const fs::path& path, std::uint32_t channels, std::uint64_t megabytes, std::uint64_t seconds,
+               std::uint64_t lapSeconds) {
+    constexpr std::uint16_t kRate = 1000;
+    if (channels == 0) {
+        std::cerr << "esses-gen-fixtures: --bench-channels must be at least 1\n";
+        return 2;
+    }
+    if (seconds == 0) {
+        seconds = std::max<std::uint64_t>(1, megabytes * 1'000'000 / (std::uint64_t{channels} * kRate * 4));
+    }
+    const std::size_t n = static_cast<std::size_t>(seconds) * kRate;
+    static const std::vector<std::pair<std::string, std::string>> kNamed = {
+        {"Ground Speed", "km/h"}, {"Engine Speed", "rpm"}, {"Throttle Pos", "%"}, {"Brake Pres", "bar"},
+        {"Steered Angle", "deg"}, {"G Force Lat", "G"},    {"G Force Long", "G"}, {"Damper Pos FL", "mm"}};
+    const std::int64_t lapSamples = lapSeconds > 0 ? static_cast<std::int64_t>(lapSeconds) * kRate : 90'000;
+    Family f;
+    f.name = "synthetic-bench";
+    f.details = baseDetails(f.name);
+    for (std::uint32_t k = 0; k < channels; ++k) {
+        const bool named = k < kNamed.size();
+        std::vector<double> v(n);
+        std::uint64_t lcg = 0x9E3779B97F4A7C15ULL ^ (std::uint64_t{k} * 0x100000001B3ULL);
+        // Speed: 60..280 km/h over a lap; the others: periods of 3 to 40 s, amplitude 1000 steps.
+        const std::int64_t period = k == 0 ? lapSamples : static_cast<std::int64_t>(3'000 + 1'700 * k);
+        const std::int64_t amplitude = k == 0 ? 22'000 : 1'000;
+        const double divisor = k == 0 ? 100.0 : 10.0;
+        const double offset = k == 0 ? 60.0 : 0.0;
+        for (std::size_t i = 0; i < n; ++i) {
+            const std::int64_t ph = static_cast<std::int64_t>(i) % period;
+            const std::int64_t half = std::max<std::int64_t>(period / 2, 1);
+            const std::int64_t tri = (ph < half ? ph : period - ph) * amplitude / half;
+            lcg = lcg * 6364136223846793005ULL + 1442695040888963407ULL;
+            const auto noise = static_cast<std::int64_t>((lcg >> 33) % 201) - 100; // +-1 % of the amplitude
+            v[i] = static_cast<double>(tri + noise) / divisor + offset;
+        }
+        auto g = floatChannel(named ? kNamed[k].first : "Bench Channel " + std::to_string(k), kFloat, 4,
+                              kRate, std::move(v));
+        g.enc.unit = named ? kNamed[k].second : "V";
+        f.channels.push_back(std::move(g));
+    }
+    if (lapSeconds > 0) {
+        std::uint32_t ordinal = 0;
+        for (std::uint64_t t = lapSeconds / 2; t + 1 < seconds; t += lapSeconds) {
+            f.markers.push_back(companionMarker(model::MarkerClass::BCN, static_cast<Micros>(t) * 1'000'000,
+                                                "Beacons", "Manual." + std::to_string(ordinal + 1), 77,
+                                                ordinal));
+            ++ordinal;
+        }
+    }
+    store::ChunkCache cache;
+    const auto t0 = std::chrono::steady_clock::now();
+    const auto src = buildSource(f, cache);
+    auto writer = formats::makeLdWriter(nullptr);
+    formats::ExportView view;
+    view.source = src;
+    auto rep = writer->write(path, view, {}, {}, {});
+    if (!rep) {
+        std::cerr << "esses-gen-fixtures: " << rep.error().toString() << "\n";
+        return 2;
+    }
+    const double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+    std::cout << "esses-gen-fixtures: wrote " << cli::u8(path) << " (" << rep->bytes << " bytes, " << channels
+              << " channels at 1 kHz, " << seconds << " s, " << f.markers.size() << " beacons) in " << s
+              << " s\n";
+    return 0;
+}
+
 int run(const std::vector<std::string>& args) {
     CLI::App app{"esses-gen-fixtures: synthetic .ld/.ldx fixture families (05 section 9.1)"};
     Options o;
@@ -1345,6 +1768,14 @@ int run(const std::vector<std::string>& args) {
                    "write a fixture verify manifest mapping --fixtures dirs to the inputs");
     app.add_option("--large", o.large, "write the AC-M0-12 timing file to this path instead");
     app.add_option("--large-mb", o.largeMb, "size of the --large file in MB (default 500)");
+    app.add_option("--bench", o.bench,
+                   "write the M1 bench file (bench/plot_bench, bench/open_bench) to this path");
+    app.add_option("--bench-channels", o.benchChannels,
+                   "float channels at 1 kHz in the --bench file (default 8)");
+    app.add_option("--bench-mb", o.benchMb, "sample bytes of the --bench file in MB (default 100)");
+    app.add_option("--bench-seconds", o.benchSeconds, "duration of the --bench file (overrides --bench-mb)");
+    app.add_option("--bench-lap-seconds", o.benchLapSeconds,
+                   "BCN beacons every N seconds in the --bench file (default 0: no beacons, one outing)");
     std::vector<const char*> argv;
     argv.reserve(args.size());
     for (const std::string& a : args) {
@@ -1358,6 +1789,9 @@ int run(const std::vector<std::string>& args) {
     o.out = cli::p8(out);
     if (!o.large.empty()) {
         return writeLarge(cli::p8(o.large), o.largeMb);
+    }
+    if (!o.bench.empty()) {
+        return writeBench(cli::p8(o.bench), o.benchChannels, o.benchMb, o.benchSeconds, o.benchLapSeconds);
     }
     std::vector<Family> families = allFamilies();
     if (o.list) {

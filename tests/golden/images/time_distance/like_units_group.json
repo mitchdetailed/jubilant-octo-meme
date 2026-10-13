@@ -1,0 +1,51 @@
+{
+    "activeChannel": "Ground Speed",
+    "body": {
+        "groups": [
+            {
+                "name": "Speed",
+                "scaleMode": "channel",
+                "traces": [
+                    {
+                        "channel": "Corr Speed"
+                    },
+                    {
+                        "channel": "Ground Speed"
+                    }
+                ]
+            }
+        ]
+    },
+    "case": "like_units_group",
+    "cursorUs": 31000000,
+    "data": "libs/plotcore/tests/td_golden_cases.hpp (synthetic rational data, sources synthetic_a/b/c.ld)",
+    "datumUs": null,
+    "domain": "time",
+    "dprs": [
+        1,
+        2
+    ],
+    "focused": false,
+    "fonts": "tests/golden/fonts (Noto Sans), QtTextMetrics",
+    "pendingStripe": false,
+    "scheme": "Test Light",
+    "singleColourMain": false,
+    "sizeLogical": [
+        400,
+        260
+    ],
+    "slots": [
+        {
+            "distanceData": true,
+            "kind": "Main",
+            "lap": 0,
+            "number": 0,
+            "source": "synthetic_a.ld"
+        }
+    ],
+    "type": "time_distance",
+    "zoom": [
+        0,
+        60000000
+    ]
+}

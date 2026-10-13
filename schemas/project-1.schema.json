@@ -1,0 +1,343 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:project-1",
+  "title": "Esses project file (project-1)",
+  "description": "<Project>/project.json (02 sections 6.1-6.2, D-019): the project's name, profile, options, maths order and built-in module settings, workbook order, recent sources, last selection and Data-window filters. Every top-level member not listed is allowed and preserved verbatim, as are members of options and dataWindow not listed; the other records are closed. A workbook named N lives in workbooks/N.workbook.json.",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "name"],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072). The urn:esses: form is written; the bare esses: form of earlier drafts and the later https form are accepted on load and normalised on save (02 section 6.6 rule 1).",
+      "type": "string",
+      "pattern": "^(urn:esses:project-1|esses:project-1|https://[^/\\s]+(/[^/\\s]+)*/project-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "name": {
+      "type": "string"
+    },
+    "profile": {
+      "description": "Profile id (circuit; drag and rally at v1.0).",
+      "type": "string",
+      "minLength": 1
+    },
+    "options": {
+      "description": "Project options (02 section 6.2 key table); members not listed are allowed and preserved.",
+      "type": "object",
+      "properties": {
+        "general": {
+          "type": "object",
+          "properties": {
+            "saveOnExit": {
+              "type": "boolean"
+            },
+            "autosaveMinutes": {
+              "description": "0 = off.",
+              "type": "integer",
+              "minimum": 0
+            },
+            "loadPreviousData": {
+              "type": "boolean"
+            },
+            "selectFastestOnLoad": {
+              "type": "boolean"
+            },
+            "looseChannelSearch": {
+              "type": "boolean"
+            },
+            "autoShowMessagesOnError": {
+              "type": "boolean"
+            },
+            "reduceCpuDuringAnimation": {
+              "type": "boolean"
+            }
+          }
+        },
+        "autoscale": {
+          "type": "object",
+          "properties": {
+            "includeUntrusted": {
+              "type": "boolean"
+            },
+            "includeOverlays": {
+              "type": "boolean"
+            }
+          }
+        },
+        "timeFormat": {
+          "enum": ["m:ss.fff", "ss.fff", "h:mm:ss.f"]
+        },
+        "lapTimeFormat": {
+          "enum": ["m:ss.fff", "ss.fff", "h:mm:ss.f"]
+        },
+        "distanceUnit": {
+          "description": "Unit symbol of the Distance quantity.",
+          "type": "string",
+          "minLength": 1
+        },
+        "fastLapTolerancePct": {
+          "type": "number",
+          "minimum": 0
+        },
+        "autoCentreCursor": {
+          "type": "boolean"
+        },
+        "animation": {
+          "type": "object",
+          "properties": {
+            "rate": {
+              "type": "number",
+              "minimum": 0.25,
+              "maximum": 4
+            }
+          }
+        },
+        "lapStretch": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "tolerancePct": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "trackMaps": {
+          "type": "object",
+          "properties": {
+            "autoGenerateOnOpen": {
+              "type": "boolean"
+            }
+          }
+        },
+        "maths": {
+          "type": "object",
+          "properties": {
+            "precision": {
+              "enum": ["single", "double"]
+            },
+            "compat": {
+              "type": "object",
+              "properties": {
+                "unaryMinusAbovePower": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "reports": {
+          "type": "object",
+          "properties": {
+            "includeUntrusted": {
+              "type": "boolean"
+            },
+            "probeSec": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "ui": {
+      "type": "object",
+      "properties": {
+        "layoutLocked": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mathsOrder": {
+      "description": "Maths module ids, top to bottom (03 section 4.3).",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "builtinMaths": {
+      "description": "Built-in maths modules by id.",
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/builtinEntry"
+      }
+    },
+    "workbooks": {
+      "description": "Workbook names in display order.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "recentSources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "importer": {
+            "type": "string"
+          },
+          "hash": {
+            "$ref": "#/definitions/hash128"
+          },
+          "openedAt": {
+            "$ref": "#/definitions/isoDateTime"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "lastSelection": {
+      "description": "The selection restored with the project (06 section 5.5).",
+      "type": "object",
+      "properties": {
+        "main": {
+          "$ref": "#/definitions/rangeKey"
+        },
+        "overlay0": {
+          "$ref": "#/definitions/rangeKey"
+        },
+        "overlays": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/rangeKey"
+          }
+        },
+        "overlaysHidden": {
+          "type": "boolean"
+        },
+        "singleColourMain": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "dataWindow": {
+      "description": "Data-window filters per source (SourceId hex or default) and the apply-to-all flag (06 section 5.4).",
+      "type": "object",
+      "properties": {
+        "filters": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/filterSpec"
+          }
+        },
+        "applyToAllSources": {
+          "type": "boolean"
+        }
+      }
+    },
+    "x-esses-legacy": {
+      "$ref": "#/definitions/legacyBag"
+    }
+  },
+  "definitions": {
+    "uuid": {
+      "description": "Canonical lower-case 8-4-4-4-12 UUID (Uuid::str()).",
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "hash128": {
+      "description": "xxh3-128 as \"xxh3:\" + 32 lower-case hex digits, high word first (Hash128::hex()).",
+      "type": "string",
+      "pattern": "^xxh3:[0-9a-f]{32}$"
+    },
+    "isoDateTime": {
+      "description": "ISO 8601 date-time with seconds and a UTC offset (or Z).",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "sourceKey": {
+      "description": "A source by path (relative to the project folder when possible) and content hash.",
+      "type": "object",
+      "required": ["path", "hash"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hash": {
+          "$ref": "#/definitions/hash128"
+        }
+      },
+      "additionalProperties": false
+    },
+    "rangeKey": {
+      "description": "Persisted RangeRef (D-014 identity (groupPath, startMarker)); restore resolves by (hash, layer, groupPath, startMarker), then by (path, layer, groupPath, name) (06 section 5.5).",
+      "type": "object",
+      "required": ["source", "groupPath", "startMarker"],
+      "properties": {
+        "source": {
+          "$ref": "#/definitions/sourceKey"
+        },
+        "layer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "groupPath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "startMarker": {
+          "$ref": "#/definitions/uuid"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "filterSpec": {
+      "description": "A Data-window filter (D-017's list); laps (\"3\", \"3-7\", \"3,5,9\") for lapNumbers.",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "enum": ["all", "selected", "fastest", "fastest3", "withinOnePercent", "lapNumbers"]
+        },
+        "laps": {
+          "type": "string",
+          "pattern": "^[0-9]+(-[0-9]+)?(,[0-9]+(-[0-9]+)?)*$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "builtinEntry": {
+      "description": "A built-in maths module's entry (03 section 9); settings validate against schemas/builtin-<id>-<version>.schema.json; absent settings mean the module defaults.",
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "settings": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "legacyBag": {
+      "description": "Fields removed by a migration, kept verbatim (02 section 6.6 rule 3).",
+      "type": "object"
+    }
+  }
+}

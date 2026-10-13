@@ -211,8 +211,8 @@ esses-cli fixture add build/tmp/synthetic.ld --format motec.ld --oracle ref-deco
 
 | Target | Deliverable (classes per outline §1.1 unless limited here) |
 |---|---|
-| `esses_analysis` | `RuleRunner` with `BeaconPairRule` (beacon-pair semantics, lap numbering, in/out/partial, stint/pit, trust) and `WholeOutingRule`; `DistanceIndex`; `CorrectedSpeed` (`fastestWheel` with clamps) and `CorrectedDistance` (D-014, D-016). Not yet: `LapStretch` (M2), `alternateList`/`gCorrection` (M3, with the dialog), track, variance, reports |
-| `esses_maths` (minimal) | Only what the built-in module needs (D-016, D-044): basic `MathGraph` (define/require/version; shadowing rules in M2), `PlanProvider` into the `ChunkCache`, `EvalContext`, built-in `esses.corrected_speed_distance` (`fastestWheel` + clamps) with its settings schema. `Parser`, `TypeChecker`, the kernels and `esses-cli eval` arrive in M2 |
+| `esses_analysis` | `RuleRunner` with `BeaconPairRule` (beacon-pair semantics, lap numbering, in/out/partial, stint/pit, trust) and `WholeOutingRule`; `DistanceIndex`; `CorrectedSpeed` (`fastestWheel` with clamps, and the `alternateList` fallback the ACC data path needs, D-154) and `CorrectedDistance` (D-014, D-016). Not yet: `LapStretch` (M2), `gCorrection` and the `alternateList` method choice (M3, with the dialog), track, variance, reports |
+| `esses_maths` (minimal) | Only what the built-in module needs (D-016, D-044): basic `MathGraph` (define/require/version; shadowing rules in M2), `PlanProvider` into the `ChunkCache`, `EvalContext`, built-in `esses.corrected_speed_distance` (`fastestWheel` + clamps, `alternateList` as its fallback, D-154) with its settings schema. `Parser`, `TypeChecker`, the kernels and `esses-cli eval` arrive in M2 |
 | `esses_project` | `ProjectFile`, `WorkbookFile`, `ComponentSpec`, `Scheme`, `Keymap`, `Profile` (Circuit) read/write paths (`SchemaRegistry` and `Migrations` in M2); shipped `circuit-default.workbook.json`, light/dark schemes, `keymaps/default.json` (full table, unimplemented rows marked `planned`) |
 | `esses_plotcore` | `ViewState`, `ChangeMask`, `SelectionSnapshot`, `DomainMapper` (time affine; distance via `DistanceIndex` + offset + stretch), `TraceBuilder` (exact M4, gap splitting, display-unit `Converter`), `AxisLayout`, `KeyLayout` (labels, value@main), basic `HitTester`, `DrawList`, `IRenderBackend` (D-012, D-018, D-025) |
 | `esses_qtrender` | `RasterBackend`, `LayerCache` (Static/Dynamic/Chrome by `ChangeMask`), `OffscreenRenderer`, `SchemeFonts`; `esses-render` |
@@ -258,7 +258,8 @@ drag cursor; V                          # Values window follows Main and Overlay
 CTRL+click two like-unit channels → grouped on one axis
 N, P                                    # next/previous Main range, zoom preserved
 esses-render data/workbooks/circuit-default.workbook.json <user>/logs/acc_spa.ld --worksheet 0 --dpr 2 -o m1.png
-esses-cli bench --suite plot --json     # prints the budget rows
+esses-plot-bench --runs 5 --json plot.json   # prints the plot budget rows (AC-M1-02; D-155)
+esses-open-bench --runs 5 --json open.json   # prints the first-paint row (AC-M1-03)
 ```
 
 ### 4.6 May slip (to M2)

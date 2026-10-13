@@ -1,0 +1,82 @@
+{
+    "activeChannel": "Gear",
+    "body": {
+        "groups": [
+            {
+                "name": "Speed",
+                "scaleMode": "channel",
+                "traces": [
+                    {
+                        "channel": "Corr Speed",
+                        "displayUnit": "km/h",
+                        "dps": 1
+                    }
+                ]
+            },
+            {
+                "name": "Gear",
+                "scaleMax": 7,
+                "scaleMin": 0,
+                "scaleMode": "manual",
+                "traces": [
+                    {
+                        "channel": "Gear"
+                    }
+                ]
+            }
+        ]
+    },
+    "case": "time_overlays",
+    "cursorUs": 40000000,
+    "data": "libs/plotcore/tests/td_golden_cases.hpp (synthetic rational data, sources synthetic_a/b/c.ld)",
+    "datumUs": null,
+    "domain": "time",
+    "dprs": [
+        1,
+        2
+    ],
+    "focused": false,
+    "fonts": "tests/golden/fonts (Noto Sans), QtTextMetrics",
+    "pendingStripe": false,
+    "scheme": "Test Light",
+    "singleColourMain": true,
+    "sizeLogical": [
+        400,
+        260
+    ],
+    "slots": [
+        {
+            "distanceData": true,
+            "kind": "Main",
+            "lap": 0,
+            "number": 0,
+            "source": "synthetic_a.ld"
+        },
+        {
+            "distanceData": true,
+            "kind": "Overlay0",
+            "lap": 0,
+            "number": 0,
+            "source": "synthetic_b.ld"
+        },
+        {
+            "distanceData": true,
+            "kind": "Overlay",
+            "lap": 2,
+            "number": 1,
+            "source": "synthetic_a.ld"
+        },
+        {
+            "distanceData": true,
+            "kind": "Overlay",
+            "lap": 2,
+            "number": 2,
+            "source": "synthetic_b.ld"
+        }
+    ],
+    "type": "time_distance",
+    "zoom": [
+        0,
+        62000000
+    ]
+}

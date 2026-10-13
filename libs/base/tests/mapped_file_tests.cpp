@@ -184,10 +184,33 @@ TEST_CASE("mapped file: a page fault inside the view becomes fail(Io)", "[unit][
     esses::Result<MappedFile> r = MappedFile::open(p);
     REQUIRE(r.ok());
     fs::resize_file(p, 0); // a writer that ignores the sharing contract truncates the file
+    // Linux raises SIGBUS for the removed page; macOS may serve the page it already had resident (the open's
+    // quick hash read every page) without a signal, which guarded() catches by re-checking the file size.
     TouchJob job{r.value().bytes().data() + page * 2, 0};
     const esses::Result<void> g = r.value().guarded(&touchDecode, &job);
     REQUIRE_FALSE(g.ok());
     CHECK(g.error().code == esses::ErrorCode::Io);
     CHECK(r.value().changedOnDisk());
+}
+
+TEST_CASE("mapped file: a truncation is fail(Io) even when no removed page is touched",
+          "[unit][mappedfile]") {
+    esses::test::TempDir dir("mapped-shrunk");
+    const fs::path p = dir.path() / "log.bin";
+    const long page = ::sysconf(_SC_PAGESIZE);
+    writeFile(p, std::string(static_cast<std::size_t>(page) * 4, 'x'));
+    esses::Result<MappedFile> r = MappedFile::open(p);
+    REQUIRE(r.ok());
+    TouchJob before{r.value().bytes().data(), 0};
+    REQUIRE(r.value().guarded(&touchDecode, &before).ok());
+    fs::resize_file(p, static_cast<std::uintmax_t>(page)); // the first page is still part of the file
+    TouchJob job{r.value().bytes().data(), 0};
+    const esses::Result<void> g = r.value().guarded(&touchDecode, &job);
+    REQUIRE_FALSE(g.ok());
+    CHECK(g.error().code == esses::ErrorCode::Io);
+    CHECK(g.error().message == "the mapped file was truncated while it was being read");
+    // Growing the file back is not a truncation: the view's bytes are all inside the file again.
+    fs::resize_file(p, static_cast<std::uintmax_t>(page) * 4);
+    CHECK(r.value().guarded(&touchDecode, &job).ok());
 }
 #endif

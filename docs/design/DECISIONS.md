@@ -51,7 +51,7 @@ Each ADR has: Title · Context · Options considered (with the research facts th
 | D-035 | MVP scope and milestones | parity-first's MVP minus i2 file importers, index DB and GL (all v1.0); Lap/Details editors, Time Report and sections stay in MVP; ~30 weeks to 0.1, re-estimated ≈ 42 with contingency (D-045) | **yes** (scope cut; answered 2026-10-10) |
 | D-036 | Profiles | Circuit profile only in MVP; range kinds for Run/Stage exist in the model from M0; Drag/Rally rules and editors v1.0 | no |
 
-Addendum A (after the open questions) adds D-037–D-152: decisions proposed by the section writers of documents 00–08, by the 2026-10-10 review (A.1–A.8) and by the final cross-document revision (A.9), plus implementation decisions taken once M0 started (A.10: the user's instructions, and the reconciliation with spike S-1 and the converter port specification) and the departures of M0 as built from the design (A.11), with their own index. Where an addendum entry amends an ADR above, the ADR carries a one-line "Amended by" note.
+Addendum A (after the open questions) adds D-037–D-160: decisions proposed by the section writers of documents 00–08, by the 2026-10-10 review (A.1–A.8) and by the final cross-document revision (A.9), plus implementation decisions taken once M0 started (A.10: the user's instructions, and the reconciliation with spike S-1 and the converter port specification) the departures of M0 as built from the design (A.11) and those of M1 as built (A.12, proposed), with their own index. Where an addendum entry amends an ADR above, the ADR carries a one-line "Amended by" note.
 
 ---
 
@@ -83,6 +83,8 @@ Addendum A (after the open questions) adds D-037–D-152: decisions proposed by 
 If the user prefers the patent grant, Apache-2.0 is a drop-in substitute with no design change. If the user wants copyleft on the application, option 3 is viable but then the maths engine must be assigned to one tree before the first public tag and the C ABI must document that plugins are separate works communicating through a published interface.
 
 **Consequences.** `LICENSE` (MIT), `NOTICES.md` (Qt LGPL notices, source offer, third-party list), `REUSE.toml` + SPDX headers from the first commit. GPL sources never pasted; the `.ld` reader is written from the public layout notes (i3rs `docs/ld-file-format.md`, motec-i2, motorsport-telemetry-rs). Harvested converter parsers must be the user's own work or MIT-compatible (open question).
+
+**Amended by (A.12):** D-160 (DCO sign-off suspended while the maintainer is the only contributor).
 
 **User must confirm:** **confirmed by the user on 2026-10-10: MIT for the whole tree.** DCO, no CLA and the no-relicensing policy apply as decided above.
 
@@ -117,6 +119,8 @@ If the user prefers the patent grant, Apache-2.0 is a drop-in substitute with no
 **Amended by (A.9, proposed):** D-128 (AI-provenance rule, forbidden paths, text-overlap check, ported-code attribution, CLEANROOM category column).
 
 **Amended by (A.10):** D-143 (the `.ld` pro-logging field is never computed or written; working around a vendor licence check is out of scope) and D-145 (`CLEANROOM.md` categories user-contributed own work and user-owned device logs).
+
+**Amended by (A.12):** D-160 (DCO sign-off suspended while the maintainer is the only contributor).
 
 **User must confirm:** no.
 
@@ -300,6 +304,7 @@ No custom software rasteriser: golden images come from `RasterBackend` run offsc
 **Consequences.** Distance-domain decimation runs per lap with no resampled channel copies; variance is O(pixels); the module appears in Channel Status like any maths item (no hidden plugin). The maths engine therefore must exist by the milestone that ships distance mode (outline M1 ships a *minimal* engine: `MathGraph`, `PlanProvider` and the built-in module; the parser, expression evaluation and the full language follow in M2 — amended by D-044).
 
 **Amended by (A.9, proposed):** D-134 (`DistanceChain`) and D-140 (`DistanceIndex` key).
+**Amended by (A.12, proposed):** D-154 (the default `alternateList` ends with `Speed`) and D-157 (`timeAt` exact between the 0.25 m steps).
 
 **User must confirm:** no (tolerance default is an open question).
 
@@ -440,6 +445,8 @@ No custom software rasteriser: golden images come from `RasterBackend` run offsc
 **Decision.** ADS as a **shared library** (LGPL compliance) via vcpkg or FetchContent, wrapped by a `DockHost` facade (`addDock(id, widget, area)`, `savePerspective()/restorePerspective()`, `setAutoHide(id)`, `resetToDefault()`). Fallback `QDockWidget` implementation of the same facade for macOS if ADS proves unusable. Fly-out = ADS auto-hide; pop-up = floating.
 
 **Consequences.** Dock state persists per user (D-019); the facade keeps the ADS API out of components.
+
+**Amended by (A.12):** D-153 (decided 2026-10-11: ADS 5.1.1 is vendored and the default backend, as a shared library linked by `esses_widgets` only; the `QDockWidget` backend is kept as a run-time and build-time fallback).
 
 **User must confirm:** no.
 
@@ -749,6 +756,14 @@ Rewritten on 2026-10-10 after the review. The list is deduplicated across this d
 | D-150 | The `qt-app` CI job starts in M1 (amends D-034, D-124) | no | M0 §5 deviation 1 |
 | D-151 | `CLAUDE.md` and `AGENTS.md` are written in M1 (amends D-128) | no | M0 §5 deviation 3 |
 | D-152 | `esses-cli fixture add` defaults (applies D-040, D-041) | no | M0 §3, §5 deviation 4 |
+| D-153 | Dock backend: ADS by default, the `QDockWidget` backend kept as the fallback (amends D-026, D-044, D-119, D-147) | no (decided by the user, 2026-10-11) | M1 §5 deviation 1 |
+| D-154 | The default `alternateList` ends with `Speed`; M1 uses the `alternateList` fallback (amends D-016, D-044) | no | M1 §5 deviation 2 |
+| D-155 | Budget rows from the benchmark executables; no `esses-cli bench` (amends 07 §4.5) | no | M1 §5 deviation 3 |
+| D-156 | The shell (`MainWindow`, `LayoutFile`) lives in `esses_widgets` (amends 01 §2.1) | no | M1 §5 deviation 4 |
+| D-157 | `DistanceIndex::timeAt` is exact between the 0.25 m steps (refines D-016) | no | M1 §5 deviation 5 |
+| D-158 | Marker order: at equal times `EOL` before `SOL` (amends 02 §4.3 behaviour 8) | no | M1 §3 review fix |
+| D-159 | Shipped data: `<exe dir>/data` first on every OS (amends 01 §9) | no | PR #1 CI (qt-app ubuntu) |
+| D-160 | DCO sign-off suspended while the maintainer is the only contributor (amends D-002, D-004) | no (user decision 2026-10-12) | PR #1 |
 
 ### A.1 Review amendments
 
@@ -792,6 +807,7 @@ Rewritten on 2026-10-10 after the review. The list is deduplicated across this d
 **Context.** M0 packed the whole Qt-free foundation plus the CSV engine into 100 h; M1 built most of the shell, the full parser and three corrected-speed methods, with 37 h for about twelve UI classes. D-016 requires the built-in Corr Speed/Dist module when distance mode ships, and 03 §14.4 put the parser in M1.
 **Decision.** M0 keeps the `.ld/.ldx` reader and writer, store, units, model, sidecar, CLI `info/channels/laps/validate/fixture add|verify`, the synthetic generator with the reference decoder, the macOS core runner (D-034) and a TSan job on `esses_base`. `TextEngine`, `motec.csv`, `generic.csv`, `Dictionary`, `UnitMappingProfile`, their schemas and fuzz targets, and `fixture diff` move to M2. M1 keeps D-016's built-in module with only the engine it needs (`MathGraph` define/require/version, `PlanProvider`, `EvalContext`, `fastestWheel` with clamps). `Parser`, `TypeChecker`, `esses-cli eval`, the elementwise budget and `LapStretch` move to M2; `alternateList` and `gCorrection` move to M3 with the dialog. The `QDockWidget` fallback is built only for an OS where spike S-3 fails (D-026's wording). `PropertiesDialog` first appears in M3, Data-window filters and Channels-window i2 search move to M2, and overlapped mode moves to M3. The review's alternative, computing Corr Speed directly in `esses_analysis` and wrapping it in M2, is rejected because D-016 makes the module the single data path for distance consumers. **Conflict** with 03 §14.4 (parser in M1) resolved by this entry.
 **User must confirm:** no.
+*Amended by D-154 (A.12, proposed): the `alternateList` fallback is used from M1 and its default list ends with `Speed`; D-153 (decided 2026-10-11): ADS is the default dock backend and the `QDockWidget` fallback is built on every OS, not only where S-3 fails.*
 
 #### D-045 0.1 re-baseline: test share and contingency (amends D-035's timing)
 **Context.** The 30-week / 750 h plan applied ×1.2 where the judges estimated parity-first at ~1.5× optimistic, held tests near 20 % and had no contingency, while documents 01–08 added infrastructure and test obligations; the review estimated 1,100–1,300 h for the design as written.
@@ -1182,6 +1198,7 @@ Rewritten on 2026-10-10 after the review. The list is deduplicated across this d
 **Context.** D-026 allows vcpkg or FetchContent. vcpkg's ADS port depends on vcpkg's own `qtbase`, against D-006.
 **Decision.** FetchContent at a pinned tag, built as a shared library.
 **User must confirm:** no.
+*Amended by D-153 (A.12, decided 2026-10-11): ADS 5.1.1 is vendored under D-147 (the user approved the download) instead of fetched, and built through its own CMake project as a shared library.*
 
 #### D-120 Build and repository conventions
 **Context.** 08 needed details that D-034 leaves open. They do not change any ADR.
@@ -1332,6 +1349,7 @@ These entries record where M0, as built and accepted on the developer machine on
 **Decision.** (a) Every library dependency is vendored under `third_party/<lib>/` as unchanged upstream files with the library's own licence file. There is no `vcpkg.json`, no `vcpkg-configuration.json`, no vcpkg toolchain or triplet in the presets and no vcpkg cache in CI; the build fetches no library at configure or build time, and CI downloads only its toolchain (actions, apt packages, the reuse tool). (b) M0 vendors pugixml 1.13 and xxHash 0.8.3 (local copies, no download) and nlohmann/json 3.11.3, json-schema-validator 2.3.0, CLI11 2.4.2, Catch2 3.7.1 and fast_float 6.1.6 (downloads the user approved on 2026-10-10). fast_float is used from M0 for every floating-point parse in `esses_formats`, because Apple Clang 15's libc++ lacks `std::from_chars` for `double`. (c) `third_party/README.md` is the single provenance record: version, licence file, route (local copy or approved download), source of the copy, upstream URL and the SHA-256 of every vendored file as committed. It replaces the per-library `UPSTREAM.md` of 08 §3.7.2; licences and copyright lines are in `NOTICES.md`, `REUSE.toml` and `LICENSES/`. (d) `cmake/third_party.cmake` builds each library itself, never through its upstream CMake files, as `esses::<lib>` targets with SYSTEM include directories and without the project's warning flags. (e) Updating a library touches only its directory, `third_party/README.md`, `NOTICES.md` and `REUSE.toml`. A later dependency (Google Benchmark, zlib, Eigen, pocketfft, Iir1, sqlite3, matio, Lua and sol2) is vendored the same way when its milestone first needs it, and each download needs the user's approval. Qt (D-006) and ADS (D-119) keep their own acquisition routes. Adopting a package manager later needs a new entry amending this one.
 **Consequences.** Builds are reproducible offline. Every vendored library is header-only or a static library built in the tree, so no third-party DLL has to be found at run time and D-124's triplet has nothing left to choose. Updating a dependency is a reviewed copy with new hashes instead of a baseline bump. 08 §1, §3.2, §3.6, §3.7, §4 and §12, 07 §3, 01 §1 and the outline's M0 row follow.
 **User must confirm:** no.
+*Amended by D-153 (A.12, decided 2026-10-11): ADS 5.1.1 is vendored here too, unmodified, but built by its own CMake project as a shared library (`cmake/qtads.cmake`), the one exception to (d); it is the one third-party library found at run time, beside the executables in `<build>/bin`.*
 
 #### D-148 Catch2 3.7.1 amalgamated, with the project's own test discovery (refines D-033; amends D-120)
 **Context.** D-033 picks Catch2 v3, D-120 and 08 §3.7.1 take it from a vcpkg `tests` feature (3.5 or later), and 08 §6.2 registers each `TEST_CASE` with Catch2's `catch_discover_tests()`. M0 phase A could only use a local copy of Catch2 2.13.10 (single header). A Catch2 test spec matches names case-insensitively after trimming, treats a leading or trailing `*` as a wildcard and an `exclude:` prefix as a negation, and Catch2 v3 accepts one name twice when the tags differ, so a ctest entry built from a test name can run the wrong test case, several of them or none.
@@ -1362,3 +1380,55 @@ These entries record where M0, as built and accepted on the developer machine on
 **Decision.** (a) A public fixture needs `--licence`, checked before anything is written, so a refused command leaves nothing behind. (b) With `--oracle ref-decode`, `oracle.validity` defaults to `finite-only`; the synthetic-fixture generator passes `--validity strict` because it supplies the validity itself. 07 §3.6 step 4 carries `--licence`.
 **Consequences.** Every public fixture states its licence (D-040), and a fixture made with the reference decoder verifies whatever gap blocks its input holds. `cli.demo_script` covers both rules.
 **User must confirm:** no.
+
+### A.12 M1 as built (proposed, 2026-10-11)
+
+These entries record where M1, as built and reviewed on the developer machine on 2026-10-11 (`docs/milestones/M1.md`), departs from what a design document or an acceptance criterion says. Each states the ADRs it amends; those ADRs carry an "Amended by" line. Lower-level departures (added accessors, argument types, helper classes the documents name without declaring) are recorded in the "Deviations from the design text" section of each library's `README.md` and summarised in M1.md §5.
+
+#### D-153 Dock backend: ADS by default, the `QDockWidget` backend kept as the fallback (amends D-026, D-044, D-119, D-147)
+**Context.** D-026 wraps ADS in `DockHost` with a `QDockWidget` fallback for an OS on which ADS proves unusable; D-044 and 07 §4.1 build that fallback only for an OS on which spike S-3 fails; D-119 fetches ADS at a pinned tag. D-147 vendors every dependency and makes each download subject to the user's approval. M1 was first built without ADS: `DockHost` got a backend seam (`IDockBackend`) and `QDockWidgetBackend` (docked, pop-up, a fly-out emulated with side tool bars, perspectives, Reset Dock Windows, ESC returning the focus), and this entry was proposed asking the user either to approve the ADS download or to accept that backend for 0.1. The user approved the download on 2026-10-11, and ADS 5.1.1 was vendored unmodified under `third_party/qtads` (archive SHA-256 in `third_party/README.md`).
+**Decision.** (a) ADS is the default `DockHost` backend (`AdsBackend`; `libs/widgets/src/shell/ads_backend.cpp` is the only translation unit that sees ADS). It is built as the shared library `qtadvanceddocking-qt6` (LGPL-2.1-or-later), aliased `esses::qtads`, and linked privately by `esses_widgets` only (`cmake/qt-free-check.cmake`, `tools/check_layering.py`). (b) The `QDockWidget` backend is kept on every OS, not only where S-3 fails as D-044 had it: the environment variable `ESSES_DOCK_BACKEND=qdockwidget` selects it at run time, and the CMake option `ESSES_DOCK_BACKEND=qdockwidget` builds without ADS for an OS on which ADS proves unusable (D-026's fallback rule). AC-M1-13's suite, `widgets.tst_dock_host`, runs on every backend the build has. (c) Acquisition (amends D-119 and 08 §3.7.3): ADS is vendored under D-147 instead of fetched, and it is built by its own unmodified CMake project (`add_subdirectory` with the options it declares: `BUILD_STATIC OFF`, `BUILD_EXAMPLES OFF`, `QT_VERSION_MAJOR` from our `find_package(Qt6)`; `cmake/qtads.cmake`), the one exception to D-147 (d). Its output directories are redirected to `<build>/bin`, beside every executable and test. ADS 5 names its target `qtadvanceddocking-qt6`, where 08 §3.7.3 has ADS 4's `qt6advanceddocking`, and the tree links the alias `esses::qtads`, where 08 has `esses::ads`. (d) A perspective names the backend that wrote it (`{"backend": "ads", ..., "state": <CDockManager::saveState>}` or `{"backend": "qdockwidget", ...}`); each backend refuses the other's, and `layout-1` records `dockBackend` and, for ADS, `adsVersion`.
+**Consequences.** Fly-outs are ADS's auto-hide side bars; the fallback keeps its emulation. A layout written by the other backend is replaced by the default layout, with an Info row in Messages naming the backend that wrote it. Spike S-3 has its Windows result (`docs/spikes/S-3.md`); the Linux and macOS results come from the `qt-app` CI runs, and an OS on which ADS fails is configured with the CMake option. `NOTICES.md` carries the LGPL notice and the replacement instructions for the ADS library (08 §9). 07 §4.1's widgets row, AC-M1-13 and R-10 read with this entry.
+**User must confirm:** no. Decided by the user on 2026-10-11 (ADS download approved; ADS is the default; the `QDockWidget` fallback is kept).
+
+#### D-154 The default `alternateList` ends with `Speed`; M1 uses the `alternateList` fallback (amends D-016, D-044)
+**Context.** D-044 moves `alternateList` and `gCorrection` to M3. The public ACC stand-in (`fixtures/motec.ld/synthetic-acc-dialect`, the sim-exporter dialect) logs its road speed as `SPEED` and has no wheel speeds. None of 03 §9.1's default channel lists names that channel, so the M1 data path (ACC `.ld` → Corr Speed/Corr Dist → distance mode; AC-M1-01, -09 and -10) showed "no distance data".
+**Decision.** (a) From M1, `fastestWheel` falls back to `alternateList` (`W-CSD-FALLBACK`) when one of its channels is unusable, as 03 §9.1 item 1 describes. The `alternateList` method (chosen in the dialog) and `gCorrection` stay in M3. (b) The module's default `alternateList` is 03 §9.1's list with `"Speed"` appended (11 entries). Lookups are case-insensitive and a channel whose unit is not a speed is skipped, so the entry has no effect on a file without such a channel. An importer `Dictionary` (M2) or a project alias can override it.
+**Consequences.** The ACC stand-in has Corr Speed and Corr Dist, and AC-M1-01, -09 and -10 pass on it. The schema example `default.json` lists the 11 entries. 03 §9.1's default object and item 2 and 07 §4.1's analysis and maths rows are updated.
+**User must confirm:** no.
+
+#### D-155 Budget rows come from the benchmark executables; there is no `esses-cli bench` (amends 07 §4.5)
+**Context.** 07 §4.5's demo prints the budget rows with `esses-cli bench --suite plot --json`. The measured paths need Qt Gui (the raster backend and `TimeDistanceGraph`), which the Qt-free `esses-cli` may not link (01 §2.2). The benchmarks are therefore separate executables under `bench/`: `esses-plot-bench` (AC-M1-02) and `esses-open-bench` (AC-M1-03). Each takes `--runs`, `--json`, `--gate` and `--smoke`, and they run under ctest (`bench.*`) and in the `bench` workflow.
+**Decision.** The demo and CI use the benchmark executables. No `esses-cli bench` subcommand is planned while the measured paths need Qt. `tools/bench_compare.py` (08 §6.9) will read their JSON when it is written, and until then the `bench` workflow skips the steps that need it with a notice.
+**Consequences.** 07 §4.5 names the two executables, and `apps/cli/README.md` lists no `bench` subcommand.
+**User must confirm:** no.
+
+#### D-156 The shell (`MainWindow`, `LayoutFile`) lives in `esses_widgets` (amends 01 §2.1)
+**Context.** 01 §2.1 places `MainWindow` in `esses_app` and the outline places `.local/layout.json` handling under `esses_qtmodel`. 07 §4.1 lists `MainWindow` under `esses_widgets`, the `tests/ui` suites must construct the real shell from a library, and the perspectives `LayoutFile` stores are produced by `DockHost` (a widget).
+**Decision.** `MainWindow`, `DockHost`, `KeyEventRouter`, `CommandActions` and `LayoutFile` (`layout-1`) live in `esses_widgets`. `apps/app` contains only `main()` (start-up order, command line, `AppRuntime`).
+**Consequences.** `tests/ui` links `esses_widgets` and drives the same window the application shows. `esses_app` stays a thin executable. `schemas/layout-1.schema.json` is still to be written (M2).
+**User must confirm:** no.
+
+#### D-157 `DistanceIndex::timeAt` is exact between the 0.25 m steps (refines D-016)
+**Context.** D-016 defines `tAtD[]` at 0.25 m as the first time each distance is reached, so that stopped-car plateaus are handled, and 04 §3.1 reads `timeAt(d)` from that table. Interpolating linearly between two steps places a distance inside a step in which the car stopped up to the whole stop later than its first reach. AC-M1-08's plateau rule therefore held only at the grid points.
+**Decision.** `tAtD[]` stays the 0.25 m table (seconds, D-099). `timeAt(d)` uses it to find the sample segment that first reaches `d` (a binary search over the segments that start in that step) and interpolates on that segment. At the grid points the result equals `tAtD[k]`.
+**Consequences.** The first-reach rule holds for every distance. A query costs O(log s) for the s sample segments in its step, which is usually one or two. `DistanceChain`, F9, variance and the distance-mode cursor values inherit the exact rule.
+**User must confirm:** no.
+
+#### D-158 Marker order: at equal times `EOL` before `SOL` (amends 02 §4.3 behaviour 8)
+**Context.** 02 §4.3 behaviour 8 sorts a layer's markers by `(t, cls, id)` with the classes in declaration order, so a `SOL` sorts before an `EOL` at the same time. When one outing ends exactly where the next starts (companion or user markers), the whole-outing rule then emitted a zero-length second outing and left the rest of it outside any outing, and the beacon-pair rule dropped the first outing's in lap and the second's out lap.
+**Decision.** At equal `t` the order is `EOL`, then `SOL`, then the other classes in declaration order; ties within a class are broken by `id` as before. Separately, the beacon-pair rule closes an outing that is still open when a new `SOL` arrives (an implied `EOL` at that time, with a nil end marker), and a missing final `EOL` is placed at the layer duration rather than at the latest marker of any kind.
+**Consequences.** Only layers with coincident `EOL`/`SOL` markers sort differently; no public fixture has any. `markerSetHash` follows the new order for those layers.
+**User must confirm:** no.
+
+#### D-159 Shipped data: `<exe dir>/data` first on every OS (amends 01 §9)
+**Context.** 01 §9 gives one shipped-data location per OS: `<exe dir>\data\` on Windows, `<prefix>/share/esses/data/` on Linux, `Contents/Resources/data/` in a macOS bundle. The build copies `data/` to `<build>/bin/data` on every OS, so Linux and macOS build trees could not find `units.json` (PR #1 `qt-app` ubuntu run: `esses-render`, both bench smokes and render parity failed).
+**Decision.** After the `--data-dir` flag and `ESSES_DATA_DIR`, `esses::Paths` takes the first existing directory of: `<exe dir>/data` (build tree or portable layout, every OS); on Linux and on macOS outside a bundle `<exe dir>/../share/esses/data`; inside a macOS bundle `Contents/Resources/data`, then the `data/` next to the bundle. When none exists it returns the installed location so error messages name the expected path. Windows is unchanged.
+**Consequences.** Build trees, portable layouts and installs resolve the same way on all OSes; `libs/base/tests/paths_tests.cpp` covers each layout. Installed packages (08 §7) must put data under `share/esses/data` or `Resources/data`, as before.
+**User must confirm:** no.
+
+#### D-160 DCO sign-off suspended while the maintainer is the only contributor (amends D-002, D-004)
+**Context.** D-002 and D-004 require a `Signed-off-by:` line on every commit (DCO, no CLA). The sign-off is a personal certification, so an agent must not add it in the maintainer's name; PR #1 therefore failed the `dco` check on every commit. The maintainer is the only contributor today.
+**Decision.** By the user's instruction on 2026-10-12 ("drop dco for now"), the requirement is suspended. The `dco` CI job stays in `.github/workflows/ci.yml` but runs only when the repository variable `ESSES_REQUIRE_DCO` is `true`. CONTRIBUTING.md, GOVERNANCE.md, AGENTS.md, CLAUDE.md and the pull request template say so. Before outside contributions are accepted, the maintainer sets the variable and the requirement applies again; no CLA either way.
+**Consequences.** Commits made so far carry no sign-off and need no history rewrite. Re-enabling is one repository setting. The no-relicensing policy and the MIT licence are unchanged.
+**User must confirm:** no (decided by the user, 2026-10-12).

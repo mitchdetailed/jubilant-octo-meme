@@ -6,7 +6,9 @@
 
 #include <esses/base/paths.hpp>
 
+#include <string>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 namespace esses::cli {
@@ -111,6 +113,28 @@ formats::OpenContext AppContext::openContext(bool withUnits, bool loadSidecar) {
     c.loadSidecar = loadSidecar;
     c.mergeCompanion = true;
     return c;
+}
+
+Result<const analysis::RuleRunner*> AppContext::rules() {
+    if (!rules_) {
+        static const std::vector<std::string> kCircuitRules = {"circuit.whole-outing", "circuit.beacon-pair"};
+        for (const auto& d : dataDirs(options_)) {
+            const std::filesystem::path dir = d / "rules";
+            if (!isFile(dir / "circuit.beacon-pair.rule.json")) {
+                continue;
+            }
+            auto runner = analysis::RuleRunner::fromRuleIds(dir, kCircuitRules);
+            if (!runner) {
+                return Failure{runner.error()};
+            }
+            rules_ = std::make_unique<analysis::RuleRunner>(std::move(runner).value());
+            break;
+        }
+        if (!rules_) {
+            rules_ = std::make_unique<analysis::RuleRunner>(analysis::RuleRunner::circuitDefault());
+        }
+    }
+    return static_cast<const analysis::RuleRunner*>(rules_.get());
 }
 
 Result<std::filesystem::path> AppContext::schemaDir() const {

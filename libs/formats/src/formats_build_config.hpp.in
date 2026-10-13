@@ -7,4 +7,5 @@
 
 // Device identity the .ld writer puts in its header (05 section 5 item 1): Esses' own neutral constants.
 #define ESSES_FORMATS_LD_DEVICE_TYPE "@ESSES_FORMATS_LD_DEVICE_TYPE@"
+// NOLINTNEXTLINE(modernize-macro-to-enum): a configure-time value, kept as a macro like the type above.
 #define ESSES_FORMATS_LD_DEVICE_VERSION (@ESSES_VERSION_MAJOR@ * 100 + @ESSES_VERSION_MINOR@)

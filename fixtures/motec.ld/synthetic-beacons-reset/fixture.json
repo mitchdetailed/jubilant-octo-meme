@@ -1,0 +1,41 @@
+{
+  "$schema": "urn:esses:fixture-1",
+  "schemaVersion": 1,
+  "channelsCompared": "all",
+  "companions": [
+    {
+      "bytes": 797,
+      "file": "input.ldx",
+      "sha256": "3964e541f784831a419713315c11427ebcd121d51e62fb0eac72e431035b83d6"
+    }
+  ],
+  "dialect": "pc-layout",
+  "format": "motec.ld",
+  "importOptions": {
+    "ld": {
+      "shiftOrder": "afterMul"
+    }
+  },
+  "input": {
+    "bytes": 18368,
+    "file": "input.ld",
+    "sha256": "235cb045ebf5b730323feaefc6686a5346d14a2f28d52bea4f282057f46e8c48"
+  },
+  "licence": "CC0-1.0",
+  "name": "synthetic-beacons-reset",
+  "notes": "AC-M1-07 / 02 section 4.4 rules 11-13: BCN->RESET is a partial lap (Lap 2 (partial), untrusted, number 2 not consumed), RESET->BCN an out lap, the next flying lap is Lap 2; the RESET starts stint 2 and ordinary beacon intervals never split a stint",
+  "oracle": {
+    "kind": "ref-decode",
+    "ref": "tools/ld_ref_decode.py 0.1.0 (MIT), afterMul",
+    "tolerance": {
+      "F32": "1ulp",
+      "F64": "1ulp",
+      "I32": "exact",
+      "timesUs": "exact"
+    },
+    "validity": "strict"
+  },
+  "private": false,
+  "provenance": "synthetic",
+  "source": "synthetic: BCN beacons with a RESET marker (group \"\") inside the second flying lap, then an out lap, two flying laps and an in lap"
+}

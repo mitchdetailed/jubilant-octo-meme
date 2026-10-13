@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: MIT
 #
 # esses_base (layer 0, Qt-free): primitives every other library builds on (01 section 2.1, 02 section 1).
+# nlohmann-json is private (JsonDoc's implementation); <esses/base/json_nlohmann.hpp> is the interop header for
+# libraries that use nlohmann-json themselves (they link esses::nlohmann_json privately).
 
 configure_file(src/build_config.hpp.in "${CMAKE_CURRENT_BINARY_DIR}/generated/base_build_config.hpp" @ONLY)
 
@@ -16,6 +18,8 @@ esses_add_library(base LAYER 0 QT_FREE
     src/hash.cpp
     src/int128.cpp
     src/json_depth.cpp
+    src/json_doc.cpp
+    src/json_read.cpp
     src/log.cpp
     src/mapped_file.cpp
     src/paths.cpp
@@ -29,6 +33,7 @@ esses_add_library(base LAYER 0 QT_FREE
     src/uuid.cpp
     src/version.cpp
   PRIVATE_DEPS
+    esses::nlohmann_json
     esses::xxhash)
 
 target_include_directories(${ESSES_PREFIX}_base PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
@@ -47,6 +52,7 @@ esses_add_test(base_tests QT_FREE
     tests/hash_tests.cpp
     tests/int128_tests.cpp
     tests/json_depth_tests.cpp
+    tests/json_doc_tests.cpp
     tests/log_tests.cpp
     tests/mapped_file_tests.cpp
     tests/paths_tests.cpp
@@ -57,4 +63,5 @@ esses_add_test(base_tests QT_FREE
     tests/uuid_tests.cpp
     tests/version_tests.cpp
   DEPS
-    esses::base)
+    esses::base
+    esses::nlohmann_json)

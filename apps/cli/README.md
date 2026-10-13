@@ -8,10 +8,14 @@ documents and maintain the fixture corpus. `src/` is the internal library `esses
 |---|---|
 | `info <file> [--json] [--importer id] [--options json] [--timing]` | sniff + probe; `--json` prints `probe_json` (`probe-1`). With `--options` the probe comes from the reader `open()` returns (options such as `ld.shiftOrder` change it), otherwise from `IImporter::probe` (O(header)) |
 | `channels <file> [--json] [--no-sidecar]` | the channel table after the open pipeline: name, unit (the quantity's base unit), vendor unit, rate, dtype, kind, samples |
-| `laps <file> [--json] [--no-sidecar]` | enabled markers (device events, `.ldx` markers, synthesised SOL/EOL) and the range-group tree (whole-outing ranges in M0); `--json` prints `laps-1` |
+| `laps <file> [--json] [--no-sidecar]` | enabled markers (device events, `.ldx` markers, synthesised SOL/EOL) and the range-group tree of the circuit rules (`data/rules/circuit.whole-outing` and `circuit.beacon-pair` through `analysis::RuleRunner`, else the same rules built in code): outings, beacon-pair laps with classes, numbers and trust, and the phase-2 `stint`/`pitStop` annotations with Corr Speed from the built-in algorithm's default settings (AC-M1-07); `--json` prints `laps-1` |
 | `validate <paths...> [--schema file] [--json] [--verbose]` | every JSON document against the schema its `$schema` names (`urn:esses:<name>-<major>`, `esses:`, https form); `draft-07` documents must load as schemas; directories are walked for `*.json` and files without `$schema` are skipped there |
 | `fixture add <file> --format motec.ld --oracle ref-decode\|<dir> --out <dir> --licence <spdx> [--provenance <class>] [--private] [--validity strict\|finite-only] [--json] [...]` | writes a fixture directory (05 §9.1): `input.<ext>` and companions, `fixture.json`, `expected.probe.json`, `expected.markers.json`, `expected.laps.json` and `expected.channels/<NNN>_<name>.csv` **from the oracle** (`python -I tools/ld_ref_decode.py --dump-channel`), never from the reader (D-041). A public fixture needs `--licence` with a redistributable licence (checked before anything is written); `oracle.validity` defaults to `finite-only` for `--oracle ref-decode`, because the reference decoder does not decode gap blocks |
 | `fixture verify [<dir>...] [--manifest file] [--if-present] [--update] [--json]` | re-probes, re-opens and re-decodes every fixture under the given directories (default `fixtures/`) and compares: input and companion sha256, `expected.probe.json`, the dialect, `expected.markers.json` and `expected.laps.json` byte for byte, every expected channel sample (timestamps exact; integers exact; F32/F64 within the fixture's ulp tolerance; validity per `oracle.validity`). A private fixture without its input is `SKIP (private)`; a public one fails. A manifest (`{"fixtures": [{"dir", "input"}]}`) points fixture directories at inputs elsewhere (the user's files, or inputs generated into a build tree). `--update` rewrites the probe/markers/laps goldens, the hashes and the dialect, never the channel values |
+
+Every command that opens a log (`channels`, `laps`, `fixture add|verify`) runs the open pipeline with the circuit
+rules as step 6 (`OpenContext::rangeRebuild`); `laps` and `fixture add|verify` then run phase 2 (`runRangePhase2`),
+so `expected.laps.json` equals `laps --json --no-sidecar`.
 
 Global options: `--data-dir` (default `<exe dir>/data`, where the build copies `data/units.json` and
 `schemas/`), `--units`, `--schemas`, `--no-units`. Every `--json` output is canonical JSON (02 §6.5 rule 1,
@@ -36,9 +40,10 @@ oracle channel the reader does not make a channel (`ld.zero_rate`, `ld.unknown_d
   third-party, vendor-sample) and `oracle.validity` (strict, finite-only).
 - New schema `laps-1` (05 §15 item 15) for `laps --json` and `expected.laps.json`; `channels --json` has no
   schema yet.
-- `fixture diff`, `convert`, `export`, `units scan`, `bench` and `validate --all` are later milestones; `validate`
-  takes directories instead of `--all`.
+- `fixture diff`, `convert`, `export`, `units scan` and `validate --all` are later milestones; `validate`
+  takes directories instead of `--all`. There is no `bench` subcommand: the measured paths need Qt Gui, so the
+  budget rows come from `esses-plot-bench` and `esses-open-bench` under `bench/` (D-155, proposed; 07 §4.5).
 
 Tests: `esses_cli_tests` (helpers), `cli.validate.*` (exit codes, every shipped JSON), `cli.demo_script` (the
-synthetic part of the 07 §3.6 demo), and the corpus tests of `tools/CMakeLists.txt` (`fixtures.*`,
-`lint.check_importlog_codes`).
+synthetic part of the 07 §3.6 demo), and the corpus tests of `tools/CMakeLists.txt` (`fixtures.*` including
+`fixtures.laps_golden`, AC-M1-07, `lint.check_importlog_codes`).

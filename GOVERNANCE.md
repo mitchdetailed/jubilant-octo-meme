@@ -14,8 +14,9 @@ decision first amends the decision.
   Qt Advanced Docking System) are linked dynamically and unmodified.
 - **No relicensing without every contributor's consent.** The project will not change the licence of
   contributed code unless every contributor whose work is affected agrees in writing.
-- **No CLA.** Contributors keep their copyright. Every commit carries a `Signed-off-by:` line certifying the
-  Developer Certificate of Origin (`DCO`); see `CONTRIBUTING.md`.
+- **No CLA.** Contributors keep their copyright. Sign-off under the Developer Certificate of Origin (`DCO`) is
+  suspended while the maintainer is the only contributor and is required again before outside contributions are
+  accepted (D-160); see `CONTRIBUTING.md`.
 
 ## Delegation
 

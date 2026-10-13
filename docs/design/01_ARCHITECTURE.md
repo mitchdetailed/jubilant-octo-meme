@@ -517,10 +517,11 @@ Rows are kept for the session (cap 5,000, oldest dropped) and are not persisted.
 
 Rules:
 1. Overrides: `ESSES_CONFIG_DIR`, `ESSES_CACHE_DIR`, `ESSES_DATA_DIR`, `ESSES_LOG_DIR`; CLI flags `--config-dir`, `--data-dir`.
-2. **Portable mode**: when a file named `portable.marker` exists next to the executable (the portable zip ships it), config, cache and logs live under `<exe dir>\config\`, `\cache\`, `\logs\` (§12 P-5).
-3. Per-user files are never written into the project folder except `.local/layout.json` (dock perspectives keyed by workbook id, D-019) and the `.journal/`; both are excluded from workspace archives.
-4. User copies of shipped data take precedence by id: a `<config>/schemes/x.scheme.json` with the same `id` as a shipped scheme shadows it; shipped files are never modified in place.
-5. All writes are atomic (temp + rename) and go through `esses_base::AtomicFile`; the loader validates every JSON file it reads against its schema and runs migrations (D-019).
+2. **Shipped data search (D-159)**: after the overrides, the first existing of `<exe dir>/data` (build tree or portable layout, every OS), then the installed location of the table above (macOS bundles also try the `data/` next to the bundle).
+3. **Portable mode**: when a file named `portable.marker` exists next to the executable (the portable zip ships it), config, cache and logs live under `<exe dir>\config\`, `\cache\`, `\logs\` (§12 P-5).
+4. Per-user files are never written into the project folder except `.local/layout.json` (dock perspectives keyed by workbook id, D-019) and the `.journal/`; both are excluded from workspace archives.
+5. User copies of shipped data take precedence by id: a `<config>/schemes/x.scheme.json` with the same `id` as a shipped scheme shadows it; shipped files are never modified in place.
+6. All writes are atomic (temp + rename) and go through `esses_base::AtomicFile`; the loader validates every JSON file it reads against its schema and runs migrations (D-019).
 
 ---
 

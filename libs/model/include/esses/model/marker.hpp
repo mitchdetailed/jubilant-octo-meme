@@ -78,7 +78,8 @@ struct MarkerEdit {
 // marker's index among markers of the same (class, group, loggedT) in file order, 0 for the first.
 MarkerId markerIdLogged(MarkerClass cls, Micros loggedT, std::string_view group, std::uint32_t ordinal);
 
-// Model order (02 section 4.3 behaviour 8): t, then class in declaration order, then id.
+// Model order (02 section 4.3 behaviour 8, D-158): t; at equal t an EOL before a SOL (an outing that ends
+// where the next one starts), then the other classes in declaration order; then id.
 bool markerOrderLess(const Marker& a, const Marker& b) noexcept;
 void sortMarkers(std::vector<Marker>& markers);
 

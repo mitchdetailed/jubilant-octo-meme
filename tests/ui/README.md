@@ -1,0 +1,31 @@
+# Cross-layer Qt Test suites (M1)
+
+Every `tst_<name>.cpp` in this directory (and below it) is one Qt Test executable (ctest `ui.tst_<name>`, run
+offscreen with the Qt kit on `PATH`); every other `.cpp` file is a helper compiled into each of them. They link
+`esses_widgets`, `esses_qtmodel` and `esses_qtrender`; `ESSES_TEST_REPO_ROOT` points at the repository for fixtures.
+Registered by `CMakeLists.txt` (glob, CONFIGURE_DEPENDS), added from the top-level `CMakeLists.txt` when
+`ESSES_BUILD_QT` and `ESSES_BUILD_TESTS` are on.
+
+| File | Acceptance | What it checks |
+|---|---|---|
+| `tst_walkthrough_m1.cpp` | AC-M1-01 | The real shell (`MainWindow`, shipped `circuit-default` workbook) on `synthetic-acc-dialect/input.ld`: F8 focuses the Data window; CTRL+F makes the fastest trusted flying lap Main (checked against every trusted flying lap; the highlight follows); DOWN, ALT+ENTER adds the next lap as Overlay 1; F9 switches to distance without the banner; once the Background-prefetched lap indexes have landed, W shows the whole Main lap from 0 m; both slots' chains start at 0 m at their lap start, and the Corr Speed polylines of Main and Overlay 1 start at the trace area's left edge and coincide (the stand-in's laps are identical); V shows the Values window, whose Corr Speed row reads the same value for Main and Overlay 1 at the start line; a mouse drag in the first panel moves the cursor and changes both cells. Every key goes through the `KeyEventRouter`. CTRL+F is pressed with the slowest trusted flying lap as Main and must give the exact fastest one (lowest number on a tie). Because the stand-in's laps are identical, a second case runs the walkthrough on a written synthetic log with flying laps of 50, 48 and 49 s that share one profile per lap fraction: CTRL+F must pick the 48 s lap, and at 72 % of Main the Throttle of Main and Overlay 1 agrees in distance mode and differs in time mode, which only an alignment through each lap's `DistanceIndex` gives. A third case runs on a real logger file of the private corpus with two trusted flying laps when there is one, else skips with the reason (the corpus has no ACC export and no file with beacons). |
+| `tst_f9_preservation.cpp` | AC-M1-09 | Two logs in the shell: the ACC stand-in (Corr Dist from `SPEED`) and a written circuit log without a speed channel. With Corr Dist, F9 converts a lap-relative span through the Main lap's `DistanceIndex` (`a' = distAt(R.start + a)`, within 1e-6 m) and back within one 1 kHz sample; no banner. Without, the fraction rule `a' = R.start' + (a - R.start) / len(R) * len(R')` (`R.start' = 0`, `len(R') = 1`) and back losslessly, `noDistance()` and the Chrome text "No distance data for no-speed.ld"; the same banner when that log is only Overlay 1 under a Main with distance data. |
+| `tst_corr_dist_prefetch.cpp` | AC-M1-10 | Corr Speed / Corr Dist of the ACC stand-in are the built-in module's outputs, served by the maths `PlanProvider` (chunk keys `chunk/<src>/<layer>/maths/<name>/<version>`); once the first log's graph and the Dispatcher are quiet, a second log opened while the first is Main, with every worker parked at its publication, has its module tasks (`maths/<src>/...`, read with `TaskPool::queuedTasks`) queued in the Background band and no task of that source at Interactive or Visible; with no request they evaluate and every lap index is built; made Main, F9 converts through its chain at once and the graph draws distance traces; the project settings, the defaults and the shipped example validate against the module schema and `{"method": "bogus"}` is refused. |
+| `tst_render_parity.cpp` | AC-M1-05 | Runs `esses-render` (next to the test executable) on `data/workbooks/circuit-default.workbook.json` and the ACC stand-in, worksheet 0, light scheme, golden fonts, DPR 1, at the on-screen canvas size, and compares it with the on-screen `LayerCache::composite()` of the shell's graph for the same `ViewState` (CTRL+F, W, the cursor at the lap start, the graph not the focused component): `--component 0`, and the graph's rectangle of the whole-worksheet render, both with `qt::compareImages` (fail above 0.5 %). The worksheet's `values_list` has no Qt-free builder yet (esses-render draws its placeholder, 07 §4.6 lets the component slip), so it is not compared. Images go to `<build>/tests/ui/artefacts/`. |
+| `keymap/tst_keymap.cpp` | AC-M1-06 | One row per key of every implemented row of `data/keymaps/default.json`, sent with QTest through the `KeyEventRouter` in the real shell (two synthetic logs opened), the post-condition checked (N/P: the new Main with the zoom and the cursor kept, and no wrap at the ends); every `global` row runs a second time with the focus in the Data window's tree; a `KEYMAP_TEST` entry per command, which `tools/check_keymap_coverage.py` (ctest `lint.check_keymap_coverage.rows`) requires for every implemented row. |
+| `tst_ui_smoke.cpp` | — | The plumbing: shell start-up and shutdown order. |
+
+`ui_test_support.*` (namespace `esses::uitest`): fixture lookup (`<build>/fixture-inputs` first, then the source
+tree), the private-corpus scan, a `MainWindow` on a private configuration directory and the repository's data
+directory, key and mouse delivery, the golden fonts (`initMain`), graph waits and Values-cell parsing.
+`makeRuntime` marks the GUI thread `ThreadRole::NoBlock` as `esses` does (AC-M1-12) and installs an assertion
+recorder; every suite checks in `cleanup()` that no `ESSES_ASSERT` failed on any thread. Test code that blocks
+on purpose (writing a synthetic log) runs under `ThreadRole::Scope(ThreadRole::Normal)`; the keymap suite and the
+`esses_widgets` shell and dock suites mark their runtimes NoBlock too (the default handler aborts there). Suites that
+need synthetic logs compile `libs/qtmodel/tests/qtmodel_test_support.cpp` into their own executable.
+
+The synthetic `.ld` inputs are generated, not committed (`.gitignore`): the four suites that open the ACC stand-in
+require the ctest fixture `fixtures.generate_inputs` (`FIXTURES_REQUIRED esses_fixture_inputs`), so ctest writes
+`<build>/fixture-inputs` before them and never while they run; run directly, they skip with a message when no
+input exists. On Windows the Qt Test text log does not reach a redirected stdout in this setup; pass
+`-o <file>,txt` to read it.

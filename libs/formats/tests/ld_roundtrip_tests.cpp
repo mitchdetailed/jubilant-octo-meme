@@ -232,7 +232,9 @@ TEST_CASE("ld roundtrip: shift/mul variants in both orders, zero factors, F64 fo
 
         CHECK(decodeAll(*f, 2) == std::vector<double>{21.0, -21.0});
         CHECK(hasCode(*f, code::kZeroScale));
-        CHECK(decodeAll(*f, 3) == std::vector<double>{static_cast<float>(0.7), static_cast<float>(-0.7)});
+        // The stored f32 values, widened exactly.
+        CHECK(decodeAll(*f, 3) == std::vector<double>{static_cast<double>(static_cast<float>(0.7)),
+                                                      static_cast<double>(static_cast<float>(-0.7))});
         CHECK(hasCode(*f, code::kZeroMul));
         CHECK(decodeAll(*f, 4) == std::vector<double>{300.0, -400.0});
         CHECK(decodeAll(*f, 5) == std::vector<double>{4.0, -3.0});

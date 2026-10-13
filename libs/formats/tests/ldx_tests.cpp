@@ -153,6 +153,65 @@ TEST_CASE("ldx: markers, ordinals and the verbatim preservation of unknown conte
     CHECK(writeLdx(again) == out);
 }
 
+// Regression (fuzz_ldx, first CI run): elements kept verbatim that themselves contain the writer's reserved
+// placeholder instruction ("<?esses-opaque N?>") as a processing instruction, in a comment, in CDATA or in an
+// attribute value (pugixml accepts a raw '<' there). The writer used to search its whole output for each
+// placeholder after splicing earlier elements in, so the comment in <Note> captured the bad-time EOL marker
+// and the output was no longer well-formed. Every element must land at its own placeholder, byte-identical.
+TEST_CASE("ldx: verbatim elements containing the reserved placeholder round-trip unchanged", "[unit][ldx]") {
+    const std::string text =
+        "<?xml version=\"1.0\"?>\n"
+        "<LDXFile Locale=\"C\" DefaultLocale=\"C\" Version=\"1.6\">\n"
+        " <Layers>\n"
+        "  <Layer>\n"
+        "   <MarkerBlock>\n"
+        "    <MarkerGroup Name=\"Beacons\" Index=\"3\">\n"
+        "     <Note><!-- <?esses-opaque 1?> --><?esses-opaque 2?><![CDATA[<?esses-opaque 3?>]]></Note>\n"
+        "     <Marker Version=\"100\" ClassName=\"EOL\" Name=\"late\" Flags=\"77\" Time=\"soon\"><!-- x "
+        "--></Marker>\n"
+        "     <Marker Version=\"100\" ClassName=\"BCN\" Name=\"Manual.1\" Flags=\"77\" "
+        "Time=\"5000000.00\"/>\n"
+        "     <Odd a=\"]]>\"/>\n"
+        "    </MarkerGroup>\n"
+        "   </MarkerBlock>\n"
+        "  </Layer>\n"
+        "  <Details>\n"
+        "   <String Id=\"Note\" Value=\"<?esses-opaque 0?>\"/>\n"
+        "  </Details>\n"
+        "  <Extra b='<?esses-opaque 0?>'/>\n"
+        " </Layers>\n"
+        "</LDXFile>\n";
+    ImportLog log;
+    const LdxDocument d = parseOk(text, log);
+    REQUIRE(d.markers.size() == 1);
+    REQUIRE(d.details.size() == 1);
+    CHECK(d.details[0].value == "<?esses-opaque 0?>"); // a known attribute: the writer escapes it
+    REQUIRE(d.opaque.size() == 4);
+    CHECK(d.opaque[0].xml ==
+          "<Note><!-- <?esses-opaque 1?> --><?esses-opaque 2?><![CDATA[<?esses-opaque 3?>]]></Note>");
+    CHECK(d.opaque[1].xml == "<Marker Version=\"100\" ClassName=\"EOL\" Name=\"late\" Flags=\"77\" "
+                             "Time=\"soon\"><!-- x --></Marker>");
+    CHECK(d.opaque[2].xml == "<Odd a=\"]]>\"/>");
+    CHECK(d.opaque[3].xml == "<Extra b='<?esses-opaque 0?>'/>");
+
+    const std::string out = writeLdx(d);
+    for (const LdxOpaque& o : d.opaque) {
+        const std::size_t at = out.find(o.xml);
+        CHECK(at != std::string::npos);
+        CHECK(out.find(o.xml, at + 1) == std::string::npos); // each verbatim text exactly once
+    }
+    ImportLog log2;
+    auto again = parseLdx(asBytes(out), log2);
+    REQUIRE(again.ok()); // the fuzz_ldx invariant: the writer's output parses again
+    CHECK(again->markers == d.markers);
+    CHECK(again->details == d.details);
+    REQUIRE(again->opaque.size() == d.opaque.size());
+    for (std::size_t i = 0; i < d.opaque.size(); ++i) {
+        CHECK(again->opaque[i] == d.opaque[i]);
+    }
+    CHECK(writeLdx(*again) == out);
+}
+
 TEST_CASE("ldx: malformed documents log ldx.parse_error and fail", "[unit][ldx]") {
     ImportLog log;
     const std::string broken = "<LDXFile><Layers></LDXFile>";

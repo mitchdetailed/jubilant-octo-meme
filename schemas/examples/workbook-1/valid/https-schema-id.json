@@ -1,0 +1,10 @@
+{
+  "$schema": "https://esses.example/schemas/workbook-1.schema.json",
+  "schemaVersion": 1,
+  "name": "Scratch",
+  "worksheets": [
+    {
+      "name": "Sheet 1"
+    }
+  ]
+}

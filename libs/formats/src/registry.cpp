@@ -570,8 +570,9 @@ Result<OpenedSource> ImporterRegistry::open(const std::shared_ptr<const ByteSour
         addNotes(log, model::resolveDetailUnits(ds->details, *units));
     }
 
-    // ---- 6. phase-1 ranges (M0: the whole-outing rule) ----------------------------------------------------
-    addNotes(log, model::rebuildWholeOutingRanges(*ds).notes);
+    // ---- 6. phase-1 ranges (the caller's rules; without them the whole-outing rule of M0) -----------------
+    addNotes(log,
+             (context.rangeRebuild ? context.rangeRebuild(*ds) : model::rebuildWholeOutingRanges(*ds)).notes);
 
     {
         std::lock_guard lock(logsMutex_);

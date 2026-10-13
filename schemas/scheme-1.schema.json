@@ -1,0 +1,161 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:scheme-1",
+  "title": "Esses colour scheme (scheme-1)",
+  "description": "A colour and font scheme (06 section 16, 02 section 6.9; D-017): data/schemes/light.scheme.json and data/schemes/dark.scheme.json shipped, <config>/schemes/*.scheme.json per user. Roles and fonts are maps by role name; a role or font a user scheme lacks falls back to the shipped scheme of the same background (06 section 16 rule 8). channelPalette has at least 10 colours (indexed by colourIndex modulo its length), overlayPalette exactly 9 (Overlays 1..n, cycling). print overrides any subset for printing and clipboard export. Unknown top-level members are allowed and preserved; the records are closed.",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "name", "background"],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072). The urn:esses: form is written; the bare esses: form of earlier drafts and the later https form are accepted on load and normalised on save (02 section 6.6 rule 1).",
+      "type": "string",
+      "pattern": "^(urn:esses:scheme-1|esses:scheme-1|https://[^/\\s]+(/[^/\\s]+)*/scheme-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "background": {
+      "enum": ["light", "dark"]
+    },
+    "roles": {
+      "$ref": "#/definitions/roleMap"
+    },
+    "channelPalette": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "$ref": "#/definitions/colour"
+      }
+    },
+    "overlayPalette": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "items": {
+        "$ref": "#/definitions/colour"
+      }
+    },
+    "overlayStyle": {
+      "description": "Style of Overlays 1..n (D-017, D-100); default plain channel colours.",
+      "type": "object",
+      "properties": {
+        "colourSource": {
+          "enum": ["channel", "overlayPalette"]
+        },
+        "dash": {
+          "enum": ["solid", "dash", "dot", "dashDot"]
+        },
+        "lightness": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "widthScale": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 10
+        }
+      },
+      "additionalProperties": false
+    },
+    "fonts": {
+      "$ref": "#/definitions/fontMap"
+    },
+    "print": {
+      "description": "Overrides for printing and clipboard export (06 section 16 rule 5).",
+      "type": "object",
+      "properties": {
+        "roles": {
+          "$ref": "#/definitions/roleMap"
+        },
+        "channelPalette": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/colour"
+          }
+        },
+        "overlayPalette": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "items": {
+            "$ref": "#/definitions/colour"
+          }
+        },
+        "fonts": {
+          "$ref": "#/definitions/fontMap"
+        }
+      },
+      "additionalProperties": false
+    },
+    "x-esses-legacy": {
+      "$ref": "#/definitions/legacyBag"
+    }
+  },
+  "definitions": {
+    "colour": {
+      "description": "A colour \"#rrggbb\" (alpha ff) or \"#rrggbbaa\"; written in lower case (Rgba, 04 section 5.1).",
+      "type": "string",
+      "pattern": "^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$"
+    },
+    "roleMap": {
+      "description": "Colours by role name (06 section 16 lists the roles).",
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z][A-Za-z0-9]*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/colour"
+      }
+    },
+    "fontMap": {
+      "description": "Fonts by font role (06 section 16 lists the roles).",
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z][A-Za-z0-9]*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/font"
+      }
+    },
+    "font": {
+      "type": "object",
+      "required": ["family", "pointSize", "weight"],
+      "properties": {
+        "family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pointSize": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "weight": {
+          "description": "OpenType weight (400 regular, 700 bold).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "italic": {
+          "type": "boolean"
+        },
+        "strikeOut": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "legacyBag": {
+      "description": "Fields removed by a migration, kept verbatim (02 section 6.6 rule 3).",
+      "type": "object"
+    }
+  }
+}

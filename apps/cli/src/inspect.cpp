@@ -4,8 +4,9 @@
 
 #include "cli_common.hpp"
 
+#include <esses/analysis/beacon_pair_rule.hpp>
+#include <esses/analysis/corrected_speed.hpp>
 #include <esses/formats/byte_source.hpp>
-#include <esses/model/whole_outing.hpp>
 #include <esses/store/series.hpp>
 #include <esses/store/types.hpp>
 
@@ -13,6 +14,8 @@
 #include <chrono>
 #include <cstdio>
 #include <iomanip>
+#include <memory>
+#include <optional>
 #include <ostream>
 #include <sstream>
 #include <utility>
@@ -111,12 +114,76 @@ Result<ProbeOutcome> probeFile(AppContext& ctx, const std::filesystem::path& fil
 
 Result<formats::OpenedSource> openFile(AppContext& ctx, const std::filesystem::path& file,
                                        const formats::ImportOptions& options, bool withUnits,
-                                       bool loadSidecar) {
+                                       bool loadSidecar, bool rangePhase2) {
     auto reg = ctx.registry();
     if (!reg) {
         return Failure{reg.error()};
     }
-    return (*reg)->open(file, options, ctx.openContext(withUnits, loadSidecar));
+    auto rules = ctx.rules();
+    if (!rules) {
+        return Failure{rules.error()};
+    }
+    formats::OpenContext context = ctx.openContext(withUnits, loadSidecar);
+    context.rangeRebuild = (*rules)->rebuildFunction();
+    auto opened = (*reg)->open(file, options, context);
+    if (!opened || !rangePhase2) {
+        return opened;
+    }
+    if (auto annotated = runRangePhase2(ctx, *opened); !annotated) {
+        return Failure{annotated.error()};
+    }
+    return opened;
+}
+
+Result<void> runRangePhase2(AppContext& ctx, formats::OpenedSource& opened) {
+    auto rules = ctx.rules();
+    if (!rules) {
+        return Failure{rules.error()};
+    }
+    const units::UnitRegistry* units = nullptr;
+    if (!ctx.options().noUnits) {
+        if (auto u = ctx.units(); u) {
+            units = *u;
+        }
+    }
+    const auto hasLaps = [&](const model::DataLayer& layer) {
+        for (const auto& rule : (*rules)->rules()) {
+            const auto* beacons = dynamic_cast<const analysis::BeaconPairRule*>(rule.get());
+            if (beacons != nullptr && beacons->appliesTo(layer.name) &&
+                layer.ranges.find(beacons->settings().produces) != nullptr) {
+                return true;
+            }
+        }
+        return false;
+    };
+    std::shared_ptr<model::DataSource> next;
+    for (std::size_t i = 0; i < opened.source->layers.size(); ++i) {
+        const model::DataLayer& layer = opened.source->layers[i];
+        if (!hasLaps(layer)) {
+            continue;
+        }
+        std::optional<store::Series> speed;
+        auto corr = analysis::CorrectedSpeed::compute(analysis::CorrectedSpeedSettings{}, layer, units, {});
+        if (corr) {
+            store::ColumnOptions co;
+            co.cache = &ctx.cache();
+            speed = analysis::toUniformSeries(corr->speedMps, co, "cli:corr-speed");
+        } else if (corr.error().code != ErrorCode::NotFound && corr.error().code != ErrorCode::Unsupported) {
+            return Failure{corr.error()};
+        }
+        auto tree = (*rules)->runPhase2(*opened.source, layer.name, speed, {});
+        if (!tree) {
+            return Failure{tree.error()};
+        }
+        if (!next) {
+            next = std::make_shared<model::DataSource>(*opened.source);
+        }
+        next->layers[i].ranges = std::move(tree).value();
+    }
+    if (next) {
+        opened.source = std::move(next);
+    }
+    return ok();
 }
 
 json markerJson(const model::Marker& m) {
@@ -401,7 +468,7 @@ int runChannels(AppContext& ctx, const InspectOptions& o, std::ostream& out, std
     if (!units) {
         return printError(err, o.file, units.error());
     }
-    auto opened = openFile(ctx, o.file, *opts, true, !o.noSidecar);
+    auto opened = openFile(ctx, o.file, *opts, true, !o.noSidecar, false);
     if (!opened) {
         return printError(err, o.file, opened.error());
     }
@@ -488,8 +555,15 @@ int runLaps(AppContext& ctx, const InspectOptions& o, std::ostream& out, std::os
                 out << "    " << model::rangeKindName(r.kind) << " " << r.number << " '" << r.name << "' "
                     << fixed(static_cast<double>(r.start) / 1e6, 6) << " - "
                     << fixed(static_cast<double>(r.end) / 1e6, 6) << " s ("
-                    << fixed(static_cast<double>(r.duration()) / 1e6, 3) << " s)"
-                    << (r.trusted ? "" : " untrusted") << "\n";
+                    << fixed(static_cast<double>(r.duration()) / 1e6, 3) << " s)";
+                if (r.lapClass != model::LapClass::None) {
+                    out << " " << model::lapClassName(r.lapClass);
+                }
+                out << (r.trusted ? "" : " untrusted");
+                if (r.stint != 0) {
+                    out << " stint " << r.stint;
+                }
+                out << (r.pitStop ? " pit-stop" : "") << "\n";
             }
         });
     }

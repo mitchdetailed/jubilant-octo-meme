@@ -11,14 +11,11 @@ esses_add_library(model LAYER 1 QT_FREE
   SOURCES
     src/channel.cpp
     src/detail.cpp
-    src/json_canonical.cpp
-    src/json_read.cpp
     src/layer.cpp
     src/marker.cpp
     src/marker_json.cpp
     src/markers_document.cpp
     src/notes.cpp
-    src/opaque_json.cpp
     src/range.cpp
     src/resolver.cpp
     src/sidecar.cpp
@@ -39,10 +36,10 @@ esses_add_test(model_tests QT_FREE
     tests/channel_tests.cpp
     tests/detail_tests.cpp
     tests/ids_tests.cpp
-    tests/json_canonical_tests.cpp
     tests/layer_tests.cpp
     tests/marker_tests.cpp
     tests/markers_document_tests.cpp
+    tests/opaque_json_tests.cpp
     tests/range_tests.cpp
     tests/resolver_tests.cpp
     tests/sidecar_tests.cpp
@@ -53,6 +50,6 @@ esses_add_test(model_tests QT_FREE
     esses::nlohmann_json
     esses::json_schema_validator)
 if(TARGET ${ESSES_PREFIX}_model_tests)
-  # The canonical-JSON tests reach the private writer directly.
+  # Tests may reach the private document helpers (src/).
   target_include_directories(${ESSES_PREFIX}_model_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 endif()

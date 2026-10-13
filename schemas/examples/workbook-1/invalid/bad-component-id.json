@@ -1,0 +1,109 @@
+{
+  "$schema": "urn:esses:workbook-1",
+  "schemaVersion": 1,
+  "activeWorksheet": "Overlay",
+  "futureMember": {
+    "kept": true
+  },
+  "id": "b7c1d2e3-4f5a-4b6c-8d7e-9f0a1b2c3d4e",
+  "name": "General",
+  "profile": "circuit",
+  "worksheets": [
+    {
+      "components": [
+        {
+          "activeChannel": "Corr Speed",
+          "body": {
+            "groups": [
+              {
+                "edges": [0, 0.5],
+                "name": "Speed",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "Corr Speed",
+                    "displayUnit": "km/h",
+                    "dps": 1
+                  }
+                ]
+              }
+            ]
+          },
+          "caption": {
+            "auto": true,
+            "show": true,
+            "text": ""
+          },
+          "id": "c1a0",
+          "legend": {
+            "channels": true,
+            "colour": false
+          },
+          "links": {
+            "cursor": true,
+            "datum": true,
+            "zoom": true
+          },
+          "rect": [0, 0, 0.75, 1],
+          "type": "time_distance",
+          "version": 1,
+          "x-i2": {
+            "ModeId": "0"
+          },
+          "z": 0
+        },
+        {
+          "activeChannel": "",
+          "body": {
+            "traces": [
+              {
+                "channel": "Damper Vel FL",
+                "visible": true
+              }
+            ]
+          },
+          "caption": {
+            "auto": true,
+            "show": true,
+            "text": ""
+          },
+          "id": "c2b1c3d4-e5f6-4071-8283-94a5b6c7d8e9",
+          "legend": {
+            "channels": true,
+            "colour": false
+          },
+          "links": {
+            "cursor": false,
+            "datum": false,
+            "zoom": true
+          },
+          "rect": [0.75, 0, 1, 0.5],
+          "type": "histogram",
+          "version": 1,
+          "z": 1
+        },
+        {
+          "body": {
+            "lambdaDelayUs": 150000,
+            "x": "Engine RPM",
+            "y": "Lambda 1"
+          },
+          "id": "c3c2d4e5-f607-4182-9394-a5b6c7d8e9fa",
+          "rect": [0.75, 0.5, 1, 1],
+          "type": "mixture_map",
+          "version": 1,
+          "z": 2
+        }
+      ],
+      "domain": "distance",
+      "grid": [100, 100],
+      "hotkey": "Ctrl+Shift+1",
+      "id": "6e1f0a2b-3c4d-4e5f-8a9b-0c1d2e3f4a5b",
+      "linkTo": "Laps",
+      "name": "Overlay"
+    }
+  ],
+  "x-i2": {
+    "Version": "200"
+  }
+}

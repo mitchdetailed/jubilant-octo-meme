@@ -100,7 +100,12 @@ TEST_CASE("taskpool: 10000 tasks across three priorities complete", "[unit][task
 TEST_CASE(
     "taskpool: Interactive tasks submitted after 1000 Background tasks start before the 20th Background task",
     "[unit][taskpool]") {
-    constexpr int kWorkers = 4;
+    // One worker: the start number is taken inside the task body, so with several workers a worker that has
+    // already claimed an Interactive task can be pre-empted before recording it while the others run hundreds
+    // of trivial Background tasks (seen on a loaded CI runner: last Interactive start 506). With one worker
+    // the start order is the claim order, so the check is exact. Multi-worker behaviour is covered by the
+    // 10,000-task test above.
+    constexpr int kWorkers = 1;
     constexpr int kBackground = 1'000;
     constexpr int kInteractive = 10;
     TaskPool pool(kWorkers);
@@ -137,6 +142,8 @@ TEST_CASE(
     const int lastInteractive = *std::max_element(interactiveStart.begin(), interactiveStart.end());
     INFO("last Interactive start " << lastInteractive << ", 20th Background start " << twentiethBackground);
     CHECK(lastInteractive < twentiethBackground);
+    // Stronger, and exact with one worker: every Interactive task starts before any queued Background task.
+    CHECK(lastInteractive < sortedBackground[kWorkers]);
 }
 
 TEST_CASE("taskpool: FIFO within a band", "[unit][taskpool]") {
@@ -242,6 +249,38 @@ TEST_CASE("taskpool: coalescing and raise move a queued task to a higher band", 
         REQUIRE(f->get().ok());
     }
     CHECK(order == std::vector<std::string>{"a", "c", "b"});
+}
+
+TEST_CASE("taskpool: queuedTasks lists the runnable tasks of a key prefix with their bands",
+          "[unit][taskpool]") {
+    TaskPool pool(1);
+    Gate gate;
+    auto blockers = blockWorkers(pool, gate, 1);
+    const auto noop = [](CancelToken) { return 0; };
+    auto a = pool.submit(Priority::Background, TaskKey{"maths/s1/a"}, CancelToken{}, noop);
+    auto b = pool.submit(Priority::Visible, TaskKey{"maths/s1/b"}, CancelToken{}, noop);
+    auto c = pool.submit(Priority::Background, TaskKey{"maths/s2/c"}, CancelToken{}, noop);
+    auto d = pool.submit(Priority::Interactive, TaskKey{}, CancelToken{}, noop);
+    pool.raise(TaskKey{"maths/s1/a"}, Priority::Interactive); // the stale Background entry is not listed
+
+    const std::vector<TaskPool::QueuedTask> s1 = pool.queuedTasks("maths/s1/");
+    REQUIRE(s1.size() == 2u);
+    CHECK(s1[0].key == "maths/s1/a");
+    CHECK(s1[0].priority == Priority::Interactive);
+    CHECK(s1[1].key == "maths/s1/b");
+    CHECK(s1[1].priority == Priority::Visible);
+    CHECK(pool.queuedTasks("maths/").size() == 3u);
+    CHECK(pool.queuedTasks("").size() == 4u); // "" includes the unkeyed task
+    CHECK(pool.queuedTasks("trace/").empty());
+
+    pool.cancelAll("maths/s2/");
+    CHECK(pool.queuedTasks("maths/s2/").empty());
+    gate.open();
+    for (auto* f : {&a, &b, &d}) {
+        REQUIRE(f->get().ok());
+    }
+    CHECK(c.get().error().code == ErrorCode::Cancelled);
+    CHECK(pool.queuedTasks("").empty());
 }
 
 TEST_CASE("taskpool: replace keys keep one running and one pending task", "[unit][taskpool]") {

@@ -1,0 +1,42 @@
+{
+  "bad-filter-kind.json": {
+    "pointer": "/dataWindow/filters",
+    "why": "filter kinds are D-017's list (reported at the map)"
+  },
+  "bad-hash.json": {
+    "pointer": "/recentSources/0/hash",
+    "why": "hashes are written as xxh3:<32 hex digits>"
+  },
+  "bad-start-marker.json": {
+    "pointer": "/lastSelection/main/startMarker",
+    "why": "start markers are MarkerId UUIDs"
+  },
+  "bad-time-format.json": {
+    "pointer": "/options/timeFormat",
+    "why": "time formats are m:ss.fff, ss.fff or h:mm:ss.f"
+  },
+  "builtin-bad-id.json": {
+    "pointer": "/builtinMaths",
+    "why": "built-in module ids are dotted snake_case"
+  },
+  "missing-name.json": {
+    "pointer": "",
+    "why": "a project has a name"
+  },
+  "selection-unknown-member.json": {
+    "pointer": "/lastSelection",
+    "why": "lastSelection is closed"
+  },
+  "settings-not-object.json": {
+    "pointer": "/builtinMaths",
+    "why": "module settings are an object (reported at the map)"
+  },
+  "ui-unknown-member.json": {
+    "pointer": "/ui",
+    "why": "ui is closed"
+  },
+  "wrong-schema-id.json": {
+    "pointer": "/$schema",
+    "why": "the $schema id names another schema"
+  }
+}

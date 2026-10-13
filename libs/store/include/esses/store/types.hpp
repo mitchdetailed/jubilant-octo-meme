@@ -50,6 +50,7 @@ constexpr bool hasPyramid(Dtype d) noexcept {
 }
 
 // The dtype of each C++ sample type.
+// NOLINTBEGIN(readability-identifier-naming): `value` is the standard type-trait member name.
 template <class T> struct DtypeOf;
 template <> struct DtypeOf<float> {
     static constexpr Dtype value = Dtype::F32;
@@ -63,6 +64,7 @@ template <> struct DtypeOf<std::int32_t> {
 template <> struct DtypeOf<std::int64_t> {
     static constexpr Dtype value = Dtype::I64;
 };
+// NOLINTEND(readability-identifier-naming)
 template <class T> inline constexpr Dtype kDtypeOf = DtypeOf<T>::value;
 
 // ---- chunk and pyramid geometry (02 section 3.1, 04 section 4.1)
@@ -206,20 +208,20 @@ constexpr float nextFloatDown(float f) noexcept {
     if (f == 0.0f) {
         return -std::numeric_limits<float>::denorm_min();
     }
-    const std::uint32_t bits = std::bit_cast<std::uint32_t>(f);
+    const auto bits = std::bit_cast<std::uint32_t>(f);
     return std::bit_cast<float>(f > 0.0f ? bits - 1u : bits + 1u);
 }
 constexpr float nextFloatUp(float f) noexcept {
     if (f == 0.0f) {
         return std::numeric_limits<float>::denorm_min();
     }
-    const std::uint32_t bits = std::bit_cast<std::uint32_t>(f);
+    const auto bits = std::bit_cast<std::uint32_t>(f);
     return std::bit_cast<float>(f > 0.0f ? bits + 1u : bits - 1u);
 }
 
 // The largest float <= v (v not NaN).
 inline float roundFloatDown(double v) noexcept {
-    constexpr double kMax = static_cast<double>(std::numeric_limits<float>::max());
+    constexpr auto kMax = static_cast<double>(std::numeric_limits<float>::max());
     if (v > kMax) {
         return std::isinf(v) ? std::numeric_limits<float>::infinity() : std::numeric_limits<float>::max();
     }
@@ -228,19 +230,19 @@ inline float roundFloatDown(double v) noexcept {
     }
     // In range: round to nearest, finite. The redundant clamp keeps MSVC from constant-folding an overflowing
     // cast in the unreachable path when v is a constant (C4756).
-    const float f = static_cast<float>(v > kMax ? kMax : (v < -kMax ? -kMax : v));
+    const auto f = static_cast<float>(v > kMax ? kMax : (v < -kMax ? -kMax : v));
     return static_cast<double>(f) > v ? nextFloatDown(f) : f;
 }
 // The smallest float >= v (v not NaN).
 inline float roundFloatUp(double v) noexcept {
-    constexpr double kMax = static_cast<double>(std::numeric_limits<float>::max());
+    constexpr auto kMax = static_cast<double>(std::numeric_limits<float>::max());
     if (v < -kMax) {
         return std::isinf(v) ? -std::numeric_limits<float>::infinity() : -std::numeric_limits<float>::max();
     }
     if (v > kMax) {
         return std::numeric_limits<float>::infinity();
     }
-    const float f = static_cast<float>(v > kMax ? kMax : (v < -kMax ? -kMax : v)); // see roundFloatDown
+    const auto f = static_cast<float>(v > kMax ? kMax : (v < -kMax ? -kMax : v)); // see roundFloatDown
     return static_cast<double>(f) < v ? nextFloatUp(f) : f;
 }
 // The float enclosure of the exact interval [lo, hi] (neither NaN).

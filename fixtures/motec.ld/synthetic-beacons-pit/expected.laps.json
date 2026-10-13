@@ -1,0 +1,206 @@
+{
+  "$schema": "urn:esses:laps-1",
+  "schemaVersion": 1,
+  "layers": {
+    "Normal": {
+      "durationUs": 300000000,
+      "groups": [
+        {
+          "children": [
+            {
+              "children": [],
+              "name": "Laps",
+              "path": "Outings:Laps",
+              "ranges": [
+                {
+                  "abbrev": "Out",
+                  "enabled": true,
+                  "endMarker": "7776acec-e4f4-57e2-9550-a91b547dbe75",
+                  "endUs": 60000000,
+                  "id": "b1cca993-a885-5807-9e5c-73dd7fa1a7e9",
+                  "kind": "Lap",
+                  "lapClass": "Out",
+                  "name": "Out Lap",
+                  "number": 0,
+                  "pitStop": true,
+                  "startMarker": "4a220465-0e86-5534-8b34-1cae5de4ee3b",
+                  "startUs": 0,
+                  "stint": 1,
+                  "trusted": false
+                },
+                {
+                  "abbrev": "L1",
+                  "enabled": true,
+                  "endMarker": "acc8417a-1938-5099-98d3-27392a00bfa8",
+                  "endUs": 120000000,
+                  "id": "ca3a0170-7335-51d7-8de9-61f5f2481867",
+                  "kind": "Lap",
+                  "lapClass": "Flying",
+                  "name": "Lap 1",
+                  "number": 1,
+                  "startMarker": "7776acec-e4f4-57e2-9550-a91b547dbe75",
+                  "startUs": 60000000,
+                  "stint": 1,
+                  "trusted": true
+                },
+                {
+                  "abbrev": "L2",
+                  "enabled": true,
+                  "endMarker": "90d6e410-bf93-577b-909e-2f8148e021d8",
+                  "endUs": 190000000,
+                  "id": "4cacb35d-f62b-5ec7-b245-fd285e720443",
+                  "kind": "Lap",
+                  "lapClass": "Flying",
+                  "name": "Lap 2",
+                  "number": 2,
+                  "pitStop": true,
+                  "startMarker": "acc8417a-1938-5099-98d3-27392a00bfa8",
+                  "startUs": 120000000,
+                  "stint": 1,
+                  "trusted": true
+                },
+                {
+                  "abbrev": "L3",
+                  "enabled": true,
+                  "endMarker": "9e60dd24-2fda-5ab6-9bdf-b14b20e8c314",
+                  "endUs": 240000000,
+                  "id": "9098956e-9873-5d84-b7a2-859d2206e627",
+                  "kind": "Lap",
+                  "lapClass": "Flying",
+                  "name": "Lap 3",
+                  "number": 3,
+                  "startMarker": "90d6e410-bf93-577b-909e-2f8148e021d8",
+                  "startUs": 190000000,
+                  "stint": 2,
+                  "trusted": true
+                },
+                {
+                  "abbrev": "L4",
+                  "enabled": true,
+                  "endMarker": "0d8a5ae5-ffcd-5f8c-b93d-7871ac7fbb81",
+                  "endUs": 270000000,
+                  "id": "6da84c4d-efb2-5f0c-9437-e5570729e1f1",
+                  "kind": "Lap",
+                  "lapClass": "Flying",
+                  "name": "Lap 4",
+                  "number": 4,
+                  "startMarker": "9e60dd24-2fda-5ab6-9bdf-b14b20e8c314",
+                  "startUs": 240000000,
+                  "stint": 3,
+                  "trusted": true
+                },
+                {
+                  "abbrev": "In",
+                  "enabled": true,
+                  "endMarker": "681b35c0-7733-5f6e-b98c-7615faeb3924",
+                  "endUs": 300000000,
+                  "id": "f9f2ab11-98b6-5ec0-ad9c-58ee31d61a3c",
+                  "kind": "Lap",
+                  "lapClass": "In",
+                  "name": "In Lap",
+                  "number": 5,
+                  "startMarker": "0d8a5ae5-ffcd-5f8c-b93d-7871ac7fbb81",
+                  "startUs": 270000000,
+                  "stint": 3,
+                  "trusted": false
+                }
+              ],
+              "supportsReporting": true,
+              "supportsTrackGeneration": true
+            }
+          ],
+          "name": "Outings",
+          "path": "Outings",
+          "ranges": [
+            {
+              "abbrev": "1",
+              "enabled": true,
+              "endMarker": "681b35c0-7733-5f6e-b98c-7615faeb3924",
+              "endUs": 300000000,
+              "id": "16845ead-b6ef-5c0c-8fb6-003722a0c028",
+              "kind": "Outing",
+              "lapClass": "None",
+              "name": "input.ld",
+              "number": 1,
+              "startMarker": "4a220465-0e86-5534-8b34-1cae5de4ee3b",
+              "startUs": 0,
+              "trusted": true
+            }
+          ],
+          "supportsReporting": true,
+          "supportsTrackGeneration": false
+        }
+      ],
+      "markers": [
+        {
+          "class": "SOL",
+          "comment": "",
+          "group": "",
+          "id": "4a220465-0e86-5534-8b34-1cae5de4ee3b",
+          "name": "",
+          "prov": "Derived",
+          "tUs": 0
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "id": "7776acec-e4f4-57e2-9550-a91b547dbe75",
+          "name": "B1",
+          "prov": "Companion",
+          "tUs": 60000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "id": "acc8417a-1938-5099-98d3-27392a00bfa8",
+          "name": "B2",
+          "prov": "Companion",
+          "tUs": 120000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "id": "90d6e410-bf93-577b-909e-2f8148e021d8",
+          "name": "B3",
+          "prov": "Companion",
+          "tUs": 190000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "id": "9e60dd24-2fda-5ab6-9bdf-b14b20e8c314",
+          "name": "B4",
+          "prov": "Companion",
+          "tUs": 240000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "id": "0d8a5ae5-ffcd-5f8c-b93d-7871ac7fbb81",
+          "name": "B5",
+          "prov": "Companion",
+          "tUs": 270000000
+        },
+        {
+          "class": "EOL",
+          "comment": "",
+          "group": "",
+          "id": "681b35c0-7733-5f6e-b98c-7615faeb3924",
+          "name": "",
+          "prov": "Derived",
+          "tUs": 300000000
+        }
+      ]
+    }
+  }
+}

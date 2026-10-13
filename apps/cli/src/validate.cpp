@@ -173,6 +173,7 @@ void collectFiles(const std::filesystem::path& dir, std::vector<std::filesystem:
 int runValidate(AppContext& ctx, const ValidateOptions& o, std::ostream& out, std::ostream& err) {
     std::optional<SchemaStore> store;
     std::optional<std::unique_ptr<nlohmann::json_schema::json_validator>> fixed;
+    std::string fixedName; // the --schema file's name, reported with each result it validated
     if (o.schemaFile) {
         auto schema = loadJson(*o.schemaFile);
         if (!schema) {
@@ -185,6 +186,7 @@ int runValidate(AppContext& ctx, const ValidateOptions& o, std::ostream& out, st
             return 2;
         }
         fixed = std::move(v).value();
+        fixedName = u8(o.schemaFile->filename());
     } else {
         auto dir = ctx.schemaDir();
         if (!dir) {
@@ -227,7 +229,7 @@ int runValidate(AppContext& ctx, const ValidateOptions& o, std::ostream& out, st
                     c.errors.push_back({"", std::string("validator error: ") + e.what()});
                 }
                 errs = std::move(c.errors);
-                r.schema = u8(o.schemaFile->filename());
+                r.schema = fixedName;
             } else {
                 const bool hasSchema = doc->is_object() && doc->contains("$schema");
                 if (!hasSchema && walked) {

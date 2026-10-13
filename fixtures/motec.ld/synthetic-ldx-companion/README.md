@@ -7,4 +7,4 @@ synthetic: an .ldx companion with markers of every class, an unknown marker clas
 - Byte edits after the writer: the .ldx is hand-written (unknown elements cannot come from a DataSource); device version pinned.
 - The `.ldx` companion is hand-written by the generator.
 - `input.ld` and `input.ldx` are not committed: `esses-gen-fixtures --inputs-only` regenerates them bit-identically (`fixture.json` pins the sha256).
-- `expected.channels/` comes from `tools/ld_ref_decode.py` (D-041), never from the Esses reader. `expected.probe.json`, `expected.markers.json` and `expected.laps.json` are `esses-cli` output (regression goldens).
+- `expected.channels/` comes from `tools/ld_ref_decode.py` (D-041), never from the Esses reader. `expected.probe.json`, `expected.markers.json` and `expected.laps.json` are `esses-cli` output (regression goldens), except the `Outings:Laps` group of `expected.laps.json`, which the generator writes from a hand-checked lap table (AC-M1-07): out lap, Lap 1, in lap 2; SPLTBCN and IGRDBCN skipped; the RESET in MarkerGroup Stages is not in the rule's marker groups.

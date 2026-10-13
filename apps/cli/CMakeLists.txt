@@ -20,6 +20,7 @@ esses_add_library(cli_core LAYER 3 QT_FREE
     esses::store
     esses::model
     esses::formats
+    esses::analysis         # M1: esses-cli laps runs the profile's rules (RuleRunner, AC-M1-07)
     esses::nlohmann_json
   PRIVATE_DEPS
     esses::json_schema_validator

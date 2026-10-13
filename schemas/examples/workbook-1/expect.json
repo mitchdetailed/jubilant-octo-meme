@@ -1,0 +1,46 @@
+{
+  "bad-component-id.json": {
+    "pointer": "/worksheets/0/components/0/id",
+    "why": "ids are canonical UUIDs"
+  },
+  "bad-domain.json": {
+    "pointer": "/worksheets/0/domain",
+    "why": "the domain is time or distance"
+  },
+  "body-not-object.json": {
+    "pointer": "/worksheets/0/components/0/body",
+    "why": "a component body is an object"
+  },
+  "empty-worksheets.json": {
+    "pointer": "/worksheets",
+    "why": "a workbook has at least one worksheet"
+  },
+  "grid-too-fine.json": {
+    "pointer": "/worksheets/0/grid/0",
+    "why": "grid cells lie in 20..200"
+  },
+  "missing-worksheets.json": {
+    "pointer": "",
+    "why": "a workbook has worksheets"
+  },
+  "rect-out-of-range.json": {
+    "pointer": "/worksheets/0/components/0/rect/2",
+    "why": "rect values are fractions 0..1"
+  },
+  "rect-three-values.json": {
+    "pointer": "/worksheets/0/components/0/rect",
+    "why": "rect is [l, t, r, b]"
+  },
+  "unknown-header-member.json": {
+    "pointer": "/worksheets/0/components/0",
+    "why": "component headers are closed"
+  },
+  "uppercase-type.json": {
+    "pointer": "/worksheets/0/components/0/type",
+    "why": "component types are snake_case"
+  },
+  "wrong-schema-id.json": {
+    "pointer": "/$schema",
+    "why": "the $schema id names another schema"
+  }
+}

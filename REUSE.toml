@@ -66,6 +66,30 @@ precedence = "override"
 SPDX-FileCopyrightText = "Catch2 Authors"
 SPDX-License-Identifier = "BSL-1.0"
 
+# The Qt Advanced Docking System 5.1.1, unmodified (D-153): LGPL-2.1-or-later, as its source headers grant ("version
+# 2.1 of the License, or (at your option) any later version"); LICENSES/LGPL-2.1-or-later.txt is a copy of its
+# LICENSE. Built and shipped as a separate shared library (NOTICES.md). UPSTREAM.md beside it is our provenance note.
+[[annotations]]
+path = "third_party/qtads/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2017-2026 Uwe Kindler and the Qt Advanced Docking System contributors"
+SPDX-License-Identifier = "LGPL-2.1-or-later"
+
+[[annotations]]
+path = "third_party/qtads/UPSTREAM.md"
+precedence = "override"
+SPDX-FileCopyrightText = "2026 the Esses contributors"
+SPDX-License-Identifier = "MIT"
+
+# Test-only font for the golden images (04 section 6.7 item 2, 08 section 6.4, D-127): Noto Sans 2.015,
+# unmodified, never distributed with the programs; tests/golden/fonts/OFL.txt and LICENSES/OFL-1.1.txt hold the
+# licence text.
+[[annotations]]
+path = "tests/golden/fonts/**"
+precedence = "override"
+SPDX-FileCopyrightText = "2022 The Noto Project Authors (https://github.com/notofonts/latin-greek-cyrillic)"
+SPDX-License-Identifier = "OFL-1.1"
+
 # Synthetic fixtures written by our own generator (esses-gen-fixtures) and their expectations are CC0-1.0
 # (08 section 10); LICENSES/CC0-1.0.txt holds the licence text.
 [[annotations]]

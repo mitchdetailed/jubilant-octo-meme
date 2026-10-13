@@ -9,6 +9,9 @@ Checks schemas/*.schema.json and the examples under schemas/examples/<schema-id>
   2. Schemas: named <name>-<major>.schema.json; draft-07 "$schema"; "$id" = urn:esses:<name>-<major> (D-072);
      non-empty "title" and "description"; root type object requiring "$schema" and "schemaVersion", whose
      "$schema" pattern accepts the urn:esses:, esses: and https forms of this id only (02 section 6.6 rule 1).
+     Built-in maths settings schemas, builtin-<module id>-<version>.schema.json (03 section 9; the module id
+     may contain '.' and '_'), validate a member of project.json/sidecar documents rather than a document:
+     they follow every rule except the "$schema"/"schemaVersion" envelope.
   3. Portability: only the draft-07 keywords that both the vendored json-schema-validator 2.3.0 and the
      validator below implement (no "format": the C++ validator needs a format checker for it); only local
      "#/definitions/<name>" references, all resolvable, no unused definitions; required members listed in
@@ -37,6 +40,9 @@ from typing import Any, Callable
 
 DRAFT07 = "http://json-schema.org/draft-07/schema#"
 SCHEMA_FILE_RE = re.compile(r"^([a-z][a-z0-9-]*?)-([1-9][0-9]*)\.schema\.json$")
+# Built-in maths module settings (03 section 9): builtin-<module id>-<version>, e.g.
+# builtin-esses.corrected_speed_distance-1; a settings fragment without the document envelope.
+BUILTIN_FILE_RE = re.compile(r"^(builtin-[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*)-([1-9][0-9]*)\.schema\.json$")
 REF_RE = re.compile(r"^#/definitions/([A-Za-z0-9_]+)$")
 
 ANNOTATIONS = {"$comment", "title", "description", "default", "examples"}
@@ -287,14 +293,25 @@ def accepts(pattern: str, text: str) -> bool:
     return re.search(pattern, text) is not None
 
 
+def schema_file_id(name: str) -> tuple[str, str, bool] | None:
+    """(schema id, major, is a built-in settings fragment) of a schema file name, or None."""
+    m = BUILTIN_FILE_RE.match(name)
+    if m:
+        return f"{m.group(1)}-{m.group(2)}", m.group(2), True
+    m = SCHEMA_FILE_RE.match(name)
+    if m:
+        return f"{m.group(1)}-{m.group(2)}", m.group(2), False
+    return None
+
+
 def lint_schema(name: str, schema: Any) -> tuple[list[str], set[str]]:
     """Returns (findings, referenced definition names)."""
     findings: list[str] = []
     refs: set[str] = set()
-    m = SCHEMA_FILE_RE.match(name)
-    if not m:
+    ident = schema_file_id(name)
+    if ident is None:
         return [f"{name}: file name is not <name>-<major>.schema.json"], refs
-    schema_id = f"{m.group(1)}-{m.group(2)}"
+    schema_id, major, fragment = ident
     if not isinstance(schema, dict):
         return [f"{name}: the schema is not an object"], refs
     if schema.get("$schema") != DRAFT07:
@@ -308,24 +325,28 @@ def lint_schema(name: str, schema: Any) -> tuple[list[str], set[str]]:
         findings.append(f"{name}: the root type is not object")
     required = schema.get("required", [])
     props = schema.get("properties", {})
-    for member in ("$schema", "schemaVersion"):
+    for member in () if fragment else ("$schema", "schemaVersion"):
         if member not in required or member not in props:
             findings.append(f"{name}: '{member}' is not a required root property (D-072)")
     id_pattern = props.get("$schema", {}).get("pattern") if isinstance(props.get("$schema"), dict) else None
-    if isinstance(id_pattern, str):
+    if fragment:
+        pass  # a settings fragment has no document envelope
+    elif isinstance(id_pattern, str):
         for good in (f"urn:esses:{schema_id}", f"esses:{schema_id}",
                      f"https://esses.example/schemas/{schema_id}.schema.json",
                      f"https://esses.example/{schema_id}.json"):
             if not accepts(id_pattern, good):
                 findings.append(f"{name}: $schema pattern rejects '{good}'")
+        stem = schema_id[: -len(major) - 1]
         for bad in (f"urn:esses:{schema_id}0", f"urn:esses:x{schema_id}", "urn:esses:other-1",
-                    f"urn:esses:{m.group(1)}-{int(m.group(2)) + 1}", f" urn:esses:{schema_id}"):
+                    f"urn:esses:{stem}-{int(major) + 1}", f" urn:esses:{schema_id}"):
             if accepts(id_pattern, bad):
                 findings.append(f"{name}: $schema pattern accepts '{bad}'")
     else:
         findings.append(f"{name}: the '$schema' property has no pattern")
     version = props.get("schemaVersion")
-    if not (isinstance(version, dict) and version.get("type") == "integer" and version.get("minimum") == 1):
+    if not fragment and not (isinstance(version, dict) and version.get("type") == "integer"
+                             and version.get("minimum") == 1):
         findings.append(f"{name}: schemaVersion is not an integer with minimum 1")
     definitions = schema.get("definitions", {})
     if not isinstance(definitions, dict):
@@ -431,9 +452,9 @@ def check(root: pathlib.Path) -> tuple[list[str], dict[str, int]]:
             continue
         lint, _ = lint_schema(path.name, doc)
         findings.extend(f"schemas/{f}" for f in lint)
-        m = SCHEMA_FILE_RE.match(path.name)
-        if m and isinstance(doc, dict):
-            schemas[f"{m.group(1)}-{m.group(2)}"] = doc
+        ident = schema_file_id(path.name)
+        if ident and isinstance(doc, dict):
+            schemas[ident[0]] = doc
     counts["schemas"] = len(schemas)
 
     # Shared definitions must not drift apart.
@@ -609,6 +630,25 @@ def self_test() -> int:
     lint, _ = lint_schema("Thing.schema.json", good)
     if not lint:
         failures.append("lint accepted a bad file name")
+
+    # Built-in settings fragments: no envelope, but every other rule.
+    fragment = {
+        "$schema": DRAFT07, "$id": "urn:esses:builtin-acme.speed_fix-2", "title": "t", "description": "d",
+        "type": "object", "additionalProperties": False, "properties": {"x": {"type": "number"}},
+    }
+    lint, _ = lint_schema("builtin-acme.speed_fix-2.schema.json", fragment)
+    if lint:
+        failures.append(f"lint of a good built-in settings schema: {lint}")
+    bad_fragment = dict(fragment, **{"$id": "urn:esses:builtin-acme.speed_fix-1"})
+    lint, _ = lint_schema("builtin-acme.speed_fix-2.schema.json", bad_fragment)
+    if not any("$id is not" in f for f in lint):
+        failures.append(f"lint missed a built-in settings schema with the wrong $id: {lint}")
+    for bad_name in ("builtin-Acme.speed-2.schema.json", "builtin-.x-1.schema.json", "builtin-acme..x-1.schema.json"):
+        if schema_file_id(bad_name) is not None and schema_file_id(bad_name)[2]:
+            failures.append(f"accepted the built-in schema name {bad_name}")
+    lint, _ = lint_schema("thing.x-1.schema.json", good)
+    if not lint:
+        failures.append("lint accepted a '.' outside a built-in schema name")
 
     for f in failures:
         print(f"self-test: {f}")

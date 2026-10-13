@@ -1,11 +1,16 @@
 # SPDX-FileCopyrightText: 2026 the Esses contributors
 # SPDX-License-Identifier: MIT
 #
-# CI (08_REPO_AND_BUILD.md section 4). Jobs: core (3 OSes, no Qt), lint, sanitize, fuzz-smoke.
+# CI (08_REPO_AND_BUILD.md section 4). Jobs: core (3 OSes, no Qt), lint, sanitize, fuzz-smoke (plus an MSVC
+# variant) and, from M1 (D-150), qt-app: Windows and Linux on every pull request and push, macOS nightly and on
+# manual dispatch only, never merge-blocking (D-124, 08 section 4.4). The benchmarks are in bench.yml (D-042).
 # The build itself uses only code vendored in third_party/ (pugixml, xxHash, nlohmann-json, json-schema-validator,
-# CLI11, fast_float, Catch2 v3; see third_party/README.md); CI fetches nothing but the toolchain (actions, apt
-# packages, the reuse tool). The vendored libraries replace the vcpkg manifest that 08 section 3.7.1 describes,
-# so the vcpkg cache steps of 08 section 4.2 are not needed. The qt-app job arrives with the first Qt code (M1).
+# CLI11, fast_float, Catch2 v3 and, in qt-app, the Qt Advanced Docking System built as a shared library through its
+# own CMake project; see third_party/README.md); CI fetches nothing but the toolchain (actions, apt packages, the
+# clang-format/clang-tidy wheels and the reuse tool) and, in qt-app, the Qt kit through install-qt-action
+# (aqtinstall, D-006). The vendored libraries replace the vcpkg manifest that 08 section 3.7.1
+# describes, so the vcpkg cache steps of 08 section 4.2 are not needed; sccache is not configured yet (08 section
+# 4.3).
 name: ci
 
 on:
@@ -14,6 +19,7 @@ on:
     branches: [main]
   schedule:
     - cron: "0 3 * * *" # nightly
+  workflow_dispatch: {} # manual run of everything, including the nightly-only qt-app on macOS
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -21,6 +27,19 @@ concurrency:
 
 permissions:
   contents: read
+
+env:
+  # The CI and release Qt (D-006, D-126). Pixel goldens are authoritative on ubuntu with exactly this kit (D-127),
+  # so a bump regenerates them from the ubuntu qt-app artefacts in the same pull request.
+  QT_VERSION: "6.12.0"
+  # The aqtinstall that install-qt-action runs, pinned to a commit of its master branch instead of the action's
+  # default PyPI 3.3.x. From Qt 6.11 the Windows x64 online repository keeps one Updates.xml per toolchain
+  # (windows_x86/desktop/qt6_6120/qt6_6120_msvc2022_64/) instead of the nested qt6_<v>/qt6_<v>/ of Qt 6.8 to 6.10,
+  # and aqtinstall 3.3.0, the newest release, still looks for that path ("Failed to locate XML data for Qt version
+  # '6.12.0'"; aqtinstall issue 959). Its pull request 1000 (merged 2026-03-24, in no release yet) reads the new
+  # layout; this commit (2026-09-11) contains it. All three qt-app OSes use it, so they install the same Qt 6.12.0
+  # the same way. Back to a released aqtversion once a release after 3.3.0 is on PyPI.
+  AQT_SOURCE: "git+https://github.com/miurahr/aqtinstall.git@076e1659807d0b362a3ed684d54c2e9c775eb9c7"
 
 jobs:
   core:
@@ -43,6 +62,8 @@ jobs:
         run: cmake --preset ${{ matrix.preset }}
       - name: Build
         run: cmake --build --preset ${{ matrix.preset }}
+      # Includes the DrawList JSON goldens of the M1 worksheet cases, the strict cross-platform half of AC-M1-04
+      # (plotcore.*, tests/golden/drawlist/), and the BeaconPairRule laps goldens of AC-M1-07 (fixtures.laps_golden).
       - name: Test
         run: ctest --preset ${{ matrix.preset }} --parallel 4
       # ctest above already ran fixtures.generate_inputs and fixtures.verify_public; this step repeats the fixture
@@ -54,6 +75,119 @@ jobs:
           "$bin/esses-gen-fixtures" --inputs-only --out build/fixture-inputs/motec.ld --fixtures fixtures/motec.ld \
             --manifest build/fixture-inputs/manifest.json
           "$bin/esses-cli" fixture verify fixtures/ --manifest build/fixture-inputs/manifest.json
+      # A DrawList golden mismatch writes <case>@<dpr>x.actual.json next to the test binary (libs/plotcore/README.md).
+      - name: Upload DrawList golden diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drawlist-diffs-${{ matrix.os }}
+          path: |
+            build/${{ matrix.preset }}/**/*.actual.json
+            build/${{ matrix.preset }}/Testing/Temporary/LastTest*.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # The qt-app rows: Windows and Linux always (the required qt-app checks, D-124); macOS only nightly and on manual
+  # dispatch (08 section 4.4). A job-level `if` cannot see the matrix, so this job picks the rows.
+  qt-matrix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      include: ${{ steps.rows.outputs.include }}
+    steps:
+      - id: rows
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          rows='{"os":"windows-2022","preset":"ci-win-msvc-qt","qtarch":"win64_msvc2022_64"}'
+          rows+=',{"os":"ubuntu-24.04","preset":"ci-linux-gcc-qt","qtarch":"linux_gcc_64"}'
+          if [ "$EVENT" = schedule ] || [ "$EVENT" = workflow_dispatch ]; then
+            rows+=',{"os":"macos-14","preset":"ci-mac-clang-qt","qtarch":"clang_64"}'
+          fi
+          echo "include=[$rows]" >> "$GITHUB_OUTPUT"
+
+  # Everything, Qt layers included (D-150): Qt Test offscreen (libs/qtmodel, libs/qtrender, libs/widgets, tests/ui
+  # walkthrough, F9 preservation, Corr Dist prefetch, render parity, keymap rows of AC-M1-06, the dock tests of
+  # AC-M1-13 on both DockHost backends, ADS and QDockWidget), the pixel goldens of tests/golden (authoritative on
+  # ubuntu only; Windows and macOS run them as render smoke tests, D-127, 08 section 6.4) and, again, every Qt-free
+  # test. ADS (third_party/qtads, D-153) is built from source against the job's Qt as the shared library
+  # qtadvanceddocking-qt6 into build/<preset>/bin, beside every executable and test, where ctest and esses find it
+  # (the DLL on Windows; the .so/.dylib through the build tree's RPATH on Linux and macOS). Spike S-3
+  # (docs/spikes/S-3.md) reads its Linux and macOS results from these runs.
+  qt-app:
+    name: qt-app (${{ matrix.os }})
+    needs: qt-matrix
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.qt-matrix.outputs.include) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      QT_QPA_PLATFORM: offscreen
+      ESSES_TEST_FONT_DIR: ${{ github.workspace }}/tests/golden/fonts # Noto Sans only (D-127)
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: false }
+      - uses: lukka/get-cmake@latest
+      - name: Install Qt ${{ env.QT_VERSION }} (aqtinstall)
+        uses: jurplel/install-qt-action@v4 # sets QT_ROOT_DIR, puts the kit's bin on PATH (08 section 3.7.5)
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: ${{ matrix.qtarch }}
+          cache: true
+          aqtsource: ${{ env.AQT_SOURCE }}
+          py7zrversion: "==1.1.3" # that aqtinstall requires py7zr >= 1.1.3; the action's default is 1.1.0
+          # py7zr 1.1.3 fails intermittently on Windows ("Bad7zFile: Specified path is bad", install-qt-action #344,
+          # aqtinstall #995; fixed upstream in py7zr 329b83de, not released yet). On Windows, extract with the
+          # 7-Zip preinstalled on the runner instead, the action's documented example for this.
+          extra: ${{ runner.os == 'Windows' && '--external 7z' || '' }}
+      # libxcb1-dev: ADS includes <xcb/xcb.h> and links libxcb on Linux (its floating windows talk to X11 when the
+      # platform is xcb; offscreen they do not). Its other Linux need, Qt6::GuiPrivate (Qt 6.9+), is in the kit.
+      - name: Qt build and runtime dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgl-dev libegl-dev libglx-dev libopengl-dev \
+            libxkbcommon-dev libfontconfig1-dev libfreetype-dev libdbus-1-3 libxcb1-dev
+      - uses: ilammy/msvc-dev-cmd@v1 # no-op outside Windows
+      # The kit comes from install-qt-action; on Windows this overrides the local C:/Qt kit of ci-win-msvc-qt.
+      - name: Configure (ESSES_BUILD_QT=ON)
+        id: configure
+        shell: bash
+        run: cmake --preset ${{ matrix.preset }} -DCMAKE_PREFIX_PATH="${QT_ROOT_DIR//\\//}"
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }}
+      - name: Docking library beside the executables (D-026, 08 section 3.7.5)
+        shell: bash
+        run: |
+          bin=build/${{ matrix.preset }}/bin
+          ls "$bin" | grep -E '^(lib)?qtadvanceddocking-qt6d?[.0-9]*\.(dll|so|dylib)' \
+            || { echo "::error::the ADS shared library is not in $bin"; exit 1; }
+      - name: Test (offscreen)
+        run: ctest --preset ${{ matrix.preset }} --parallel 4
+      # The lint job's layering check sees only the Qt-free targets (ESSES_BUILD_QT=OFF); this one adds the Qt layers
+      # and their allowed Qt modules (01 section 2.2 rule 4).
+      - name: Layering with the Qt layers (01 section 2.3)
+        if: always() && runner.os == 'Linux' && steps.configure.outcome == 'success'
+        run: python3 -I tools/check_layering.py --build-dir build/${{ matrix.preset }}
+      # Every rendered image is written to <build>/**/artefacts/ (with <name>.actual.png and <name>.diff.png on a
+      # mismatch); DrawList mismatches write *.actual.json. New pixel goldens are taken only from the ubuntu
+      # artefact, never rendered locally (D-127).
+      # The ubuntu renders are uploaded on every run, so new pixel goldens can be taken from a passing run too.
+      - name: Upload golden diffs
+        if: failure() || matrix.os == 'ubuntu-24.04'
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-diffs-${{ matrix.os }}
+          path: |
+            build/${{ matrix.preset }}/**/artefacts/
+            build/${{ matrix.preset }}/**/*.actual.json
+            build/${{ matrix.preset }}/golden-diffs/
+            build/${{ matrix.preset }}/Testing/Temporary/LastTest*.log
+          if-no-files-found: ignore
+          retention-days: 14
 
   lint:
     runs-on: ubuntu-24.04
@@ -62,32 +196,50 @@ jobs:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
       - uses: lukka/get-cmake@latest
-      - name: Install LLVM tools
-        run: sudo apt-get update && sudo apt-get install -y clang-format-18 clang-tidy-18
-      - name: clang-format
-        run: git ls-files '*.c' '*.cpp' '*.h' '*.hpp' ':!:third_party/**' | xargs -r clang-format-18 --dry-run --Werror
+      # The same LLVM release as the maintainer's machine (Visual Studio 2022's bundled LLVM 19.1.5, AGENTS.md section
+      # 4): clang-format 18 and 19 lay out some constructs differently, so a tree formatted locally failed here with 18.
+      # Exact PyPI wheels; clang-tidy falls back, with a warning, to the newest 19.1.x of LLVM's apt repository when
+      # its wheel is missing or cannot compile a standard header. CLANG_FORMAT and CLANG_TIDY carry absolute paths.
+      - name: Install LLVM tools (clang-format and clang-tidy 19.1.5)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin=$(pipx environment --value PIPX_BIN_DIR)
+          pipx install clang-format==19.1.5
+          "$bin/clang-format" --version | grep -F 'version 19.1.5'
+          echo "CLANG_FORMAT=$bin/clang-format" >> "$GITHUB_ENV"
+          probe=$(mktemp --suffix=.cpp)
+          printf '#include <cstddef>\n#include <string>\nint main() { return 0; }\n' > "$probe"
+          if pipx install clang-tidy==19.1.5 && "$bin/clang-tidy" --checks='-*,misc-unused-using-decls' "$probe" -- -std=c++20; then
+            tidy="$bin/clang-tidy"
+          else
+            echo "::warning::clang-tidy 19.1.5 wheel unavailable or unusable; using clang-tidy-19 from apt.llvm.org"
+            pipx uninstall clang-tidy || true
+            wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc > /dev/null
+            echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-19 main" | sudo tee /etc/apt/sources.list.d/llvm-19.list
+            sudo apt-get update && sudo apt-get install -y clang-tidy-19
+            tidy=$(command -v clang-tidy-19)
+          fi
+          "$tidy" --version | grep -E 'version 19\.1\.'
+          echo "CLANG_TIDY=$tidy" >> "$GITHUB_ENV"
+      - name: clang-format (19.1.5)
+        run: git ls-files '*.c' '*.cpp' '*.h' '*.hpp' ':!:third_party/**' | xargs -r "$CLANG_FORMAT" --dry-run --Werror
       - name: Vendor marks (D-003, D-125)
         run: python3 -I tools/check_vendor_marks.py --self-test && python3 -I tools/check_vendor_marks.py
       - name: Schemas and their examples (02 section 6.6, D-072)
         run: python3 -I tools/check_schemas.py --self-test && python3 -I tools/check_schemas.py
+      - name: Keymap rows and their tests (AC-M1-06; the tests themselves run in qt-app)
+        run: python3 -I tools/check_keymap_coverage.py --self-test && python3 -I tools/check_keymap_coverage.py --root .
       - name: Forbidden paths (section 1)
         shell: bash
         run: |
           bad=$(git ls-files | grep -E '^(research|help_text|conv_samples)/|\.(chm|i2wkb|i2wsp|mcs|mfs|mt2)$' | grep -v '^fixtures/private/' || true)
           if [ -n "$bad" ]; then echo "Forbidden paths are tracked:"; echo "$bad"; exit 1; fi
-      - name: DCO sign-off
-        if: github.event_name == 'pull_request'
-        shell: bash
-        run: |
-          status=0
-          for c in $(git rev-list "origin/${{ github.base_ref }}..HEAD"); do
-            if ! git log -1 --format=%B "$c" | grep -q '^Signed-off-by: '; then echo "missing Signed-off-by: $c"; status=1; fi
-          done
-          exit $status
       - name: Configure with clang-tidy on the Qt-free targets
-        run: cmake --preset ci-linux-lint -DCLANG_TIDY_EXE=$(command -v clang-tidy-18)
+        run: cmake --preset ci-linux-lint -DCLANG_TIDY_EXE="$CLANG_TIDY"
       - name: Build (clang-tidy runs as part of the build)
-        run: cmake --build --preset ci-linux-lint
+        # -k 0: keep going after a failing file so one run reports every clang-tidy finding.
+        run: cmake --build --preset ci-linux-lint -- -k 0
       - name: Layering (section 2, 01 section 11 item 3)
         run: python3 -I tools/check_layering.py --self-test && python3 -I tools/check_layering.py --build-dir build/ci-linux-lint
       - name: Qt-free and layer-check negative tests (AC-M0-07)
@@ -100,14 +252,57 @@ jobs:
       - name: Import Log codes documented (AC-M0-12)
         run: python3 -I tools/check_importlog_codes.py --self-test && python3 -I tools/check_importlog_codes.py --root .
 
+  # Separate from lint so a missing sign-off does not hide the remaining lint steps. Suspended while the maintainer
+  # is the only contributor (D-160): it runs only when the repository variable ESSES_REQUIRE_DCO is 'true'.
+  dco:
+    name: DCO sign-off
+    if: github.event_name == 'pull_request' && vars.ESSES_REQUIRE_DCO == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      # Every commit of the pull request needs a Signed-off-by: line (CONTRIBUTING.md, DCO). On pull_request the
+      # checkout is GitHub's synthetic merge of the PR into its base (refs/pull/<n>/merge), so HEAD is that merge
+      # commit, which nobody authored or signed. The commits checked are the PR's own: reachable from the PR head
+      # but not from the base branch, merge commits excluded (a merge of the base into the branch carries no change
+      # of its own to certify).
+      - name: DCO sign-off
+        shell: bash
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          base="refs/remotes/origin/$BASE_REF"
+          for ref in "$base" "$HEAD_SHA"; do
+            if ! git rev-parse --verify --quiet "$ref^{commit}" > /dev/null; then
+              echo "::error::$ref was not fetched"
+              exit 1
+            fi
+          done
+          commits=$(git rev-list --no-merges "$base..$HEAD_SHA")
+          status=0
+          for c in $commits; do
+            msg=$(git log -1 --format=%B "$c")
+            if grep -q '^Signed-off-by: ' <<< "$msg"; then
+              echo "signed off: $c"
+            else
+              echo "::error::missing Signed-off-by: $(git log -1 --format='%h %s' "$c")"
+              status=1
+            fi
+          done
+          exit $status
+
   sanitize:
     name: sanitize (${{ matrix.preset }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
-        preset: [linux-clang-asan, linux-clang-tsan] # TSan runs the esses_base and esses_store tests (test preset filter)
+        # TSan runs the esses_base, esses_store, esses_maths and esses_plotcore tests (the linux-clang-tsan test
+        # preset's name filter; AC-M0-11, AC-M1-12, 01 section 5.3 rule 8); ASan + UBSan run every Qt-free test.
+        preset: [linux-clang-asan, linux-clang-tsan]
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
       UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1

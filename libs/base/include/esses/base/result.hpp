@@ -26,6 +26,7 @@
 namespace esses {
 
 // Values mirror the C ABI's esses_status 1:1 (D-051, D-131); never renumber.
+// NOLINTNEXTLINE(performance-enum-size): the width of the C ABI's status, with room to grow.
 enum class ErrorCode : std::uint16_t {
     Ok = 0,
     Io,          // open/read/write/mmap failure; context.path
@@ -232,12 +233,12 @@ public:
     explicit operator bool() const noexcept { return ok(); }
 
     void value() const {
-        if (!ok()) {
+        if (err_) {
             detail::badResultAccess(&*err_, "Result<void>::value() on a failed Result");
         }
     }
     const Error& error() const {
-        if (ok()) {
+        if (!err_) {
             detail::badResultAccess(nullptr, "Result::error() on a successful Result");
         }
         return *err_;
@@ -285,7 +286,7 @@ template <class T> Result<std::decay_t<T>> ok(T&& v) {
     return Result<std::decay_t<T>>(std::forward<T>(v));
 }
 inline Result<void> ok() {
-    return Result<void>();
+    return {};
 }
 
 // Deducible form: `return fail(ErrorCode::Io, "cannot open");`

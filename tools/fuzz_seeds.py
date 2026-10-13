@@ -5,6 +5,7 @@
 
   <out>/fuzz_ld_header/<family>.ld   every synthetic family's input.ld (the first --max-bytes of larger ones)
   <out>/fuzz_ldx/<family>.ldx        every synthetic family's input.ldx, plus minimal hand-written documents
+                                     and regression reproducers (minimal-<k>.ldx)
 With --corpus fixtures/private/s1/corpus.json (local runs only, never committed): the heads of the user's real
 .ld files and their .ldx companions as well.
 
@@ -26,6 +27,16 @@ MINIMAL_LDX = [
     b'     <Marker Version="100" ClassName="BCN" Name="Manual.1" Flags="77" Time="5000000.00"/>\n'
     b'    </MarkerGroup>\n   </MarkerBlock>\n  </Layer>\n  <Details>\n'
     b'   <String Id="Total Laps" Value="1"/>\n  </Details>\n </Layers>\n</LDXFile>\n',
+    # Regression seed (fuzz_ldx, first CI run): elements kept verbatim that contain the writer's reserved
+    # placeholder instruction in a PI, a comment, CDATA and attribute values (libs/formats/tests/ldx_tests.cpp).
+    b'<?xml version="1.0"?>\n<LDXFile Locale="C" DefaultLocale="C" Version="1.6">\n <Layers>\n  <Layer>\n'
+    b'   <MarkerBlock>\n    <MarkerGroup Name="Beacons" Index="3">\n'
+    b'     <Note><!-- <?esses-opaque 1?> --><?esses-opaque 2?><![CDATA[<?esses-opaque 3?>]]></Note>\n'
+    b'     <Marker Version="100" ClassName="EOL" Name="late" Flags="77" Time="soon"><!-- x --></Marker>\n'
+    b'     <Marker Version="100" ClassName="BCN" Name="Manual.1" Flags="77" Time="5000000.00"/>\n'
+    b'     <Odd a="]]>"/>\n    </MarkerGroup>\n   </MarkerBlock>\n  </Layer>\n  <Details>\n'
+    b'   <String Id="Note" Value="<?esses-opaque 0?>"/>\n  </Details>\n'
+    b"  <Extra b='<?esses-opaque 0?>'/>\n </Layers>\n</LDXFile>\n",
 ]
 
 

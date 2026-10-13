@@ -1,0 +1,150 @@
+{
+  "$schema": "urn:esses:probe-1",
+  "schemaVersion": 1,
+  "companions": ["input.ldx"],
+  "details": [
+    {
+      "id": "Device Type",
+      "value": "Esses"
+    },
+    {
+      "id": "Device Serial",
+      "value": "1"
+    },
+    {
+      "id": "Device Version",
+      "value": "100"
+    },
+    {
+      "id": "Log Date",
+      "value": "11/10/2026"
+    },
+    {
+      "id": "Log Time",
+      "value": "10:00:00"
+    },
+    {
+      "id": "Driver",
+      "value": "Synthetic Driver"
+    },
+    {
+      "id": "Vehicle Id",
+      "value": "SYN-01"
+    },
+    {
+      "id": "Venue",
+      "value": "Synthetic Circuit"
+    },
+    {
+      "id": "Session",
+      "value": "Fixture"
+    },
+    {
+      "id": "Short Comment",
+      "value": "synthetic-beacons-reset"
+    }
+  ],
+  "dialect": "pc-layout",
+  "enumTables": [],
+  "importerId": "motec.ld",
+  "importerVersion": "0.1.0",
+  "layers": [
+    {
+      "channels": [
+        {
+          "dps": 3,
+          "dtype": "F32",
+          "flags": 0,
+          "index": 0,
+          "kind": "Real",
+          "loggedName": "Throttle Pos",
+          "sampleCount": 1200,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 10
+            }
+          },
+          "vendorDtype": "f32",
+          "vendorId": "20101",
+          "vendorUnit": ""
+        }
+      ],
+      "durationUs": 120000000,
+      "markers": [
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "name": "B1",
+          "ordinal": 0,
+          "tUs": 10000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "name": "B2",
+          "ordinal": 0,
+          "tUs": 30000000
+        },
+        {
+          "class": "RESET",
+          "comment": "",
+          "flags": 0,
+          "group": "",
+          "name": "R1",
+          "ordinal": 0,
+          "tUs": 45000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "name": "B3",
+          "ordinal": 0,
+          "tUs": 52000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "name": "B4",
+          "ordinal": 0,
+          "tUs": 71000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 77,
+          "group": "Beacons",
+          "name": "B5",
+          "ordinal": 0,
+          "tUs": 92000000
+        }
+      ],
+      "name": "Normal",
+      "utc": {
+        "assumedLocal": true,
+        "unixUs": 1791712800000000
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "code": "ld.string_encoding",
+      "ctx": {
+        "detail": "ascii",
+        "offset": 0
+      },
+      "level": "Info",
+      "message": "strings decoded as ascii"
+    }
+  ]
+}

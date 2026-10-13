@@ -1,0 +1,9 @@
+{
+  "$schema": "urn:esses:scheme-1",
+  "schemaVersion": 1,
+  "background": "light",
+  "channelPalette": ["#ff5252", "#40c4ff", "#69f0ae", "#ffd740", "#ea80fc", "#ffab40", "#18ffff", "#b2ff59", "#ff80ab", "#8c9eff"],
+  "futureMember": "kept",
+  "name": "Palettes",
+  "overlayPalette": ["#ff5252", "#40c4ff", "#69f0ae", "#ffd740", "#ea80fc", "#ffab40", "#18ffff", "#b2ff59"]
+}

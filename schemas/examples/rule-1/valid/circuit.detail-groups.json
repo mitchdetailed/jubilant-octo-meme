@@ -1,0 +1,51 @@
+{
+  "$schema": "urn:esses:rule-1",
+  "schemaVersion": 1,
+  "anchor": "SOL",
+  "groupFlags": {
+    "supportsReporting": true,
+    "supportsTrackGeneration": false
+  },
+  "groups": [
+    {
+      "missing": "(no event)",
+      "name": "'Event'",
+      "produces": "Events"
+    },
+    {
+      "missing": "(no vehicle)",
+      "name": "'Vehicle Id'",
+      "produces": "Vehicles"
+    },
+    {
+      "missing": "(no session)",
+      "name": "'Session'",
+      "produces": "Sessions"
+    },
+    {
+      "missing": "(no driver)",
+      "name": "'Driver'",
+      "produces": "Driver"
+    },
+    {
+      "missing": "(none)",
+      "name": "'Vehicle Id'",
+      "produces": "Vehicle Id"
+    },
+    {
+      "missing": "(none)",
+      "name": "'Vehicle Number'",
+      "produces": "Vehicle Number"
+    }
+  ],
+  "id": "circuit.detail-groups",
+  "kind": "detail-group",
+  "layers": [
+    "*"
+  ],
+  "phase": 1,
+  "sortDetails": [
+    "Log Date",
+    "Log Time"
+  ]
+}

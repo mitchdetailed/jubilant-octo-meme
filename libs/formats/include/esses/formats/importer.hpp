@@ -50,7 +50,7 @@ using LayerIx = std::uint32_t;
 using ChannelIx = std::uint32_t;
 
 // sniff() sees at most this many leading bytes (05 section 1.3 rule 1).
-inline constexpr std::size_t kSniffHeadBytes = 64 * 1024;
+inline constexpr std::size_t kSniffHeadBytes = std::size_t{64} * 1024;
 
 struct SniffInput { // everything sniff may look at; no ByteSource, so no read beyond the head
     std::filesystem::path path;

@@ -1,0 +1,51 @@
+{
+  "$schema": "urn:esses:keymap-1",
+  "schemaVersion": 1,
+  "bindings": [
+    {
+      "command": "view.data_window",
+      "context": "global",
+      "keys": ["F8"],
+      "status": "implemented"
+    },
+    {
+      "command": "data.toggle_domain",
+      "context": "global",
+      "doc": "Toggle the active worksheet between time and distance with zoom preserved",
+      "keys": ["F9"],
+      "milestone": "M1",
+      "status": "implemented"
+    },
+    {
+      "args": [0],
+      "command": "component.colour_band",
+      "context": "component",
+      "keys": ["Alt+0"],
+      "milestone": "M3",
+      "status": "planned"
+    },
+    {
+      "command": "file.print",
+      "context": "global",
+      "keys": ["Ctrl+P"],
+      "milestone": "v1.0",
+      "status": "planned"
+    },
+    {
+      "command": "file.unload_device",
+      "context": "global",
+      "keys": ["Ctrl+F8"],
+      "status": "reserved"
+    },
+    {
+      "command": "view.messages_window",
+      "context": "global",
+      "keys": [],
+      "milestone": "M2",
+      "status": "planned"
+    }
+  ],
+  "inherits": null,
+  "name": "default",
+  "unbind": []
+}

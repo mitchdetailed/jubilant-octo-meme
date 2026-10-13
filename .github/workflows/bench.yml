@@ -1,0 +1,168 @@
+# SPDX-FileCopyrightText: 2026 the Esses contributors
+# SPDX-License-Identifier: MIT
+#
+# Benchmarks (D-042; 07_ROADMAP.md section 12; 08_REPO_AND_BUILD.md sections 4.1 and 6.9). Two jobs:
+#
+# - hosted-alarm: GitHub-hosted ubuntu-24.04, nightly and on manual dispatch. It runs the same benchmarks as the
+#   reference machine and compares them with its own baseline bench/baselines/hosted-<os>.json at +-30 %. It is a
+#   non-blocking regression alarm: it warns and never fails the workflow (continue-on-error).
+# - reference-gate: the reference machine (the developer's Windows machine, recorded in bench/workloads.md)
+#   registered as a self-hosted runner with the labels self-hosted, windows, x64, esses-reference. It checks the
+#   absolute limits of 07 section 12 (median of >= 5 repetitions). It runs only when the repository variable
+#   ESSES_REFERENCE_RUNNER is 'true' (set once the runner is registered by hand, U-09), on pushes to main, on v*
+#   tags, nightly and on manual dispatch. This workflow has no pull_request trigger, so code from a fork never
+#   reaches the self-hosted machine; keep it that way if the repository becomes public.
+#
+# Contract for bench/ (it arrives with the first benchmark; Google Benchmark is vendored under third_party/ per
+# D-147, after the user approves the download): with ESSES_BUILD_BENCH=ON the top-level CMakeLists.txt calls
+# enable_testing() and add_subdirectory(bench); bench/CMakeLists.txt registers every benchmark executable as a
+# ctest entry with the label `bench`. Each entry repeats its benchmarks ESSES_BENCH_REPETITIONS times and writes
+# Google Benchmark JSON into the directory ESSES_BENCH_OUT (both set by the bench test presets in
+# CMakePresets.json). tools/bench_compare.py (08 section 6.9) reads that directory: `--limits bench/workloads.md`
+# for the gate, `--baseline <file> --tolerance 0.30` for the alarm, `--accept` to rewrite a baseline at a
+# milestone tag. Until bench/CMakeLists.txt exists both jobs stop after a notice.
+name: bench
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  schedule:
+    - cron: "30 3 * * *" # nightly
+  workflow_dispatch: {}
+
+concurrency:
+  group: bench-${{ github.ref }}
+  cancel-in-progress: false # never cancel a measurement half-way
+
+permissions:
+  contents: read
+
+env:
+  QT_VERSION: "6.12.0" # as ci.yml (D-006, D-126); the plot benchmarks need esses_qtrender
+
+jobs:
+  hosted-alarm:
+    name: bench hosted alarm (${{ matrix.os }})
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    continue-on-error: true # non-blocking (D-042)
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, preset: linux-gcc-bench, qtarch: linux_gcc_64 }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    env:
+      QT_QPA_PLATFORM: offscreen
+      ESSES_TEST_FONT_DIR: ${{ github.workspace }}/tests/golden/fonts
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: false }
+      - name: Benchmark sources present?
+        id: probe
+        shell: bash
+        run: |
+          if [ -f bench/CMakeLists.txt ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::bench/CMakeLists.txt does not exist yet; nothing to measure"
+          fi
+      - if: steps.probe.outputs.present == 'true'
+        uses: lukka/get-cmake@latest
+      - name: Install Qt ${{ env.QT_VERSION }} (aqtinstall)
+        if: steps.probe.outputs.present == 'true'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: ${{ matrix.qtarch }}
+          cache: true
+      - name: Qt build and runtime dependencies (libxcb1-dev for ADS, as in ci.yml qt-app)
+        if: steps.probe.outputs.present == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgl-dev libegl-dev libglx-dev libopengl-dev \
+            libxkbcommon-dev libfontconfig1-dev libfreetype-dev libdbus-1-3 libxcb1-dev
+      - name: Configure (Release, ESSES_BUILD_BENCH=ON)
+        if: steps.probe.outputs.present == 'true'
+        shell: bash
+        run: cmake --preset ${{ matrix.preset }} -DCMAKE_PREFIX_PATH="${QT_ROOT_DIR//\\//}"
+      - name: Build
+        if: steps.probe.outputs.present == 'true'
+        run: cmake --build --preset ${{ matrix.preset }}
+      - name: Run (one benchmark at a time, label bench)
+        if: steps.probe.outputs.present == 'true'
+        run: ctest --preset ${{ matrix.preset }}
+      - name: Compare with the hosted baseline (+-30 %, warning only)
+        if: steps.probe.outputs.present == 'true'
+        shell: bash
+        run: |
+          results=build/bench-results/${{ matrix.preset }}
+          baseline=bench/baselines/hosted-${{ matrix.os }}.json
+          if [ ! -f tools/bench_compare.py ]; then
+            echo "::warning::tools/bench_compare.py does not exist yet; results are uploaded only"; exit 0
+          fi
+          if [ ! -f "$baseline" ]; then
+            echo "::warning::no baseline $baseline yet; accept one at a milestone tag (bench_compare.py --accept)"; exit 0
+          fi
+          python3 -I tools/bench_compare.py --results "$results" --baseline "$baseline" --tolerance 0.30 \
+            || echo "::warning::hosted benchmarks moved by more than 30 % against $baseline (D-042 alarm)"
+      - name: Upload results
+        if: always() && steps.probe.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-hosted-${{ matrix.os }}
+          path: build/bench-results/
+          if-no-files-found: ignore
+          retention-days: 30
+
+  reference-gate:
+    name: bench reference gate
+    if: vars.ESSES_REFERENCE_RUNNER == 'true' && github.event_name != 'pull_request'
+    runs-on: [self-hosted, windows, x64, esses-reference]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: false }
+      - name: Benchmark sources present?
+        id: probe
+        shell: cmd
+        run: |
+          if exist bench\CMakeLists.txt (
+            echo present=true>> "%GITHUB_OUTPUT%"
+          ) else (
+            echo present=false>> "%GITHUB_OUTPUT%"
+            echo ::notice::bench/CMakeLists.txt does not exist yet; nothing to measure
+          )
+      # tools/dev/build-qt.cmd sets up MSVC (vcvars64.bat) and the machine's Qt 6.7.2 kit, as for local builds.
+      - name: Build (Release, ESSES_BUILD_BENCH=ON)
+        if: steps.probe.outputs.present == 'true'
+        shell: cmd
+        env:
+          ESSES_SKIP_TESTS: "1"
+        run: call tools\dev\build-qt.cmd win-msvc-bench build\win-msvc-bench
+      - name: Run (one benchmark at a time, label bench)
+        if: steps.probe.outputs.present == 'true'
+        shell: cmd
+        run: ctest --preset win-msvc-bench
+      # The gate itself is the ctest step above: each benchmark runs with --gate and fails on a row over its
+      # 07 section 12 limit. bench_compare.py (a second check against bench/workloads.md) is not written yet;
+      # the step skips with a notice until it lands, so a missing script never fails a passing gate.
+      - name: Absolute limits of 07 section 12 (second check)
+        if: steps.probe.outputs.present == 'true'
+        shell: cmd
+        run: |
+          if not exist tools\bench_compare.py (
+            echo ::notice::tools/bench_compare.py does not exist yet; the ctest --gate step is the gate
+            exit /b 0
+          )
+          python -I tools\bench_compare.py --results build\bench-results\win-msvc-bench --limits bench\workloads.md
+      - name: Upload results
+        if: always() && steps.probe.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-reference
+          path: build/bench-results/
+          if-no-files-found: ignore
+          retention-days: 90

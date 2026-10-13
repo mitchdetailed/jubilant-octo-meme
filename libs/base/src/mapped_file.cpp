@@ -143,7 +143,7 @@ void installBusHandler() {
 
 int runGuarded(void (*decode)(void*), void* ctx, const std::byte* begin, const std::byte* end) noexcept {
     std::call_once(gBusHandlerOnce, installBusHandler);
-    GuardFrame frame;
+    GuardFrame frame{}; // value-initialised; sigsetjmp fills frame.jump below
     frame.begin = begin;
     frame.end = end;
     frame.previous = tlsGuard;
@@ -233,10 +233,10 @@ Result<MappedFile> MappedFile::open(const std::filesystem::path& path) {
         return fail(ErrorCode::Io, std::string("cannot open file: ") + std::strerror(errno),
                     contextFor(path));
     }
+    mf.fd_ = fd; // owned by mf from here (closed by close()); guarded() fstat()s it
     struct stat sb{};
     if (::fstat(fd, &sb) != 0) {
         const int err = errno;
-        ::close(fd);
         return fail(ErrorCode::Io, std::string("cannot stat file: ") + std::strerror(err), contextFor(path));
     }
     const auto fileSize = static_cast<std::uint64_t>(sb.st_size);
@@ -250,14 +250,12 @@ Result<MappedFile> MappedFile::open(const std::filesystem::path& path) {
         void* view = ::mmap(nullptr, static_cast<std::size_t>(fileSize), PROT_READ, MAP_PRIVATE, fd, 0);
         if (view == MAP_FAILED) {
             const int err = errno;
-            ::close(fd);
             return fail(ErrorCode::Io, std::string("cannot map file: ") + std::strerror(err),
                         contextFor(path));
         }
         mf.data_ = static_cast<const std::byte*>(view);
         mf.size_ = static_cast<std::size_t>(fileSize);
     }
-    ::close(fd); // the mapping keeps the file referenced
 #endif
     mf.open_ = true;
     Hash128Stream stream;
@@ -296,6 +294,9 @@ void MappedFile::moveFrom(MappedFile& other) noexcept {
     mappingHandle_ = other.mappingHandle_;
     other.fileHandle_ = nullptr;
     other.mappingHandle_ = nullptr;
+#else
+    fd_ = other.fd_;
+    other.fd_ = -1;
 #endif
     other.data_ = nullptr;
     other.size_ = 0;
@@ -319,6 +320,10 @@ void MappedFile::close() noexcept {
     if (data_ != nullptr) {
         ::munmap(const_cast<std::byte*>(data_), size_);
     }
+    if (fd_ >= 0) {
+        ::close(fd_);
+    }
+    fd_ = -1;
 #endif
     data_ = nullptr;
     size_ = 0;
@@ -337,9 +342,22 @@ Result<void> MappedFile::guarded(void (*decode)(void* ctx), void* ctx) const noe
     if (decode == nullptr) {
         return fail(ErrorCode::Invalid, "guarded: no decode routine");
     }
-    if (runGuarded(decode, ctx, data_, data_ + size_) != 0) {
+    const bool faulted = runGuarded(decode, ctx, data_, data_ + size_) != 0;
+#if defined(ESSES_OS_WINDOWS)
+    const bool truncated = false; // an in-place writer cannot shrink the file: it gets a sharing error
+#else
+    // POSIX leaves reads of a shrunken mapping unspecified (macOS serves resident pages without SIGBUS), so a
+    // file that is now shorter than the view fails the call even when no signal was raised.
+    struct stat sb{};
+    const bool truncated = !faulted && size_ > 0 && fd_ >= 0 && ::fstat(fd_, &sb) == 0 &&
+                           static_cast<std::uint64_t>(sb.st_size) < static_cast<std::uint64_t>(size_);
+#endif
+    if (faulted || truncated) {
         try {
-            return fail(ErrorCode::Io, "page fault while reading a mapped file", contextFor(path_));
+            return fail(ErrorCode::Io,
+                        faulted ? "page fault while reading a mapped file"
+                                : "the mapped file was truncated while it was being read",
+                        contextFor(path_));
         } catch (...) {
             return Failure{Error{ErrorCode::OutOfMemory, "bad_alloc", {}}};
         }

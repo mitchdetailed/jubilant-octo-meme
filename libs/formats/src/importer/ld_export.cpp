@@ -262,8 +262,8 @@ public:
             if (!wc) {
                 return Failure{wc.error()};
             }
-            if (*wc) {
-                input.channels.push_back(std::move(**wc));
+            if (std::optional<ld::LdWriteChannel>& written = *wc) {
+                input.channels.push_back(std::move(*written));
             }
             if (progress) {
                 progress(0.9 * static_cast<double>(k + 1) / static_cast<double>(channels.size()));
@@ -337,8 +337,8 @@ public:
             input.details =
                 view.includeDetails ? writeDetailsOf(src.details, units_, notes) : ld::LdWriteDetails{};
         }
-        if (opts->dataAlignment) {
-            wopt.dataAlignment = *opts->dataAlignment;
+        if (const auto& alignment = opts->dataAlignment) {
+            wopt.dataAlignment = *alignment;
         }
 
         WriteReport report;

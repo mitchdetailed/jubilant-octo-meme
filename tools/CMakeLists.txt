@@ -39,6 +39,14 @@ add_test(NAME fixtures.verify_private
 set_tests_properties(fixtures.verify_private PROPERTIES LABELS "fixtures;oracle" TIMEOUT 1800
                      SKIP_REGULAR_EXPRESSION "skipped \\(private\\): no manifest present")
 
+# AC-M1-07: esses-cli laps --json --no-sidecar equals expected.laps.json for every public fixture with beacons
+# (out/in/partial, RESET, IGRDBCN, Start Lap numbering, stint and pitStop annotations).
+add_test(NAME fixtures.laps_golden
+         COMMAND "${CMAKE_COMMAND}" "-DCLI=${_cli}" "-DFIXTURES=${CMAKE_SOURCE_DIR}/fixtures/motec.ld"
+                 "-DINPUTS=${_inputs}/motec.ld" -P "${CMAKE_CURRENT_SOURCE_DIR}/laps_golden.cmake")
+set_tests_properties(fixtures.laps_golden PROPERTIES FIXTURES_REQUIRED esses_fixture_inputs LABELS "fixtures"
+                     TIMEOUT 300)
+
 # Every JSON document of the corpus satisfies the schema it names (08 section 5; AC-M0-10). The private fixture
 # directory is checked when it exists (fixtures/private/s1 holds spike outputs that are not schema documents).
 add_test(NAME fixtures.validate_json COMMAND ${_cli} validate "${CMAKE_SOURCE_DIR}/fixtures/motec.ld")

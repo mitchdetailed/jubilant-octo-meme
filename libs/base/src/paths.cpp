@@ -8,6 +8,7 @@
 
 #include <string>
 #include <system_error>
+#include <vector>
 
 #if defined(ESSES_OS_WINDOWS)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -22,7 +23,6 @@
 #include <shlobj.h>
 #elif defined(__APPLE__)
 #include <cstdint>
-#include <vector>
 
 #include <mach-o/dyld.h>
 #endif
@@ -82,6 +82,17 @@ Failure notFound(const char* what) {
     return fail(ErrorCode::NotFound, std::string("cannot determine the ") + what + " directory");
 }
 
+// The first candidate that is an existing directory; empty when none is.
+fs::path firstDirectory(const std::vector<fs::path>& candidates) {
+    for (const fs::path& c : candidates) {
+        std::error_code ec;
+        if (!c.empty() && fs::is_directory(c, ec)) {
+            return c;
+        }
+    }
+    return {};
+}
+
 } // namespace
 
 fs::path Paths::executableDir() {
@@ -127,7 +138,8 @@ Result<Paths> Paths::resolve(const PathOverrides& overrides) {
     std::optional<fs::path> defCache;
     std::optional<fs::path> defLogs;
     std::optional<fs::path> documents;
-    fs::path defData;
+    fs::path defData;                 // the installed shipped-data location
+    std::vector<fs::path> dataSearch; // searched after <exe dir>/data; defData when none exists
     std::vector<fs::path> plugins;
 #if defined(ESSES_OS_WINDOWS)
     if (const auto roaming = knownFolder(FOLDERID_RoamingAppData)) {
@@ -137,7 +149,7 @@ Result<Paths> Paths::resolve(const PathOverrides& overrides) {
         defCache = *local / dirName / "cache";
     }
     documents = knownFolder(FOLDERID_Documents);
-    defData = p.exe_ / "data";
+    defData = p.exe_ / "data"; // installer, portable zip and build tree alike
     plugins.push_back(p.exe_ / "plugins");
 #elif defined(__APPLE__)
     if (const auto home = homeDir()) {
@@ -149,9 +161,13 @@ Result<Paths> Paths::resolve(const PathOverrides& overrides) {
     const bool inBundle = p.exe_.filename() == "MacOS" && p.exe_.parent_path().filename() == "Contents";
     if (inBundle) {
         defData = (p.exe_ / ".." / "Resources" / "data").lexically_normal();
+        dataSearch.push_back(defData);
+        // A bundle in the build tree: <bin>/<App>.app beside the <bin>/data that CMake copies.
+        dataSearch.push_back((p.exe_ / ".." / ".." / ".." / "data").lexically_normal());
         plugins.push_back((p.exe_ / ".." / "PlugIns" / dirName).lexically_normal());
     } else {
         defData = (p.exe_ / ".." / "share" / dirName / "data").lexically_normal();
+        dataSearch.push_back(defData);
         plugins.push_back((p.exe_ / ".." / "lib" / dirName / "plugins").lexically_normal());
     }
 #else
@@ -166,6 +182,7 @@ Result<Paths> Paths::resolve(const PathOverrides& overrides) {
     }
     documents = xdgDir("XDG_DOCUMENTS_DIR", "Documents");
     defData = (p.exe_ / ".." / "share" / dirName / "data").lexically_normal();
+    dataSearch.push_back(defData);
     plugins.push_back((p.exe_ / ".." / "lib" / dirName / "plugins").lexically_normal());
 #endif
 
@@ -209,12 +226,22 @@ Result<Paths> Paths::resolve(const PathOverrides& overrides) {
     }
 
     // ---- shipped data ----
+    // <exe dir>/data first on every OS (a build tree, where CMake copies data/ beside the executables, or a
+    // portable layout), then the installed locations; the installed one when none exists (01 section 9).
     if (overrides.dataDir) {
         p.data_ = *overrides.dataDir;
     } else if (auto e = envPath("DATA_DIR")) {
         p.data_ = *e;
     } else {
-        p.data_ = defData;
+        std::vector<fs::path> search;
+        if (!p.exe_.empty()) {
+            search.push_back(p.exe_ / "data");
+        }
+        search.insert(search.end(), dataSearch.begin(), dataSearch.end());
+        p.data_ = firstDirectory(search);
+        if (p.data_.empty()) {
+            p.data_ = defData;
+        }
     }
 
     // ---- projects and plugins ----

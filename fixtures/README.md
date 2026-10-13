@@ -30,10 +30,19 @@ ctest generates the inputs into the build tree and verifies through a manifest (
 `fixtures.verify_public`), so concurrent builds never write here; `fixtures.verify_private` runs when the
 private manifest exists and reports "skipped (private)" otherwise.
 
-The 49 synthetic families cover every `(dtype_a, dtype)` pair of dtype_a 0x00 and 0x03 to 0x08 at widths 1, 2,
+The 52 synthetic families cover every `(dtype_a, dtype)` pair of dtype_a 0x00 and 0x03 to 0x08 at widths 1, 2,
 4 and 8 (`synthetic-dtype-<aa>-<w>`), multi-rate channels, `shift != 0` with `mul != 1` in both orders, scaling
 edge cases, aux-chained records (long names; enumeration references, the 212-byte record + aux case), gap blocks,
 32-byte names, a wrong header channel count, device events, a header-only file, a zero-rate record, a truncated
 data array, non-finite floats, an `.ldx` with unknown elements, the m1, c-series, converter-legacy and
 pc-layout dialects, the public sim writers' header fingerprints (`synthetic-sim-gotzl`, `synthetic-sim-mi2`)
-and `synthetic-acc-dialect` (sim-exporter, ACC-style names, BCN laps, one hour at 1 kHz).
+`synthetic-acc-dialect` (sim-exporter, ACC-style names, BCN laps, one hour at 1 kHz) and the beacon families of
+AC-M1-07: `synthetic-beacons-numbering` (Start Lap 7, SPLTBCN, IGRDBCN, a device event inside a lap),
+`synthetic-beacons-reset` (a RESET inside a flying lap: partial lap, out lap, stint 2) and
+`synthetic-beacons-pit` (four wheel speeds and a lap counter: a wait in the pit box, a 10 s stop, a 20 s pit
+stop, a counter reset, a locking wheel, front wheels below zero while stationary).
+
+For every family with beacons (those three, `synthetic-acc-dialect` and `synthetic-ldx-companion`) the
+`Outings:Laps` group of `expected.laps.json` comes from a hand-checked lap table in the generator
+(`Family::expectedLaps`, reasoned from the beacon-pair rule of 02 §4.5 and D-075/D-132), never from the code
+under test; `fixtures.verify_public` and `fixtures.laps_golden` compare `esses-cli` against it.

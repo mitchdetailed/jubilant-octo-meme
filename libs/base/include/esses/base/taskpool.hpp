@@ -33,6 +33,7 @@
 #include <mutex>
 #include <new>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <type_traits>
 #include <typeindex>
@@ -189,6 +190,14 @@ public:
         std::size_t workers = 0;
     };
     Stats stats() const;
+    // Diagnostics and tests: the keys and bands of the runnable (queued) tasks whose key starts with
+    // `keyPrefix` ("" includes unkeyed tasks), band by band, FIFO within a band. Parked and running tasks
+    // are not listed.
+    struct QueuedTask {
+        std::string key;
+        Priority priority = Priority::Background;
+    };
+    std::vector<QueuedTask> queuedTasks(std::string_view keyPrefix) const;
 
     // Executor: fire-and-forget submit.
     void run(Priority priority, TaskKey key, CancelToken token, std::function<void(CancelToken)> fn) override;

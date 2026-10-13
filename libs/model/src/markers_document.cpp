@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: 2026 the Esses contributors
 // SPDX-License-Identifier: MIT
-#include "json_canonical.hpp"
 #include "json_read.hpp"
 #include "marker_json.hpp"
 
@@ -48,11 +47,11 @@ Result<MarkersDocument> MarkersDocument::parse(std::string_view text) {
         }
         doc.schemaVersion = static_cast<int>(version);
         const std::string layersPtr = r.child("layers");
-        const json& layers = r.required("layers");
-        if (!layers.is_object()) {
+        const json& layersJson = r.required("layers");
+        if (!layersJson.is_object()) {
             detail::violate(layersPtr, "expected an object keyed by layer name");
         }
-        for (auto it = layers.begin(); it != layers.end(); ++it) {
+        for (auto it = layersJson.begin(); it != layersJson.end(); ++it) {
             if (it.key().empty()) {
                 detail::violate(layersPtr, "layer names are non-empty (\"Normal\", not the empty alias)");
             }
@@ -67,8 +66,8 @@ Result<MarkersDocument> MarkersDocument::parse(std::string_view text) {
             }
             doc.layers.emplace(it.key(), std::move(markers));
         }
-        if (const json* legacy = r.optional("x-esses-legacy")) {
-            auto o = detail::toOpaque(*legacy);
+        if (const json* legacyJson = r.optional("x-esses-legacy")) {
+            auto o = jsonio::toDoc(*legacyJson);
             if (!o) {
                 detail::violate(r.child("x-esses-legacy"), o.error().message);
             }
@@ -93,9 +92,9 @@ Result<std::string> MarkersDocument::toJson() const {
     }
     root["layers"] = std::move(layersJson);
     if (legacy) {
-        root["x-esses-legacy"] = detail::fromOpaque(*legacy);
+        root["x-esses-legacy"] = jsonio::fromDoc(*legacy);
     }
-    return detail::canonicalJson(root);
+    return jsonio::canonicalJson(root);
 }
 
 } // namespace esses::model

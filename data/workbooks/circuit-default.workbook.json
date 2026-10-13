@@ -1,0 +1,495 @@
+{
+  "$schema": "urn:esses:workbook-1",
+  "schemaVersion": 1,
+  "activeWorksheet": "Overlay",
+  "id": "876b1936-3b4f-495d-b8f9-dfa0c067242f",
+  "name": "Circuit",
+  "profile": "circuit",
+  "worksheets": [
+    {
+      "components": [
+        {
+          "activeChannel": "Corr Speed",
+          "body": {
+            "display": {
+              "axis": {
+                "showX": true,
+                "showXScrollbar": true,
+                "showY": true,
+                "showYScrollbar": true
+              },
+              "bandGroup": "Outings:Laps:Track Sections:Default",
+              "bandMode": "sections",
+              "cursorSnap": true,
+              "cursorStyle": "line",
+              "key": {
+                "mode": "labels",
+                "pos": "left",
+                "stats": false,
+                "values": true
+              },
+              "lineWidth": 1,
+              "overlapMode": "panels",
+              "pointSize": 2,
+              "showBands": true,
+              "showDeviceEvents": true,
+              "showGrid": true,
+              "showMarkers": true,
+              "showStatusStrip": false,
+              "statusChannels": [],
+              "traceStyle": "line",
+              "variance": {
+                "autoScale": true,
+                "heightFrac": 0.15,
+                "max": {
+                  "unit": "s",
+                  "v": 2
+                },
+                "min": {
+                  "unit": "s",
+                  "v": -2
+                },
+                "show": false
+              }
+            },
+            "groups": [
+              {
+                "edges": [0, 0.4],
+                "hi": 0.4,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0,
+                "name": "Speed",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "Corr Speed",
+                    "displayUnit": "km/h",
+                    "dps": 1,
+                    "visible": true
+                  },
+                  {
+                    "channel": "SPEED",
+                    "displayUnit": "km/h",
+                    "dps": 1,
+                    "visible": true
+                  }
+                ]
+              },
+              {
+                "edges": [0.4, 0.6],
+                "hi": 0.6,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0.4,
+                "name": "Pedals",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "THROTTLE",
+                    "dps": 1,
+                    "visible": true
+                  },
+                  {
+                    "channel": "BRAKE",
+                    "dps": 1,
+                    "visible": true
+                  }
+                ]
+              },
+              {
+                "edges": [0.6, 0.75],
+                "hi": 0.75,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0.6,
+                "name": "Steering",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "STEERANGLE",
+                    "displayUnit": "deg",
+                    "dps": 0,
+                    "visible": true
+                  }
+                ]
+              },
+              {
+                "edges": [0.75, 0.9],
+                "hi": 0.9,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0.75,
+                "name": "Engine",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "RPMS",
+                    "displayUnit": "rpm",
+                    "dps": 0,
+                    "visible": true
+                  }
+                ]
+              },
+              {
+                "edges": [0.9, 1],
+                "hi": 1,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0.9,
+                "name": "Gear",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "GEAR",
+                    "dps": 0,
+                    "visible": true
+                  }
+                ]
+              }
+            ]
+          },
+          "caption": {
+            "auto": true,
+            "show": true,
+            "text": ""
+          },
+          "id": "c1413bb7-8379-4574-a45f-911e9e04e111",
+          "legend": {
+            "channels": true,
+            "colour": false
+          },
+          "links": {
+            "cursor": true,
+            "datum": true,
+            "zoom": true
+          },
+          "rect": [0, 0, 0.75, 1],
+          "type": "time_distance",
+          "version": 1,
+          "z": 0
+        },
+        {
+          "activeChannel": "Corr Speed",
+          "body": {
+            "autoSizeColumns": true,
+            "channels": [
+              {
+                "channel": "Corr Speed",
+                "displayUnit": "km/h",
+                "dps": 1
+              },
+              {
+                "channel": "Corr Dist",
+                "displayUnit": "m",
+                "dps": 0
+              },
+              {
+                "channel": "SPEED",
+                "displayUnit": "km/h",
+                "dps": 1
+              },
+              {
+                "channel": "THROTTLE",
+                "dps": 1
+              },
+              {
+                "channel": "BRAKE",
+                "dps": 1
+              },
+              {
+                "channel": "STEERANGLE",
+                "displayUnit": "deg",
+                "dps": 1
+              },
+              {
+                "channel": "RPMS",
+                "displayUnit": "rpm",
+                "dps": 0
+              },
+              {
+                "channel": "GEAR",
+                "dps": 0
+              },
+              {
+                "channel": "FUEL",
+                "displayUnit": "l",
+                "dps": 2
+              }
+            ],
+            "columns": {
+              "datum": false,
+              "delta": true,
+              "inlineUnits": true
+            },
+            "showHeading": true,
+            "widths": {
+              "datum": 80,
+              "delta": 80,
+              "name": 120,
+              "value": 80
+            }
+          },
+          "caption": {
+            "auto": true,
+            "show": true,
+            "text": ""
+          },
+          "id": "74781eb0-1c8b-4d97-8d85-53206faf83b7",
+          "legend": {
+            "channels": true,
+            "colour": false
+          },
+          "links": {
+            "cursor": true,
+            "datum": true,
+            "zoom": true
+          },
+          "rect": [0.75, 0, 1, 1],
+          "type": "values_list",
+          "version": 1,
+          "z": 1
+        }
+      ],
+      "domain": "time",
+      "grid": [100, 100],
+      "id": "c4f6c7fd-be20-4c00-b4ab-7f6b7dd7999d",
+      "linkTo": "Laps",
+      "name": "Overlay"
+    },
+    {
+      "components": [
+        {
+          "activeChannel": "THROTTLE",
+          "body": {
+            "display": {
+              "axis": {
+                "showX": true,
+                "showXScrollbar": true,
+                "showY": true,
+                "showYScrollbar": true
+              },
+              "bandGroup": "Outings:Laps:Track Sections:Default",
+              "bandMode": "sections",
+              "cursorSnap": true,
+              "cursorStyle": "line",
+              "key": {
+                "mode": "labels",
+                "pos": "left",
+                "stats": false,
+                "values": true
+              },
+              "lineWidth": 1,
+              "overlapMode": "panels",
+              "pointSize": 2,
+              "showBands": true,
+              "showDeviceEvents": true,
+              "showGrid": true,
+              "showMarkers": true,
+              "showStatusStrip": false,
+              "statusChannels": [],
+              "traceStyle": "line",
+              "variance": {
+                "autoScale": true,
+                "heightFrac": 0.15,
+                "max": {
+                  "unit": "s",
+                  "v": 2
+                },
+                "min": {
+                  "unit": "s",
+                  "v": -2
+                },
+                "show": false
+              }
+            },
+            "groups": [
+              {
+                "edges": [0, 0.35],
+                "hi": 0.35,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0,
+                "name": "Speed",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "Corr Speed",
+                    "displayUnit": "km/h",
+                    "dps": 1,
+                    "visible": true
+                  },
+                  {
+                    "channel": "SPEED",
+                    "displayUnit": "km/h",
+                    "dps": 1,
+                    "visible": true
+                  }
+                ]
+              },
+              {
+                "edges": [0.35, 0.65],
+                "hi": 0.65,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0.35,
+                "name": "Pedals",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "THROTTLE",
+                    "dps": 1,
+                    "visible": true
+                  },
+                  {
+                    "channel": "BRAKE",
+                    "dps": 1,
+                    "visible": true
+                  }
+                ]
+              },
+              {
+                "edges": [0.65, 0.85],
+                "hi": 0.85,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0.65,
+                "name": "Steering",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "STEERANGLE",
+                    "displayUnit": "deg",
+                    "dps": 0,
+                    "visible": true
+                  }
+                ]
+              },
+              {
+                "edges": [0.85, 1],
+                "hi": 1,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0.85,
+                "name": "Gear",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "GEAR",
+                    "dps": 0,
+                    "visible": true
+                  }
+                ]
+              }
+            ]
+          },
+          "caption": {
+            "auto": true,
+            "show": true,
+            "text": ""
+          },
+          "id": "6dc2d7e8-54a5-44f0-8932-ff8e4b58aada",
+          "legend": {
+            "channels": true,
+            "colour": false
+          },
+          "links": {
+            "cursor": true,
+            "datum": true,
+            "zoom": true
+          },
+          "rect": [0, 0, 1, 1],
+          "type": "time_distance",
+          "version": 1,
+          "z": 0
+        }
+      ],
+      "domain": "distance",
+      "grid": [100, 100],
+      "id": "dbe1b836-172a-41ba-bdb1-6187b979377f",
+      "linkTo": "Laps",
+      "name": "Driver"
+    }
+  ]
+}

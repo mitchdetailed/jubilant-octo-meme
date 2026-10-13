@@ -1,0 +1,123 @@
+{
+    "activeChannel": "Ch 07",
+    "body": {
+        "groups": [
+            {
+                "name": "Group 1",
+                "scaleMode": "channel",
+                "traces": [
+                    {
+                        "channel": "Ch 01"
+                    },
+                    {
+                        "channel": "Ch 02"
+                    },
+                    {
+                        "channel": "Ch 03"
+                    },
+                    {
+                        "channel": "Ch 04"
+                    },
+                    {
+                        "channel": "Ch 05"
+                    }
+                ]
+            },
+            {
+                "name": "Group 2",
+                "scaleMode": "channel",
+                "traces": [
+                    {
+                        "channel": "Ch 06"
+                    },
+                    {
+                        "channel": "Ch 07"
+                    },
+                    {
+                        "channel": "Ch 08"
+                    },
+                    {
+                        "channel": "Ch 09"
+                    },
+                    {
+                        "channel": "Ch 10"
+                    }
+                ]
+            },
+            {
+                "name": "Group 3",
+                "scaleMode": "channel",
+                "traces": [
+                    {
+                        "channel": "Ch 11"
+                    },
+                    {
+                        "channel": "Ch 12"
+                    },
+                    {
+                        "channel": "Ch 13"
+                    },
+                    {
+                        "channel": "Ch 14"
+                    },
+                    {
+                        "channel": "Ch 15"
+                    }
+                ]
+            },
+            {
+                "name": "Group 4",
+                "scaleMode": "channel",
+                "traces": [
+                    {
+                        "channel": "Ch 16"
+                    },
+                    {
+                        "channel": "Ch 17"
+                    },
+                    {
+                        "channel": "Ch 18"
+                    },
+                    {
+                        "channel": "Ch 19"
+                    },
+                    {
+                        "channel": "Ch 20"
+                    }
+                ]
+            }
+        ]
+    },
+    "case": "twenty_traces",
+    "cursorUs": 15000000,
+    "data": "libs/plotcore/tests/td_golden_cases.hpp (synthetic rational data, sources synthetic_a/b/c.ld)",
+    "datumUs": null,
+    "domain": "time",
+    "dprs": [
+        1,
+        2
+    ],
+    "focused": false,
+    "fonts": "tests/golden/fonts (Noto Sans), QtTextMetrics",
+    "pendingStripe": false,
+    "scheme": "Test Light",
+    "singleColourMain": false,
+    "sizeLogical": [
+        420,
+        420
+    ],
+    "slots": [
+        {
+            "distanceData": true,
+            "kind": "Main",
+            "lap": 0,
+            "number": 0,
+            "source": "synthetic_a.ld"
+        }
+    ],
+    "type": "time_distance",
+    "zoom": [
+        10000000,
+        30000000
+    ]
+}

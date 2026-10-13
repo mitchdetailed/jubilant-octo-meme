@@ -1,0 +1,79 @@
+{
+    "activeChannel": "Corr Speed",
+    "body": {
+        "display": {
+            "key": {
+                "pos": "right"
+            }
+        },
+        "groups": [
+            {
+                "name": "Speed",
+                "scaleMode": "channel",
+                "traces": [
+                    {
+                        "channel": "Corr Speed",
+                        "displayUnit": "km/h",
+                        "dps": 1
+                    }
+                ]
+            },
+            {
+                "name": "Throttle",
+                "scaleMax": {
+                    "unit": "%",
+                    "v": 100
+                },
+                "scaleMin": {
+                    "unit": "%",
+                    "v": 0
+                },
+                "scaleMode": "manual",
+                "traces": [
+                    {
+                        "channel": "Throttle Pos"
+                    }
+                ]
+            }
+        ]
+    },
+    "case": "dark_scheme",
+    "cursorUs": 22500000,
+    "data": "libs/plotcore/tests/td_golden_cases.hpp (synthetic rational data, sources synthetic_a/b/c.ld)",
+    "datumUs": 10000000,
+    "domain": "time",
+    "dprs": [
+        1,
+        2
+    ],
+    "focused": false,
+    "fonts": "tests/golden/fonts (Noto Sans), QtTextMetrics",
+    "pendingStripe": false,
+    "scheme": "Test Dark",
+    "singleColourMain": false,
+    "sizeLogical": [
+        400,
+        260
+    ],
+    "slots": [
+        {
+            "distanceData": true,
+            "kind": "Main",
+            "lap": 1,
+            "number": 0,
+            "source": "synthetic_a.ld"
+        },
+        {
+            "distanceData": true,
+            "kind": "Overlay",
+            "lap": 1,
+            "number": 1,
+            "source": "synthetic_b.ld"
+        }
+    ],
+    "type": "time_distance",
+    "zoom": [
+        5000000,
+        45000000
+    ]
+}

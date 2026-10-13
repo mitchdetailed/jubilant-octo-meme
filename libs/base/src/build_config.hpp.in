@@ -6,9 +6,11 @@
 #pragma once
 
 #define ESSES_BUILD_VERSION_STRING "@ESSES_VERSION_STRING@"
+// NOLINTBEGIN(modernize-macro-to-enum): configure-time values, kept as macros like the strings around them.
 #define ESSES_BUILD_VERSION_MAJOR @ESSES_VERSION_MAJOR@
 #define ESSES_BUILD_VERSION_MINOR @ESSES_VERSION_MINOR@
 #define ESSES_BUILD_VERSION_PATCH @ESSES_VERSION_PATCH@
+// NOLINTEND(modernize-macro-to-enum)
 #define ESSES_BUILD_GIT_SHA "@ESSES_GIT_SHA@"
 #define ESSES_BUILD_DATE "@ESSES_BUILD_DATE@"
 #define ESSES_BUILD_APP_NAME "@ESSES_APP_NAME@"
