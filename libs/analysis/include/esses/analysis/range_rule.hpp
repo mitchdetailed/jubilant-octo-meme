@@ -15,10 +15,11 @@
 // plus this RuleContext; no esses_project type appears here.
 #pragma once
 
+#include <esses/base/json_doc.hpp>
 #include <esses/base/result.hpp>
 #include <esses/model/detail.hpp>
 #include <esses/model/layer.hpp>
-#include <esses/model/opaque_json.hpp>
+#include <esses/model/opaque_json.hpp> // compatibility: model::OpaqueJson names JsonDoc
 #include <esses/model/range.hpp>
 
 #include <filesystem>
@@ -38,7 +39,7 @@ struct RuleDocument {
     std::string produces;            // "Outings:Laps"
     std::string parent;              // "Outings"; "" for a root group
     std::vector<std::string> layers; // ["Normal", "Fastest"], or ["*"] for every layer
-    model::OpaqueJson json;          // the complete document
+    JsonDoc json;                    // the complete document
 
     // Format/Invalid with context.detail (a JSON pointer) on a malformed document; Unsupported for another
     // major version of the schema. Checks the envelope only ($schema rule-1, id, kind, phase, produces,

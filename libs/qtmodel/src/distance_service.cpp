@@ -46,6 +46,12 @@ std::string keyHash(const analysis::DistanceIndexKey& key) {
     return h.digest().hex();
 }
 
+bool sameButStretch(const analysis::DistanceIndexKey& a, const analysis::DistanceIndexKey& b) {
+    analysis::DistanceIndexKey c = a;
+    c.stretch = b.stretch;
+    return c == b;
+}
+
 bool isCorrDist(const maths::ChannelKey& key) {
     return key.nameCf == caseFold(detail::kCorrDist);
 }
@@ -166,6 +172,15 @@ std::shared_ptr<const analysis::DistanceIndex> DistanceService::index(const mode
         if (entry.index != nullptr || entry.failed || entry.pending) {
             return entry.index;
         }
+    }
+    if (entry.index != nullptr && !entry.pending && sameButStretch(entry.key, key)) {
+        // Only the lap-stretch factor changed (LapStretchService): the published index is copied with the new
+        // scalar (D-140: a shared index never changes), without a rebuild from Corr Dist.
+        auto copy = std::make_shared<analysis::DistanceIndex>(*entry.index);
+        copy->setStretch(key.stretch);
+        entry = Impl::Lap{key, std::move(copy), false, false, {}, priority};
+        ++s.generation;
+        return entry.index;
     }
     TaskKey taskKey{"distidx/" + detail::sourceHex(lap.src) + "/" + lap.layer + "/" + lap.range.str() + "/" +
                     corrDist->version.hex() + "/" + keyHash(key)};

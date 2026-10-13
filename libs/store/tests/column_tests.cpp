@@ -475,10 +475,16 @@ TEST_CASE("column: version bumps under concurrent readers never expose freed or 
             }
         });
     }
+    // Progress is synchronised, not timed: the bumps start once a reader has read, and the readers stop only
+    // after a read that followed the last bump (under a loaded parallel ctest the readers may otherwise not
+    // be scheduled before the bump loop ends).
+    REQUIRE(test::waitFor([&] { return reads.load() > 0; }));
     for (int i = 0; i < 40; ++i) {
         std::this_thread::sleep_for(std::chrono::milliseconds(3));
         provider->bumpVersion();
     }
+    const int readsAtLastBump = reads.load();
+    REQUIRE(test::waitFor([&] { return reads.load() > readsAtLastBump; }));
     stop.store(true);
     for (std::thread& th : readers) {
         th.join();

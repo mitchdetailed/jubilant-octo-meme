@@ -1,0 +1,22 @@
+{
+  "blank-latitude.json": {
+    "pointer": "/latitude",
+    "why": "a channel name is not blank"
+  },
+  "document-envelope.json": {
+    "pointer": "",
+    "why": "the settings are a member of a document, not a document"
+  },
+  "percent-over-100.json": {
+    "pointer": "/timeShift/percentOfUpdatePeriod",
+    "why": "the time shift is at most the whole update period"
+  },
+  "unknown-outputs.json": {
+    "pointer": "/outputs",
+    "why": "the outputs shadow the inputs or carry a prefix"
+  },
+  "valid-when-text.json": {
+    "pointer": "/statusChannel/validWhen",
+    "why": "the status condition is an operator and a number"
+  }
+}

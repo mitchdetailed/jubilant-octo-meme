@@ -54,6 +54,9 @@ struct Profile {
     std::vector<ProfileDetail> details;
     JsonDoc terms;   // {"range": "Lap", "ranges": "Laps", "editor": "Lap Editor"}
     JsonDoc unknown; // unrecognised top-level members, preserved
+    // The minor written on save: the newest this build writes, or the newer minor the document was read with
+    // (R-38: never downgraded).
+    int schemaVersion = 1;
 
     const DataView* defaultView() const noexcept; // the view marked default, else the first, else nullptr
     const ProfileDetail* findDetail(std::string_view id) const noexcept;

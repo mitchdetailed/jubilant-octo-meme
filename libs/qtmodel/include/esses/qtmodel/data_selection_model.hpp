@@ -17,10 +17,16 @@
 // Deviations: the constructor takes a nullable ProjectSession* (06 writes ProjectSession&) so the selection
 // rules are testable without a project; with a session the model reads options.fastLapTolerancePct and
 // options.general.selectFastestOnLoad on projectOpened and writes lastSelection back on every change.
-// setTrusted (no undo before M2) hands the edited sidecar to the SidecarCommit hook (the shell passes
-// SourceLoader::commitSidecar), whose new snapshot comes back through sourceReplaced. Filters are kept per
-// session in M1 (persisted in project.json dataWindow from M2). Additions: hasMain, displayedRanges,
-// filterAccepts, selectionKeys, parseLapNumbers, setSelectFastestOnLoad, setSidecarCommit.
+// setTrusted hands the edited sidecar to the SidecarCommit hook; connectSourceLoader makes it an undoable
+// SidecarCommand on the session's stack (D-032) committed through SourceLoader::commitSidecar, whose new
+// snapshot comes back through sourceReplaced.
+// Data-window filters (06 section 5.4, M2): with a session they are project.json dataWindow (view state,
+// written without the undo stack, D-032): "default" (the filter of a source without its own entry) and one
+// entry per source by quick hash ("xxh3:<hex>", D-162), restored unconditionally when the project opens and
+// when a source publishes, kept for sources that are closed; applyToAllSources is the toolbar flag. A
+// lap-number filter that does not parse is refused (filterRejected(), the previous filter stays).
+// Additions: hasMain, displayedRanges, filterAccepts, selectionKeys, parseLapNumbers, lapNumbersError,
+// filterKindName/parseFilterKind, defaultFilter, session, setSelectFastestOnLoad, setSidecarCommit.
 #pragma once
 
 #include <esses/model/ids.hpp>
@@ -54,6 +60,10 @@ struct FilterSpec { // 06 section 5.4; persisted in project.json dataWindow.filt
     std::string laps; // LapNumbers: "3,5-7"
     friend bool operator==(const FilterSpec&, const FilterSpec&) = default;
 };
+// The project.json spelling of a filter kind (02 section 6.2): "all", "selected", "fastest", "fastest3",
+// "withinOnePercent", "lapNumbers"; nullopt for anything else.
+std::string_view filterKindName(FilterSpec::Kind kind) noexcept;
+std::optional<FilterSpec::Kind> parseFilterKind(std::string_view name) noexcept;
 
 class DataSelectionModel final : public QObject {
     Q_OBJECT
@@ -82,7 +92,10 @@ public:
     std::optional<model::RangeRef> referenceOverlay() const;
     std::vector<model::RangeRef> visibleOverlays() const; // empty while overlaysHidden
     int overlayNumber(const model::RangeRef& r) const;    // 0 = Overlay 0, 1..n, -1 = none
+    // The filter of an open source: its own, else the persisted one of its hash, else defaultFilter().
     FilterSpec filter(const model::SourceId& source) const;
+    const FilterSpec& defaultFilter() const noexcept { return defaultFilter_; }
+    ProjectSession* session() const noexcept { return session_; }
     const std::vector<std::shared_ptr<const model::DataSource>>& sources() const noexcept { return sources_; }
     std::shared_ptr<const model::DataSource> source(const model::SourceId& id) const;
     // The Range a RangeRef names in the current snapshot of its source, or nullptr.
@@ -112,6 +125,8 @@ public:
     // Lap-number filter syntax (06 section 5.4): expr := term (',' term)*; term := int | int '-' int;
     // whitespace ignored, descending ranges normalised. nullopt on a parse error.
     static std::optional<std::vector<std::pair<int, int>>> parseLapNumbers(std::string_view text);
+    // The filter editor's message for text that does not parse ("expected a lap number at 4"), else "".
+    static std::string lapNumbersError(std::string_view text);
 
 public Q_SLOTS:
     void setMain(const model::RangeRef& r);
@@ -137,6 +152,8 @@ public Q_SLOTS:
 Q_SIGNALS:
     void changed(const esses::plot::SelectionSnapshot& snapshot, esses::qt::DataSelectionModel::Changes what);
     void filterChanged(const esses::model::SourceId& source);
+    // A lap-number filter that does not parse was refused; the previous filter stays (06 section 5.4).
+    void filterRejected(const esses::model::SourceId& source, const QString& error);
     void sourcesChanged();
     // Status-bar and Messages hints (no-op commands: CTRL+F without candidates, CTRL+ENTER on Main, ...).
     void hint(const QString& text);
@@ -146,6 +163,9 @@ private:
     void commit(Changes what);
     void checkInvariants() const;
     void readProjectOptions();
+    void readFilters();
+    void writeFilters();
+    std::optional<FilterSpec> storedFilter(const model::SourceId& source) const;
     bool removeFromSlots(const model::RangeRef& r, Changes& what);
     std::optional<model::RangeRef> firstRangeOf(const model::DataSource& src) const;
     std::optional<model::RangeRef> fastestOf(const model::DataSource& src) const;
@@ -157,6 +177,10 @@ private:
     plot::SelectionSnapshot snapshot_;
     std::vector<std::shared_ptr<const model::DataSource>> sources_;
     std::map<model::SourceId, FilterSpec> filters_;
+    // project.json dataWindow.filters by key ("xxh3:<hex>"), also of sources that are not open, and
+    // "default".
+    std::map<std::string, FilterSpec, std::less<>> storedFilters_;
+    FilterSpec defaultFilter_;
     std::string displayedGroupPath_ = "Outings:Laps";
     double fastLapTolerancePct_ = 1.0;
     bool applyToAllSources_ = false;

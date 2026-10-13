@@ -1,0 +1,30 @@
+{
+  "bad-hash.json": {
+    "pointer": "/entries/0/hash",
+    "why": "hashes are xxh3: and 32 hex digits"
+  },
+  "bad-time.json": {
+    "pointer": "/at",
+    "why": "at is an ISO 8601 date-time with an offset"
+  },
+  "document-not-object.json": {
+    "pointer": "/entries/0/document",
+    "why": "an entry holds a whole document"
+  },
+  "entry-unknown-member.json": {
+    "pointer": "/entries/0",
+    "why": "entries are closed"
+  },
+  "missing-session.json": {
+    "pointer": "",
+    "why": "an entry file names its session"
+  },
+  "path-leaves-folder.json": {
+    "pointer": "/entries/0/path",
+    "why": "entry paths stay inside the project folder"
+  },
+  "seq-zero.json": {
+    "pointer": "/seq",
+    "why": "seq starts at 1"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "urn:esses:fixture-1",
+  "schemaVersion": 1,
+  "channelsCompared": "all",
+  "dialect": "tab,timestamped",
+  "format": "text.profile:generic.csv",
+  "input": {
+    "bytes": 16291,
+    "file": "input.txt",
+    "sha256": "96f00c8a81054f136091c765e657aaedb1dcbbd1591770219ac95ac1d3c6dc04"
+  },
+  "licence": "CC0-1.0",
+  "name": "timestamped-tab",
+  "notes": "timestamped rows: jitter and a pause, a repeated time (last wins), an earlier time (dropped)",
+  "oracle": {
+    "kind": "generator",
+    "ref": "tools/gen_text_fixtures.py 1.0.0 (MIT)",
+    "tolerance": {
+      "F32": "1ulp",
+      "F64": "1ulp",
+      "I32": "exact",
+      "timesUs": "exact"
+    },
+    "validity": "strict"
+  },
+  "private": false,
+  "provenance": "synthetic",
+  "source": "synthetic: tools/gen_text_fixtures.py, tab-separated epoch-millisecond rows with jitter"
+}

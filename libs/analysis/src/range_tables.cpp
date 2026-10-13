@@ -56,4 +56,17 @@ std::uint64_t RangeTables::rangeVersion(std::string_view path) const noexcept {
     return it == versions_.end() ? 0 : it->second;
 }
 
+bool RangeTables::contains(std::string_view path) const noexcept {
+    return groups_.find(path) != groups_.end();
+}
+
+std::vector<std::string> RangeTables::paths() const {
+    std::vector<std::string> out;
+    out.reserve(groups_.size());
+    for (const auto& [path, intervals] : groups_) {
+        out.push_back(path);
+    }
+    return out;
+}
+
 } // namespace esses::analysis

@@ -1,0 +1,8 @@
+{
+  "$schema": "urn:esses:importer-profile-1",
+  "schemaVersion": 1,
+  "id": "logger-semicolon",
+  "name": "Semicolon logger export",
+  "version": "1.0.0",
+  "delimiter": ":"
+}

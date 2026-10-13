@@ -1,0 +1,188 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:dictionary-1",
+  "title": "Esses importer dictionary (dictionary-1)",
+  "description": "Per-importer channel knowledge (05 section 8.3, 02 section 4.6 rule 15): data/dictionaries/<importer file stem>.json. Entries match by vendorId, exact name or nameRegex (first match wins, in file order) and overwrite the channel's name, unit, quantity, interpolation, kind and storage dtype before the channel resolver runs; bitfields expand a group channel into Bool channels, filtered by the Device Type and Device Version details. version is the dictionary's content version and enters the column cache key. Unknown top-level members are allowed and preserved; entries and bitfields are closed.",
+  "type": "object",
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "importer",
+    "version"
+  ],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072). The urn:esses: form is written; the bare esses: form of earlier drafts and the later https form are accepted on load and normalised on save (02 section 6.6 rule 1).",
+      "type": "string",
+      "pattern": "^(urn:esses:dictionary-1|esses:dictionary-1|https://[^/\\s]+(/[^/\\s]+)*/dictionary-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "importer": {
+      "$ref": "#/definitions/importerId"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/dictionaryEntry"
+      }
+    },
+    "bitfields": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/dictionaryBitfield"
+      }
+    },
+    "x-esses-legacy": {
+      "$ref": "#/definitions/legacyBag"
+    }
+  },
+  "definitions": {
+    "importerId": {
+      "description": "Importer id (D-028): \"motec.ld\", \"motec.csv\", \"text.profile:generic.csv\", ...",
+      "type": "string",
+      "pattern": "^[a-z0-9]+([._:-][a-z0-9]+)*$"
+    },
+    "legacyBag": {
+      "description": "Fields removed by a migration, kept verbatim (02 section 6.6 rule 3).",
+      "type": "object"
+    },
+    "dictionaryMatch": {
+      "description": "Every member stated must hold.",
+      "type": "object",
+      "minProperties": 1,
+      "properties": {
+        "vendorId": {
+          "description": "The format's channel id as a string (\"900\").",
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nameRegex": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "dictionaryEntry": {
+      "type": "object",
+      "required": [
+        "match"
+      ],
+      "properties": {
+        "match": {
+          "$ref": "#/definitions/dictionaryMatch"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "shortName": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "quantity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "Real",
+            "Integer",
+            "Enum",
+            "Bool",
+            "Bitfield",
+            "Text"
+          ]
+        },
+        "interp": {
+          "enum": [
+            "Linear",
+            "Closest",
+            "Previous",
+            "Next"
+          ]
+        },
+        "dtype": {
+          "enum": [
+            "F32",
+            "F64",
+            "I32"
+          ]
+        },
+        "lapSource": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "dictionaryBitfield": {
+      "type": "object",
+      "required": [
+        "match",
+        "bits"
+      ],
+      "properties": {
+        "match": {
+          "$ref": "#/definitions/dictionaryMatch"
+        },
+        "device": {
+          "type": "object",
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minVersion": {
+              "type": "integer"
+            },
+            "maxVersion": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": false
+        },
+        "bits": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "mask",
+              "name"
+            ],
+            "properties": {
+              "mask": {
+                "description": "A non-zero mask, hexadecimal (\"0x0001\") or decimal.",
+                "type": "string",
+                "pattern": "^(0[xX][0-9A-Fa-f]*[1-9A-Fa-f][0-9A-Fa-f]*|[1-9][0-9]*)$"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

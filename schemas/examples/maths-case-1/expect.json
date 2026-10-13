@@ -1,0 +1,46 @@
+{
+  "missing-expected.json": {
+    "pointer": "",
+    "why": "a case states what it expects"
+  },
+  "bad-provenance-kind.json": {
+    "pointer": "/provenance/kind",
+    "why": "provenance kinds are those of 03 section 14.1"
+  },
+  "input-without-rate.json": {
+    "pointer": "/inputs/X",
+    "why": "an input has its rate"
+  },
+  "input-value-not-number.json": {
+    "pointer": "/inputs/X/values/2",
+    "why": "input values are numbers; validity goes in valid"
+  },
+  "expected-without-result.json": {
+    "pointer": "/expected",
+    "why": "expected holds the result or the error"
+  },
+  "bad-id.json": {
+    "pointer": "/id",
+    "why": "ids are lower-case file stems"
+  },
+  "wrong-schema-id.json": {
+    "pointer": "/$schema",
+    "why": "the $schema id names another schema"
+  },
+  "selection-without-index.json": {
+    "pointer": "/selection/main",
+    "why": "a selection names the range's index in its group"
+  },
+  "unknown-member.json": {
+    "pointer": "",
+    "why": "maths-case-1 is closed"
+  },
+  "negative-tolerance.json": {
+    "pointer": "/expected/tolerance/abs",
+    "why": "tolerances are not negative"
+  },
+  "name-with-quote.json": {
+    "pointer": "/inputs",
+    "why": "a channel name never contains a quote"
+  }
+}

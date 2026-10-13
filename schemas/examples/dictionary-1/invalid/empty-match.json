@@ -1,0 +1,12 @@
+{
+  "$schema": "urn:esses:dictionary-1",
+  "schemaVersion": 1,
+  "importer": "text.profile:logger-semicolon",
+  "version": "1.0.0",
+  "entries": [
+    {
+      "match": {},
+      "name": "X"
+    }
+  ]
+}

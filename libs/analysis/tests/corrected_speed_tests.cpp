@@ -42,8 +42,8 @@ UniformSignal uniformSignal(std::uint32_t hz, std::vector<double> values) {
     return s;
 }
 
-model::OpaqueJson json(const std::string& text) {
-    auto j = model::OpaqueJson::parse(text);
+JsonDoc json(const std::string& text) {
+    auto j = JsonDoc::parse(text);
     REQUIRE(j.ok());
     return std::move(j).value();
 }
@@ -359,7 +359,7 @@ TEST_CASE("corrected_speed: settings parse the 03 section 9.1 object and its sch
     CHECK(s->speedOutput == "CS");
     CHECK(s->distanceOutput == "CD");
 
-    auto defaults = CorrectedSpeedSettings::fromJson(model::OpaqueJson{}, registry());
+    auto defaults = CorrectedSpeedSettings::fromJson(JsonDoc{}, registry());
     REQUIRE(defaults.ok());
     CHECK(defaults->clamp.minMps == 0.0);
     CHECK(defaults->speedOutput == "Corr Speed");

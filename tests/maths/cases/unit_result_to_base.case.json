@@ -1,0 +1,37 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "unit_result_to_base",
+  "expression": "'S'[km/h] * 2",
+  "provenance": {
+    "kind": "derived",
+    "ref": "03_MATHS_ENGINE.md 6.1",
+    "note": "a declared result unit: the values are stored in its base unit"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "resultUnit": "km/h",
+  "durationUs": 400000,
+  "inputs": {
+    "S": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "m/s",
+      "values": [0, 10, 20, 27.5]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [0, 20, 40, 55],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

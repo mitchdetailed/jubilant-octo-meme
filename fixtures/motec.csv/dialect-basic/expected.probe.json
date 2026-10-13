@@ -1,0 +1,224 @@
+{
+  "$schema": "urn:esses:probe-1",
+  "schemaVersion": 1,
+  "companions": [],
+  "details": [
+    {
+      "id": "Export Workbook",
+      "value": "Fixture"
+    },
+    {
+      "id": "Venue",
+      "value": "Synthetic Park"
+    },
+    {
+      "id": "Export Worksheet",
+      "value": "Overview"
+    },
+    {
+      "id": "Vehicle Id",
+      "value": "SYN-01"
+    },
+    {
+      "id": "Driver",
+      "value": "Test Driver"
+    },
+    {
+      "id": "Device Type",
+      "value": "SYNLOG"
+    },
+    {
+      "id": "Comment",
+      "value": "self-authored fixture"
+    },
+    {
+      "id": "Session",
+      "value": "1"
+    },
+    {
+      "id": "Log Date",
+      "value": "12/10/2026"
+    },
+    {
+      "id": "Log Time",
+      "value": "09:30:00"
+    },
+    {
+      "id": "Export Range",
+      "value": "full log"
+    }
+  ],
+  "dialect": "",
+  "enumTables": [],
+  "importerId": "motec.csv",
+  "importerVersion": "1.0.0",
+  "layers": [
+    {
+      "channels": [
+        {
+          "dps": 1,
+          "dtype": "F64",
+          "flags": 0,
+          "index": 0,
+          "kind": "Real",
+          "loggedName": "Corr Dist",
+          "sampleCount": 1843,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 25,
+              "num": 512
+            }
+          },
+          "vendorDtype": "text",
+          "vendorUnit": "m"
+        },
+        {
+          "dps": 1,
+          "dtype": "F32",
+          "flags": 0,
+          "index": 1,
+          "kind": "Real",
+          "loggedName": "Ground Speed",
+          "sampleCount": 1843,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 25,
+              "num": 512
+            }
+          },
+          "vendorDtype": "text",
+          "vendorUnit": "km/h"
+        },
+        {
+          "dps": 0,
+          "dtype": "F32",
+          "flags": 0,
+          "index": 2,
+          "kind": "Integer",
+          "loggedName": "Engine RPM",
+          "sampleCount": 1843,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 25,
+              "num": 512
+            }
+          },
+          "vendorDtype": "text",
+          "vendorUnit": "rpm"
+        },
+        {
+          "dps": 1,
+          "dtype": "F32",
+          "flags": 0,
+          "index": 3,
+          "kind": "Real",
+          "loggedName": "Throttle Pos",
+          "sampleCount": 1843,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 25,
+              "num": 512
+            }
+          },
+          "vendorDtype": "text",
+          "vendorUnit": "%"
+        },
+        {
+          "dps": 0,
+          "dtype": "F32",
+          "flags": 0,
+          "index": 4,
+          "kind": "Integer",
+          "loggedName": "Gear",
+          "sampleCount": 1843,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 25,
+              "num": 512
+            }
+          },
+          "vendorDtype": "text",
+          "vendorUnit": ""
+        },
+        {
+          "dps": 0,
+          "dtype": "F32",
+          "flags": 0,
+          "index": 5,
+          "kind": "Integer",
+          "loggedName": "Lap",
+          "sampleCount": 1843,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 25,
+              "num": 512
+            }
+          },
+          "vendorDtype": "text",
+          "vendorUnit": ""
+        }
+      ],
+      "durationUs": 89990234,
+      "markers": [
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 0,
+          "group": "Beacons",
+          "name": "",
+          "ordinal": 0,
+          "tUs": 29980469
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 0,
+          "group": "Beacons",
+          "name": "",
+          "ordinal": 0,
+          "tUs": 59960938
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 0,
+          "group": "Beacons",
+          "name": "",
+          "ordinal": 0,
+          "tUs": 89941406
+        }
+      ],
+      "name": "Normal"
+    }
+  ],
+  "warnings": [
+    {
+      "code": "text.lap_source",
+      "ctx": {
+        "detail": "lap_counter_edge:Lap"
+      },
+      "level": "Info",
+      "message": "laps from the changes of a lap counter column"
+    },
+    {
+      "code": "text.rate_from_detail",
+      "ctx": {
+        "detail": "512/25 Hz"
+      },
+      "level": "Info",
+      "message": "sample rate from the file's details"
+    }
+  ]
+}

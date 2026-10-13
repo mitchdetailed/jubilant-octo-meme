@@ -51,6 +51,7 @@ struct ColumnHandle {
     model::ChannelDescriptor descriptor; // rate set; statusText empty (the status is MathGraph's)
     store::Series series;                // a UniformSeries at the result rate (03 section 6.4)
     Diagnostics diags;                   // runtime warnings and infos of the evaluation (W-CSD-FALLBACK)
+    Hash128 selectionKey;                // M2: the selection a SelectionDependent output was evaluated for
 };
 
 } // namespace esses::maths

@@ -59,10 +59,14 @@ TEST_CASE("registry: built-ins, lookup and the catalogue", "[unit][registry]") {
     const auto reg = ImporterRegistry::withBuiltins();
     REQUIRE(reg->find("motec.ld") != nullptr);
     CHECK(reg->find("motec.ld")->version() == kLdImporterVersion);
-    CHECK(reg->find("motec.csv") == nullptr);
+    // M2 (D-044): the shipped text profiles and the two CSV writers follow motec.ld.
+    CHECK(reg->find("motec.csv") != nullptr);
+    CHECK(reg->find("text.profile:generic.csv") != nullptr);
     REQUIRE(reg->writer("motec.ld") != nullptr);
-    CHECK(reg->importers().size() == 1);
-    CHECK(reg->writers().size() == 1);
+    CHECK(reg->writer("motec.csv") != nullptr);
+    CHECK(reg->writer("csv") != nullptr);
+    CHECK(reg->importers().size() == 3);
+    CHECK(reg->writers().size() == 3);
     const auto cat = nlohmann::json::parse(reg->catalogue().compact());
     CHECK(cat["importers"][0]["id"] == "motec.ld");
     CHECK(cat["importers"][0]["extensions"] == nlohmann::json::array({".ld"}));
@@ -121,10 +125,15 @@ TEST_CASE("registry: sniff confidence bands and companions", "[unit][registry]")
 
     // Extension only: 25; neither: no candidate. A file shorter than 4 bytes is not an error.
     writeText(dir.path() / "notes.ld", "this is text, not a log");
+    writeText(dir.path() / "notes.dat", "this is text, not a log");
     writeText(dir.path() / "notes.txt", "this is text, not a log");
     writeText(dir.path() / "tiny.ld", "@");
     CHECK(reg->sniff(dir.path() / "notes.ld")->front().second.confidence == 25);
-    CHECK(reg->sniff(dir.path() / "notes.txt")->empty());
+    CHECK(reg->sniff(dir.path() / "notes.dat")->empty());
+    // M2: the generic delimited-text profile claims .txt by its extension (05 section 7.3, at most 30).
+    REQUIRE(reg->sniff(dir.path() / "notes.txt")->size() == 1);
+    CHECK(reg->sniff(dir.path() / "notes.txt")->front().first->id() == "text.profile:generic.csv");
+    CHECK(reg->sniff(dir.path() / "notes.txt")->front().second.confidence == 30);
     CHECK(reg->sniff(dir.path() / "tiny.ld")->front().second.confidence == 25);
     CHECK(reg->sniff(dir.path() / "missing.ld").error().code == ErrorCode::Io);
 
@@ -176,8 +185,11 @@ TEST_CASE("registry: open entry points and their errors", "[unit][registry]") {
     CHECK(mem->source->id == opened->source->id);
 
     CHECK(reg->open(dir.path() / "missing.ld", {}, context()).error().code == ErrorCode::Io);
+    writeText(dir.path() / "notes.dat", "plain text");
+    CHECK(reg->open(dir.path() / "notes.dat", {}, context()).error().code == ErrorCode::NotFound);
+    // M2: a .txt file goes to the generic text profile, which finds no table in it.
     writeText(dir.path() / "notes.txt", "plain text");
-    CHECK(reg->open(dir.path() / "notes.txt", {}, context()).error().code == ErrorCode::NotFound);
+    CHECK(reg->open(dir.path() / "notes.txt", {}, context()).error().code == ErrorCode::Format);
     ImportOptions unknown;
     unknown.importerId = "test.none";
     CHECK(reg->open(path, unknown, context()).error().code == ErrorCode::NotFound);

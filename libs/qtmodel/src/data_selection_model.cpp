@@ -69,12 +69,46 @@ bool sameSlots(const std::vector<model::RangeRef>& a, const std::vector<model::R
 
 } // namespace
 
+std::string_view filterKindName(FilterSpec::Kind kind) noexcept {
+    switch (kind) {
+    case FilterSpec::Kind::All:
+        return "all";
+    case FilterSpec::Kind::Selected:
+        return "selected";
+    case FilterSpec::Kind::Fastest:
+        return "fastest";
+    case FilterSpec::Kind::Fastest3:
+        return "fastest3";
+    case FilterSpec::Kind::WithinOnePercent:
+        return "withinOnePercent";
+    case FilterSpec::Kind::LapNumbers:
+        return "lapNumbers";
+    }
+    return "all";
+}
+
+std::optional<FilterSpec::Kind> parseFilterKind(std::string_view name) noexcept {
+    for (const FilterSpec::Kind k :
+         {FilterSpec::Kind::All, FilterSpec::Kind::Selected, FilterSpec::Kind::Fastest,
+          FilterSpec::Kind::Fastest3, FilterSpec::Kind::WithinOnePercent, FilterSpec::Kind::LapNumbers}) {
+        if (filterKindName(k) == name) {
+            return k;
+        }
+    }
+    return std::nullopt;
+}
+
 DataSelectionModel::DataSelectionModel(ProjectSession* session, QObject* parent)
     : QObject(parent), session_(session) {
     if (session_ != nullptr) {
-        connect(session_, &ProjectSession::projectOpened, this, [this] { readProjectOptions(); });
+        connect(session_, &ProjectSession::projectOpened, this, [this] {
+            readProjectOptions();
+            readFilters(); // restored unconditionally (06 section 5.5)
+        });
+        connect(session_, &ProjectSession::projectClosed, this, [this] { readFilters(); });
         connect(session_, &ProjectSession::documentsChanged, this, [this] { readProjectOptions(); });
         readProjectOptions();
+        readFilters();
     }
 }
 
@@ -106,7 +140,87 @@ int DataSelectionModel::overlayNumber(const model::RangeRef& r) const {
 
 FilterSpec DataSelectionModel::filter(const model::SourceId& source) const {
     const auto it = filters_.find(source);
-    return it == filters_.end() ? FilterSpec{} : it->second;
+    if (it != filters_.end()) {
+        return it->second;
+    }
+    return storedFilter(source).value_or(defaultFilter_);
+}
+
+std::optional<FilterSpec> DataSelectionModel::storedFilter(const model::SourceId& source) const {
+    const auto it = storedFilters_.find(std::string(kHashPrefix) + source.hex());
+    return it == storedFilters_.end() ? std::nullopt : std::optional<FilterSpec>(it->second);
+}
+
+// ---- Data-window filter persistence (06 section 5.4; project.json dataWindow, D-162) --------------------
+
+void DataSelectionModel::readFilters() {
+    storedFilters_.clear();
+    defaultFilter_ = FilterSpec{};
+    applyToAllSources_ = false;
+    if (session_ == nullptr) {
+        return;
+    }
+    const JsonDoc& doc = session_->projectFile().dataWindow;
+    const QJsonObject o = doc.isObject()
+                              ? QJsonDocument::fromJson(QByteArray::fromStdString(doc.compact())).object()
+                              : QJsonObject();
+    const QJsonObject filters = o.value(QStringLiteral("filters")).toObject();
+    for (auto it = filters.begin(); it != filters.end(); ++it) {
+        const QJsonObject f = it.value().toObject();
+        const std::optional<FilterSpec::Kind> kind =
+            parseFilterKind(f.value(QStringLiteral("kind")).toString().toStdString());
+        if (!kind) {
+            continue;
+        }
+        FilterSpec spec;
+        spec.kind = *kind;
+        spec.laps = f.value(QStringLiteral("laps")).toString().toStdString();
+        if (spec.kind == FilterSpec::Kind::LapNumbers && !parseLapNumbers(spec.laps)) {
+            continue; // never restore a filter the editor would refuse
+        }
+        if (it.key() == QLatin1String("default")) {
+            defaultFilter_ = spec;
+        } else {
+            storedFilters_.insert_or_assign(it.key().toStdString(), spec);
+        }
+    }
+    applyToAllSources_ = o.value(QStringLiteral("applyToAllSources")).toBool(false);
+    // Open sources take their stored filter (or the default); an explicit one of this session is replaced.
+    filters_.clear();
+    for (const auto& s : sources_) {
+        Q_EMIT filterChanged(s->id);
+    }
+}
+
+void DataSelectionModel::writeFilters() {
+    if (session_ == nullptr) {
+        return;
+    }
+    for (const auto& [id, spec] : filters_) {
+        storedFilters_.insert_or_assign(std::string(kHashPrefix) + id.hex(), spec);
+    }
+    const auto toJson = [](const FilterSpec& spec) {
+        QJsonObject f;
+        f.insert(QStringLiteral("kind"),
+                 QString::fromLatin1(filterKindName(spec.kind).data(),
+                                     static_cast<qsizetype>(filterKindName(spec.kind).size())));
+        if (spec.kind == FilterSpec::Kind::LapNumbers) {
+            f.insert(QStringLiteral("laps"), QString::fromStdString(spec.laps));
+        }
+        return f;
+    };
+    QJsonObject filters;
+    filters.insert(QStringLiteral("default"), toJson(defaultFilter_));
+    for (const auto& [key, spec] : storedFilters_) {
+        filters.insert(QString::fromStdString(key), toJson(spec));
+    }
+    QJsonObject o;
+    o.insert(QStringLiteral("filters"), filters);
+    o.insert(QStringLiteral("applyToAllSources"), applyToAllSources_);
+    Result<JsonDoc> doc = JsonDoc::parse(QJsonDocument(o).toJson(QJsonDocument::Compact).toStdString());
+    if (doc) {
+        session_->setDataWindow(std::move(doc).value());
+    }
 }
 
 std::shared_ptr<const model::DataSource> DataSelectionModel::source(const model::SourceId& id) const {
@@ -179,6 +293,49 @@ std::optional<std::vector<std::pair<int, int>>> DataSelectionModel::parseLapNumb
         ++i;
     }
     return terms;
+}
+
+std::string DataSelectionModel::lapNumbersError(std::string_view text) {
+    std::size_t i = 0;
+    const auto skipSpace = [&] {
+        while (i < text.size() && std::isspace(static_cast<unsigned char>(text[i])) != 0) {
+            ++i;
+        }
+    };
+    const auto at = [&](const char* what) { return std::string(what) + " at " + std::to_string(i + 1); };
+    const auto readInt = [&]() -> std::string {
+        skipSpace();
+        const std::size_t begin = i;
+        long long v = 0;
+        while (i < text.size() && std::isdigit(static_cast<unsigned char>(text[i])) != 0) {
+            v = v * 10 + (text[i] - '0');
+            if (v > 1'000'000) {
+                return "lap number too large at " + std::to_string(begin + 1);
+            }
+            ++i;
+        }
+        return i == begin ? at("expected a lap number") : std::string();
+    };
+    while (true) {
+        if (std::string e = readInt(); !e.empty()) {
+            return e;
+        }
+        skipSpace();
+        if (i < text.size() && text[i] == '-') {
+            ++i;
+            if (std::string e = readInt(); !e.empty()) {
+                return e;
+            }
+            skipSpace();
+        }
+        if (i == text.size()) {
+            return {};
+        }
+        if (text[i] != ',') {
+            return at("expected ',' or '-'");
+        }
+        ++i;
+    }
 }
 
 bool DataSelectionModel::filterAccepts(const model::RangeRef& r) const {
@@ -614,23 +771,36 @@ void DataSelectionModel::setTrusted(const model::RangeRef& r, bool trusted) {
 }
 
 void DataSelectionModel::setFilter(const model::SourceId& source, const FilterSpec& spec) {
+    if (spec.kind == FilterSpec::Kind::LapNumbers) {
+        if (const std::string error = lapNumbersError(spec.laps); !error.empty()) {
+            // A parse error keeps the previous filter and shows the error in the editor (06 section 5.4).
+            Q_EMIT filterRejected(source, QString::fromStdString(error));
+            return;
+        }
+    }
     const bool flagWasSet = applyToAllSources_;
     applyToAllSources_ = false; // a later per-source change clears the flag (06 section 5.4)
     if (filter(source) == spec && !flagWasSet) {
         return;
     }
     filters_[source] = spec;
+    writeFilters();
     Q_EMIT filterChanged(source);
 }
 
 void DataSelectionModel::applyFilterToAllSources() {
     const FilterSpec spec = hasMain() ? filter(snapshot_.main.src) : FilterSpec{};
-    applyToAllSources_ = true;
+    applyToAllSources_ = true; // sources published later take it too while the flag holds (06 section 5.4)
+    std::vector<model::SourceId> changed;
     for (const auto& s : sources_) {
         if (!(filter(s->id) == spec)) {
-            filters_[s->id] = spec;
-            Q_EMIT filterChanged(s->id);
+            changed.push_back(s->id);
         }
+        filters_[s->id] = spec;
+    }
+    writeFilters();
+    for (const model::SourceId& id : changed) {
+        Q_EMIT filterChanged(id);
     }
 }
 
@@ -646,6 +816,8 @@ void DataSelectionModel::sourcePublished(std::shared_ptr<const model::DataSource
     }
     if (applyToAllSources_ && hasMain()) {
         filters_[src->id] = filter(snapshot_.main.src);
+    } else if (const std::optional<FilterSpec> stored = storedFilter(src->id)) {
+        filters_[src->id] = *stored; // the project's filter of this file (06 section 5.5: unconditional)
     }
     sources_.push_back(src);
     Q_EMIT sourcesChanged();

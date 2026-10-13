@@ -1,0 +1,58 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "stat_mean_reset_per_lap",
+  "expression": "stat_mean('X', 1, range_change(\"Outings:Laps\"))",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): stat_*",
+    "note": "with reset: per segment, written to every sample of it (LapScalar, stat.segments)"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 1200000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [3, 1.5, 4.25, 1, 5.5, 9, 2.75, 6.5, 5.25, 3.5, 5, 8.75]
+    }
+  },
+  "ranges": {
+    "Outings": [
+      {
+        "startUs": 0,
+        "endUs": 1200000
+      }
+    ],
+    "Outings:Laps": [
+      {
+        "startUs": 0,
+        "endUs": 400000
+      },
+      {
+        "startUs": 400000,
+        "endUs": 800000
+      },
+      {
+        "startUs": 800000,
+        "endUs": 1200000
+      }
+    ]
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [2.4375, 2.4375, 2.4375, 2.4375, 5.9375, 5.9375, 5.9375, 5.9375, 5.625, 5.625, 5.625, 5.625],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

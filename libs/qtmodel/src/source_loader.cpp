@@ -17,12 +17,16 @@
 #include <esses/qtmodel/distance_service.hpp>
 #include <esses/qtmodel/maths_service.hpp>
 #include <esses/qtmodel/messages_model.hpp>
+#include <esses/qtmodel/project_session.hpp>
 #include <esses/qtmodel/source_loader.hpp>
+#include <esses/qtmodel/undo_commands.hpp>
 #include <esses/store/series.hpp>
 
 #include <QPointer>
+#include <QTimer>
 #include <algorithm>
 #include <chrono>
+#include <mutex>
 #include <utility>
 
 namespace esses::qt {
@@ -56,15 +60,66 @@ QString toQString(const std::filesystem::path& p) {
     return QString::fromStdString(pathToUtf8(p));
 }
 
+formats::ImportLogEntry logEntry(formats::ImportLogEntry::Level level, std::string code,
+                                 std::string message) {
+    formats::ImportLogEntry e;
+    e.level = level;
+    e.code = std::move(code);
+    e.message = std::move(message);
+    return e;
+}
+
+// Coalesced sidecar writes (02 section 4 sidecar rule 4): 500 ms after the first edit that is not on disk.
+constexpr int kSidecarCoalesceMs = 500;
+
+} // namespace
+
+// The generation of the sidecar document on disk, per source. A write takes the mutex and writes only a newer
+// generation, so a Background write that finishes after a newer one (or after the flush of a closing source)
+// never puts an older document back.
+struct SourceLoader::SidecarSlot {
+    std::mutex m;
+    std::uint64_t written = 0;
+};
+
+namespace {
+
+Result<void> writeSidecarFile(std::mutex& m, std::uint64_t& written, const model::SidecarDocument& doc,
+                              const std::filesystem::path& path, std::uint64_t generation) {
+    const std::lock_guard lock(m);
+    if (generation <= written) {
+        return ok(); // a newer document is on disk already
+    }
+    if (Result<void> r = doc.save(path); !r) {
+        return r;
+    }
+    written = generation;
+    return ok();
+}
+
 } // namespace
 
 SourceLoader::SourceLoader(TaskPool& pool, Dispatcher& dispatcher,
                            std::shared_ptr<const units::UnitRegistry> units, QObject* parent)
     : QObject(parent), pool_(pool), dispatcher_(dispatcher), units_(std::move(units)),
       registry_(formats::ImporterRegistry::withBuiltins(units_.get())),
-      rules_(analysis::RuleRunner::circuitDefault()) {} // until setRuleRunner: the built-in circuit rules
+      rules_(analysis::RuleRunner::circuitDefault()), // until setRuleRunner: the built-in circuit rules
+      sidecarTimer_(new QTimer(this)) {
+    sidecarTimer_->setSingleShot(true);
+    sidecarTimer_->setInterval(kSidecarCoalesceMs);
+    connect(sidecarTimer_, &QTimer::timeout, this, [this] { writeDueSidecars(); });
+}
 
 SourceLoader::~SourceLoader() {
+    // The edits not on disk yet are written now (exit: a queued write may be cancelled by the pool's
+    // shutdown), and the opens in flight are cancelled.
+    while (!sidecarsDue_.empty() || !sidecarsInFlight_.empty()) {
+        flushSidecar(!sidecarsDue_.empty() ? sidecarsDue_.begin()->first : sidecarsInFlight_.begin()->first,
+                     false);
+    }
+    for (auto& [id, inFlight] : opens_) {
+        inFlight.cancel.cancel();
+    }
     for (const auto& src : open_) {
         const std::string hex = detail::sourceHex(src->id);
         pool_.cancelAll("summary/" + hex);
@@ -111,42 +166,97 @@ std::vector<std::shared_ptr<const model::DataSource>> SourceLoader::sources() co
     return open_;
 }
 
-void SourceLoader::open(const std::filesystem::path& path) {
-    ++pending_;
+formats::OpenContext SourceLoader::openContext() const {
     formats::OpenContext context;
     context.units = units_.get();
     context.pool = &pool_;
     context.loadSidecar = useSidecars_;
     context.rangeRebuild = rules_.rebuildFunction(); // shares the rules: may outlive this loader
+    context.mappings = mappings_;                    // M2 step 4c
+    context.unitMaps = unitMaps_;                    // M2 step 4b
+    return context;
+}
+
+int SourceLoader::track(const std::filesystem::path& path, CancelSource cancel) {
+    const int id = nextOpenId_++;
+    opens_.emplace(id, InFlight{std::move(cancel), path});
+    return id;
+}
+
+void SourceLoader::open(const std::filesystem::path& path) {
+    ++pending_;
+    formats::OpenContext context = openContext();
+    CancelSource canceller;
+    const CancelToken token = canceller.token();
+    const int openId = track(path, std::move(canceller));
+    if (mappingHandOff_) {
+        openWithHandOff(path, std::move(context), openId, token); // M2: task A may end at the Mapping panel
+        return;
+    }
     // The task holds the registry and the units by shared_ptr (01 section 5.3 rule 9).
     Future<formats::OpenedSource> future =
-        pool_.submit(Priority::Interactive, openKey(path), CancelToken{},
+        pool_.submit(Priority::Interactive, openKey(path), token,
                      [registry = std::shared_ptr<const formats::ImporterRegistry>(registry_), units = units_,
                       path, context](const CancelToken& cancel) {
                          static_cast<void>(units); // keeps context.units alive
                          return registry->open(path, {}, context, cancel);
                      });
+    deliver(path, std::move(future), openId);
+}
+
+void SourceLoader::deliver(const std::filesystem::path& path, Future<formats::OpenedSource> future,
+                           int openId) {
     Dispatcher* dispatcher = &dispatcher_;    // runtime-owned (01 section 5.3 rule 11): the context
     const QPointer<SourceLoader> guard(this); // made on the GUI thread, checked there
-    future.onReady([dispatcher, guard, path](const Result<formats::OpenedSource>& result) {
+    // The registry and the unit table stay alive until the result is delivered (a task of the registry, e.g.
+    // ImporterRegistry::resume, borrows them while it runs).
+    future.onReady([dispatcher, guard, path, openId,
+                    keep = std::shared_ptr<const formats::ImporterRegistry>(registry_),
+                    units = units_](const Result<formats::OpenedSource>& result) {
         if (!result) {
             const QString message = QString::fromStdString(result.error().toString());
-            dispatcher->post(dispatcher, [guard, path, message] {
-                if (SourceLoader* self = guard.data()) {
-                    --self->pending_;
-                    Q_EMIT self->openFailed(toQString(path), message);
+            dispatcher->post(dispatcher, [guard, path, message, openId, keep] {
+                SourceLoader* self = guard.data();
+                if (self == nullptr || self->opens_.erase(openId) == 0) {
+                    return; // cancelled (cancelOpens): dropped, already counted
                 }
+                --self->pending_;
+                Q_EMIT self->openFailed(toQString(path), message);
             });
             return;
         }
+        static_cast<void>(units);
         Published p{result->source, result->log};
-        dispatcher->post(dispatcher, [guard, path, p]() mutable {
-            if (SourceLoader* self = guard.data()) {
-                --self->pending_;
-                self->published(path, std::move(p.source), std::move(p.log));
+        dispatcher->post(dispatcher, [guard, path, p, openId, keep]() mutable {
+            SourceLoader* self = guard.data();
+            if (self == nullptr || self->opens_.erase(openId) == 0) {
+                return; // cancelled (cancelOpens): never published
             }
+            --self->pending_;
+            self->published(path, std::move(p.source), std::move(p.log));
         });
     });
+}
+
+void SourceLoader::cancelOpens() {
+    std::map<int, InFlight> opens = std::move(opens_);
+    opens_.clear();
+    pending_ -= static_cast<int>(opens.size());
+    for (auto& [id, inFlight] : opens) {
+        inFlight.cancel.cancel();
+        Q_EMIT importLog(toQString(inFlight.path),
+                         {logEntry(formats::ImportLogEntry::Level::Info, "open.cancelled",
+                                   "the open was cancelled (the project changed or the files were closed)")});
+    }
+    std::map<int, formats::PendingResolution> waiting = std::move(pendingMappings_);
+    pendingMappings_.clear();
+    for (const auto& [id, pending] : waiting) {
+        Q_EMIT importLog(
+            QString::fromStdString(pending.path),
+            {logEntry(formats::ImportLogEntry::Level::Info, "open.mapping_cancelled",
+                      "the open waiting for the Mapping panel was cancelled (the project changed "
+                      "or the files were closed)")});
+    }
 }
 
 void SourceLoader::published(const std::filesystem::path& path,
@@ -332,9 +442,14 @@ SourceLoader::commitSidecar(std::shared_ptr<const model::DataSource> current, mo
     model::SidecarApplyReport report;
     std::shared_ptr<const model::DataSource> next =
         current->withSidecar(std::move(doc), &report, rules_.rebuildFunction());
-    Result<void> saved;
     if (useSidecars_ && !next->prov.path.empty()) {
-        saved = next->sidecar.save(model::SidecarDocument::pathFor(next->prov.path));
+        // Written within 500 ms by a Background task; the edits in between coalesce (D-190).
+        sidecarsDue_.insert_or_assign(next->id, SidecarDue{next->sidecar,
+                                                           model::SidecarDocument::pathFor(next->prov.path),
+                                                           ++sidecarGeneration_});
+        if (!sidecarTimer_->isActive()) {
+            sidecarTimer_->start();
+        }
     }
     publishReplacement(next);
     if (!report.notes.empty()) {
@@ -350,10 +465,81 @@ SourceLoader::commitSidecar(std::shared_ptr<const model::DataSource> current, mo
         }
         Q_EMIT importLog(toQString(next->prov.path), notes);
     }
-    if (!saved) {
-        return Failure{saved.error()};
-    }
     return next;
+}
+
+std::shared_ptr<SourceLoader::SidecarSlot> SourceLoader::slotFor(const model::SourceId& source) {
+    std::shared_ptr<SidecarSlot>& slot = sidecarSlots_[source];
+    if (slot == nullptr) {
+        slot = std::make_shared<SidecarSlot>();
+    }
+    return slot;
+}
+
+void SourceLoader::writeDueSidecars() {
+    std::map<model::SourceId, SidecarDue> due = std::move(sidecarsDue_);
+    sidecarsDue_.clear();
+    Dispatcher* dispatcher = &dispatcher_;
+    const QPointer<SourceLoader> guard(this);
+    for (auto& [id, d] : due) {
+        // Kept until the write is known to be done, so a close or the destructor can write it on this thread
+        // should the task still be queued (or be cancelled by the pool's shutdown).
+        sidecarsInFlight_.insert_or_assign(id, d);
+        // Unkeyed: the slot orders the writes of one source (the newest generation wins).
+        Future<void> written =
+            pool_.submit(Priority::Background, TaskKey{}, CancelToken{},
+                         [slot = slotFor(id), doc = std::move(d.doc), path = d.path,
+                          generation = d.generation](const CancelToken&) -> Result<void> {
+                             return writeSidecarFile(slot->m, slot->written, doc, path, generation);
+                         });
+        written.onReady([dispatcher, guard, id, path = d.path,
+                         generation = d.generation](const Result<void>& r) {
+            const bool failed = !r && r.error().code != ErrorCode::Cancelled;
+            const std::string message =
+                failed ? "the sidecar could not be written: " + r.error().toString() : std::string();
+            dispatcher->post(dispatcher, [guard, id, path, generation, failed, message] {
+                SourceLoader* self = guard.data();
+                if (self == nullptr) {
+                    return;
+                }
+                const auto it = self->sidecarsInFlight_.find(id);
+                if (it != self->sidecarsInFlight_.end() && it->second.generation == generation) {
+                    self->sidecarsInFlight_.erase(it);
+                }
+                if (failed) {
+                    Q_EMIT self->importLog(toQString(path), {logEntry(formats::ImportLogEntry::Level::Warning,
+                                                                      "sidecar.write_failed", message)});
+                }
+            });
+        });
+    }
+}
+
+void SourceLoader::flushSidecar(const model::SourceId& source, bool report) {
+    // The newest document of the source: the one due, else the one whose Background write may not have run.
+    std::optional<SidecarDue> latest;
+    if (const auto it = sidecarsDue_.find(source); it != sidecarsDue_.end()) {
+        latest = std::move(it->second);
+        sidecarsDue_.erase(it);
+    }
+    if (const auto it = sidecarsInFlight_.find(source); it != sidecarsInFlight_.end()) {
+        if (!latest) {
+            latest = std::move(it->second);
+        }
+        sidecarsInFlight_.erase(it);
+    }
+    if (!latest) {
+        return;
+    }
+    const SidecarDue& due = *latest;
+    const std::shared_ptr<SidecarSlot> slot = slotFor(source);
+    // On this thread: a Background write of an older document in flight finishes first (the slot's mutex).
+    if (Result<void> r = writeSidecarFile(slot->m, slot->written, due.doc, due.path, due.generation);
+        !r && report) {
+        Q_EMIT importLog(toQString(due.path),
+                         {logEntry(formats::ImportLogEntry::Level::Warning, "sidecar.write_failed",
+                                   "the sidecar could not be written: " + r.error().toString())});
+    }
 }
 
 void SourceLoader::close(const model::SourceId& id) {
@@ -361,6 +547,7 @@ void SourceLoader::close(const model::SourceId& id) {
     if (it == open_.end()) {
         return;
     }
+    flushSidecar(id, true); // the edits not on disk yet, before the source goes (D-190)
     open_.erase(it);
     const std::string hex = detail::sourceHex(id);
     pool_.cancelAll("chunk/" + hex);
@@ -377,6 +564,7 @@ void SourceLoader::close(const model::SourceId& id) {
 }
 
 void SourceLoader::closeAll() {
+    cancelOpens();
     while (!open_.empty()) {
         close(open_.back()->id);
     }
@@ -388,13 +576,24 @@ void connectSourceLoader(SourceLoader& loader, DataSelectionModel& selection, Me
     QObject::connect(&loader, &SourceLoader::sourceReplaced, &selection, &DataSelectionModel::sourceReplaced);
     QObject::connect(&loader, &SourceLoader::sourceClosed, &selection, &DataSelectionModel::closeSource);
     // The selection may outlive the loader (MainWindow destroys the loader first): a commit after that is
-    // dropped instead of reaching a destroyed loader.
+    // dropped instead of reaching a destroyed loader. With a project session the edit is an undoable
+    // SidecarCommand on its stack (D-032, 06 section 5.2 setTrusted); its redo() commits.
     selection.setSidecarCommit(
-        [guard = QPointer<SourceLoader>(&loader)](std::shared_ptr<const model::DataSource> current,
-                                                  model::SidecarDocument doc) {
-            if (SourceLoader* l = guard.data()) {
-                static_cast<void>(l->commitSidecar(std::move(current), std::move(doc)));
+        [guard = QPointer<SourceLoader>(&loader), session = QPointer<ProjectSession>(selection.session())](
+            std::shared_ptr<const model::DataSource> current, model::SidecarDocument doc) {
+            SourceLoader* l = guard.data();
+            if (l == nullptr || current == nullptr) {
+                return;
             }
+            if (ProjectSession* s = session.data()) {
+                const std::shared_ptr<const model::DataSource> newest = l->source(current->id);
+                if (newest != nullptr) {
+                    s->undoStack().push(new SidecarCommand(*l, newest->id, newest->sidecar, std::move(doc),
+                                                           QObject::tr("Edit trust")));
+                }
+                return;
+            }
+            static_cast<void>(l->commitSidecar(std::move(current), std::move(doc)));
         });
     if (messages != nullptr) {
         QObject::connect(&loader, &SourceLoader::importLog, messages, &MessagesModel::appendImportLog);

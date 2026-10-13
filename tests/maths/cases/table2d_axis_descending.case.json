@@ -1,0 +1,43 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "table2d_axis_descending",
+  "expression": "'P'[m]",
+  "item": {
+    "kind": "table2d",
+    "axis": {
+      "unit": "m",
+      "breakpoints": [0, 20, 10]
+    },
+    "values": {
+      "unit": "",
+      "data": [0, 1, 2]
+    },
+    "interpolation": "linear",
+    "outOfRange": "clamp"
+  },
+  "provenance": {
+    "kind": "derived",
+    "ref": "03_MATHS_ENGINE.md 4.4",
+    "note": "breakpoints not ascending: E-TABLE-AXIS"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 1200000,
+  "inputs": {
+    "P": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "m",
+      "values": [-5, 0, 5, 10, 15, 20, 27.5, 30, 35, 40, 45, 12]
+    }
+  },
+  "expected": {
+    "error": {
+      "code": "E-TABLE-AXIS"
+    }
+  }
+}

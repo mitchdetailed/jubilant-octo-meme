@@ -3,9 +3,10 @@
 //
 // esses: the GUI application (06 sections 18-19). Start-up order (01 section 5.3 rule 11): QApplication, then
 // the AppRuntime (pool, cache, dispatcher; the GUI thread marked NoBlock), then the MainWindow (settings,
-// shipped defaults, keymap, commands, the session's dock layout); then -w <project> (its own layout), then
-// every -l <log> in order. After exec() returns the window is destroyed (it writes the layout), rt.shutdown()
-// runs, and only then the runtime and the application.
+// shipped defaults, keymap, commands, the session's dock layout); then -w <project> (its own layout and its
+// recovery prompt), then every -l <log> in order (with a project: after the prompt, through SessionRestore).
+// After exec() returns the window is destroyed (it writes the layout), rt.shutdown() runs, and only then the
+// runtime and the application.
 //   esses [-w <project folder>] [-l <log file>]... [--offscreen] [--dump-commands] [--version] [<file>...]
 // Bare arguments (06 section 19 item 3): a folder containing project.json, or a project.json, is -w; any
 // other file is -l (the importer registry decides whether it can open it).
@@ -28,6 +29,7 @@
 #include <cstring>
 #include <filesystem>
 #include <memory>
+#include <vector>
 
 #if defined(ESSES_OS_WINDOWS)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -186,11 +188,17 @@ int main(int argc, char** argv) {
             window.setSaveLayoutOnExit(false);
             QTextStream(stdout) << window.commands().dumpJson();
         } else {
-            if (!project.isEmpty()) {
-                window.openProject(toPath(project));
-            }
+            // 06 section 18 steps 3-6: with a project, its recovery prompt comes first, then the -l logs
+            // (else its previous data) and the last selection; without one (or when it does not open), the
+            // logs.
+            std::vector<std::filesystem::path> logPaths;
             for (const QString& log : logs) {
-                window.openLog(toPath(log));
+                logPaths.push_back(toPath(log));
+            }
+            if (project.isEmpty() || !window.openProject(toPath(project), logPaths)) {
+                for (const std::filesystem::path& log : logPaths) {
+                    window.openLog(log);
+                }
             }
             window.show();
             rc = QApplication::exec();

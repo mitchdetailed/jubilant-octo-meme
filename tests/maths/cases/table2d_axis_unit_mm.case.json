@@ -1,0 +1,49 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "table2d_axis_unit_mm",
+  "expression": "'P'[mm]",
+  "item": {
+    "kind": "table2d",
+    "axis": {
+      "unit": "mm",
+      "breakpoints": [0, 10, 20, 30, 40]
+    },
+    "values": {
+      "unit": "N",
+      "data": [0, 850, 1700, 2600, 3600]
+    },
+    "interpolation": "linear",
+    "outOfRange": "clamp"
+  },
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Tables (Pro)",
+    "note": "the axis expression is written in the axis unit ([mm]; table.axis-units)"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 400000,
+  "inputs": {
+    "P": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "m",
+      "values": [0.0078125, 0.015625, 0.0234375, 0.046875]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [664.0625, 1328.125, 2009.375, 3600],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

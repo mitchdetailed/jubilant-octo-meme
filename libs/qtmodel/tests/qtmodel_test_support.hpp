@@ -16,6 +16,7 @@
 #include <QString>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -32,6 +33,13 @@ struct SyntheticOptions {
     unsigned rateHz = 50;
     bool wheelSpeeds = true; // "Wheel Speed FL" / "Wheel Speed FR" (m/s); false: no distance data
     bool throttle = true;    // "Throttle" (%), a logged channel for the item models
+    // M2 additions: a per-lap factor on the wheel speeds (lap k measures trackLengthM * scale[k]; missing
+    // entries are 1), "GPS Latitude" / "GPS Longitude" (deg, the first second of fixes at (0, 0)), the logged
+    // spelling of "Throttle" when a dictionary or mapping renamed it, and a "Venue Length" detail (m).
+    std::vector<double> lapLengthScale;
+    bool gps = false;
+    std::string throttleLoggedName;
+    std::optional<double> venueLengthM;
 };
 
 // The source with its phase-1 ranges ("Outings", "Outings:Laps") from RuleRunner::circuitDefault().

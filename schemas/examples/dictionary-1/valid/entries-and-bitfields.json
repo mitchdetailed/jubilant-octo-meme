@@ -1,0 +1,53 @@
+{
+  "$schema": "urn:esses:dictionary-1",
+  "schemaVersion": 1,
+  "importer": "text.profile:logger-semicolon",
+  "version": "1.0.0",
+  "entries": [
+    {
+      "match": {
+        "name": "Eng Spd"
+      },
+      "name": "Engine Speed",
+      "unit": "rpm",
+      "quantity": "Angular Speed",
+      "kind": "Real",
+      "interp": "Linear"
+    },
+    {
+      "match": {
+        "nameRegex": "^Gear"
+      },
+      "kind": "Integer",
+      "interp": "Previous"
+    },
+    {
+      "match": {
+        "vendorId": "512"
+      },
+      "name": "Status Group 1",
+      "kind": "Bitfield"
+    }
+  ],
+  "bitfields": [
+    {
+      "match": {
+        "name": "Status Group 1"
+      },
+      "device": {
+        "type": "LOGGER-2",
+        "minVersion": 1
+      },
+      "bits": [
+        {
+          "mask": "0x0001",
+          "name": "Status Pump"
+        },
+        {
+          "mask": "0x0002",
+          "name": "Status Fan"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "empty-match.json": {
+    "pointer": "/entries/0/match",
+    "why": "a match states at least one member"
+  },
+  "zero-mask.json": {
+    "pointer": "/bitfields/0/bits/0/mask",
+    "why": "a bit mask is not zero"
+  },
+  "missing-importer.json": {
+    "pointer": "",
+    "why": "a dictionary names its importer"
+  },
+  "wrong-schema-id.json": {
+    "pointer": "/$schema",
+    "why": "the $schema id names another schema"
+  }
+}

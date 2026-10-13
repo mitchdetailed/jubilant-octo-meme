@@ -94,3 +94,24 @@ versions, `withSidecar`), `fastest_lap_tests` (TT 2485), `range_tables_tests`, `
 (AC-M1-08 property test and plateau), `corrected_speed_tests` (AC-M1-11 hand reference, trapezoid 1e-9,
 settings against the schema examples). The fixture goldens (`fixtures.verify_public`, `fixtures.laps_golden`)
 cover AC-M1-07 through `esses-cli`.
+
+## M2: lap stretching (07 §5.1, D-016, D-140)
+
+`lap_stretch.hpp`: `LapStretchSettings` (`options.lapStretch`: the toolbar toggle and the tolerance as a fraction),
+`LapStretchRow` (lap, measured length, track length, the stretch in effect, `applied`, `withinTolerance`,
+`candidate`, `percent()`) and `LapStretch` (`kDefaultTolerance`, `factor`, `apply`, `row`, `report`). `apply` sets
+the lap index's stretch through `DistanceIndex::setStretch`: the stretch is a scalar of the index key (D-140) that
+scales nothing inside the index (`distAt`/`timeAt` stay unstretched; `DistanceChain` and `DomainMapper` multiply,
+04 §3.1), so it is set before the index is published and a changed setting builds a new key rather than a new
+table. With the toggle off the stretch is 1 and the row still reports `withinTolerance` and `candidate`, so the
+Lap Editor can show what stretching would do; a lap without an index or without a track length gets no stretch.
+`report` gives the rows of the Lap Editor's Stretch column and the Corrected Speed and Distance dialog's table in
+the order given. Consumers: `esses_widgets` (`LapEditor`), `esses_qtmodel` (`DistanceService`, the toolbar
+toggle).
+
+AC-M2-05's core part is `tests/marker_edit_rebuild_tests.cpp` (`analysis.marker_edit: ...`): on a 60-lap outing
+with 200 channels, a beacon inserted before lap 30 and an offset edit rebuild the laps through
+`DataSource::withSidecar` and `RuleRunner::rebuildFunction()`; lap 30's trust flag and alignment offsets follow
+its start marker (renumbered 31); restore deletes the edit (D-065) and "restore logged laps" removes every edit
+and user marker. The best of 15 rebuilds is asserted under 5 ms in optimised builds and reported in debug ones
+(about 3 ms in an MSVC debug build). `tests/lap_stretch_tests.cpp` covers `apply`, the toggle and the report.

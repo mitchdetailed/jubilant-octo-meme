@@ -1,0 +1,45 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "integrate_dist_plain",
+  "expression": "integrate_dist('X')",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): integrate_dist",
+    "note": "sum of x times the Corr Dist increment (integrate_dist.form)"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 1200000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [3, 1.5, 4.25, 1, 5.5, 9, 2.75, 6.5, 5.25, 3.5, 5, 8.75]
+    },
+    "Corr Dist": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "m",
+      "values": [0, 1.5, 3.5, 6, 9, 12.5, 16, 19, 22, 24.5, 27, 30],
+      "dtype": "f64"
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [0, 2.25, 10.75, 13.25, 29.75, 61.25, 70.875, 90.375, 106.125, 114.875, 127.375, 153.625],
+    "tolerance": {
+      "abs": 1e-09,
+      "rel": 1e-09
+    }
+  }
+}

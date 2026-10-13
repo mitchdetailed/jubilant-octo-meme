@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:mappings-1",
+  "title": "Esses channel mappings (mappings-1)",
+  "description": "<Project>/channels/mappings.json (02 sections 4.6 and 6.3, D-013): logged name -> analysis name renames, matched case-insensitively (each logged name at most once, checked by the loader), optionally stamping a unit (unitlessOnly: only on a channel without one). Unknown top-level members are allowed and preserved; mapping records are closed.",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "mappings"],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072). The urn:esses: form is written; the bare esses: form of earlier drafts and the later https form are accepted on load and normalised on save (02 section 6.6 rule 1).",
+      "type": "string",
+      "pattern": "^(urn:esses:mappings-1|esses:mappings-1|https://[^/\\s]+(/[^/\\s]+)*/mappings-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "mappings": {
+      "description": "Mappings in file order.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/mapping"
+      }
+    },
+    "x-esses-legacy": {
+      "$ref": "#/definitions/legacyBag"
+    }
+  },
+  "definitions": {
+    "mapping": {
+      "type": "object",
+      "required": ["from", "to"],
+      "properties": {
+        "from": {
+          "description": "The logged name.",
+          "type": "string",
+          "minLength": 1
+        },
+        "to": {
+          "description": "The analysis name.",
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "$ref": "#/definitions/unitSymbol"
+        },
+        "unitlessOnly": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "unitSymbol": {
+      "description": "A unit symbol or alias of the unit registry (units-1), without leading or trailing white space.",
+      "type": "string",
+      "pattern": "^\\S(.*\\S)?$"
+    },
+    "legacyBag": {
+      "description": "Fields removed by a migration, kept verbatim (02 section 6.6 rule 3).",
+      "type": "object"
+    }
+  }
+}

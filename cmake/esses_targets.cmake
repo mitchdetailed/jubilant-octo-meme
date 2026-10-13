@@ -321,8 +321,24 @@ function(_esses_write_targets_manifest)
   _esses_json_string(jprefix "${ESSES_PREFIX}")
   _esses_json_string(jns "${ESSES_NAMESPACE}")
   _esses_json_array(jforbidden ${ESSES_FORBIDDEN_EDGES})
+  # D-161: the Qt Gui header directories (QtGui, or the framework's Headers on macOS), so check_layering.py can
+  # refuse every Qt Gui header in esses_qtmodel except the undo framework's.
+  set(gui_dirs "")
+  foreach(qt_gui Qt6::Gui Qt::Gui)
+    if(TARGET ${qt_gui})
+      get_target_property(dirs ${qt_gui} INTERFACE_INCLUDE_DIRECTORIES)
+      foreach(d IN LISTS dirs)
+        if(NOT d MATCHES "^\\$<" AND IS_DIRECTORY "${d}" AND d MATCHES "(QtGui|QtGui[.]framework/Headers)/?$")
+          list(APPEND gui_dirs "${d}")
+        endif()
+      endforeach()
+    endif()
+  endforeach()
+  list(REMOVE_DUPLICATES gui_dirs)
+  _esses_json_array(jguidirs ${gui_dirs})
   file(WRITE "${CMAKE_BINARY_DIR}/esses_targets.json"
        "{\n  \"prefix\": ${jprefix},\n  \"namespace\": ${jns},\n  \"forbiddenEdges\": ${jforbidden},\n"
+       "  \"qtGuiHeaderDirs\": ${jguidirs},\n"
        "  \"targets\": [\n${body}\n  ]\n}\n")
 endfunction()
 cmake_language(DEFER DIRECTORY "${CMAKE_SOURCE_DIR}" CALL _esses_write_targets_manifest)

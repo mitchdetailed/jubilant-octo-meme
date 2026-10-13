@@ -7,6 +7,7 @@
 #include <esses/qtmodel/channels_model.hpp>
 #include <esses/qtmodel/data_selection_model.hpp>
 #include <esses/qtmodel/maths_service.hpp>
+#include <esses/qtmodel/project_session.hpp>
 
 #include <QCollator>
 #include <QJsonArray>
@@ -14,6 +15,7 @@
 #include <QJsonObject>
 #include <QTimer>
 #include <algorithm>
+#include <optional>
 #include <utility>
 
 namespace esses::qt {
@@ -40,6 +42,13 @@ ChannelsModel::ChannelsModel(DataSelectionModel& selection, MathsService& maths,
     coalesce_->setInterval(kCoalesceMs);
     connect(coalesce_, &QTimer::timeout, this, &ChannelsModel::rebuild);
     connect(&selection_, &DataSelectionModel::sourcesChanged, this, &ChannelsModel::rebuild);
+    if (ProjectSession* session = selection_.session(); session != nullptr) {
+        connect(session, &ProjectSession::documentsChanged, this, [this] {
+            if (!coalesce_->isActive()) {
+                coalesce_->start();
+            }
+        });
+    }
     connect(&maths_, &MathsService::statusChanged, this, [this] {
         if (!coalesce_->isActive()) {
             coalesce_->start();
@@ -85,6 +94,12 @@ void ChannelsModel::rebuild() {
         return text;
     };
 
+    // The project's aliases (resolved per source through its logged channels, else a maths candidate).
+    std::optional<model::ChannelResolver> resolver;
+    if (const ProjectSession* session = selection_.session(); session != nullptr) {
+        resolver.emplace(session->mappingTable(), session->aliasTable(), registry);
+    }
+
     beginResetModel();
     roots_.clear();
     for (const auto& src : selection_.sources()) {
@@ -106,19 +121,50 @@ void ChannelsModel::rebuild() {
             Node mathsNode;
             for (const maths::ChannelKey& key : maths_.outputs(src->id, model::kNormalLayer)) {
                 const auto desc = maths_.descriptor(key);
-                if (!desc) {
-                    continue;
+                const maths::MathState state = maths_.status(key).state;
+                if (!desc || state == maths::MathState::Disabled) {
+                    continue; // a disabled output is no channel (03 section 4.3: consumers skip it)
                 }
                 Node& n = add(mathsNode, label(*desc));
                 n.name = QString::fromStdString(desc->name);
-                n.status = maths::toChannelStatus(maths_.status(key).state);
+                n.status = maths::toChannelStatus(state);
                 n.channel = true;
             }
-            for (auto* category : {&logged, &mathsNode}) {
+            Node aliasNode;
+            if (resolver) {
+                for (const model::AliasRow& alias : resolver->aliases().rows) {
+                    const model::ChannelResolver::Resolution res =
+                        resolver->resolve(alias.name, *layer, src->id);
+                    std::optional<model::ChannelDescriptor> desc = res.alias;
+                    if (!desc) {
+                        for (const model::AliasCandidate& cand : alias.candidates) {
+                            const maths::ChannelKey key =
+                                maths::ChannelKey::make(src->id, model::kNormalLayer, cand.name);
+                            if (cand.enabled &&
+                                maths_.isMathsChannel(src->id, model::kNormalLayer, cand.name)) {
+                                if (const auto target = maths_.descriptor(key)) {
+                                    desc = model::makeAliasDescriptor(*target, alias, src->id,
+                                                                      model::kNormalLayer);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    if (!desc) {
+                        continue;
+                    }
+                    Node& n = add(aliasNode, label(*desc));
+                    n.name = QString::fromStdString(alias.name);
+                    n.channel = true;
+                }
+            }
+            for (auto* category : {&logged, &mathsNode, &aliasNode}) {
                 if (category->children.empty()) {
                     continue;
                 }
-                Node& cat = add(*root, category == &logged ? tr("Logged") : tr("Maths"));
+                Node& cat = add(*root, category == &logged      ? tr("Logged")
+                                       : category == &mathsNode ? tr("Maths")
+                                                                : tr("Alias"));
                 cat.children = std::move(category->children);
                 for (auto& child : cat.children) {
                     child->parent = &cat;
@@ -127,6 +173,44 @@ void ChannelsModel::rebuild() {
             }
         }
         roots_.push_back(std::move(root));
+    }
+    // "Project": the constants of the enabled global modules (source-independent, 06 section 7 item 1).
+    {
+        auto root = std::make_unique<Node>();
+        root->text = tr("Project");
+        Node constants;
+        for (const maths::MathModule& m : maths_.modules()) {
+            if (!m.enabled) {
+                continue;
+            }
+            for (const maths::MathConstant& k : m.constants) {
+                if (!k.enabled) {
+                    continue;
+                }
+                QString text = QString::fromStdString(k.name);
+                if (registry != nullptr && registry->contains(k.value.unit)) {
+                    const std::string_view unit = registry->unit(k.value.unit).label();
+                    if (!unit.empty()) {
+                        text += QStringLiteral(" (") +
+                                QString::fromUtf8(unit.data(), static_cast<qsizetype>(unit.size())) +
+                                QLatin1Char(')');
+                    }
+                }
+                Node& n = add(constants, text);
+                n.name = QString::fromStdString(k.name);
+                n.channel = true;
+            }
+        }
+        if (!constants.children.empty()) {
+            Node& cat = add(*root, tr("Constants"));
+            cat.children = std::move(constants.children);
+            for (auto& child : cat.children) {
+                child->parent = &cat;
+            }
+            sortChannels(cat);
+            root->row = static_cast<int>(roots_.size());
+            roots_.push_back(std::move(root));
+        }
     }
     endResetModel();
 }
@@ -182,12 +266,44 @@ QVariant ChannelsModel::data(const QModelIndex& index, int role) const {
     }
 }
 
-bool ChannelsModel::filterAccepts(const QString& channelName, const QString& query) {
-    const QStringList words = query.split(QLatin1Char(' '), Qt::SkipEmptyParts);
-    for (const QString& w : words) {
-        if (!channelName.contains(w, Qt::CaseInsensitive)) {
+QStringList ChannelsModel::searchWords(const QString& text) {
+    QStringList words;
+    QString word;
+    for (const QChar ch : text) {
+        const bool separator = ch.isSpace() || ch == QLatin1Char('_') || ch == QLatin1Char('-') ||
+                               ch == QLatin1Char('/') || ch == QLatin1Char('(') || ch == QLatin1Char(')') ||
+                               ch == QLatin1Char('[') || ch == QLatin1Char(']');
+        if (separator) {
+            if (!word.isEmpty()) {
+                words.push_back(word);
+                word.clear();
+            }
+        } else {
+            word.append(ch);
+        }
+    }
+    if (!word.isEmpty()) {
+        words.push_back(word);
+    }
+    return words;
+}
+
+bool ChannelsModel::filterAccepts(const QString& channelName, const QString& query, bool loose) {
+    const QStringList wanted = searchWords(query);
+    if (wanted.isEmpty()) {
+        return true;
+    }
+    const QStringList words = searchWords(channelName);
+    qsizetype next = 0; // each query word takes a distinct name word after the previous one (in order)
+    for (const QString& q : wanted) {
+        while (next < words.size() && !(loose ? words[next].contains(q, Qt::CaseInsensitive)
+                                              : words[next].startsWith(q, Qt::CaseInsensitive))) {
+            ++next;
+        }
+        if (next == words.size()) {
             return false;
         }
+        ++next;
     }
     return true;
 }

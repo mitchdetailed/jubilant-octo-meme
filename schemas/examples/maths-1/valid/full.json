@@ -1,0 +1,178 @@
+{
+  "$schema": "urn:esses:maths-1",
+  "schemaVersion": 1,
+  "condition": "'Vehicle Id' == \"GT3-07\"",
+  "constants": [
+    {
+      "name": "Gaussian Weight",
+      "value": {
+        "unit": "",
+        "v": 0.35
+      }
+    },
+    {
+      "comment": "spare",
+      "enabled": false,
+      "name": "Wheelbase Ref",
+      "value": {
+        "unit": "m",
+        "v": 2.7
+      }
+    }
+  ],
+  "enabled": true,
+  "enumerations": [
+    {
+      "entries": [
+        {
+          "name": "Understeer",
+          "value": 0
+        },
+        {
+          "name": "Neutral",
+          "value": 1
+        },
+        {
+          "name": "Oversteer",
+          "value": 2
+        }
+      ],
+      "name": "Balance"
+    }
+  ],
+  "id": "Chassis",
+  "items": [
+    {
+      "display": {
+        "colourIndex": 3,
+        "dps": 1,
+        "unit": "deg/s"
+      },
+      "enabled": true,
+      "expr": "'Corr Speed'[m/s] / 'Vehicle Wheelbase'[m] * tan('Steered Angle'[rad])  // reference",
+      "interp": "Linear",
+      "kind": "expression",
+      "name": "Yaw Rate Ref",
+      "quantity": "Angular Velocity",
+      "rate": "auto",
+      "resultUnit": "rad/s"
+    },
+    {
+      "display": {
+        "colourIndex": 5,
+        "dps": 0,
+        "unit": ""
+      },
+      "enumeration": "Balance",
+      "expr": "choose('Oversteer'[deg] > 2, 2, choose('Oversteer'[deg] < -2, 0, 1))",
+      "interp": "Previous",
+      "kind": "expression",
+      "name": "Balance State",
+      "quantity": "Unitless",
+      "rate": {
+        "den": 1,
+        "num": 20
+      },
+      "resultUnit": ""
+    },
+    {
+      "applies": {
+        "logged": true,
+        "telemetry": false
+      },
+      "expr": "smooth('G Force Lat', 0.5)",
+      "kind": "expression",
+      "name": "Lat G Smooth",
+      "precision": "double",
+      "rate": 50
+    },
+    {
+      "display": {
+        "colourIndex": 1,
+        "dps": 2,
+        "unit": "G"
+      },
+      "kind": "filter",
+      "name": "G Force Long",
+      "window": {
+        "points": 6
+      }
+    },
+    {
+      "kind": "scale_offset",
+      "name": "Brake Pres Front",
+      "offset": {
+        "unit": "bar",
+        "v": -0.3
+      },
+      "scale": 1
+    },
+    {
+      "axis": {
+        "breakpoints": [0, 10, 20, 30, 40],
+        "expr": "'Damper Pos FL'[mm]",
+        "unit": "mm"
+      },
+      "display": {
+        "colourIndex": 7,
+        "dps": 0,
+        "unit": "N"
+      },
+      "interpolation": "linear",
+      "kind": "table2d",
+      "name": "Spring Force FL",
+      "outOfRange": "clamp",
+      "quantity": "Force",
+      "resultUnit": "N",
+      "values": {
+        "data": [0, 850, 1700, 2600, 3600],
+        "unit": "N"
+      }
+    },
+    {
+      "display": {
+        "colourIndex": 2,
+        "dps": 1,
+        "unit": "%"
+      },
+      "interpolation": "linear",
+      "kind": "table3d",
+      "name": "Aero Balance",
+      "outOfRange": "invalid",
+      "quantity": "Ratio",
+      "resultUnit": "%",
+      "values": {
+        "data": [[41, 43, 45, 47], [40, 42, 44, 46], [39, 41, 43, 45]],
+        "rowMajor": true,
+        "unit": "%"
+      },
+      "x": {
+        "breakpoints": [20, 30, 40],
+        "expr": "'Ride Height Front'[mm]",
+        "unit": "mm"
+      },
+      "y": {
+        "breakpoints": [40, 60, 80, 100],
+        "expr": "'Ride Height Rear'[mm]",
+        "unit": "mm"
+      }
+    },
+    {
+      "kind": "builtin",
+      "module": "esses.corrected_speed_distance",
+      "settings": {
+        "method": "fastestWheel"
+      },
+      "version": 1
+    },
+    {
+      "comment": "preserved until v1.0",
+      "kind": "regression",
+      "name": "Fit",
+      "x-i2": {
+        "Flags": "3"
+      }
+    }
+  ],
+  "precision": "single"
+}

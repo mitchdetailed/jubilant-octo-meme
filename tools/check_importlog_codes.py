@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 the Esses contributors
 # SPDX-License-Identifier: MIT
-"""Import Log codes documented (AC-M0-12, 08 section 1): every code the Esses reader emits on the corpus appears
-in docs/formats/ld.md.
+"""Import Log codes documented (AC-M0-12, 08 section 1): every code the Esses readers emit on the corpus appears
+in docs/formats/ld.md (the .ld/.ldx reader and the open pipeline) or docs/formats/text.md (the text engine, M2).
 
 Codes are collected from
   1. warnings[].code of every expected.probe.json under fixtures/: the public synthetic families and, when the
      private checkout is present, the user's real files (fixtures/private, kept current by fixture verify);
   2. with --cli <esses-cli>: the live `esses-cli info --json` of every .ld file listed in
      fixtures/private/s1/corpus.json that exists on this machine (the user's real files, spike S-1).
-A code counts as documented when docs/formats/ld.md contains it in backticks (`ld.header_only`).
+A code counts as documented when docs/formats/ld.md or docs/formats/text.md contains it in backticks
+(`ld.header_only`, `text.auto_delimiter`).
 
 Standard library only. `python -I tools/check_importlog_codes.py --root <repo> [--cli <esses-cli>]`;
 `--self-test` checks the checker. Exit status: 0 clean, 1 findings, 2 usage or tool error.
@@ -24,7 +25,8 @@ import subprocess
 import sys
 import tempfile
 
-CODE_RE = re.compile(r"`((?:ld|ldx|open|sidecar|companion|model|detail)\.[a-z0-9_]+)`")
+CODE_RE = re.compile(r"`((?:ld|ldx|open|sidecar|companion|model|detail|text)\.[a-z0-9_]+)`")
+DOCS = ("ld.md", "text.md")
 
 
 def documented(doc: pathlib.Path) -> set[str]:
@@ -64,15 +66,16 @@ def collect(root: pathlib.Path, cli: str | None) -> tuple[dict[str, set[str]], i
 
 
 def check(root: pathlib.Path, cli: str | None) -> tuple[list[str], str]:
-    doc = root / "docs" / "formats" / "ld.md"
-    known = documented(doc)
+    known: set[str] = set()
+    for name in DOCS:
+        known |= documented(root / "docs" / "formats" / name)
     seen, files, live = collect(root, cli)
     findings = []
     for code in sorted(seen):
         if code not in known:
             where = sorted(seen[code])
             findings.append(f"{code} is emitted ({', '.join(where[:3])}{' ...' if len(where) > 3 else ''}) "
-                            f"but not documented in docs/formats/ld.md")
+                            f"but not documented in docs/formats/ld.md or docs/formats/text.md")
     summary = (f"check_importlog_codes: {len(seen)} code(s) emitted over {files} expected.probe.json file(s) and "
                f"{live} live probe(s); {len(known)} documented; {len(findings)} finding(s)")
     return findings, summary
@@ -98,6 +101,16 @@ def self_test() -> int:
         findings, _ = check(root, None)
         if findings:
             failures.append(f"clean tree reported {findings}")
+        # Text-engine codes are documented in docs/formats/text.md.
+        tx = root / "fixtures" / "generic.csv" / "b"
+        tx.mkdir(parents=True)
+        probe = {"warnings": [{"code": "text.known"}, {"code": "text.missing_doc"}]}
+        (tx / "expected.probe.json").write_text(json.dumps(probe), encoding="utf-8")
+        (root / "docs" / "formats" / "text.md").write_text("| `text.known` | info |\n", encoding="utf-8")
+        findings, _ = check(root, None)
+        got = {f.split(" ", 1)[0] for f in findings}
+        if got != {"text.missing_doc"}:
+            failures.append(f"expected one undocumented text code, got {sorted(got)}")
     for f in failures:
         print("self-test:", f)
     print(f"check_importlog_codes self-test: {'FAILED' if failures else 'ok'}")

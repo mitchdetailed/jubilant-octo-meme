@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 the Esses contributors
 // SPDX-License-Identifier: MIT
 
+#include "chunk_values.hpp"
+
 #include <esses/maths/plan_provider.hpp>
 #include <esses/store/chunk.hpp>
 
@@ -36,7 +38,7 @@ void fill(std::span<T> out, const analysis::UniformSignal& whole, std::size_t fi
         if constexpr (std::is_floating_point_v<T>) {
             out[i] = valid ? static_cast<T>(v) : std::numeric_limits<T>::quiet_NaN();
         } else {
-            out[i] = valid ? static_cast<T>(std::llround(v)) : T{0};
+            out[i] = valid ? detail::toI32(v) : T{0};
         }
         if (!valid && b.hasBitmap()) {
             b.setValid(static_cast<std::uint32_t>(i), false);
@@ -111,22 +113,39 @@ Result<void> PlanProvider::materialise(SampleIdx chunkNo, store::ChunkBuilder& o
     }
 
     const auto first = static_cast<std::size_t>(store::chunkFirstSample(chunkNo));
-    bool bitmap = false;
-    for (std::size_t i = first; i < first + count && !bitmap; ++i) {
-        bitmap = !whole.validAt(i) || std::isnan(whole.values[i]);
+    // Any invalid sample (a cleared flag or NaN)? Counted branch-free so the scan vectorises.
+    const double* v = whole.values.data() + first;
+    std::size_t invalid = 0;
+    if (whole.valid.empty()) {
+        for (std::size_t i = 0; i < count; ++i) {
+            invalid += v[i] != v[i] ? 1u : 0u; // NaN
+        }
+    } else {
+        const std::uint8_t* flags = whole.valid.data() + first;
+        for (std::size_t i = 0; i < count; ++i) {
+            invalid += (flags[i] == 0 || v[i] != v[i]) ? 1u : 0u;
+        }
     }
+    const bool bitmap = invalid > 0;
     if (auto r = out.allocate(count, plan_->outDtype, bitmap); !r) {
         return r;
     }
+    const auto write = [&](auto samples) {
+        if (bitmap) {
+            fill(samples, whole, first, out);
+        } else {
+            detail::fillValid(samples, v);
+        }
+    };
     switch (plan_->outDtype) {
     case store::Dtype::F32:
-        fill(out.samples<float>(), whole, first, out);
+        write(out.samples<float>());
         break;
     case store::Dtype::F64:
-        fill(out.samples<double>(), whole, first, out);
+        write(out.samples<double>());
         break;
     case store::Dtype::I32:
-        fill(out.samples<std::int32_t>(), whole, first, out);
+        write(out.samples<std::int32_t>());
         break;
     case store::Dtype::I64:
         break; // rejected above

@@ -1,0 +1,44 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "flip_flop_reset_wins",
+  "expression": "flip_flop('S', 'R')",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): flip_flop",
+    "note": "a high first sample is a rising edge; both edges on one sample: reset wins (stateful.before-start)"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 800000,
+  "inputs": {
+    "S": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [1, 0, 1, 0, 1, 0, 0, 0]
+    },
+    "R": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [0, 0, 1, 0, 0, 0, 0, 0]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [1, 1, 0, 0, 1, 1, 1, 1],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

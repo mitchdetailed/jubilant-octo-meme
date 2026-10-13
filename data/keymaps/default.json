@@ -147,7 +147,7 @@
       "doc": "Select workbook n (Ctrl+0 selects the tenth) and restore its dock perspective.",
       "keys": ["Ctrl+1"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "args": [2],
@@ -156,7 +156,7 @@
       "doc": "Select workbook n (Ctrl+0 selects the tenth) and restore its dock perspective.",
       "keys": ["Ctrl+2"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "args": [3],
@@ -165,7 +165,7 @@
       "doc": "Select workbook n (Ctrl+0 selects the tenth) and restore its dock perspective.",
       "keys": ["Ctrl+3"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "args": [4],
@@ -174,7 +174,7 @@
       "doc": "Select workbook n (Ctrl+0 selects the tenth) and restore its dock perspective.",
       "keys": ["Ctrl+4"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "args": [5],
@@ -183,7 +183,7 @@
       "doc": "Select workbook n (Ctrl+0 selects the tenth) and restore its dock perspective.",
       "keys": ["Ctrl+5"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "args": [6],
@@ -192,7 +192,7 @@
       "doc": "Select workbook n (Ctrl+0 selects the tenth) and restore its dock perspective.",
       "keys": ["Ctrl+6"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "args": [7],
@@ -201,7 +201,7 @@
       "doc": "Select workbook n (Ctrl+0 selects the tenth) and restore its dock perspective.",
       "keys": ["Ctrl+7"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "args": [8],
@@ -210,7 +210,7 @@
       "doc": "Select workbook n (Ctrl+0 selects the tenth) and restore its dock perspective.",
       "keys": ["Ctrl+8"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "args": [9],
@@ -219,7 +219,7 @@
       "doc": "Select workbook n (Ctrl+0 selects the tenth) and restore its dock perspective.",
       "keys": ["Ctrl+9"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "args": [10],
@@ -228,7 +228,7 @@
       "doc": "Select workbook n (Ctrl+0 selects the tenth) and restore its dock perspective.",
       "keys": ["Ctrl+0"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "view.prev_worksheet",
@@ -252,7 +252,7 @@
       "doc": "Previous workbook, wrapping at the ends.",
       "keys": ["Ctrl+F11"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "view.next_workbook",
@@ -260,7 +260,7 @@
       "doc": "Next workbook, wrapping at the ends.",
       "keys": ["Ctrl+F12"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "view.channel_status",
@@ -268,7 +268,7 @@
       "doc": "Alias of tools.channel_status, which carries Ctrl+U: show and focus the Channel Status dock.",
       "keys": [],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "view.messages_window",
@@ -276,7 +276,7 @@
       "doc": "Toggle the Messages dock.",
       "keys": [],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "view.track_map_window",
@@ -300,7 +300,7 @@
       "doc": "Reset the dock windows to the default perspective.",
       "keys": [],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "view.fullscreen",
@@ -315,7 +315,7 @@
       "context": "global",
       "doc": "Open Log File dialog (multi-select, a details pane probing the selected file); the last folder is remembered per user.",
       "keys": ["Ctrl+O"],
-      "milestone": "M2",
+      "milestone": "M3",
       "status": "planned"
     },
     {
@@ -323,7 +323,7 @@
       "context": "global",
       "doc": "Close every source without a prompt.",
       "keys": ["Ctrl+A"],
-      "milestone": "M2",
+      "milestone": "M3",
       "status": "planned"
     },
     {
@@ -339,7 +339,7 @@
       "context": "global",
       "doc": "Save every changed project document atomically, keep a backup copy and clear the journal.",
       "keys": ["Ctrl+S"],
-      "milestone": "M2",
+      "milestone": "M3",
       "status": "planned"
     },
     {
@@ -378,7 +378,7 @@
       "doc": "Undo the last document edit.",
       "keys": ["Ctrl+Z"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "edit.redo",
@@ -386,14 +386,14 @@
       "doc": "Redo the last undone edit (no Ctrl+Shift+Z alias: that chord is channel.zero_at_cursor).",
       "keys": ["Ctrl+Y"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "file.new_project",
       "context": "global",
       "doc": "Create a project folder.",
       "keys": [],
-      "milestone": "M2",
+      "milestone": "M3",
       "status": "planned"
     },
     {
@@ -401,7 +401,7 @@
       "context": "global",
       "doc": "Open a project folder.",
       "keys": [],
-      "milestone": "M2",
+      "milestone": "M3",
       "status": "planned"
     },
     {
@@ -409,7 +409,7 @@
       "context": "global",
       "doc": "Close the project.",
       "keys": [],
-      "milestone": "M2",
+      "milestone": "M3",
       "status": "planned"
     },
     {
@@ -554,7 +554,7 @@
       "doc": "Toggle lap-distance stretching.",
       "keys": [],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "data.filter_all_sources",
@@ -562,7 +562,7 @@
       "doc": "Apply the Main source's Data-window lap filter to every source.",
       "keys": [],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "data.select_main",
@@ -602,7 +602,7 @@
       "doc": "Open the Details editor.",
       "keys": ["Ctrl+D"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "tools.channel_editor",
@@ -610,7 +610,7 @@
       "doc": "Open the Channel Editor.",
       "keys": ["Ctrl+E"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "tools.channel_status",
@@ -618,7 +618,7 @@
       "doc": "Show and focus the Channel Status dock.",
       "keys": ["Ctrl+U"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "tools.maths_editor",
@@ -626,7 +626,7 @@
       "doc": "Open the Maths Editor at the last item.",
       "keys": ["Ctrl+M"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "tools.setup_sheets",
@@ -641,7 +641,7 @@
       "doc": "Open the Lap Editor.",
       "keys": [],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "tools.track_editor",
@@ -665,7 +665,7 @@
       "doc": "Open the channel aliases editor.",
       "keys": [],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "tools.mappings",
@@ -673,14 +673,14 @@
       "doc": "Open the channel mappings editor.",
       "keys": [],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "tools.units_list",
       "context": "global",
       "doc": "Show the units list.",
       "keys": [],
-      "milestone": "M2",
+      "milestone": "M3",
       "status": "planned"
     },
     {
@@ -689,7 +689,7 @@
       "doc": "Open the Options dialog.",
       "keys": [],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "channel.next_active",
@@ -697,7 +697,7 @@
       "doc": "Move the active-channel square to the next trace of the component, wrapping.",
       "keys": ["PgDown"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "channel.prev_active",
@@ -705,7 +705,7 @@
       "doc": "Move the active-channel square to the previous trace of the component, wrapping.",
       "keys": ["PgUp"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "channel.hide",
@@ -713,7 +713,7 @@
       "doc": "Hide the active trace (a component edit).",
       "keys": ["Ctrl+H"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "channel.remove",
@@ -721,7 +721,7 @@
       "doc": "Remove the active trace from the component (a component edit).",
       "keys": ["Ctrl+Delete"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "channel.edit_maths",
@@ -729,7 +729,7 @@
       "doc": "Open the Maths Editor at the item defining the active channel; a hint for a logged channel.",
       "keys": ["Ctrl+Shift+M"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "channel.status",
@@ -737,7 +737,7 @@
       "doc": "Show the Channel Status dock with the active channel's row selected.",
       "keys": ["Ctrl+Shift+S"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "channel.filter",
@@ -745,7 +745,7 @@
       "doc": "Filter dialog: a transient maths item shadowing the active channel for this session.",
       "keys": ["Ctrl+Shift+F"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "channel.scale_offset",
@@ -753,7 +753,7 @@
       "doc": "Scale and offset dialog: a local maths item in the sidecar.",
       "keys": ["Ctrl+Shift+O"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "channel.zero_at_cursor",
@@ -761,7 +761,7 @@
       "doc": "Offset the active channel by minus its value at the cursor (a local maths item).",
       "keys": ["Ctrl+Shift+Z"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "channel.properties",
@@ -1315,7 +1315,7 @@
       "doc": "Insert a beacon marker at the cursor into the sidecar; the laps rebuild.",
       "keys": ["Shift+F7"],
       "milestone": "M2",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "cursor.place",

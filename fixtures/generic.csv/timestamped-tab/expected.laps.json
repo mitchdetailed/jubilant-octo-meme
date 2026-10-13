@@ -1,0 +1,54 @@
+{
+  "$schema": "urn:esses:laps-1",
+  "schemaVersion": 1,
+  "layers": {
+    "Normal": {
+      "durationUs": 13782000,
+      "groups": [
+        {
+          "children": [],
+          "name": "Outings",
+          "path": "Outings",
+          "ranges": [
+            {
+              "abbrev": "1",
+              "enabled": true,
+              "endMarker": "9e967bc8-3ba4-5a8a-b0f0-5e0f1dc08c0c",
+              "endUs": 13782000,
+              "id": "16845ead-b6ef-5c0c-8fb6-003722a0c028",
+              "kind": "Outing",
+              "lapClass": "None",
+              "name": "input.txt",
+              "number": 1,
+              "startMarker": "4a220465-0e86-5534-8b34-1cae5de4ee3b",
+              "startUs": 0,
+              "trusted": true
+            }
+          ],
+          "supportsReporting": true,
+          "supportsTrackGeneration": false
+        }
+      ],
+      "markers": [
+        {
+          "class": "SOL",
+          "comment": "",
+          "group": "",
+          "id": "4a220465-0e86-5534-8b34-1cae5de4ee3b",
+          "name": "",
+          "prov": "Derived",
+          "tUs": 0
+        },
+        {
+          "class": "EOL",
+          "comment": "",
+          "group": "",
+          "id": "9e967bc8-3ba4-5a8a-b0f0-5e0f1dc08c0c",
+          "name": "",
+          "prov": "Derived",
+          "tUs": 13782000
+        }
+      ]
+    }
+  }
+}

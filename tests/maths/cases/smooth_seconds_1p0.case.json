@@ -1,0 +1,36 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "smooth_seconds_1p0",
+  "expression": "smooth('X', 1.0)",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): smooth",
+    "note": "a decimal window is seconds converted to an odd count; 1.0 s: 11 points"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 1200000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [3, 1.5, 4.25, 1, 5.5, 9, 2.75, 6.5, 5.25, 3.5, 5, 8.75]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [4.04166666667, 3.85714285714, 4.1875, 4.30555555556, 4.225, 4.29545454545, 4.81818181818, 5.15, 5.25, 5.78125, 5.82142857143, 5.29166666667],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

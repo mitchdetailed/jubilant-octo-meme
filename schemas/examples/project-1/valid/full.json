@@ -1,6 +1,6 @@
 {
   "$schema": "urn:esses:project-1",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "builtinMaths": {
     "esses.corrected_speed_distance": {
       "enabled": true,

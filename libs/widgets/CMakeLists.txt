@@ -8,16 +8,20 @@
 # Links esses_qtmodel, esses_qtrender, Qt Widgets and, privately, esses::qtads (the ADS shared library, only
 # when ESSES_DOCK_BACKEND=ads; its types stay inside src/shell/ads_backend.cpp). Built only with ESSES_BUILD_QT=ON.
 #
-# Three independent glob roots so two agents can work in this library without touching a shared file:
-#   src/shell/**       include/esses/widgets/shell/**       MainWindow, DockHost, canvas, commands, keys
-#   src/docks/**       include/esses/widgets/docks/**       the docks
-#   src/components/**  include/esses/widgets/components/**  ComponentWidget and the components
+# Independent glob roots so parallel agents can work in this library without touching a shared file:
+#   src/shell/**            include/esses/widgets/shell/**            MainWindow, DockHost, canvas, commands, keys
+#   src/docks/**            include/esses/widgets/docks/**            the docks
+#   src/components/**       include/esses/widgets/components/**       ComponentWidget and the components
+#   src/editors_maths/**    include/esses/widgets/editors_maths/**    (M2) MathsEditor, ChannelStatusWindow
+#   src/editors_data/**     include/esses/widgets/editors_data/**     (M2) ChannelEditor, MappingPanel, DetailsEditor,
+#                                                                     LapEditor
+#   src/editors_options/**  include/esses/widgets/editors_options/**  (M2) OptionsDialog, SchemeSelector
 # Every tests/**/tst_<name>.cpp is one Qt Test executable (ctest widgets.tst_<name>, run offscreen); other
 # tests/**/*.cpp are helpers shared by them.
 
 set(CMAKE_AUTOMOC ON)
 set(_esses_widgets_sources "")
-foreach(_root shell docks components)
+foreach(_root shell docks components editors_maths editors_data editors_options)
   file(GLOB_RECURSE _files CONFIGURE_DEPENDS
        "${CMAKE_CURRENT_SOURCE_DIR}/src/${_root}/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/src/${_root}/*.hpp"
        "${CMAKE_CURRENT_SOURCE_DIR}/include/esses/widgets/${_root}/*.hpp")

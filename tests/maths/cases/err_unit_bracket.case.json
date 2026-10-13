@@ -1,0 +1,30 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "err_unit_bracket",
+  "expression": "'X' km/h",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Expressions (Pro)",
+    "note": "a unit without brackets"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 800000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [0, 1, 2, 3, 4, 5, 6, 7]
+    }
+  },
+  "expected": {
+    "error": {
+      "code": "E-UNIT-BRACKET"
+    }
+  }
+}

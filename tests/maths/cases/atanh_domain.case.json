@@ -1,0 +1,36 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "atanh_domain",
+  "expression": "atanh('X')",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): atanh",
+    "note": "|x| >= 1 invalid"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 800000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [-1, -0.75, -0.5, 0, 0.25, 0.5, 0.875, 1]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [null, -0.972955074528, -0.549306144334, 0, 0.255412811883, 0.549306144334, 1.35402510055, null],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "table2d_axis_expression",
+  "expression": "abs('P'[m] - 20)",
+  "item": {
+    "kind": "table2d",
+    "axis": {
+      "unit": "m",
+      "breakpoints": [0, 10, 20]
+    },
+    "values": {
+      "unit": "",
+      "data": [5, 6, 7]
+    },
+    "interpolation": "previous",
+    "outOfRange": "clamp"
+  },
+  "provenance": {
+    "kind": "derived",
+    "ref": "03_MATHS_ENGINE.md 4.4",
+    "note": "the axis is a full expression"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 1200000,
+  "inputs": {
+    "P": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "m",
+      "values": [-5, 0, 5, 10, 15, 20, 27.5, 30, 35, 40, 45, 12]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [7, 7, 6, 6, 5, 5, 5, 6, 6, 7, 7, 5],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

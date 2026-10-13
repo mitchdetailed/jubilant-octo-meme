@@ -15,6 +15,8 @@ literal motec.csv
 # (b) import/export dialog format labels that name the file formats: added with the dialogs (M1+)
 
 # (c) the CSV writer's format-name constant and the motec.csv sniff pattern: added in phase B (M2)
+#     (libs/formats csv.hpp kLegacyCsvFormatName; data/profiles-text/motec.csv.json sniff.preambleRegex)
+literal MoTeC CSV File
 
 # (d) the D-019 round-trip bag: JSON key x-i2 and its C++ member xI2 (rename offered as Q-17)
 literal x-i2

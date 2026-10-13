@@ -1,0 +1,55 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "table2d_previous_clamp",
+  "expression": "'P'[m]",
+  "item": {
+    "kind": "table2d",
+    "axis": {
+      "unit": "m",
+      "breakpoints": [0, 10, 20, 30, 40]
+    },
+    "values": {
+      "unit": "N",
+      "data": [0, 850, 1700, 2600, 3600]
+    },
+    "interpolation": "previous",
+    "outOfRange": "clamp"
+  },
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Tables (Pro)",
+    "note": "previous lookup, exact breakpoints included; out of range: clamp (table.out-of-range)"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 1200000,
+  "inputs": {
+    "P": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "m",
+      "values": [-5, 0, 5, 10, 15, 20, 27.5, 30, 35, 40, 45, 12]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [0, 0, 0, 850, 850, 1700, 1700, 2600, 2600, 3600, 3600, 850],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    },
+    "diagnostics": [
+      {
+        "code": "W-UNIT-MISSING",
+        "count": 0
+      }
+    ]
+  }
+}

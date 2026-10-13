@@ -1,0 +1,44 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "remainder_sign_of_x",
+  "expression": "remainder('X', 'Y')",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): remainder",
+    "note": "f = x - i*y with the sign of x; y = 0 invalid"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 800000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [7, -7, 7, -7, 5.5, 3, 0, 9]
+    },
+    "Y": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [3, 3, -3, -3, 2, 0, 4, 2.5]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [1, -1, 1, -1, 1.5, null, 0, 1.5],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

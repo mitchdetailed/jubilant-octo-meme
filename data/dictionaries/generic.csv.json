@@ -1,0 +1,23 @@
+{
+  "$schema": "urn:esses:dictionary-1",
+  "schemaVersion": 1,
+  "bitfields": [],
+  "entries": [
+    {
+      "interp": "Previous",
+      "kind": "Integer",
+      "match": {
+        "nameRegex": "^[Gg][Ee][Aa][Rr]$"
+      }
+    },
+    {
+      "interp": "Previous",
+      "kind": "Integer",
+      "match": {
+        "nameRegex": "^[Ll][Aa][Pp]( ?([Nn][Uu][Mm][Bb][Ee][Rr]|[Cc][Oo][Uu][Nn][Tt]))?$"
+      }
+    }
+  ],
+  "importer": "text.profile:generic.csv",
+  "version": "1.0.0"
+}

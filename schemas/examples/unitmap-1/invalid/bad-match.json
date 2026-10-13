@@ -1,0 +1,13 @@
+{
+  "$schema": "urn:esses:unitmap-1",
+  "schemaVersion": 1,
+  "importer": "text.profile:generic.csv",
+  "rules": [
+    {
+      "match": "nameOrUnit",
+      "name": "A",
+      "quantity": "Speed",
+      "unit": "km/h"
+    }
+  ]
+}

@@ -25,6 +25,8 @@
 #include <QSignalSpy>
 #include <QTest>
 #include <atomic>
+#include <fstream>
+#include <iterator>
 
 using namespace esses;
 using namespace esses::qt;
@@ -236,7 +238,8 @@ private Q_SLOTS:
             QVERIFY(replaced.count() >= 1);
             QVERIFY(!w.selection.resolve(lap1)->trusted);
             QVERIFY(!rangeAt(*w.loader.source(id), 1).trusted);
-            QVERIFY(std::filesystem::exists(model::SidecarDocument::pathFor(ld)));
+            // Written by a Background task within 500 ms (D-190).
+            QTRY_VERIFY_WITH_TIMEOUT(std::filesystem::exists(model::SidecarDocument::pathFor(ld)), 10000);
             QVERIFY(w.loader.commitSidecar(nullptr, {}).error().code == ErrorCode::NotFound);
             QSignalSpy closed(&w.loader, &SourceLoader::sourceClosed);
             w.loader.close(id);
@@ -250,6 +253,73 @@ private Q_SLOTS:
         again.loader.open(ld);
         QTRY_COMPARE_WITH_TIMEOUT(published.count(), 1, 30000);
         QVERIFY(!rangeAt(*again.loader.source(id), 1).trusted); // read back from the sidecar
+    }
+
+    // D-190 (02 section 4 sidecar rule 4): an edit never writes the sidecar on the GUI thread; the edits of
+    // 500 ms coalesce into one Background write of the newest document; a closing source writes its last
+    // edit at once.
+    void sidecarWritesAreCoalesced() {
+        AppRuntime rt(runtimeOptions());
+        const std::filesystem::path ld = writeSynthetic("sidecar-coalesce", rt.cache());
+        const std::filesystem::path sidecar = model::SidecarDocument::pathFor(ld);
+        Workspace w(rt);
+        QSignalSpy published(&w.loader, &SourceLoader::sourcePublished);
+        w.loader.open(ld);
+        QTRY_COMPARE_WITH_TIMEOUT(published.count(), 1, 30000);
+        const model::SourceId id =
+            published.first().at(0).value<std::shared_ptr<const model::DataSource>>()->id;
+        const model::RangeRef lap1 = rangeRef(*w.loader.source(id), 1);
+        w.selection.setTrusted(lap1, false);
+        QVERIFY(!std::filesystem::exists(sidecar)); // nothing written by the edit itself
+        w.selection.setTrusted(lap1, true);
+        w.selection.setTrusted(lap1, false);
+        QVERIFY(!std::filesystem::exists(sidecar));
+        QTRY_VERIFY_WITH_TIMEOUT(std::filesystem::exists(sidecar), 10000);
+        const auto fileText = [&sidecar] {
+            std::ifstream in(sidecar, std::ios::binary);
+            return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        };
+        QCOMPARE(fileText(), *w.loader.source(id)->sidecar.toJson()); // the newest edit
+        // The source closes before its next write is due: the edit is written on the way out.
+        w.selection.setTrusted(lap1, true);
+        const model::SidecarDocument last = w.loader.source(id)->sidecar;
+        w.loader.close(id);
+        if (last.empty()) {
+            QVERIFY(!std::filesystem::exists(sidecar)); // an empty document deletes the file (D-069)
+        } else {
+            QCOMPARE(fileText(), *last.toJson());
+        }
+        Workspace again(rt);
+        QSignalSpy reopened(&again.loader, &SourceLoader::sourcePublished);
+        again.loader.open(ld);
+        QTRY_COMPARE_WITH_TIMEOUT(reopened.count(), 1, 30000);
+        QVERIFY(rangeAt(*again.loader.source(id), 1).trusted); // the last edit, read back
+    }
+
+    // D-190: closeAll() cancels the opens in flight; a result that arrives afterwards is dropped.
+    void closeAllCancelsOpensInFlight() {
+        AppRuntime rt(runtimeOptions());
+        const std::filesystem::path ld = writeSynthetic("cancel-open", rt.cache());
+        Workspace w(rt);
+        w.loader.setUseSidecars(false);
+        QSignalSpy published(&w.loader, &SourceLoader::sourcePublished);
+        QSignalSpy failed(&w.loader, &SourceLoader::openFailed);
+        QSignalSpy logs(&w.loader, &SourceLoader::importLog);
+        w.loader.open(ld);
+        QCOMPARE(w.loader.pendingOpens(), 1);
+        // The result can only reach this thread through its event loop, which has not run yet.
+        w.loader.closeAll();
+        QCOMPARE(w.loader.pendingOpens(), 0);
+        QCOMPARE(logs.count(), 1);
+        QVERIFY(logs.first().at(1).value<std::vector<formats::ImportLogEntry>>().at(0).code ==
+                "open.cancelled");
+        QTest::qWait(500);
+        QCOMPARE(published.count(), 0);
+        QCOMPARE(failed.count(), 0);
+        QVERIFY(w.loader.sources().empty());
+        // The loader opens again afterwards.
+        w.loader.open(ld);
+        QTRY_COMPARE_WITH_TIMEOUT(published.count(), 1, 30000);
     }
 
     // AC-M1-12: the open pipeline, publication, maths and distance work on a NoBlock thread without a wait.

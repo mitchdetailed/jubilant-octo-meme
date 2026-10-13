@@ -1,0 +1,44 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "op_relational",
+  "expression": "('A' < 'B') + ('A' <= 4) * 2 + ('A' > 6) * 4 + ('A' >= 'B') * 8",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Operators (Pro)",
+    "note": "< <= > >="
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 800000,
+  "inputs": {
+    "A": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [1, 2, 3, 4, 5, 6, 7, 8]
+    },
+    "B": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [8, 7, 6, 5, 4, 3, 2, 1]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [3, 3, 3, 3, 8, 8, 12, 12],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "f32_overflow_invalid",
+  "expression": "'X' * 1e38",
+  "provenance": {
+    "kind": "derived",
+    "ref": "03_MATHS_ENGINE.md 6.6",
+    "note": "an F32 result beyond the F32 range is invalid (D-185)"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 800000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [0, 1, 2, 3, 4, -4, 0.5, 10]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [0, 1e+38, 2e+38, 3e+38, null, null, 5e+37, null],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

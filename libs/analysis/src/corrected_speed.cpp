@@ -255,7 +255,7 @@ Result<UniformSignal> loadSpeed(const model::DataLayer& layer, const std::string
 // ---- settings
 // -----------------------------------------------------------------------------------------------
 
-Result<CorrectedSpeedSettings> CorrectedSpeedSettings::fromJson(const model::OpaqueJson& settings,
+Result<CorrectedSpeedSettings> CorrectedSpeedSettings::fromJson(const JsonDoc& settings,
                                                                 const units::UnitRegistry& units) {
     if (settings.isNull()) {
         return CorrectedSpeedSettings{};

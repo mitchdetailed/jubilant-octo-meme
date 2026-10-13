@@ -1,0 +1,9 @@
+{
+  "$schema": "urn:esses:mappings-1",
+  "schemaVersion": 1,
+  "mappings": [
+    {
+      "from": "A"
+    }
+  ]
+}

@@ -8,9 +8,10 @@
 #pragma once
 
 #include <esses/base/hash.hpp>
+#include <esses/base/json_doc.hpp>
 #include <esses/base/result.hpp>
 #include <esses/model/marker.hpp>
-#include <esses/model/opaque_json.hpp>
+#include <esses/model/opaque_json.hpp> // compatibility: model::OpaqueJson names JsonDoc
 
 #include <functional>
 #include <map>
@@ -30,7 +31,7 @@ struct MarkersDocument {
 
     int schemaVersion = kSchemaVersion;
     std::map<std::string, std::vector<Marker>, std::less<>> layers; // layer name -> markers in model order
-    std::optional<OpaqueJson> legacy;                               // "x-esses-legacy"
+    std::optional<JsonDoc> legacy;                                  // "x-esses-legacy"
 
     // Every layer's baseMarkers (a layer without markers gets an empty list).
     static MarkersDocument fromSource(const DataSource& src);

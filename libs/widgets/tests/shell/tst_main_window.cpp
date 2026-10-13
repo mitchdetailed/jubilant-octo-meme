@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: MIT
 //
 // MainWindow (06 sections 2-4, 14, 18), offscreen, on a private config directory and the repository's data
-// directory: the assembly (menus in the 06 section 2.2 order with key texts, the Main toolbar, the M1 docks,
-// the shipped workbook's worksheet tabs, every keymap command registered, planned ones disabled), the view
+// directory: the assembly (menus in the 06 section 2.2 order with key texts, the Main toolbar with its M2
+// additions, the M1 docks, the shipped workbook's worksheet tabs, every keymap command registered, planned
+// ones disabled), the view
 // hotkeys of batch 1 through the real KeyEventRouter (F8, ESC, V, C, F11/F12, 1-9), session restore of the
 // dock layout without a project (<config>/layout.json) and per project (<project>/.local/layout.json, keyed
 // by the workbook id), a damaged layout file (info row, default docks), opening a log (-l) into the Data
@@ -178,7 +179,9 @@ private Q_SLOTS:
             QVERIFY(view->actions().contains(f8));
             QCOMPARE(f8->text(), QStringLiteral("Data Window\tF8"));
             QVERIFY(f8->shortcut().isEmpty()); // keys are routed by the KeyEventRouter only
-            // The Main toolbar: open, save | time/distance, overlays, single colour.
+            // The Main toolbar (06 section 2.1): open, save | time/distance, overlays, single colour, lap
+            // stretch (M2) | the scheme selector (M2, hidden until Options > Colours shows it) | undo, redo
+            // (M2).
             QStringList ids;
             for (QAction* a : w.mainToolBar().actions()) {
                 ids << (a->isSeparator() ? QStringLiteral("|") : a->objectName());
@@ -186,7 +189,10 @@ private Q_SLOTS:
             QCOMPARE(ids, (QStringList{QStringLiteral("file.open_log"), QStringLiteral("file.save_project"),
                                        QStringLiteral("|"), QStringLiteral("data.toggle_domain"),
                                        QStringLiteral("data.overlays_toggle"),
-                                       QStringLiteral("data.single_colour_main")}));
+                                       QStringLiteral("data.single_colour_main"),
+                                       QStringLiteral("data.lap_stretch_toggle"), QStringLiteral("|"),
+                                       QStringLiteral("schemeSelector"), QStringLiteral("|"),
+                                       QStringLiteral("edit.undo"), QStringLiteral("edit.redo")}));
             QVERIFY(w.actions().action(QStringLiteral("data.toggle_domain"))->isCheckable());
             QAction* overlays = w.actions().action(QStringLiteral("data.overlays_toggle"));
             QVERIFY(overlays->isCheckable());
@@ -201,10 +207,12 @@ private Q_SLOTS:
             QVERIFY(!print->isEnabled());
             QVERIFY(print->toolTip().contains(QStringLiteral("planned for v1.0")));
             QVERIFY(w.commands().dumpJson().contains(QStringLiteral("\"view.data_window\"")));
-            // The M1 docks with their 06 section 3.2 defaults.
-            QCOMPARE(w.docks().dockIds(), (QStringList{kData, kChannels, kValues, kMessages}));
+            // The docks with their 06 section 3.2 defaults (M1, and Channel Status from M2).
+            QCOMPARE(w.docks().dockIds(),
+                     (QStringList{kData, kChannels, kValues, kMessages, QStringLiteral("channelstatus")}));
             QCOMPARE(w.docks().state(kData), DockState::Docked);
             QCOMPARE(w.docks().state(kMessages), DockState::AutoHide);
+            QCOMPARE(w.docks().state(QStringLiteral("channelstatus")), DockState::Closed);
             // The shipped workbook: two worksheets, "Overlay" active (its activeWorksheet), components
             // placed.
             QCOMPARE(w.worksheetCount(), 2);

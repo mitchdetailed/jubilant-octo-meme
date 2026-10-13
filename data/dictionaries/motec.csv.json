@@ -1,0 +1,23 @@
+{
+  "$schema": "urn:esses:dictionary-1",
+  "schemaVersion": 1,
+  "bitfields": [],
+  "entries": [
+    {
+      "interp": "Previous",
+      "kind": "Integer",
+      "match": {
+        "name": "Gear"
+      }
+    },
+    {
+      "interp": "Previous",
+      "kind": "Integer",
+      "match": {
+        "name": "Lap Number"
+      }
+    }
+  ],
+  "importer": "motec.csv",
+  "version": "1.0.0"
+}

@@ -14,6 +14,58 @@
 #     their JSON (a Google-Benchmark-style "benchmarks" array plus the rows).
 #   ESSES_BUILD_TESTS=ON: bench.<name>.smoke, label `bench-smoke`, the harness on small files (no budget).
 
+# M2 (AC-M2-13): the text engine on a 300 MB, 100-channel CSV (Qt-free; bench/formats_bench.cpp):
+#   <build>/bin/esses-formats-bench --runs 5 --gate --json formats.json
+esses_add_executable(formats_bench LAYER 3 QT_FREE
+  SOURCES formats_bench.cpp
+  DEPS
+    esses::base
+    esses::units
+    esses::store
+    esses::formats
+    esses::nlohmann_json
+  OUTPUT_NAME esses-formats-bench)
+set_target_properties(${ESSES_PREFIX}_formats_bench PROPERTIES FOLDER "bench")
+target_compile_definitions(${ESSES_PREFIX}_formats_bench PRIVATE "ESSES_BENCH_SOURCE_DIR=\"${CMAKE_SOURCE_DIR}\"")
+if(ESSES_BUILD_BENCH)
+  add_test(NAME bench.formats_bench COMMAND ${ESSES_PREFIX}_formats_bench --gate)
+  set_tests_properties(bench.formats_bench PROPERTIES LABELS "bench" TIMEOUT 3600 RUN_SERIAL TRUE)
+endif()
+if(ESSES_BUILD_TESTS)
+  add_test(NAME bench.formats_bench.smoke COMMAND ${ESSES_PREFIX}_formats_bench --smoke)
+  set_tests_properties(bench.formats_bench.smoke PROPERTIES LABELS "bench-smoke" TIMEOUT 600)
+endif()
+
+# M2 (AC-M2-14): the maths language on one core, elementwise 2.16 M samples <= 10 ms (Qt-free; bench/maths_bench.cpp):
+#   <build>/bin/esses-maths-bench --runs 7 --gate --json maths.json
+# AC-M2-05: the 60-lap marker rebuild (< 5 ms) is a row of the same Release bench (analysis.marker_rebuild_60lap).
+esses_add_executable(maths_bench LAYER 3 QT_FREE
+  SOURCES maths_bench.cpp
+  DEPS
+    esses::base
+    esses::units
+    esses::store
+    esses::model
+    esses::analysis
+    esses::maths
+    esses::nlohmann_json
+  OUTPUT_NAME esses-maths-bench)
+set_target_properties(${ESSES_PREFIX}_maths_bench PROPERTIES FOLDER "bench")
+target_compile_definitions(${ESSES_PREFIX}_maths_bench PRIVATE "ESSES_BENCH_SOURCE_DIR=\"${CMAKE_SOURCE_DIR}\"")
+if(ESSES_BUILD_BENCH)
+  add_test(NAME bench.maths_bench COMMAND ${ESSES_PREFIX}_maths_bench --gate)
+  set_tests_properties(bench.maths_bench PROPERTIES LABELS "bench" TIMEOUT 1800 RUN_SERIAL TRUE)
+endif()
+if(ESSES_BUILD_TESTS)
+  add_test(NAME bench.maths_bench.smoke COMMAND ${ESSES_PREFIX}_maths_bench --smoke)
+  set_tests_properties(bench.maths_bench.smoke PROPERTIES LABELS "bench-smoke" TIMEOUT 600)
+endif()
+
+# The M1 Qt benches need the widgets layer.
+if(NOT TARGET ${ESSES_PREFIX}_widgets)
+  return()
+endif()
+
 foreach(_bench plot_bench open_bench)
   string(REPLACE "_" "-" _bench_exe "${_bench}")
   esses_add_executable(${_bench} LAYER 5

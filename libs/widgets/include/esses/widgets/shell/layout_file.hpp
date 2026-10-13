@@ -57,6 +57,11 @@ public:
     QJsonObject dock(const QString& id) const;
     void setDockOption(const QString& id, const QString& option, const QJsonValue& value);
 
+    // dialogs.<key>.geometry (06 section 3.4: "Dialog geometries ... persist here"; QWidget::saveGeometry
+    // bytes, base64); empty when absent.
+    QByteArray dialogGeometry(const QString& key) const;
+    void setDialogGeometry(const QString& key, const QByteArray& geometry);
+
     // `adsVersion` empty: the member is removed (the perspectives were not written by ADS).
     void setVersions(const QString& appVersion, const QString& qtVersion, const QString& dockBackend,
                      const QString& adsVersion = {});

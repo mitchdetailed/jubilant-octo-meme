@@ -1,0 +1,42 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "unit_missing_reads_base",
+  "expression": "'T' - 273.15",
+  "provenance": {
+    "kind": "derived",
+    "ref": "03_MATHS_ENGINE.md 2.4 rule 5",
+    "note": "no [unit]: the stored base unit, with W-UNIT-MISSING"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 400000,
+  "inputs": {
+    "T": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "K",
+      "values": [273.15, 283.15, 300, 373.15]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [-6.10351560226e-06, 9.99999389648, 26.85, 99.9999938965],
+    "tolerance": {
+      "abs": 0.0001,
+      "rel": 1e-06
+    },
+    "diagnostics": [
+      {
+        "code": "W-UNIT-MISSING",
+        "count": 1
+      }
+    ]
+  }
+}

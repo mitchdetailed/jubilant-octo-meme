@@ -4,6 +4,9 @@
 
 #include "cli_common.hpp"
 
+#include <esses/base/json_nlohmann.hpp>
+#include <esses/project/migrations.hpp>
+
 #include <nlohmann/json-schema.hpp>
 
 #include <algorithm>
@@ -131,7 +134,58 @@ struct FileOutcome {
     std::string schema;
     enum class Status : std::uint8_t { Valid, Invalid, Skipped, Error } status = Status::Valid;
     std::vector<SchemaError> errors;
+    std::vector<std::string> log; // migration steps and notes (02 section 6.6 rule 5)
 };
+
+// Steps 1-2 of 02 section 6.6 rule 2 on an Esses document: a major newer than the schemas of `dir` is
+// refused, an older minor is migrated to the newest one the registered steps reach. Returns the errors
+// (empty: go on validating `doc`, which may have been replaced by its migrated form).
+std::vector<SchemaError> prepareForValidation(json& doc, const std::filesystem::path& dir, FileOutcome& r) {
+    if (!doc.is_object() || !doc.contains("$schema") || !doc["$schema"].is_string()) {
+        return {};
+    }
+    const auto key = SchemaStore::schemaName(doc["$schema"].get<std::string>());
+    if (!key) {
+        return {};
+    }
+    const std::size_t dash = key->rfind('-');
+    const std::string name = key->substr(0, dash);
+    const int major = std::stoi(key->substr(dash + 1));
+    std::error_code ec;
+    if (!std::filesystem::is_regular_file(dir / p8(*key + ".schema.json"), ec)) {
+        for (int older = major - 1; older >= 1; --older) {
+            const std::string known = name + "-" + std::to_string(older);
+            if (std::filesystem::is_regular_file(dir / p8(known + ".schema.json"), ec)) {
+                return {{"/$schema", *key + " is a newer major than this build reads (" + known +
+                                         "); the file is not opened (02 section 6.6 rule 2)"}};
+            }
+        }
+        return {}; // reported as an unknown schema by the validator
+    }
+    const project::Migrations& migrations = project::Migrations::instance();
+    const int latest = migrations.latest(*key);
+    const int version = doc.contains("schemaVersion") && doc["schemaVersion"].is_number_integer()
+                            ? doc["schemaVersion"].get<int>()
+                            : 1;
+    if (version > latest) {
+        r.log.push_back(*key + " schemaVersion " + std::to_string(version) + " is newer than this build's " +
+                        std::to_string(latest) + "; validated as it is");
+        return {};
+    }
+    if (version == latest) {
+        return {};
+    }
+    auto asDoc = jsonio::toDoc(doc);
+    if (!asDoc) {
+        return {{"", asDoc.error().message}};
+    }
+    auto upgraded = migrations.upgrade(std::move(asDoc).value(), *key, latest, r.log);
+    if (!upgraded) {
+        return {{upgraded.error().context.detail.value_or(""), upgraded.error().message}};
+    }
+    doc = jsonio::fromDoc(*upgraded);
+    return {};
+}
 
 std::string_view statusName(FileOutcome::Status s) {
     switch (s) {
@@ -147,7 +201,20 @@ std::string_view statusName(FileOutcome::Status s) {
     return "error";
 }
 
-void collectFiles(const std::filesystem::path& dir, std::vector<std::filesystem::path>& out) {
+std::filesystem::path normalised(const std::filesystem::path& p) {
+    std::error_code ec;
+    std::filesystem::path abs = std::filesystem::absolute(p, ec);
+    return (ec ? p : abs).lexically_normal();
+}
+
+bool excluded(const std::filesystem::path& dir, const std::vector<std::filesystem::path>& exclude) {
+    const std::filesystem::path n = normalised(dir);
+    return std::any_of(exclude.begin(), exclude.end(),
+                       [&n](const std::filesystem::path& e) { return normalised(e) == n; });
+}
+
+void collectFiles(const std::filesystem::path& dir, std::vector<std::filesystem::path>& out,
+                  const std::vector<std::filesystem::path>& exclude) {
     std::error_code ec;
     std::vector<std::filesystem::path> entries;
     for (std::filesystem::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
@@ -161,7 +228,9 @@ void collectFiles(const std::filesystem::path& dir, std::vector<std::filesystem:
         }
         std::error_code e2;
         if (std::filesystem::is_directory(p, e2)) {
-            collectFiles(p, out);
+            if (!excluded(p, exclude)) {
+                collectFiles(p, out, exclude);
+            }
         } else if (p.extension() == ".json") {
             out.push_back(p);
         }
@@ -170,8 +239,37 @@ void collectFiles(const std::filesystem::path& dir, std::vector<std::filesystem:
 
 } // namespace
 
+std::vector<std::filesystem::path> allValidatePaths(const std::filesystem::path& root) {
+    std::vector<std::filesystem::path> out;
+    for (const char* dir : {"data", "fixtures", "tests/maths"}) {
+        std::error_code ec;
+        if (std::filesystem::is_directory(root / dir, ec)) {
+            out.push_back(root / dir);
+        }
+    }
+    // The schemas themselves against the draft-07 meta-schema; their examples (half of them deliberately
+    // invalid) are tools/check_schemas.py's.
+    std::vector<std::filesystem::path> schemas;
+    std::error_code ec;
+    for (std::filesystem::directory_iterator it(root / "schemas", ec), end; !ec && it != end;
+         it.increment(ec)) {
+        if (u8(it->path().filename()).ends_with(".schema.json")) {
+            schemas.push_back(it->path());
+        }
+    }
+    std::sort(schemas.begin(), schemas.end());
+    out.insert(out.end(), schemas.begin(), schemas.end());
+    return out;
+}
+
+std::vector<std::filesystem::path> allValidateExclusions(const std::filesystem::path& root) {
+    return {root / "fixtures" / "private", root / "tests" / "maths" / "user_modules",
+            root / "tests" / "maths" / "oracle"};
+}
+
 int runValidate(AppContext& ctx, const ValidateOptions& o, std::ostream& out, std::ostream& err) {
     std::optional<SchemaStore> store;
+    std::filesystem::path schemaDir;
     std::optional<std::unique_ptr<nlohmann::json_schema::json_validator>> fixed;
     std::string fixedName; // the --schema file's name, reported with each result it validated
     if (o.schemaFile) {
@@ -193,17 +291,34 @@ int runValidate(AppContext& ctx, const ValidateOptions& o, std::ostream& out, st
             err << "esses-cli: " << dir.error().toString() << "\n";
             return 2;
         }
+        schemaDir = *dir;
         store.emplace(*dir);
+    }
+    std::vector<std::filesystem::path> paths = o.paths;
+    std::vector<std::filesystem::path> exclude = o.exclude;
+    if (o.all) {
+        const std::filesystem::path root = o.root.empty() ? std::filesystem::path(".") : o.root;
+        for (const auto& p : allValidatePaths(root)) {
+            paths.push_back(p);
+        }
+        for (const auto& p : allValidateExclusions(root)) {
+            exclude.push_back(p);
+        }
+        if (paths.empty()) {
+            err << "esses-cli: validate --all: none of data/, fixtures/, tests/maths/, schemas/ under "
+                << u8(root) << "\n";
+            return 2;
+        }
     }
 
     std::vector<FileOutcome> results;
     bool ioError = false;
-    for (const auto& path : o.paths) {
+    for (const auto& path : paths) {
         std::error_code ec;
         std::vector<std::filesystem::path> files;
         const bool walked = std::filesystem::is_directory(path, ec);
         if (walked) {
-            collectFiles(path, files);
+            collectFiles(path, files, exclude);
         } else {
             files.push_back(path);
         }
@@ -234,6 +349,12 @@ int runValidate(AppContext& ctx, const ValidateOptions& o, std::ostream& out, st
                 const bool hasSchema = doc->is_object() && doc->contains("$schema");
                 if (!hasSchema && walked) {
                     r.status = FileOutcome::Status::Skipped;
+                    results.push_back(std::move(r));
+                    continue;
+                }
+                if (auto refused = prepareForValidation(*doc, schemaDir, r); !refused.empty()) {
+                    r.status = FileOutcome::Status::Invalid;
+                    r.errors = std::move(refused);
                     results.push_back(std::move(r));
                     continue;
                 }
@@ -284,6 +405,9 @@ int runValidate(AppContext& ctx, const ValidateOptions& o, std::ostream& out, st
                 }
                 f["errors"] = std::move(es);
             }
+            if (!r.log.empty()) {
+                f["log"] = r.log;
+            }
             files.push_back(std::move(f));
         }
         doc["files"] = std::move(files);
@@ -295,7 +419,7 @@ int runValidate(AppContext& ctx, const ValidateOptions& o, std::ostream& out, st
         }
     } else {
         for (const auto& r : results) {
-            if (r.status == FileOutcome::Status::Valid && !o.verbose) {
+            if (r.status == FileOutcome::Status::Valid && !o.verbose && r.log.empty()) {
                 continue;
             }
             out << statusName(r.status) << "  " << u8(r.path);
@@ -306,6 +430,9 @@ int runValidate(AppContext& ctx, const ValidateOptions& o, std::ostream& out, st
                 out << "  no \"$schema\"";
             }
             out << "\n";
+            for (const auto& line : r.log) {
+                out << "    " << line << "\n";
+            }
             for (const auto& e : r.errors) {
                 out << "    at '" << e.pointer << "': " << e.message << "\n";
             }

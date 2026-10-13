@@ -1,0 +1,36 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "exp10_signed",
+  "expression": "exp10('X')",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): exp10",
+    "note": "10 to the x"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 800000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5, -3.75, 3.75]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [0.00316227766017, 0.0316227766017, 0.316227766017, 3.16227766017, 31.6227766017, 316.227766017, 0.000177827941004, 5623.4132519],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

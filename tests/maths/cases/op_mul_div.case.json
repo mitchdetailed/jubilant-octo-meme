@@ -1,0 +1,44 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "op_mul_div",
+  "expression": "'A' * 'B' / 4",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Operators (Pro)",
+    "note": "* and /"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 800000,
+  "inputs": {
+    "A": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [1, 2, 3, 4, 5, 6, 7, 8]
+    },
+    "B": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [8, 7, 6, 5, 4, 3, 2, 1]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [2, 3.5, 4.5, 5, 5, 4.5, 3.5, 2],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

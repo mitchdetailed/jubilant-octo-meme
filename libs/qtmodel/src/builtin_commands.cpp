@@ -6,9 +6,11 @@
 #include <esses/qtmodel/builtin_commands.hpp>
 #include <esses/qtmodel/command_registry.hpp>
 #include <esses/qtmodel/data_selection_model.hpp>
+#include <esses/qtmodel/lap_stretch_service.hpp>
 #include <esses/qtmodel/worksheet_view_model.hpp>
 
 #include <QPointer>
+#include <QUndoStack>
 #include <memory>
 #include <utility>
 
@@ -142,6 +144,41 @@ void registerViewCommands(CommandRegistry& registry, std::function<WorksheetView
         [](WorksheetViewModel& w) { w.placeDatum(); });
     add(spec("datum.swap", "Swap Datum and Cursor", "Component/Datum", C::Graph, {QStringLiteral("X")}),
         [](WorksheetViewModel& w) { w.swapDatum(); });
+}
+
+void registerEditCommands(CommandRegistry& registry, QUndoStack& undoStack) {
+    const QPointer<QUndoStack> stack(&undoStack);
+    CommandSpec undo = spec("edit.undo", "Undo", "Edit", CommandContext::Global, {QStringLiteral("Ctrl+Z")});
+    undo.invoke = [stack](const QVariantList&) {
+        if (!stack.isNull()) {
+            stack->undo();
+        }
+    };
+    undo.enabled = [stack] { return !stack.isNull() && stack->canUndo(); };
+    registry.add(std::move(undo));
+    CommandSpec redo = spec("edit.redo", "Redo", "Edit", CommandContext::Global, {QStringLiteral("Ctrl+Y")});
+    redo.invoke = [stack](const QVariantList&) {
+        if (!stack.isNull()) {
+            stack->redo();
+        }
+    };
+    redo.enabled = [stack] { return !stack.isNull() && stack->canRedo(); };
+    registry.add(std::move(redo));
+}
+
+void registerLapStretchCommand(CommandRegistry& registry, LapStretchService& stretch) {
+    const QPointer<LapStretchService> service(&stretch);
+    CommandSpec s =
+        spec("data.lap_stretch_toggle", "Lap Distance Stretching", "Data", CommandContext::Global, {});
+    s.checkable = true;
+    s.checked = [service] { return !service.isNull() && service->enabled(); };
+    s.enabled = [service] { return !service.isNull(); };
+    s.invoke = [service](const QVariantList&) {
+        if (!service.isNull()) {
+            service->toggle();
+        }
+    };
+    registry.add(std::move(s));
 }
 
 } // namespace esses::qt

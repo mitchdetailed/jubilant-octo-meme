@@ -12,6 +12,7 @@
 #include <esses/store/memory_provider.hpp>
 #include <esses/store/series.hpp>
 
+#include <QCoreApplication>
 #include <cmath>
 #include <numbers>
 #include <stdexcept>
@@ -93,8 +94,10 @@ std::shared_ptr<const model::DataSource> makeSource(const SyntheticOptions& o, s
         }
         const double period = o.lapSeconds[lap];
         const double u = (t - lapStart) / period;
-        // Integrates to exactly trackLengthM over a lap: the sine has a whole period per lap.
-        const double v = o.trackLengthM / period * (1.0 + 0.3 * std::sin(2.0 * std::numbers::pi * u));
+        const double scale = lap < o.lapLengthScale.size() ? o.lapLengthScale[lap] : 1.0;
+        // Integrates to exactly trackLengthM (times the lap's scale) over a lap: the sine has a whole period
+        // per lap.
+        const double v = scale * o.trackLengthM / period * (1.0 + 0.3 * std::sin(2.0 * std::numbers::pi * u));
         fl[i] = static_cast<float>(v);
         fr[i] = static_cast<float>(v * 0.97);
         throttle[i] = static_cast<float>(50.0 + 50.0 * std::cos(2.0 * std::numbers::pi * u));
@@ -109,7 +112,23 @@ std::shared_ptr<const model::DataSource> makeSource(const SyntheticOptions& o, s
         layer.addChannel(channel(src->id, "Wheel Speed FR", ms, rate, fr, cache));
     }
     if (o.throttle) {
-        layer.addChannel(channel(src->id, "Throttle", *reg.find("%"), rate, throttle, cache));
+        model::Channel c = channel(src->id, "Throttle", *reg.find("%"), rate, throttle, cache);
+        if (!o.throttleLoggedName.empty()) {
+            c.desc.loggedName = o.throttleLoggedName;
+        }
+        layer.addChannel(std::move(c));
+    }
+    if (o.gps) {
+        std::vector<float> lat(n);
+        std::vector<float> lon(n);
+        for (std::size_t i = 0; i < n; ++i) {
+            const bool fix = i >= o.rateHz; // the first second: no fix, (0, 0)
+            lat[i] = fix ? static_cast<float>(-33.44 + 1e-5 * static_cast<double>(i % 1000)) : 0.0F;
+            lon[i] = fix ? static_cast<float>(149.56 + 1e-5 * static_cast<double>(i % 700)) : 0.0F;
+        }
+        const units::UnitId deg = *reg.find("deg");
+        layer.addChannel(channel(src->id, "GPS Latitude", deg, rate, lat, cache));
+        layer.addChannel(channel(src->id, "GPS Longitude", deg, rate, lon, cache));
     }
     layer.markers.push_back(
         model::makeLoggedMarker(model::MarkerClass::SOL, 0, "", "", "", 0, 0, model::Provenance::Derived));
@@ -126,6 +145,14 @@ std::shared_ptr<const model::DataSource> makeSource(const SyntheticOptions& o, s
     src->layers.push_back(std::move(layer));
     src->details.push_back(model::Detail{"File Name", std::string(pathToUtf8(src->prov.path.filename())),
                                          model::Provenance::Derived, std::nullopt});
+    if (o.venueLengthM) {
+        model::Quantityd q;
+        q.v = *o.venueLengthM;
+        q.unit = *reg.find("m");
+        q.symbol = "m";
+        q.dps = 0;
+        src->details.push_back(model::Detail{"Venue Length", q, model::Provenance::Logged, std::nullopt});
+    }
     src->baseDetails = src->details;
     analysis::RuleRunner::circuitDefault().run(*src);
     return src;
@@ -169,8 +196,11 @@ std::filesystem::path writeLd(const model::DataSource& src, const std::filesyste
 }
 
 std::filesystem::path scratchDir(const std::string& name) {
+    // One directory per process: ctest runs several copies of one executable at once (tst_undo_property and
+    // its seed variants), and a shared directory would be removed under a sibling's feet.
     const std::filesystem::path dir =
-        pathFromUtf8(ESSES_TEST_BINARY_DIR) / "qtmodel-scratch" / pathFromUtf8(name);
+        pathFromUtf8(ESSES_TEST_BINARY_DIR) / "qtmodel-scratch" /
+        pathFromUtf8(name + "-" + std::to_string(QCoreApplication::applicationPid()));
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);
     std::filesystem::create_directories(dir);

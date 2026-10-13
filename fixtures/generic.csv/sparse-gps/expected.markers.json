@@ -1,0 +1,44 @@
+{
+  "$schema": "urn:esses:markers-1",
+  "schemaVersion": 1,
+  "layers": {
+    "Normal": [
+      {
+        "class": "SOL",
+        "comment": "",
+        "group": "",
+        "id": "4a220465-0e86-5534-8b34-1cae5de4ee3b",
+        "name": "",
+        "prov": "Derived",
+        "tUs": 0
+      },
+      {
+        "class": "BCN",
+        "comment": "",
+        "group": "Beacons",
+        "id": "4e53d113-b9c4-51ee-b582-f55583d43f01",
+        "name": "",
+        "prov": "Logged",
+        "tUs": 15000000
+      },
+      {
+        "class": "BCN",
+        "comment": "",
+        "group": "Beacons",
+        "id": "3b4755ac-b37c-5986-924b-ce704f9ae809",
+        "name": "",
+        "prov": "Logged",
+        "tUs": 30000000
+      },
+      {
+        "class": "EOL",
+        "comment": "",
+        "group": "",
+        "id": "2ccbb856-d52e-56a9-9a2e-3c98acec1460",
+        "name": "",
+        "prov": "Derived",
+        "tUs": 40000000
+      }
+    ]
+  }
+}

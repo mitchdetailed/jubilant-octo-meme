@@ -4,6 +4,7 @@
 #include <esses/model/channel.hpp>
 #include <esses/qtmodel/channels_model.hpp>
 #include <esses/qtmodel/command_registry.hpp>
+#include <esses/qtmodel/project_session.hpp>
 #include <esses/widgets/docks/channels_window.hpp>
 
 #include <QApplication>
@@ -13,8 +14,10 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QKeyEvent>
+#include <QLabel>
 #include <QLineEdit>
 #include <QMimeData>
+#include <QPointer>
 #include <QSortFilterProxyModel>
 #include <QTreeView>
 #include <QVBoxLayout>
@@ -24,22 +27,25 @@ namespace esses::widgets {
 
 namespace {
 
-// The plain M1 filter over ChannelsModel (06 section 7 item 3 in its M1 form), the drag source of channel
-// rows and the styling of the channel status (Pending italic, Error red).
+// The search over ChannelsModel (06 section 7 item 3, D-175: word prefixes, loose = substrings), the drag
+// source of channel rows and the styling of the channel status (Pending italic, Error red).
 class ChannelFilterProxy final : public QSortFilterProxyModel {
 public:
     using QSortFilterProxyModel::QSortFilterProxyModel;
     QString query;
+    bool loose = false;
 
-    void setQuery(const QString& q) {
+    void setQuery(const QString& q, bool looseMatch) {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
         // invalidateRowsFilter() is deprecated for Qt 6.13 (and warned about from 6.12);
         // endFilterChange(Direction) exists from 6.10.
         beginFilterChange();
         query = q.trimmed();
+        loose = looseMatch;
         endFilterChange(QSortFilterProxyModel::Direction::Rows);
 #else
         query = q.trimmed();
+        loose = looseMatch;
         invalidateRowsFilter();
 #endif
     }
@@ -51,7 +57,7 @@ public:
         const QModelIndex i = sourceModel()->index(row, 0, parent);
         const QVariant name = i.data(qt::ChannelsModel::ChannelNameRole);
         // Source and category rows stay when a descendant matches (recursive filtering).
-        return name.isValid() && qt::ChannelsModel::filterAccepts(name.toString(), query);
+        return name.isValid() && qt::ChannelsModel::filterAccepts(name.toString(), query, loose);
     }
 
     Qt::ItemFlags flags(const QModelIndex& index) const override {
@@ -145,6 +151,14 @@ ChannelsWindow::ChannelsWindow(qt::ChannelsModel& model, qt::CommandRegistry& co
     search_->setPlaceholderText(tr("Search channels"));
     search_->setClearButtonEnabled(true);
     search_->setAccessibleName(tr("Search channels"));
+    search_->setToolTip(
+        tr("Type the first letters of words of a channel name, in order: \"W S FL\" finds Wheel "
+           "Speed FL, \"temp (ecu)\" finds Water Temp (ECU). TAB or DOWN moves into the list, "
+           "ENTER adds the channel to the focused component."));
+    noMatch_ = new QLabel(this);
+    noMatch_->setObjectName(QStringLiteral("channelNoMatch"));
+    noMatch_->setWordWrap(true);
+    noMatch_->setVisible(false);
     auto* proxy = new ChannelFilterProxy(this);
     proxy->setRecursiveFilteringEnabled(true);
     proxy->setSourceModel(&model_);
@@ -164,6 +178,7 @@ ChannelsWindow::ChannelsWindow(qt::ChannelsModel& model, qt::CommandRegistry& co
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->addWidget(search_);
+    layout->addWidget(noMatch_);
     layout->addWidget(tree_);
     setFocusProxy(search_);
 
@@ -188,9 +203,38 @@ ChannelsWindow::ChannelsWindow(qt::ChannelsModel& model, qt::CommandRegistry& co
 ChannelsWindow::~ChannelsWindow() = default;
 
 void ChannelsWindow::applyFilter(const QString& text) {
-    static_cast<ChannelFilterProxy*>(proxy_)->setQuery(text);
+    static_cast<ChannelFilterProxy*>(proxy_)->setQuery(text, loose_);
     tree_->expandAll();
     highlightFirstMatch();
+    const QString query = text.trimmed();
+    const bool none = !query.isEmpty() && visibleChannels().isEmpty();
+    noMatch_->setText(
+        none ? tr("No channel matches \"%1\"%2.")
+                   .arg(query, loose_ ? QString() : tr(" (word prefixes; loose matching is in Options)"))
+             : QString());
+    // Shown only while it is not hidden explicitly (an offscreen test reads isHidden()).
+    noMatch_->setHidden(!none);
+}
+
+void ChannelsWindow::setLooseMatch(bool loose) {
+    if (loose_ == loose) {
+        return;
+    }
+    loose_ = loose;
+    applyFilter(search_->text());
+}
+
+void ChannelsWindow::followSession(qt::ProjectSession& session) {
+    const QPointer<qt::ProjectSession> s(&session);
+    const auto follow = [this, s] {
+        if (!s.isNull()) {
+            setLooseMatch(s->looseChannelSearch());
+        }
+    };
+    connect(&session, &qt::ProjectSession::documentsChanged, this, follow);
+    connect(&session, &qt::ProjectSession::projectOpened, this, follow);
+    connect(&session, &qt::ProjectSession::projectClosed, this, follow);
+    follow();
 }
 
 void ChannelsWindow::highlightFirstMatch() {

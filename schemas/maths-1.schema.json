@@ -1,0 +1,427 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:maths-1",
+  "title": "Esses maths module (maths-1)",
+  "description": "A maths module (03 section 4.1, D-020 to D-024): <Project>/maths/<module>.maths.json, and the same document with id \"local\" as a sidecar layer's localMaths. Constants and enumerations of the module, and its items: expressions, filters, scale and offset, tables and built-in module references. Every persisted number carries its unit ({v, unit}, or {unit, data} for table values; D-010). Unknown top-level members are allowed and preserved; constants, enumerations and items are closed (unknown imported attributes go to x-i2).",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "id"],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072). The urn:esses: form is written; the bare esses: form of earlier drafts and the later https form are accepted on load and normalised on save (02 section 6.6 rule 1).",
+      "type": "string",
+      "pattern": "^(urn:esses:maths-1|esses:maths-1|https://[^/\\s]+(/[^/\\s]+)*/maths-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "id": {
+      "description": "Module id (\"user\", \"esses-circuit\", \"local\").",
+      "type": "string",
+      "minLength": 1
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "condition": {
+      "description": "Expression over details, a Bool scalar; the module applies to a source only when it holds (03 section 4.3 rule 8).",
+      "type": "string"
+    },
+    "precision": {
+      "description": "Default precision of the module's items (03 section 6.5).",
+      "enum": ["single", "double"]
+    },
+    "constants": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/constant"
+      }
+    },
+    "enumerations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/enumeration"
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/item"
+      }
+    },
+    "x-esses-legacy": {
+      "$ref": "#/definitions/legacyBag"
+    }
+  },
+  "definitions": {
+    "constant": {
+      "type": "object",
+      "required": ["name", "value"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "$ref": "#/definitions/unitValue"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "comment": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "enumeration": {
+      "type": "object",
+      "required": ["name", "entries"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "value"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "value": {
+                "type": "integer"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "item": {
+      "description": "MathItem (03 section 4.1). The members used depend on the kind; the required ones are checked per kind.",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "description": "Item kind (03 section 4.1). table3d and regression load with E-KIND-UNSUPPORTED and plugin with E-PLUGIN-UNAVAILABLE before they are implemented; all three are preserved.",
+          "enum": ["expression", "filter", "scale_offset", "table2d", "table3d", "builtin", "plugin", "regression"]
+        },
+        "name": {
+          "description": "Output channel name (any character except '); the input channel of filter and scale_offset items.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^']+$"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "comment": {
+          "type": "string"
+        },
+        "expr": {
+          "description": "The expression text in the maths language (03 section 2).",
+          "type": "string"
+        },
+        "rate": {
+          "description": "\"auto\" (the highest input rate), an exact {num, den} or a plain Hz number.",
+          "anyOf": [
+            {
+              "const": "auto"
+            },
+            {
+              "$ref": "#/definitions/rational"
+            },
+            {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          ]
+        },
+        "quantity": {
+          "description": "Result quantity name of the unit registry.",
+          "type": "string"
+        },
+        "resultUnit": {
+          "$ref": "#/definitions/unitSymbolOrEmpty"
+        },
+        "display": {
+          "$ref": "#/definitions/display"
+        },
+        "interp": {
+          "enum": ["Linear", "Closest", "Previous", "Next"]
+        },
+        "enumeration": {
+          "description": "Name of an enumeration of the module.",
+          "type": "string",
+          "minLength": 1
+        },
+        "applies": {
+          "type": "object",
+          "properties": {
+            "logged": {
+              "type": "boolean"
+            },
+            "telemetry": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "window": {
+          "description": "filter: the smoothing window as a count of points or a time in seconds.",
+          "type": "object",
+          "minProperties": 1,
+          "properties": {
+            "points": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "seconds": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "scale": {
+          "type": "number"
+        },
+        "offset": {
+          "$ref": "#/definitions/unitValue"
+        },
+        "axis": {
+          "$ref": "#/definitions/tableAxis"
+        },
+        "x": {
+          "$ref": "#/definitions/tableAxis"
+        },
+        "y": {
+          "$ref": "#/definitions/tableAxis"
+        },
+        "values": {
+          "$ref": "#/definitions/tableValues"
+        },
+        "interpolation": {
+          "enum": ["linear", "next", "previous"]
+        },
+        "outOfRange": {
+          "enum": ["clamp", "invalid"]
+        },
+        "module": {
+          "description": "builtin and plugin: the module id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "description": "builtin and plugin: the module version.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "settings": {
+          "description": "builtin and plugin: the module settings (their own schema).",
+          "type": "object"
+        },
+        "precision": {
+          "enum": ["single", "double"]
+        },
+        "x-i2": {
+          "description": "Imported attributes not understood, kept for the round trip (D-019).",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "expression"
+              }
+            }
+          },
+          "then": {
+            "required": ["name", "expr"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "filter"
+              }
+            }
+          },
+          "then": {
+            "required": ["name", "window"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "scale_offset"
+              }
+            }
+          },
+          "then": {
+            "required": ["name"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "table2d"
+              }
+            }
+          },
+          "then": {
+            "required": ["name", "axis", "values"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "table3d"
+              }
+            }
+          },
+          "then": {
+            "required": ["name", "x", "y", "values"]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "builtin"
+              }
+            }
+          },
+          "then": {
+            "required": ["module"]
+          }
+        }
+      ]
+    },
+    "display": {
+      "description": "Display defaults of the output channel.",
+      "type": "object",
+      "properties": {
+        "unit": {
+          "$ref": "#/definitions/unitSymbolOrEmpty"
+        },
+        "dps": {
+          "description": "Display decimals.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15
+        },
+        "colourIndex": {
+          "description": "Index into the scheme's channel palette.",
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "rational": {
+      "description": "An exact rate num/den Hz.",
+      "type": "object",
+      "required": ["num", "den"],
+      "properties": {
+        "num": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "den": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "tableAxis": {
+      "description": "A table axis: the expression it reads, its unit and ascending breakpoints (at least 2; the order is checked when the item compiles, E-TABLE-AXIS).",
+      "type": "object",
+      "required": ["expr", "unit", "breakpoints"],
+      "properties": {
+        "expr": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "$ref": "#/definitions/unitSymbolOrEmpty"
+        },
+        "breakpoints": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "number"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "tableValues": {
+      "description": "Table values in one unit: a row for table2d, rows of len(y) for table3d (rowMajor).",
+      "type": "object",
+      "required": ["unit", "data"],
+      "properties": {
+        "unit": {
+          "$ref": "#/definitions/unitSymbolOrEmpty"
+        },
+        "data": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              }
+            ]
+          }
+        },
+        "rowMajor": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "unitValue": {
+      "description": "A persisted number with its unit (D-010): {\"v\": number, \"unit\": symbol}, \"\" for a unitless value. The value is in the unit as written; readers convert, writers keep the written unit.",
+      "type": "object",
+      "required": ["v", "unit"],
+      "properties": {
+        "v": {
+          "type": "number"
+        },
+        "unit": {
+          "$ref": "#/definitions/unitSymbolOrEmpty"
+        }
+      },
+      "additionalProperties": false
+    },
+    "unitSymbolOrEmpty": {
+      "description": "A unit symbol or alias of the unit registry (units-1), or \"\" for the unitless unit; no leading or trailing white space.",
+      "type": "string",
+      "pattern": "^(\\S(.*\\S)?)?$"
+    },
+    "legacyBag": {
+      "description": "Fields removed by a migration, kept verbatim (02 section 6.6 rule 3).",
+      "type": "object"
+    }
+  }
+}

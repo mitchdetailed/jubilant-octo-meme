@@ -14,6 +14,8 @@
 //   quantity's
 //     base unit back to the reader (rule 6, D-010), and the reader supplies the provider that feeds a Column
 //     (motec.ld: the .ld chunk provider). Without one the pipeline wraps readBlock in a generic provider.
+//   * M2: columnHint/dictionary (pipeline step 4a), makeTimesProvider/timeRange (timestamped channels) and
+//     attachColumns (the shared slab sweep of the text engine, 05 section 7.1).
 // JsonDoc does not exist in esses_base yet, so JSON-valued members are model::OpaqueJson.
 #pragma once
 
@@ -23,12 +25,14 @@
 #include <esses/base/result.hpp>
 #include <esses/base/time.hpp>
 #include <esses/formats/byte_source.hpp>
+#include <esses/formats/dictionary.hpp>
 #include <esses/formats/import_log.hpp>
 #include <esses/formats/probe.hpp>
 #include <esses/model/channel.hpp>
 #include <esses/model/opaque_json.hpp>
 #include <esses/model/source.hpp>
 #include <esses/store/chunk_provider.hpp>
+#include <esses/store/column.hpp>
 #include <esses/store/types.hpp>
 #include <esses/units/converter.hpp>
 
@@ -42,6 +46,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace esses::formats {
@@ -75,6 +80,9 @@ struct ImportOptions {
     std::optional<std::filesystem::path> unitMap; // unit-mapping profiles arrive in M2; ignored in M0
     bool strictUnits = false;                     // fail with NotFound instead of opening a channel unitless
     std::optional<Hash128> expectedHash; // sidecar source check: another SourceId logs sidecar.source_changed
+    // The open's cancellation (D-190): ImporterRegistry sets it to the open task's token before calling
+    // IImporter::open, so an importer's long pass (the text engine's pass 1) stops when it fires (Cancelled).
+    CancelToken cancel;
 };
 
 // Host-owned output window inside a chunk under construction (D-011).
@@ -156,6 +164,27 @@ public:
     virtual std::shared_ptr<store::IChunkProvider> makeChunkProvider(LayerIx, ChannelIx) const {
         return nullptr;
     }
+
+    // ---- M2 additions (text importers; 05 section 2 step 4a, section 7.1)
+    // ---------------------------------- Step 4a: the importer's own knowledge of a channel, applied before
+    // the unit lookup: a text profile's column override (name, quantity, unit, interp, kind, dtype) and the
+    // importer's dictionary (05 section 8.3), matched by the pipeline. Defaults: none.
+    virtual const Dictionary::Entry* columnHint(LayerIx, ChannelIx) const { return nullptr; }
+    virtual const Dictionary* dictionary() const { return nullptr; }
+    // Timestamped channels: the provider of the I64 time column (channels whose readers return the same
+    // provider share one Column), nullptr: the pipeline wraps readTimestamps; and the first and last
+    // timestamp when the reader knows them without a decode (nullopt: the pipeline reads them).
+    virtual std::shared_ptr<store::IChunkProvider> makeTimesProvider(LayerIx, ChannelIx) const {
+        return nullptr;
+    }
+    virtual std::optional<std::pair<Micros, Micros>> timeRange(LayerIx, ChannelIx) const {
+        return std::nullopt;
+    }
+    // Called once per channel after the pipeline built its Columns (before publication, never concurrently
+    // with a decode): a reader that decodes several columns in one sweep seals the siblings' chunks into
+    // `cache` with ChunkCache::insertGroup (05 section 7.1).
+    virtual void attachColumns(LayerIx, ChannelIx, const store::Column& /*values*/,
+                               const store::Column* /*timesUs*/, store::ChunkCache& /*cache*/) {}
 };
 
 class IImporter { // every member is const and thread-safe (the registry hands out const IImporter*)

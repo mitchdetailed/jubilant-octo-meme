@@ -43,6 +43,11 @@ public:
     const RangeInterval* find(std::string_view path, Micros t) const noexcept;
     // RangeGroupTree::rangeVersion of the snapshot (0 when absent).
     std::uint64_t rangeVersion(std::string_view path) const noexcept;
+    // True when the layer has a group with this exact path (it may hold no enabled range); the maths range
+    // functions report E-RANGE-UNKNOWN otherwise (03 section 2.4 rule 3).
+    bool contains(std::string_view path) const noexcept;
+    // Every group path, sorted (the list of available paths in that diagnostic).
+    std::vector<std::string> paths() const;
 
 private:
     std::map<std::string, std::vector<RangeInterval>, std::less<>> groups_;

@@ -51,8 +51,11 @@ struct WorkbookFile {
     std::optional<std::string>
         activeWorksheet; // used only when .local/layout.json has no entry (06 section 4.1)
     std::vector<WorksheetDef> worksheets;
-    JsonDoc xI2;        // JSON key "x-i2"
-    JsonDoc unknown;    // unrecognised top-level members, preserved (02 section 6.1)
+    JsonDoc xI2;     // JSON key "x-i2"
+    JsonDoc unknown; // unrecognised top-level members, preserved (02 section 6.1)
+    // The minor written on save: the newest this build writes, or the newer minor the document was read with
+    // (R-38: never downgraded).
+    int schemaVersion = 1;
     bool dirty = false; // set when load() derived an id
 
     // `fileName` (without directory) derives the id when the document has none.

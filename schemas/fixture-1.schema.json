@@ -236,14 +236,14 @@
       }
     },
     "oracle": {
-      "description": "Where the expected channel values come from (05 section 9.1, D-041). Kinds: ref-decode (tools/ld_ref_decode.py), public-project (a pinned third-party decoder), converter, self (round trips of our own writer only), and the vendor-software export kind of 05 section 9.1, matched by exportOracleKind.",
+      "description": "Where the expected channel values come from (05 section 9.1, D-041). Kinds: ref-decode (tools/ld_ref_decode.py), public-project (a pinned third-party decoder), converter, self (round trips of our own writer only), generator (the values a fixture generator printed into a self-authored text input, tools/gen_text_fixtures.py; M2), and the vendor-software export kind of 05 section 9.1, matched by exportOracleKind.",
       "type": "object",
       "required": ["kind", "ref", "tolerance"],
       "properties": {
         "kind": {
           "anyOf": [
             {
-              "enum": ["ref-decode", "public-project", "converter", "self"]
+              "enum": ["ref-decode", "public-project", "converter", "self", "generator"]
             },
             {
               "$ref": "#/definitions/exportOracleKind"

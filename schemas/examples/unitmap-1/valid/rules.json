@@ -1,0 +1,27 @@
+{
+  "$schema": "urn:esses:unitmap-1",
+  "schemaVersion": 1,
+  "importer": "text.profile:generic.csv",
+  "rules": [
+    {
+      "match": "nameAndUnit",
+      "name": "Oil P",
+      "vendorUnit": "PSIG",
+      "quantity": "Pressure",
+      "unit": "psi",
+      "analysisName": "Eng Oil Pres"
+    },
+    {
+      "match": "unitOnly",
+      "vendorUnit": "KMH",
+      "quantity": "Speed",
+      "unit": "km/h"
+    },
+    {
+      "match": "nameOnly",
+      "name": "Lambda A",
+      "quantity": "Air Fuel Ratio",
+      "unit": "lambda"
+    }
+  ]
+}

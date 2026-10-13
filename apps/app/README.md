@@ -13,7 +13,10 @@ esses [-w <project folder>] [-l <log file>]... [--offscreen] [--dump-commands] [
 resolve against the current directory; a bare argument is a project when it is a folder with `project.json` (or a
 `project.json`), otherwise a log (06 §19 item 3). The MainWindow restores the session's dock layout on start
 (`<config>/layout.json`, then the project's `.local/layout.json` after `-w`) and writes it on exit (06 §§3.4,
-18 step 4). `--offscreen` sets `QT_QPA_PLATFORM=offscreen` before the application starts. `--dump-commands`
+18 step 4). With `-w` the project's recovery prompt comes first (a pending journal, AC-M2-06) and the `-l` logs
+are then opened by the session restore, which otherwise reopens the project's previous data and restores the last
+selection (06 §18 steps 3-6, D-178); without `-w` (or when the project does not open) the logs open directly.
+`--offscreen` sets `QT_QPA_PLATFORM=offscreen` before the application starts. `--dump-commands`
 prints the `CommandRegistry` as JSON (the registry export that `esses-cli validate` checks keymaps against,
 06 §14.3) without writing the layout. ctest `app.version` starts the executable offscreen.
 
