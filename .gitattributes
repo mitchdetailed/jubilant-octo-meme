@@ -21,3 +21,7 @@
 # Vendored code is stored byte-for-byte so the SHA-256 records in third_party/README.md and
 # third_party/qtads/UPSTREAM.md match on every checkout (no line-ending normalisation).
 third_party/** -text
+
+# Test fixtures are stored byte-for-byte: line endings, encodings and BOMs are part of what they test
+# (e.g. fixtures/motec.csv/dialect-basic is CRLF by design).
+fixtures/** -text
