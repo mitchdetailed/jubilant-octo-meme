@@ -23,8 +23,5 @@ when `goldens.json` says `"generatedOn": "linux"`, and anywhere with `ESSES_PIXE
 tag, ink, two renders identical) and the pixel difference is reported, not enforced. Every OS also checks
 `<case>.json` against the case definition and runs the `DrawList` JSON goldens.
 
-Provenance (M1): the committed PNGs were rendered on the developer's Windows machine (Qt 6.7.2 MSVC, offscreen,
-`ESSES_UPDATE_GOLDENS=1`), the reference machine of `bench/workloads.md`; on that machine every case differs by 0
-pixels from them. They are provisional until the first ubuntu `qt-app` run: replace them with that run's
-`artefacts/<case>@<dpr>x.png`, set `generatedOn` to `linux`, and from then on the ubuntu job enforces them.
-Regenerate (any OS, for review only): `ESSES_UPDATE_GOLDENS=1 <build>/bin/esses_golden_tst_golden_images`.
+Provenance (M1): the committed PNGs come from the ubuntu `qt-app` artefact of CI run 38290822661 (Qt 6.12.0, offscreen, commit dc335d6) and `goldens.json` says `"generatedOn": "linux"`, so the ubuntu job enforces them; Windows and macOS run them as render smoke tests. They replaced provisional Windows renders, which differed by about 1 % of pixels (font rasterisation). To update them: take the renders from a later ubuntu run's `golden-diffs-ubuntu-24.04` artefact.
+Regenerate for review only (any OS): `ESSES_UPDATE_GOLDENS=1 <build>/bin/esses_golden_tst_golden_images`.
