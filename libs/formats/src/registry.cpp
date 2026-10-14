@@ -6,6 +6,7 @@
 #include "importer_chunk_provider.hpp"
 
 #include <esses/base/assert.hpp>
+#include <esses/base/read_file.hpp>
 #include <esses/base/taskpool.hpp>
 #include <esses/base/utf8.hpp>
 #include <esses/formats/csv.hpp>
@@ -23,7 +24,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <fstream>
 #include <map>
 #include <mutex>
 #include <system_error>
@@ -182,15 +182,17 @@ ImporterRegistry::sniff(const std::filesystem::path& path) const {
     if (!st) {
         return Failure{st.error()};
     }
-    std::ifstream in(path, std::ios::binary);
-    if (!in) {
-        ErrorContext ctx;
-        ctx.path = path;
-        return fail(ErrorCode::Io, "cannot read the file", std::move(ctx));
+    // readFileHead checks the type first (a directory opens as a stream on POSIX and reads as an empty head:
+    // Io on every OS, as on Windows) and on Windows shares delete access, so a file that AtomicFile is
+    // replacing opens at every instant and the open never blocks the replacement.
+    const Result<std::string> bytes = readFileHead(path, kSniffHeadBytes, "the file");
+    if (!bytes) {
+        return Failure{bytes.error()};
     }
-    std::vector<std::byte> head(static_cast<std::size_t>(std::min<std::uint64_t>(st->size, kSniffHeadBytes)));
-    in.read(reinterpret_cast<char*>(head.data()), static_cast<std::streamsize>(head.size()));
-    head.resize(static_cast<std::size_t>(std::max<std::streamsize>(0, in.gcount())));
+    std::vector<std::byte> head(bytes->size());
+    if (!bytes->empty()) {
+        std::memcpy(head.data(), bytes->data(), bytes->size());
+    }
     const std::vector<std::filesystem::path> siblings = listSiblings(path);
     SniffInput si;
     si.path = path;

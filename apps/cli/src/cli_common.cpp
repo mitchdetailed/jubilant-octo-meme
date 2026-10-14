@@ -4,14 +4,13 @@
 
 #include <esses/base/atomic_file.hpp>
 #include <esses/base/json_depth.hpp>
+#include <esses/base/read_file.hpp>
 #include <esses/base/utf8.hpp>
 #include <esses/model/opaque_json.hpp>
 
 #include <charconv>
 #include <cmath>
 #include <cstdint>
-#include <fstream>
-#include <iterator>
 #include <limits>
 #include <numeric>
 #include <system_error>
@@ -27,25 +26,7 @@ std::filesystem::path p8(std::string_view utf8) {
 }
 
 Result<std::string> readFile(const std::filesystem::path& path) {
-    std::ifstream in(path, std::ios::binary);
-    if (!in) {
-        ErrorContext ctx;
-        ctx.path = path;
-        return fail(ErrorCode::Io, "cannot open " + u8(path), std::move(ctx));
-    }
-    std::string text;
-    try {
-        text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-    } catch (const std::ios_base::failure&) {
-        // libstdc++'s filebuf throws a failed read (a directory: EISDIR) whatever the exception mask
-        in.setstate(std::ios_base::badbit);
-    }
-    if (in.bad()) {
-        ErrorContext ctx;
-        ctx.path = path;
-        return fail(ErrorCode::Io, "cannot read " + u8(path), std::move(ctx));
-    }
-    return text;
+    return readWholeFile(path, u8(path));
 }
 
 Result<void> writeFile(const std::filesystem::path& path, std::string_view bytes) {

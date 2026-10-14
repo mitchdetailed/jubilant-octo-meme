@@ -22,6 +22,7 @@
 #include <esses/base/paths.hpp>
 #include <esses/base/priority.hpp>
 #include <esses/base/rate.hpp>
+#include <esses/base/read_file.hpp>
 #include <esses/base/result.hpp>
 #include <esses/base/taskpool.hpp>
 #include <esses/base/thread_role.hpp>

@@ -52,9 +52,9 @@ public:
                                               const units::UnitRegistry& units,
                                               Diagnostics& diags) const override;
 
-    // Loads the settings schema from `schemasDir` (Io when the file is missing or unreadable, Format when it
-    // is not a draft-07 schema with $id urn:esses:<kSettingsSchemaId>); until then settingsSchema() is null
-    // and expand() relies on CorrectedSpeedSettings::fromJson alone.
+    // Loads the settings schema from `schemasDir` (Io when the file is missing, not a regular file or
+    // unreadable, Format when it is not a draft-07 schema with $id urn:esses:<kSettingsSchemaId>); until then
+    // settingsSchema() is null and expand() relies on CorrectedSpeedSettings::fromJson alone.
     Result<void> loadSchema(const std::filesystem::path& schemasDir);
     // validateSettings(*this, settings): NotFound until loadSchema() succeeded.
     Result<void> validateSettings(const model::OpaqueJson& settings) const;

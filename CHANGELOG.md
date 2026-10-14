@@ -4,6 +4,62 @@ All notable changes are recorded here, newest first. The project follows semanti
 
 ## Unreleased (M2)
 
+- Task-pool, test-output and source-loader fixes (pull request 2). A share-key `TaskPool::submit` no longer joins a
+  task whose `Future` is already ready: the worker drops the key a moment after it publishes the result, and a
+  submit in that moment got the old result without a run (MathGraph's Recalculate re-evaluation, and timed runs
+  of the maths bench that skipped evaluations); it now starts a task of its own (01 §5.4 rule 1). A requester
+  that registers just after a share task latched its cancellation gets a task of its own too, instead of a
+  Cancelled result. Qt tests run with `QT_FORCE_STDERR_LOGGING=1` (`ESSES_QT_TEST_ENVIRONMENT`), so their output
+  reaches ctest on Windows, where Qt Test otherwise writes to `OutputDebugString` when the process has no
+  console. `SourceLoader` emits `sourcePublished()` before the distance prefetch, so `channelReady()` never
+  precedes the source it belongs to (a trust edit made in reply was dropped); regression test
+  `qtmodel.tst_source_loader` `noChannelIsAnnouncedBeforeItsSource`, and `tst_source_loader` waits on conditions
+  instead of fixed times. Test: `base.taskpool: a share key submitted once the task's Future is ready starts a
+  new task`.
+
+- Reads are no longer refused while `AtomicFile` replaces the file (Windows). `readWholeFile` read through a
+  `std::ifstream`, which does not share delete access, and `AtomicFile` renamed its temporary into place
+  through its writing handle (write access, no sharing), closed a moment after the rename: a read in that moment
+  failed with a sharing violation (about one in ten reads while another thread replaced the file in a loop),
+  and an open stream made the rename itself fail. `readWholeFile` and the new `readFileHead(path, maxBytes,
+  what)` now open with `CreateFileW` sharing read, write and delete access and read with `ReadFile` (the POSIX
+  path and every error are unchanged). `AtomicFile` writes through a handle that shares read and delete access
+  and renames through a second handle with delete access only, so `MappedFile` (which never shares write
+  access) is not refused either; a rename refused with `ERROR_ACCESS_DENIED` or `ERROR_SHARING_VIOLATION`
+  (a few in a thousand while other threads open the target) is retried for up to 500 ms before the `MoveFileExW`
+  fallback. While the rename is under way the target's name can be missing (gaps of about 10 ms measured, and
+  renames of up to 200 ms on a loaded machine), so `readWholeFile`, `readFileHead` and `MappedFile::open` look
+  again for up to 500 ms when a file is not found or is being deleted; a sharing violation is still reported at
+  once. `ImporterRegistry::sniff(path)` reads its 64 KiB head through `readFileHead`, and `tst_source_loader`
+  reads the sidecar through `readWholeFile`. Regression tests, each holding the handle states of the moment
+  after the rename still and then replacing the file again and again, with no failed read or open allowed:
+  `base.read file: a document that AtomicFile replaces reads whole at every instant` (also an open reader that
+  does not keep a replacement out; 500 reads straight after a write, then at least 2000 reads against a writer
+  thread), `base.atomic file: a mapped reader opens the file at every instant of a replacement` (at least 2000
+  opens against a writer thread) and `formats.registry: sniff reads a log through the handles of an atomic
+  replacement` (200 sniffs straight after a write); the first fails against the previous reader and against the
+  previous writer, the second against the previous writer, the third against the previous sniff.
+
+- One whole-file reader for documents (pull request 2, the macOS `core` job). The four directory regression tests
+  of the previous entry failed on macOS: libc++ opens a directory as a stream and reads it as an empty file, with
+  no error and no exception (libstdc++ throws `std::ios_base::failure` with EISDIR, MSVC refuses the open), so
+  the readers returned empty text and the failure surfaced later as Format, or, in `saveWithBackup`, an empty
+  "previous version" was copied to `backup/` before the replacement failed. `esses_base` gains
+  `readWholeFile(path, what)` and `requireRegularFile(path, what)` (`read_file.hpp`): the file type is checked
+  with `std::filesystem::status` before anything is opened (a directory, device, FIFO or socket is Io "... is
+  not a regular file", a missing file Io "cannot open ..."), the file is read in binary mode through
+  `istream::read`, which turns a failed read into badbit instead of letting it escape, and no exception leaves
+  the call. The seven copies of the old read (`jsonio::readFile`, the settings schemas of the two built-in maths
+  modules, the sidecar, the unit table, the project session's document reads, `esses-cli`'s `readFile`) now
+  call it with their own names in the messages, and `saveWithBackup` refuses a target that exists but is not a
+  regular file before it creates `backup/`. The two other reads of document input that met the same platform
+  difference check the type too: `esses-cli`'s `sha256File` (fixture verification hashed a directory as an
+  empty file on macOS) and `ImporterRegistry::sniff(path)` (a directory read as an empty head on POSIX and was
+  offered to the importers by its extension; Io on Windows). Tests: `base.read file: ...` (regular, empty,
+  missing, directory, and a file that cannot be opened: held without sharing on Windows, without read
+  permission on POSIX) and a directory case in `formats.registry: sniff confidence bands and companions`; the
+  four regression tests are unchanged.
+
 - Fixes for the first CI run of the public repository (pull request 2). `bench.maths_bench.smoke` aborted on
   Linux with "ChunkCache destroyed while Columns still use it": the readiness block of `esses-maths-bench` (and
   its `--digest` mode) declared the `TaskPool` before the `ChunkCache`, so the cache was destroyed first, while a

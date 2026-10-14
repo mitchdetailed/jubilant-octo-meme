@@ -119,10 +119,10 @@ public:
     // "<log>.<ext>.sidecar.json" next to the log.
     static std::filesystem::path pathFor(const std::filesystem::path& log);
 
-    // A missing file is an empty document (ok). Errors: Io (context.path), Format (JSON syntax;
-    // context.offset), Unsupported (another schema major; context.schemaId), Invalid (a sidecar-1 rule;
-    // context.detail = JSON pointer of the offending member). A caller must not save over a file that failed
-    // to load.
+    // A missing file is an empty document (ok). Errors: Io (context.path; also a directory standing where the
+    // sidecar belongs), Format (JSON syntax; context.offset), Unsupported (another schema major;
+    // context.schemaId), Invalid (a sidecar-1 rule; context.detail = JSON pointer of the offending member). A
+    // caller must not save over a file that failed to load.
     static Result<SidecarDocument> load(const std::filesystem::path& path);
     static Result<SidecarDocument> parse(std::string_view json);
 

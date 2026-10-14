@@ -5,6 +5,7 @@
 #include <esses/base/uuid.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -45,6 +46,13 @@ fs::path tempPathFor(const fs::path& target) {
 }
 
 #if defined(ESSES_OS_WINDOWS)
+// How long a refused rename is retried. While other handles on the target open and close, the rename can be
+// refused for a moment with ERROR_ACCESS_DENIED even when every one of them shares delete access, and with
+// ERROR_SHARING_VIOLATION while a reader that does not share it (a std::ifstream) has the target open:
+// measured with twelve processes each replacing a file while a thread of its own read it in a loop, a few
+// renames in a thousand were refused, and each went through within six retries.
+constexpr auto kRenameRetryFor = std::chrono::milliseconds(500);
+
 bool renameOverPosix(HANDLE file, const fs::path& target) {
     std::error_code ec;
     const fs::path absolute = fs::absolute(target, ec);
@@ -59,7 +67,20 @@ bool renameOverPosix(HANDLE file, const fs::path& target) {
     info->RootDirectory = nullptr;
     info->FileNameLength = static_cast<DWORD>(nameBytes);
     std::memcpy(info->FileName, name.c_str(), nameBytes + sizeof(wchar_t)); // includes the terminating NUL
-    return SetFileInformationByHandle(file, FileRenameInfoEx, info, static_cast<DWORD>(buffer.size())) != 0;
+    const auto deadline = std::chrono::steady_clock::now() + kRenameRetryFor;
+    for (;;) {
+        if (SetFileInformationByHandle(file, FileRenameInfoEx, info, static_cast<DWORD>(buffer.size())) !=
+            0) {
+            return true;
+        }
+        const DWORD code = GetLastError();
+        if ((code != ERROR_ACCESS_DENIED && code != ERROR_SHARING_VIOLATION) ||
+            std::chrono::steady_clock::now() >= deadline) {
+            SetLastError(code);
+            return false;
+        }
+        Sleep(1);
+    }
 }
 #endif
 
@@ -75,9 +96,10 @@ Result<void> AtomicFile::write(const fs::path& target, std::span<const std::byte
     }
     const fs::path tmp = tempPathFor(target);
 #if defined(ESSES_OS_WINDOWS)
-    // DELETE access lets the handle rename itself over the target (POSIX semantics, below).
-    HANDLE h = CreateFileW(tmp.c_str(), GENERIC_WRITE | DELETE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL,
-                           nullptr);
+    // DELETE access lets the handle rename itself over the target (POSIX semantics, below). Sharing read and
+    // delete access lets the renaming handle below be opened beside this one.
+    HANDLE h = CreateFileW(tmp.c_str(), GENERIC_WRITE | DELETE, FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr,
+                           CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (h == INVALID_HANDLE_VALUE) {
         return fail(ErrorCode::Io,
                     "atomic write: cannot create temporary file (Win32 error " +
@@ -104,6 +126,19 @@ Result<void> AtomicFile::write(const fs::path& target, std::span<const std::byte
     }
     if (!FlushFileBuffers(h)) {
         return abandon("flush failed");
+    }
+    // The file is renamed into place through a second handle that holds delete access only and shares
+    // everything, and the writing handle is closed first. The renaming handle stays open for a moment after
+    // the rename; a reader that opens the target in that moment meets neither write access nor an exclusive
+    // share mode, so readWholeFile() (which shares read, write and delete) and MappedFile (read and delete)
+    // are not refused with a sharing violation. When the second handle cannot be opened, the writing handle
+    // renames the file, and such a reader can be refused for that moment.
+    if (const HANDLE renamer = CreateFileW(tmp.c_str(), DELETE | SYNCHRONIZE,
+                                           FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        renamer != INVALID_HANDLE_VALUE) {
+        CloseHandle(h);
+        h = renamer;
     }
     // Rename over the target with POSIX semantics (Windows 10 1709+, NTFS): this succeeds even while a reader
     // holds the target open with FILE_SHARE_DELETE or has it mapped (MappedFile), which a classic

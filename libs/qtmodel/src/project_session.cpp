@@ -5,6 +5,7 @@
 // creating, saving and closing a project folder with every project document. The document setters, the view
 // state written without the undo stack and the journal are in src/undo/project_session_m2.cpp.
 
+#include <esses/base/read_file.hpp>
 #include <esses/base/utf8.hpp>
 #include <esses/maths/corrected_speed_distance.hpp>
 #include <esses/maths/math_module_io.hpp>
@@ -16,9 +17,7 @@
 #include <algorithm>
 #include <chrono>
 #include <ctime>
-#include <fstream>
 #include <functional>
-#include <iterator>
 #include <optional>
 #include <set>
 #include <string_view>
@@ -81,31 +80,18 @@ std::string unitMapPathOf(const std::string& stem) {
     return std::string(kUnitMapsDir) + stem + ".json";
 }
 
-// The bytes of a file, nullopt when it does not exist; Io when it exists and cannot be read.
+// The bytes of a file, nullopt when it is not a regular file (absent, or a directory standing in its place);
+// Io when it is one and cannot be read.
 Result<std::optional<std::string>> readBytes(const std::filesystem::path& path) {
     std::error_code ec;
     if (!std::filesystem::is_regular_file(path, ec)) {
         return std::optional<std::string>{};
     }
-    std::ifstream in(path, std::ios::binary);
-    if (!in) {
-        ErrorContext ctx;
-        ctx.path = path;
-        return fail(ErrorCode::Io, "cannot read " + pathToUtf8(path), std::move(ctx));
+    Result<std::string> bytes = readWholeFile(path, pathToUtf8(path));
+    if (!bytes) {
+        return Failure{bytes.error()};
     }
-    std::string bytes;
-    try {
-        bytes.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-    } catch (const std::ios_base::failure&) {
-        // libstdc++'s filebuf throws a failed read (a directory: EISDIR) whatever the exception mask
-        in.setstate(std::ios_base::badbit);
-    }
-    if (in.bad()) {
-        ErrorContext ctx;
-        ctx.path = path;
-        return fail(ErrorCode::Io, "cannot read " + pathToUtf8(path), std::move(ctx));
-    }
-    return std::optional<std::string>(std::move(bytes));
+    return std::optional<std::string>(std::move(bytes).value());
 }
 
 // A file the project no longer names (a removed or renamed workbook, unit map or module): its content is

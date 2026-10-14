@@ -34,7 +34,7 @@ private:
 };
 
 std::string sha256Hex(std::string_view bytes);
-// Streams the file in 1 MiB blocks. Io when it cannot be read.
+// Streams the file in 1 MiB blocks. Io when it is missing, not a regular file, or cannot be read.
 Result<std::string> sha256File(const std::filesystem::path& path);
 
 } // namespace esses::cli

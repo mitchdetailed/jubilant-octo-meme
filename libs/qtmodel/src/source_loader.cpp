@@ -278,10 +278,15 @@ void SourceLoader::published(const std::filesystem::path& path,
     if (maths_ != nullptr) {
         maths_->addSource(source); // step 7: built-in maths registered and prefetched at Background
     }
-    if (distance_ != nullptr) {
+    Q_EMIT sourcePublished(source);
+    // The lap indexes only now: their prefetch requires Corr Dist, and MathsService::require applies an
+    // evaluation that has already finished (an idle worker can finish the prefetch above while this thread is
+    // still here) at once, announcing channelReady() for Corr Dist and Corr Speed on the spot. Before
+    // sourcePublished(), that would hand its listeners a channel of a source the selection does not hold yet
+    // (a trust edit made in reply was dropped).
+    if (distance_ != nullptr && this->source(source->id) != nullptr) {
         distance_->prefetch(source->id);
     }
-    Q_EMIT sourcePublished(source);
     Q_EMIT importLog(toQString(path), log);
 
     // One summary/<sourceId> task (02 section 3.2 rule 10): every logged channel's SummaryPyramid, streamed

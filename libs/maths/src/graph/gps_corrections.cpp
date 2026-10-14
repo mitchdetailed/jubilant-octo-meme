@@ -10,6 +10,7 @@
 // validated and kept but not applied.
 
 #include <esses/base/casefold.hpp>
+#include <esses/base/read_file.hpp>
 #include <esses/maths/gps_corrections.hpp>
 #include <esses/maths/whole_signal.hpp>
 #include <esses/model/layer.hpp>
@@ -20,8 +21,6 @@
 
 #include <cstddef>
 #include <exception>
-#include <fstream>
-#include <iterator>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -182,26 +181,6 @@ Result<UniformSignal> zeroFix(const EvalContext& ctx, const GpsSettings& s, bool
     return out;
 }
 
-Result<std::string> readText(const std::filesystem::path& path) {
-    std::ifstream in(path, std::ios::binary);
-    ErrorContext c;
-    c.path = path;
-    if (!in) {
-        return fail(ErrorCode::Io, "cannot open the settings schema", std::move(c));
-    }
-    std::string text;
-    try {
-        text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-    } catch (const std::ios_base::failure&) {
-        // libstdc++'s filebuf throws a failed read (a directory: EISDIR) whatever the exception mask
-        in.setstate(std::ios_base::badbit);
-    }
-    if (in.bad()) {
-        return fail(ErrorCode::Io, "cannot read the settings schema", std::move(c));
-    }
-    return text;
-}
-
 } // namespace
 
 model::OpaqueJson GpsCorrectionsModule::defaultSettings() const {
@@ -266,7 +245,7 @@ Result<std::vector<BuiltinOutput>> GpsCorrectionsModule::expand(const model::Opa
 
 Result<void> GpsCorrectionsModule::loadSchema(const std::filesystem::path& schemasDir) {
     const std::filesystem::path path = schemasDir / std::filesystem::path(std::string(kSettingsSchemaFile));
-    Result<std::string> text = readText(path);
+    Result<std::string> text = readWholeFile(path, "the settings schema");
     if (!text) {
         return Failure{text.error()};
     }

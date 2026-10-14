@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: MIT
 #include <esses/base/atomic_file.hpp>
 #include <esses/base/casefold.hpp>
+#include <esses/base/read_file.hpp>
 #include <esses/base/utf8.hpp>
 #include <esses/model/layer.hpp>
 #include <esses/model/sidecar.hpp>
 
 #include <algorithm>
 #include <cmath>
-#include <fstream>
 #include <iterator>
 #include <string>
 #include <system_error>
@@ -86,25 +86,11 @@ Result<SidecarDocument> SidecarDocument::load(const fs::path& path) {
     if (!exists) {
         return SidecarDocument{};
     }
-    std::ifstream in(path, std::ios::binary);
-    if (!in) {
-        ErrorContext ctx;
-        ctx.path = path;
-        return fail(ErrorCode::Io, "cannot open sidecar for reading", std::move(ctx));
+    Result<std::string> text = readWholeFile(path, "sidecar"); // Io for a directory standing in its place
+    if (!text) {
+        return Failure{text.error()};
     }
-    std::string text;
-    try {
-        text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-    } catch (const std::ios_base::failure&) {
-        // libstdc++'s filebuf throws a failed read (a directory: EISDIR) whatever the exception mask
-        in.setstate(std::ios_base::badbit);
-    }
-    if (in.bad()) {
-        ErrorContext ctx;
-        ctx.path = path;
-        return fail(ErrorCode::Io, "cannot read sidecar", std::move(ctx));
-    }
-    auto doc = parse(text);
+    auto doc = parse(*text);
     if (!doc) {
         Error e = doc.error();
         e.context.path = path;

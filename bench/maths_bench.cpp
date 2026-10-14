@@ -272,9 +272,10 @@ maths::MathModule readinessModule() {
     return m;
 }
 
-// Waits until `pool` has completed every task. A worker completes a task (and drops its key) a moment after
-// the task's Future is ready, and an equal key submitted meanwhile joins that task (01 section 5.4): a fresh
-// graph over the same source would get the previous graph's results instead of evaluating.
+// Waits until `pool` has completed every task, so that a timed run never shares the workers with the tail of
+// the previous one (a worker completes a task, and drops its key, a moment after the task's Future is ready).
+// An equal key submitted in that window starts a task of its own (TaskPool, 01 section 5.4 rule 1), so a
+// fresh graph over the same source evaluates every output anew either way.
 void waitIdle(const TaskPool& pool) {
     for (;;) {
         const TaskPool::Stats s = pool.stats();

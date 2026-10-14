@@ -7,7 +7,11 @@ helpers (`muldivFloor`, `floorDiv128`), `Rate` with drift-free integer `timeAt`/
 `caseFold` primitive, `CancelToken`/`CancelSource`, `Future<T>`, `TaskPool` with three priority bands and key
 coalescing (D-031, D-123; `queuedTasks(prefix)` lists the queued keys and bands for diagnostics and tests),
 `Executor`/`InlineExecutor`, `ThreadRole`, `MappedFile`, `ByteReader`, `AtomicFile`,
-`Paths`, the developer log (`Log`, `ILogSink`, `ESSES_LOG`), the build identification in `version.hpp`, and
+`readWholeFile`/`readFileHead`/`requireRegularFile` (`read_file.hpp`: the one whole-file reader of documents,
+which checks the file type before it opens anything, so a directory is Io on every standard library, and on
+Windows shares delete access, so a file that `AtomicFile` is replacing opens at every instant), `Paths`, the
+developer log
+(`Log`, `ILogSink`, `ESSES_LOG`), the build identification in `version.hpp`, and
 `JsonDoc` (`json_doc.hpp`): an immutable JSON value held as compact canonical text and the owner of the one
 canonical serialisation of 02 section 6.5 rule 1 (`canonical()`, `saveAtomic()`, `schemaId()`). Libraries that
 build or read JSON with nlohmann-json use the interop header `json_nlohmann.hpp` (namespace `esses::jsonio`:

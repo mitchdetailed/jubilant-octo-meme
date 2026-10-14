@@ -14,11 +14,13 @@
 // M1 details: the open task is submitted by this class (same key, so it coalesces with
 // ImporterRegistry::load) and holds the registry and the unit table by shared_ptr, so a loader destroyed
 // while an open is in flight leaves nothing dangling; a published source is registered with the
-// MathsService and DistanceService when they are set (setMathsService/setDistanceService) before
-// sourcePublished() fires; once Corr Speed is evaluated the phase-2 range annotations (stint, pitStop; task
-// ranges/<sourceId>/<layer>/<markerSetHash>/<Corr Speed version>, older runs of the layer cancelled first)
-// run and their annotations are merged by (range id, start, end) into the newest snapshot with the same
-// marker set, published through sourceReplaced() (a snapshot with another marker set is annotated anew).
+// MathsService when it is set (setMathsService) before sourcePublished() fires, and handed to the
+// DistanceService (setDistanceService) for its lap indexes right after it, so that no channelReady() of the
+// new source reaches a listener before sourcePublished(); once Corr Speed is evaluated the phase-2 range
+// annotations (stint, pitStop; task ranges/<sourceId>/<layer>/<markerSetHash>/<Corr Speed version>, older
+// runs of the layer cancelled first) run and their annotations are merged by (range id, start, end) into the
+// newest snapshot with the same marker set, published through sourceReplaced() (a snapshot with another
+// marker set is annotated anew).
 // commitSidecar() is the sidecar edit path (DataSelectionModel::setTrusted in M1): phase-1 rules re-run on
 // the GUI thread (01 section 5.2), sourceReplaced() fires, and the sidecar is written next to the log within
 // 500 ms by a Background task (02 section 4 sidecar rule 4; edits in between coalesce into one write, a later

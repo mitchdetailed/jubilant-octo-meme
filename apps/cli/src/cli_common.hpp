@@ -23,6 +23,7 @@ namespace esses::cli {
 std::string u8(const std::filesystem::path& path);
 std::filesystem::path p8(std::string_view utf8);
 
+// The bytes of a file (readWholeFile(): Io when it is missing, not a regular file, or cannot be read).
 Result<std::string> readFile(const std::filesystem::path& path);
 // Atomic write (temporary file + rename); creates missing parent directories.
 Result<void> writeFile(const std::filesystem::path& path, std::string_view bytes);
