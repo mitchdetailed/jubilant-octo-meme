@@ -1,0 +1,6 @@
+{
+    "$comment": "Provenance of the PNGs in this directory (tests/golden/images/tst_golden_plots.cpp). Pixel goldens are authoritative on ubuntu only (D-127): replace them from the qt-app ubuntu artefact (<build>/tests/golden/artefacts/plots) and set generatedOn to linux.",
+    "generatedOn": "windows",
+    "platform": "offscreen",
+    "qt": "6.7.2"
+}

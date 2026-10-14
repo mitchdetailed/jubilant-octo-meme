@@ -169,7 +169,10 @@ TEST_CASE("rule documents: makeRangeRule picks the implementation by kind", "[un
     CHECK((*w)->kind() == "whole-outing");
     CHECK((*w)->appliesTo("Burst0"));
 
-    CHECK(makeRangeRule(*sections).error().code == ErrorCode::Unsupported);
+    auto s = makeRangeRule(*sections);
+    REQUIRE(s);
+    CHECK((*s)->kind() == "track-sections");
+    CHECK((*s)->phase() == 2);
     CHECK(makeRangeRule(*details).error().code == ErrorCode::Unsupported);
 
     RuleDocument unknown = *outing;
@@ -255,10 +258,11 @@ TEST_CASE("RuleRunner::fromRuleIds loads the named rules in order and skips late
     std::vector<std::string> skipped;
     auto runner = RuleRunner::fromRuleIds(rulesDir(), ids, &skipped);
     REQUIRE(runner);
-    REQUIRE(runner->rules().size() == 2);
+    REQUIRE(runner->rules().size() == 3);
     CHECK(runner->rules()[0]->id() == "circuit.whole-outing");
     CHECK(runner->rules()[1]->id() == "circuit.beacon-pair");
-    CHECK(skipped == std::vector<std::string>{"circuit.detail-groups", "circuit.track-sections"});
+    CHECK(runner->rules()[2]->id() == "circuit.track-sections"); // phase 2 (M3)
+    CHECK(skipped == std::vector<std::string>{"circuit.detail-groups"});
 
     const std::vector<std::string> missing = {"circuit.no-such-rule"};
     CHECK_FALSE(RuleRunner::fromRuleIds(rulesDir(), missing));

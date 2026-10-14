@@ -1,0 +1,92 @@
+{
+    "activeChannel": "Throttle Pos",
+    "body": {
+        "display": {
+            "axis": {
+                "showXScrollbar": false,
+                "showYScrollbar": false
+            },
+            "key": {
+                "stats": true
+            },
+            "showBands": false,
+            "showMarkers": false
+        },
+        "groups": [
+            {
+                "name": "Speed",
+                "scaleMode": "channel",
+                "traces": [
+                    {
+                        "channel": "Corr Speed",
+                        "displayUnit": "km/h",
+                        "dps": 1
+                    }
+                ]
+            },
+            {
+                "name": "Throttle",
+                "scaleMax": {
+                    "unit": "%",
+                    "v": 100
+                },
+                "scaleMin": {
+                    "unit": "%",
+                    "v": 0
+                },
+                "scaleMode": "manual",
+                "traces": [
+                    {
+                        "channel": "Throttle Pos"
+                    }
+                ]
+            }
+        ]
+    },
+    "case": "measurements",
+    "cursorUs": 25000000,
+    "data": "libs/plotcore/tests/td_m3_cases.hpp (the synthetic sources of td_golden_cases.hpp with laps, track sections, markers, device events, status channels, annotations and lap distance indexes)",
+    "datumUs": null,
+    "domain": "time",
+    "dprs": [
+        1,
+        2
+    ],
+    "focused": false,
+    "fonts": "tests/golden/fonts (Noto Sans), QtTextMetrics",
+    "offsetAxis": false,
+    "overrideLimitsBase": {
+    },
+    "pendingStripe": false,
+    "scheme": "Test Light",
+    "shows": "M: min, max and avg over the visible span per trace and slot",
+    "sizeLogical": [
+        600,
+        320
+    ],
+    "slots": [
+        {
+            "distanceData": true,
+            "kind": "Main",
+            "lap": 0,
+            "number": 0,
+            "offsetM": 0,
+            "offsetUs": 0,
+            "source": "synthetic_a.ld"
+        },
+        {
+            "distanceData": true,
+            "kind": "Overlay",
+            "lap": 0,
+            "number": 1,
+            "offsetM": 0,
+            "offsetUs": 0,
+            "source": "synthetic_b.ld"
+        }
+    ],
+    "type": "time_distance",
+    "zoom": [
+        10000000,
+        40000000
+    ]
+}

@@ -47,6 +47,12 @@ foreach(_schema IN LISTS _esses_cli_schemas)
   get_filename_component(_name "${_schema}" NAME)
   configure_file("${_schema}" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/data/schemas/${_name}" COPYONLY)
 endforeach()
+# (M3) The component body schemas, schemas/components/<type>-<version>.schema.json (04 sections 8.14-17).
+file(GLOB _esses_cli_component_schemas CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/schemas/components/*.schema.json")
+foreach(_schema IN LISTS _esses_cli_component_schemas)
+  get_filename_component(_name "${_schema}" NAME)
+  configure_file("${_schema}" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/data/schemas/components/${_name}" COPYONLY)
+endforeach()
 
 if(ESSES_BUILD_TESTS)
   # Unit tests of the helpers (SHA-256, the expected-channel CSVs and their comparison, the file-name encoding,

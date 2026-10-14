@@ -48,6 +48,22 @@
 // cursor.insert_marker (SHIFT+F7, a beacon at the main cursor) and the nine channel.* rows of
 // ActiveChannelCommands (hints to the status bar; the editors' messages to Messages, origin Maths).
 //
+// M3 wiring (07 section 6.1; libs/widgets/README.md "M3 properties and shell"; src/shell/main_window_m3.cpp):
+// the ZoomSummaryBar between the workbook row and the worksheet tabs; the Track Map dock (TrackMapWindow,
+// AutoHide on the right, its context the active worksheet's); the AnimationController (data.animate A, the
+// toolbar toggle, Data > Animation Rate, options.animation.rate); the CommandPalette (view.command_palette
+// CTRL+SHIFT+P, with the '>' worksheet, '@' channel and '#' range lists); the Layout Editor (layout.editor
+// CTRL+F7, ui.layoutLocked locks the canvas), the Select Worksheet dialog (F7), the Corrected Speed dialog,
+// the Track Editor, the Units list, full screen; the component rows (properties F5 / CTRL+N, cut/copy/paste/
+// delete/select all through ComponentClipboard and the component undo commands, focus next/previous, L K G S
+// ALT+n Y and the graph toggles through genericComponentEdit unless the component handles them, maximise,
+// z order, Export Data, Print to Clipboard); the offset rows (O, CTRL+SHIFT and ALT+SHIFT arrows) with the
+// WorksheetViewModel's offset commit as an undoable OffsetRangeCommand; cursor.add_annotation; the file rows
+// (Open Log with the Details pane, Close All, New/Close Project, Import/Export Data). Questions go through
+// Prompts (tests replace them). Commands a component must implement itself (vertical zoom, the track view,
+// the graph's value copy) are offered to the focused component (ComponentWidget::handleCommand) and stay
+// planned.
+//
 // Placement note: 01 section 2.1 and the outline put MainWindow in esses_app; 06 section 1 splits it
 // ("MainWindow building blocks" in esses_widgets, the assembly in esses_app) and 07 section 4.1 lists it
 // under esses_widgets. The class lives here so the tests/ui walkthrough can construct it; apps/app only
@@ -58,9 +74,11 @@
 
 #include <QMainWindow>
 #include <QString>
+#include <QStringList>
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <vector>
 
 class QComboBox;
@@ -83,6 +101,7 @@ class RenderService;
 class SessionRestore;
 class SettingsStore;
 class SourceLoader;
+class TrackMapService;
 class WorksheetViewModel;
 class WorkspaceViewModel;
 } // namespace esses::qt
@@ -90,6 +109,16 @@ class WorkspaceViewModel;
 namespace esses::widgets {
 
 class ActiveChannelCommands;
+class AnimationController;
+class CommandPalette;
+class CorrectedSpeedDialog;
+class LayoutEditor;
+class OpenLogDialog;
+class SelectWorksheetDialog;
+class TrackEditor;
+class TrackMapWindow;
+class UnitsListDialog;
+class ZoomSummaryBar;
 class ChannelEditor;
 class ChannelStatusWindow;
 class ChannelsWindow;
@@ -191,6 +220,49 @@ public:
     // Status-bar fields "t", "d", "lap", "dt", "dd".
     QLabel* statusField(const QString& name) const;
 
+    // ---- M3 (main_window_m3.cpp) ------------------------------------------------------------------------
+    // The questions of the file and project rows (tests replace them; the defaults are Qt's dialogs). A
+    // function left empty keeps the current one.
+    struct Prompts {
+        // A file to open (save = false) or write; "" = cancelled.
+        std::function<QString(const QString& title, const QString& filter, bool save)> file;
+        // A folder; "" = cancelled.
+        std::function<QString(const QString& title)> folder;
+        // A line of text; nullopt = cancelled.
+        std::function<std::optional<QString>(const QString& title, const QString& label,
+                                             const QString& initial)>
+            text;
+        // A choice among `items`; nullopt = cancelled.
+        std::function<std::optional<int>(const QString& title, const QStringList& items)> choose;
+    };
+    void setPrompts(Prompts prompts);
+    ZoomSummaryBar& zoomSummaryBar();
+    // The venues' track maps (RenderService, SourceLoader, the Track Editor and the Track Map dock use it).
+    qt::TrackMapService& trackMaps();
+    CommandPalette& commandPalette();
+    AnimationController& animation();
+    TrackMapWindow& trackMapWindow();
+    // Created on first use, kept until the window closes.
+    LayoutEditor& layoutEditor();
+    CorrectedSpeedDialog& correctedSpeedDialog();
+    TrackEditor& trackEditor();
+    UnitsListDialog& unitsList();
+    // The dialogs open while their command runs (nullptr when closed).
+    SelectWorksheetDialog* selectWorksheetDialog() const;
+    OpenLogDialog* openLogDialog() const;
+    // view.fullscreen: the window full screen with the docks hidden (and back).
+    bool fullScreenMode() const;
+    void setFullScreenMode(bool on);
+    // component.copy / cut / paste / delete on the canvas's selection (else its focused component); false
+    // when refused (layout locked, nothing selected, nothing on the clipboard).
+    bool copyComponents();
+    bool cutComponents();
+    bool pasteComponents();
+    bool deleteComponents();
+    // The last status-bar hint of a shell command ("" when none since the last call of clearHint).
+    QString lastHint() const;
+    void clearHint();
+
 Q_SIGNALS:
     void sourceOpened(const QString& path);
     void worksheetActivated(int index);
@@ -216,6 +288,16 @@ private:
     void showOptions();
     void registerEditorCommands();
     void showEditor(QDialog& dialog, const char* geometryKey);
+    // M3 (main_window_m3.cpp)
+    void buildM3Widgets(QWidget* central);
+    void buildM3Menus();
+    void registerM3Commands();
+    void followWorksheetM3(int index);
+    void syncLayoutLock();
+    void hint(const QString& text);
+    void openLogDialogNow();
+    bool newProjectNow();
+    bool closeProjectNow();
     std::unique_ptr<Impl> impl_;
 };
 

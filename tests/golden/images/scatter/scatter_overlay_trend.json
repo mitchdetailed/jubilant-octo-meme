@@ -1,0 +1,57 @@
+{
+    "activeChannel": "",
+    "body": {
+        "cursorStyle": "ring",
+        "pointSize": 3,
+        "style": "pointsTrend",
+        "traces": [
+            {
+                "yChannel": "Throttle Pos"
+            }
+        ],
+        "trend": {
+            "type": "linear"
+        },
+        "xChannel": "Corr Speed"
+    },
+    "caption": true,
+    "case": "scatter_overlay_trend",
+    "colourLegend": false,
+    "cursorUs": 12000000,
+    "data": "libs/plotcore/tests/td_golden_cases.hpp (synthetic rational data, sources synthetic_a/b/c.ld); cases in libs/plotcore/tests/plots_golden_cases.hpp",
+    "datumUs": 11000000,
+    "domain": "time",
+    "dprs": [
+        1,
+        2
+    ],
+    "focused": false,
+    "fonts": "tests/golden/fonts (Noto Sans), QtTextMetrics",
+    "pendingStripe": false,
+    "scheme": "Test Light",
+    "sizeLogical": [
+        420,
+        260
+    ],
+    "slots": [
+        {
+            "distanceData": true,
+            "kind": "Main",
+            "lap": 0,
+            "number": 0,
+            "source": "synthetic_a.ld"
+        },
+        {
+            "distanceData": true,
+            "kind": "Overlay",
+            "lap": 0,
+            "number": 1,
+            "source": "synthetic_b.ld"
+        }
+    ],
+    "type": "scatter",
+    "zoom": [
+        10000000,
+        16000000
+    ]
+}

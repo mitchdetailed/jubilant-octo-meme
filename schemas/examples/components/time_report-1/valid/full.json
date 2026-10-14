@@ -1,0 +1,25 @@
+{
+  "scope": "selectedOutings",
+  "rowGroup": "Outings:Laps:Track Sections:Default",
+  "options": {
+    "includeUntrusted": false
+  },
+  "summaries": {
+    "eclectic": true,
+    "rollingMin": true,
+    "total": true
+  },
+  "bands": [
+    {
+      "pct": 1.0,
+      "colour": "#30c030",
+      "visible": true
+    },
+    {
+      "pct": 3.0,
+      "colour": "#c0c030",
+      "visible": true
+    }
+  ],
+  "timeFormat": "project"
+}

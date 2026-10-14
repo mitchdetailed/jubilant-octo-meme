@@ -1,0 +1,10 @@
+{
+  "negative-dps.json": {
+    "pointer": "/channels/0/dps",
+    "why": "decimals are 0 to 15"
+  },
+  "row-without-channel.json": {
+    "pointer": "/channels/0",
+    "why": "a row names its channel"
+  }
+}

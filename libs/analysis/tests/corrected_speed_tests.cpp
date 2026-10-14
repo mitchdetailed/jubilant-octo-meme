@@ -298,7 +298,8 @@ TEST_CASE("corrected_speed: fallbacks, unit conversion and no speed", "[unit][AC
     CHECK(viaLogged->speedMps.values[1] == 8.0);
     CHECK(viaLogged->diagnostics.empty());
 
-    // Nothing usable: NotFound with E-CSD-NO-SPEED; gCorrection waits for M3.
+    // Nothing usable: NotFound with E-CSD-NO-SPEED; gCorrection (M3) has no fallback, so a missing wheel
+    // channel is NotFound too (corrected_speed_methods_tests.cpp covers the method).
     model::DataLayer none;
     none.addChannel(channel("Throttle Pos", tc.uniform(Rate::fromHz(10), {1})));
     auto missing = CorrectedSpeed::compute(CorrectedSpeedSettings{}, none, registry(), {});
@@ -307,7 +308,11 @@ TEST_CASE("corrected_speed: fallbacks, unit conversion and no speed", "[unit][AC
     CHECK(missing.error().context.detail == "E-CSD-NO-SPEED");
     CorrectedSpeedSettings g;
     g.method = SpeedMethod::GCorrection;
-    CHECK(CorrectedSpeed::compute(g, layer, registry(), {}).error().code == ErrorCode::Unsupported);
+    auto noWheel = CorrectedSpeed::compute(g, layer, registry(), {});
+    REQUIRE_FALSE(noWheel.ok());
+    CHECK(noWheel.error().code == ErrorCode::NotFound);
+    CHECK(noWheel.error().context.detail == "E-CSD-NO-SPEED");
+    CHECK(noWheel.error().context.channel == "Wheel Speed FL");
 
     // A timestamped speed channel is not usable yet.
     model::DataLayer stamped;

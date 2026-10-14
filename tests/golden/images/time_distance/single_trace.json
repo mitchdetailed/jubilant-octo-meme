@@ -2,8 +2,14 @@
     "activeChannel": "Corr Speed",
     "body": {
         "display": {
+            "axis": {
+                "showXScrollbar": false,
+                "showYScrollbar": false
+            },
             "lineWidth": 1,
+            "showBands": false,
             "showGrid": true,
+            "showMarkers": false,
             "traceStyle": "line"
         },
         "groups": [

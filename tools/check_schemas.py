@@ -11,7 +11,10 @@ Checks schemas/*.schema.json and the examples under schemas/examples/<schema-id>
      "$schema" pattern accepts the urn:esses:, esses: and https forms of this id only (02 section 6.6 rule 1).
      Built-in maths settings schemas, builtin-<module id>-<version>.schema.json (03 section 9; the module id
      may contain '.' and '_'), validate a member of project.json/sidecar documents rather than a document:
-     they follow every rule except the "$schema"/"schemaVersion" envelope.
+     they follow every rule except the "$schema"/"schemaVersion" envelope. Component body schemas,
+     schemas/components/<type>-<version>.schema.json (04 sections 8.14-17, 07 AC-M3-08; the type may contain
+     '_'), are fragments too: "$id" = urn:esses:components/<type>-<major>, examples under
+     schemas/examples/components/<type>-<major>/.
   3. Portability: only the draft-07 keywords that both the vendored json-schema-validator 2.3.0 and the
      validator below implement (no "format": the C++ validator needs a format checker for it); only local
      "#/definitions/<name>" references, all resolvable, no unused definitions; required members listed in
@@ -43,6 +46,9 @@ SCHEMA_FILE_RE = re.compile(r"^([a-z][a-z0-9-]*?)-([1-9][0-9]*)\.schema\.json$")
 # Built-in maths module settings (03 section 9): builtin-<module id>-<version>, e.g.
 # builtin-esses.corrected_speed_distance-1; a settings fragment without the document envelope.
 BUILTIN_FILE_RE = re.compile(r"^(builtin-[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*)-([1-9][0-9]*)\.schema\.json$")
+# Component body schemas (04 sections 8.14-17): schemas/components/<type>-<version>, e.g. components/time_distance-1;
+# a body fragment without the document envelope.
+COMPONENT_FILE_RE = re.compile(r"^components/([a-z][a-z0-9_]*)-([1-9][0-9]*)\.schema\.json$")
 REF_RE = re.compile(r"^#/definitions/([A-Za-z0-9_]+)$")
 
 ANNOTATIONS = {"$comment", "title", "description", "default", "examples"}
@@ -294,7 +300,11 @@ def accepts(pattern: str, text: str) -> bool:
 
 
 def schema_file_id(name: str) -> tuple[str, str, bool] | None:
-    """(schema id, major, is a built-in settings fragment) of a schema file name, or None."""
+    """(schema id, major, is a fragment) of a schema file name ("components/<file>" for a component body), or
+    None."""
+    m = COMPONENT_FILE_RE.match(name)
+    if m:
+        return f"components/{m.group(1)}-{m.group(2)}", m.group(2), True
     m = BUILTIN_FILE_RE.match(name)
     if m:
         return f"{m.group(1)}-{m.group(2)}", m.group(2), True
@@ -443,16 +453,18 @@ def check(root: pathlib.Path) -> tuple[list[str], dict[str, int]]:
     if not schema_dir.is_dir():
         return [f"{schema_dir}: no schemas directory"], counts
     schemas: dict[str, dict[str, Any]] = {}
-    for path in sorted(schema_dir.glob("*.schema.json")):
+    files = [(path, path.name) for path in sorted(schema_dir.glob("*.schema.json"))]
+    files += [(path, f"components/{path.name}") for path in sorted((schema_dir / "components").glob("*.schema.json"))]
+    for path, name in files:
         rel = path.relative_to(root).as_posix()
         try:
             doc = load_file(path)
         except (JsonError, OSError) as exc:
             findings.append(f"{rel}: {exc}")
             continue
-        lint, _ = lint_schema(path.name, doc)
+        lint, _ = lint_schema(name, doc)
         findings.extend(f"schemas/{f}" for f in lint)
-        ident = schema_file_id(path.name)
+        ident = schema_file_id(name)
         if ident and isinstance(doc, dict):
             schemas[ident[0]] = doc
     counts["schemas"] = len(schemas)
@@ -474,11 +486,14 @@ def check(root: pathlib.Path) -> tuple[list[str], dict[str, int]]:
         for path in sorted(examples_dir.rglob("*")):
             if path.is_file() and path.suffix != ".json":
                 findings.append(f"{path.relative_to(root).as_posix()}: not a .json file")
-        for sub in sorted(p for p in examples_dir.iterdir() if p.is_dir()):
-            if sub.name not in schemas:
-                findings.append(f"{sub.relative_to(root).as_posix()}: no schema {sub.name}.schema.json")
+        subs = [(p, p.name) for p in sorted(examples_dir.iterdir()) if p.is_dir() and p.name != "components"]
+        if (examples_dir / "components").is_dir():
+            subs += [(p, f"components/{p.name}") for p in sorted((examples_dir / "components").iterdir()) if p.is_dir()]
+        for sub, schema_id in subs:
+            if schema_id not in schemas:
+                findings.append(f"{sub.relative_to(root).as_posix()}: no schema {schema_id}.schema.json")
                 continue
-            findings.extend(check_examples(root, sub, schemas[sub.name], counts))
+            findings.extend(check_examples(root, sub, schemas[schema_id], counts))
     return findings, counts
 
 
@@ -649,6 +664,24 @@ def self_test() -> int:
     lint, _ = lint_schema("thing.x-1.schema.json", good)
     if not lint:
         failures.append("lint accepted a '.' outside a built-in schema name")
+
+    # Component body schemas: fragments under components/, the id names the directory.
+    body = {
+        "$schema": DRAFT07, "$id": "urn:esses:components/gauge_dial-1", "title": "t", "description": "d",
+        "type": "object", "additionalProperties": False, "properties": {"channel": {"type": "string"}},
+    }
+    lint, _ = lint_schema("components/gauge_dial-1.schema.json", body)
+    if lint:
+        failures.append(f"lint of a good component body schema: {lint}")
+    if schema_file_id("components/gauge_dial-1.schema.json") != ("components/gauge_dial-1", "1", True):
+        failures.append("component body schema id")
+    lint, _ = lint_schema("components/gauge_dial-1.schema.json", dict(body, **{"$id": "urn:esses:gauge_dial-1"}))
+    if not any("$id is not" in f for f in lint):
+        failures.append(f"lint missed a component body schema with the wrong $id: {lint}")
+    for bad_name in ("components/Gauge-1.schema.json", "components/gauge_dial.schema.json", "gauge_dial-1.schema.json"):
+        ident = schema_file_id(bad_name)
+        if ident is not None and ident[0].startswith("components/"):
+            failures.append(f"accepted the component schema name {bad_name}")
 
     for f in failures:
         print(f"self-test: {f}")

@@ -11,7 +11,31 @@ D-127):
   with an overlay, dark scheme, time overlays, the no-distance banner), each at DPR 1 and 2 (16 PNGs). The same
   cases are the `DrawList` JSON goldens of `drawlist/time_distance/` (plotcore, `FixedTextMetrics`); the pixel
   goldens use `QtTextMetrics` with the golden fonts.
-- `images/time_distance/goldens.json`: where the PNGs were rendered (`generatedOn`, Qt version, platform).
+- `images/time_distance/goldens.json`: where the PNGs were rendered (`generatedOn`, Qt version, platform) and, in
+  `cases`, the provisional cases with where their PNGs came from (a case not listed takes `generatedOn`).
+- The thirteen M3 time_distance cases of `libs/plotcore/tests/td_m3_cases.hpp` (AC-M3-02, D-201: variance in
+  both domains and its banner, the datum key, measurements, the offset axis in both domains, the bands,
+  annotations and device events, the status strip, overlapped mode, scale lines with the crosshair, the dark full
+  anatomy) in the same `tst_golden_images.cpp` and directory: `DrawList` JSON goldens in `drawlist/time_distance/`
+  (exact everywhere) and PNGs rendered on Windows (`cases`: `"windows"`, compared in report mode until replaced
+  from the ubuntu artefact). The M1 `dark_scheme` case changed with the datum's key columns: its `DrawList` golden
+  is regenerated and its ubuntu PNG is `"linux-stale"` until replaced. `ESSES_UPDATE_GOLDENS_CASES=<a,b,...>`
+  rewrites only those cases (and lists them as rendered on this platform); `ESSES_UPDATE_GOLDEN_JSON=1` rewrites the
+  case JSONs only.
+- `images/tst_golden_plots.cpp` (M3, AC-M3-02, D-198): three cases each of `scatter`, `histogram`, `outing`,
+  `gauge_numeric` and `gauge_bar` (`libs/plotcore/tests/plots_golden_cases.hpp`), rendered through the whole
+  builders (the binners and TrendFit included) at DPR 1 and 2 into `images/<type>/<case>@<dpr>x.png` with
+  `<case>.json` and one `goldens.json` per directory. The PNGs committed with that work are Windows renders
+  (`"generatedOn": "windows"`, compared in report mode) until they are replaced from the ubuntu artefact
+  (`<build>/tests/golden/artefacts/plots/`). The gauge cases are also `DrawList` JSON goldens
+  (`drawlist/gauge_numeric`, `drawlist/gauge_bar`).
+- `libs/widgets/tests/components/reports_track/tst_reports_track_goldens.cpp` (M3, AC-M3-02, D-199; a widgets
+  test, ctest `widgets.tst_reports_track_goldens`, because the report tables render through `QWidget::render`):
+  three cases each of `channel_report`, `time_report` and `track_position` at DPR 1 and 2 into
+  `images/<type>/<case>@<dpr>x.png` with one `goldens.json` per directory (Windows renders, provisional, the
+  renders in `<build>/libs/widgets/artefacts/<type>/`); exact goldens beside them: the report tables' contents in
+  `tables/<type>/<case>.json` and the track map's `DrawList` JSON in
+  `drawlist/track_position/widget_<case>@<dpr>x.json`.
 - `fonts/`: the only fonts the renderer may use (Noto Sans, OFL-1.1, REUSE-annotated), registered with
   `SchemeFonts::registerApplicationFonts` before any `QtTextMetrics` exists.
 

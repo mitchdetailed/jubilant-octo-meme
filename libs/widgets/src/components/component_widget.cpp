@@ -11,6 +11,7 @@
 #include <esses/qtmodel/worksheet_view_model.hpp>
 #include <esses/widgets/components/component_widget.hpp>
 #include <esses/widgets/components/placeholder_component.hpp>
+#include <esses/widgets/properties_shell/properties_dialog.hpp>
 
 #include <QEvent>
 #include <QHash>
@@ -135,7 +136,9 @@ QImage ComponentWidget::renderToImage(qreal dpr) const {
     return img;
 }
 
-void ComponentWidget::openProperties(int) {} // PropertiesDialog in M3 (D-044)
+void ComponentWidget::openProperties(int tabIndex) { // F5 / CTRL+N (06 section 12, D-044)
+    PropertiesDialog::openFor(*this, tabIndex);
+}
 
 qt::CommandContext ComponentWidget::commandContext() const {
     return qt::CommandContext::Component;
@@ -192,6 +195,10 @@ void ComponentWidget::queueSizeChange(plot::ChangeMask what) {
 
 bool ComponentWidget::sizeThrottleActive() const {
     return sizeTimer_->isActive();
+}
+
+bool ComponentWidget::handleCommand(const QString&, const QVariantList&) {
+    return false; // the shell's generic behaviour applies (M3)
 }
 
 bool ComponentWidget::cancelTransient() {

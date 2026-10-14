@@ -78,6 +78,10 @@ struct TextRun {
     Rgba colour = 0x000000FF;
     float maxWidthPx = 0.0F; // > 0: elide with an ellipsis
     Rgba background = 0;     // 0: none
+    // Added in M3 (the numeric gauge's dynamic font, 04 section 16 item 1; D-198): the style's point size
+    // times `scale` (> 0; 1 = the style's size). Builders measure a scaled run as the style's metrics times
+    // scale.
+    float scale = 1.0F;
     friend bool operator==(const TextRun&, const TextRun&) = default;
 };
 
@@ -128,7 +132,8 @@ struct DrawList {
     // The DrawList golden form (AC-M1-04, 08 section 6.4): deterministic JSON, one command per line, in
     // command order. Coordinates and sizes are written with at most two decimals (fixed rounding, trailing
     // zeros dropped, -0 as 0), so last-bit floating-point differences between compilers do not change a
-    // golden; colours as "#rrggbb" / "#rrggbbaa"; enum values by name; text runs carry their UTF-8 text.
+    // golden; colours as "#rrggbb" / "#rrggbbaa"; enum values by name; text runs carry their UTF-8 text (and
+    // "scale" only when it is not 1, so the M1 goldens are unchanged).
     std::string toJson() const;
 
     friend bool operator==(const DrawList&, const DrawList&) = default;

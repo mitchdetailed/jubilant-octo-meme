@@ -8,8 +8,9 @@ the design documents win (section 2), and the disagreement is a bug in this file
 Esses is a clean-room, MIT-licensed reimplementation of a motorsport data-analysis workflow: a Qt 6 Widgets
 application over a Qt-free C++20 core. Status: M0 (foundations) is complete, M1 (walking skeleton) passed its
 acceptance run, and M2 (channels, maths, persistence) is built and in review, waiting on the maintainer's
-decisions listed in `docs/milestones/M2.md`. See `docs/milestones/` for what each milestone actually built and
-where it departs from the design.
+decisions listed in `docs/milestones/M2.md`. The M3 contracts are laid down (`docs/milestones/M3.md` §2: the
+`M3-STUB`s, their owners' source roots and the dispatch points wired once). See `docs/milestones/` for what each
+milestone actually built and where it departs from the design.
 
 ## 1. Ground rules
 

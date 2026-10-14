@@ -235,3 +235,52 @@ No `M2-STUB` is left in this library.
   issue 11).
 - Autosave and save serialise and write on the GUI thread (D-190 (d)): a background journal writer needs an
   asynchronous save first, since the save's write-ahead must land before its writes.
+
+## M3 contract (07 §6.1; `docs/milestones/M3.md` §2; D-193)
+
+- `report_model.hpp`, `src/reports/report_model.cpp` (reports work): `ReportModel`, the `QAbstractTableModel` of
+  `channel_report` and `time_report` over `analysis::ReportEngine`/`TimeReportEngine` and a shared
+  `analysis::StatCache`. Implemented (below, "M3: reports and track").
+- `componentChannels` (final): time_distance and values_list as before, every other type through
+  `plot::componentChannelUses`, so the M3 owners never edit `render_service.cpp`.
+
+### M3: reports and track (D-199)
+
+- `ReportModel` (`src/reports/`): `refresh()` coalesces per event-loop turn; the inputs are built on the GUI
+  thread (the ranges in scope; every channel resolved once per source and layer through `detail::resolveChannel`,
+  maths outputs requested at Background) and the engine runs on the pool under the replace key
+  `report/<componentId>`, delivered through the Dispatcher (a QPointer made at submit; older deliveries dropped).
+  Scopes, the zoom link, the two layouts, row labels, cell texts, time formats and export quoting are in the
+  header. Styling is in plain roles (`BackgroundRgbaRole`, `ItalicRole`, `BoldRole`, `CellStateRole`,
+  `RowKindRole`): D-161 keeps `QColor`/`QFont` out of this library, so the widget maps them. Added:
+  `setHighlight`, `setTimeFormat`, `setProjectTimeFormat`, `setDistanceService`, `busy`, `deliveries`,
+  `lastError`, `quoteField`, `channelTable`, `timeTable`.
+- `TrackMapService` and `TrackMapCommand` (`track_map_service.hpp`, `src/track/`): the workspace's track maps by
+  venue (`trackmaps/<slug>.track.json`, read on first use and cached; written at once by `setMap`, the previous
+  file to `backup/` on Accept, a removal moved to `backup/<stem>.<stamp>.removed.json`; in memory without a
+  project; a project change drops the cache) and the one undo command of every track-map edit (02 §7).
+  `generate(TrackGenerationRequest, context, onGui)` is the generation path of 06 §13.5 item 1 (the inputs
+  resolved here through `MathsService`, `analysis::TrackGenerator` on a worker, `geom/track/<source>/<lap>`).
+- `RenderService`: `pool()`, `dispatcher()`, `statCache()` (the workspace's `StatCache`), `setTrackMaps()`;
+  `prepareInputs` fills `ComponentBuildInputs::trackMap` from the Main source's venue.
+- `SourceLoader::setTrackMaps`: phase 2 builds the Track Sections groups (open issue 4 of the milestone note):
+  the `RuleRunner` overload with the venue's map and the lap indexes ready now; `distanceReady` and `mapChanged`
+  run it again; the key gains `/t<map generation>/i<indexed laps>`.
+- Wiring a workspace (M3): one `TrackMapService(&session, &maths, &runtime.dispatcher())`, then
+  `render.setTrackMaps(&maps)` and `loader.setTrackMaps(&maps)` (MainWindow does, `main_window_m3.cpp`).
+- Tests: `tests/reports/tst_report_model` (every display rule against hand-computed cells), `tests/track/
+  tst_track_map_service` (load, cache, write, backup, remove, undo/redo, the `RenderService` binding, GPS
+  generation within 2 m RMS of the AC-M3-04 synthetic circuit's true centreline, Speed+LatG, pending inputs,
+  and `SourceLoader` building the Track Sections of an opened `.ld` at the hand-computed times).
+
+### M3: the time_distance completion (D-201)
+
+- `WorksheetViewModel`: `beginOffsetDrag`/`endOffsetDrag` (a sub-axis drag holds the 250 ms commit and commits
+  once at the release, `offsetDragActive`), `offsetRangeBy` (a nudge by a computed amount), and
+  `setSourceSamplePeriod`/`samplePeriodOf`: the offset step of a source's ranges in time mode, reported by the
+  focused time_distance graph for every visible slot (`offsetRange` steps a range by its own source's period; the
+  Main source's `activeSamplePeriod()` when none was reported).
+- `DataSelectionModel::commitSidecar(source, doc, undoText)`: any sidecar edit of an open source through the
+  SidecarCommit hook (with a session one undoable `SidecarCommand` named `undoText`; `connectSourceLoader` reads
+  `sidecarCommitText()`); `setTrusted` goes through it with its M2 text "Edit trust". The graph's annotation Edit /
+  Remove use it.

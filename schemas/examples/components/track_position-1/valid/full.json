@@ -1,0 +1,19 @@
+{
+  "showZoomSpan": true,
+  "showSectionLabels": false,
+  "showSectionMarks": true,
+  "showSectionColours": true,
+  "sizes": {
+    "cursor": 6,
+    "detail": 2,
+    "material": 2
+  },
+  "scale": {
+    "mode": "fit",
+    "zoom": 1.0,
+    "panX": 0,
+    "panY": 0,
+    "rotation": 0
+  },
+  "background": false
+}

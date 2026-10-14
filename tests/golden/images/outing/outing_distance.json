@@ -1,0 +1,49 @@
+{
+    "activeChannel": "",
+    "body": {
+        "groups": [
+            {
+                "name": "Speed",
+                "traces": [
+                    {
+                        "channel": "Corr Speed",
+                        "displayUnit": "km/h"
+                    }
+                ]
+            }
+        ]
+    },
+    "caption": true,
+    "case": "outing_distance",
+    "colourLegend": false,
+    "cursorUs": 20000000,
+    "data": "libs/plotcore/tests/td_golden_cases.hpp (synthetic rational data, sources synthetic_a/b/c.ld); cases in libs/plotcore/tests/plots_golden_cases.hpp",
+    "datumUs": null,
+    "domain": "distance",
+    "dprs": [
+        1,
+        2
+    ],
+    "focused": false,
+    "fonts": "tests/golden/fonts (Noto Sans), QtTextMetrics",
+    "pendingStripe": false,
+    "scheme": "Test Light",
+    "sizeLogical": [
+        520,
+        200
+    ],
+    "slots": [
+        {
+            "distanceData": true,
+            "kind": "Main",
+            "lap": 1,
+            "number": 0,
+            "source": "synthetic_a.ld"
+        }
+    ],
+    "type": "outing",
+    "zoom": [
+        0,
+        2798.25308933258
+    ]
+}

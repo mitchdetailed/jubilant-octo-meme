@@ -1,0 +1,62 @@
+{
+    "activeChannel": "Corr Speed",
+    "body": {
+        "display": {
+            "axis": {
+                "showXScrollbar": false,
+                "showYScrollbar": false
+            },
+            "showBands": false
+        },
+        "groups": [
+            {
+                "name": "Speed",
+                "scaleMode": "channel",
+                "traces": [
+                    {
+                        "channel": "Corr Speed",
+                        "displayUnit": "km/h",
+                        "dps": 1
+                    }
+                ]
+            }
+        ]
+    },
+    "case": "annotations_events",
+    "cursorUs": 40000000,
+    "data": "libs/plotcore/tests/td_m3_cases.hpp (the synthetic sources of td_golden_cases.hpp with laps, track sections, markers, device events, status channels, annotations and lap distance indexes)",
+    "datumUs": null,
+    "domain": "time",
+    "dprs": [
+        1,
+        2
+    ],
+    "focused": false,
+    "fonts": "tests/golden/fonts (Noto Sans), QtTextMetrics",
+    "offsetAxis": false,
+    "overrideLimitsBase": {
+    },
+    "pendingStripe": false,
+    "scheme": "Test Light",
+    "shows": "the marker band: beacons, annotations (with their dotted lines) and device events",
+    "sizeLogical": [
+        520,
+        300
+    ],
+    "slots": [
+        {
+            "distanceData": true,
+            "kind": "Main",
+            "lap": 1,
+            "number": 0,
+            "offsetM": 0,
+            "offsetUs": 0,
+            "source": "synthetic_a.ld"
+        }
+    ],
+    "type": "time_distance",
+    "zoom": [
+        -10000000,
+        100000000
+    ]
+}

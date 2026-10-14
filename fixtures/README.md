@@ -17,6 +17,10 @@ fixtures/generic.csv/<name>/        tools/gen_text_fixtures.py: input.csv|.txt c
                                     (oracle kind generator), expected.channels from the generator's own values,
                                     expected.probe/markers/laps.json from esses-cli, reviewed against the facts
                                     the generator states (README.md per family)
+fixtures/track/synthetic-circuit/   public, CC0-1.0, written by tools/gen_track_fixtures.py (M3, AC-M3-04): a
+                                    made-up circuit with its true centreline, inner and outer lines and corner
+                                    apexes, and simulated GPS and IMU laps (README.md there); checked by
+                                    fixtures.track_generator_current (--check), read by the analysis track tests
 fixtures/private/                   never committed: the user's files (spike S-1 inventory in s1/) and the
                                     private manifest motec.ld/manifest.json built from it
 ```

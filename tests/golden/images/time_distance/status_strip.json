@@ -1,0 +1,85 @@
+{
+    "activeChannel": "Corr Speed",
+    "body": {
+        "display": {
+            "axis": {
+                "showXScrollbar": false,
+                "showYScrollbar": false
+            },
+            "showBands": false,
+            "showMarkers": false,
+            "showStatusStrip": true,
+            "statusChannels": [
+                "Engine Status",
+                "Pit Limiter"
+            ]
+        },
+        "groups": [
+            {
+                "name": "Speed",
+                "scaleMode": "channel",
+                "traces": [
+                    {
+                        "channel": "Corr Speed",
+                        "displayUnit": "km/h",
+                        "dps": 1
+                    }
+                ]
+            },
+            {
+                "name": "Throttle",
+                "scaleMax": {
+                    "unit": "%",
+                    "v": 100
+                },
+                "scaleMin": {
+                    "unit": "%",
+                    "v": 0
+                },
+                "scaleMode": "manual",
+                "traces": [
+                    {
+                        "channel": "Throttle Pos"
+                    }
+                ]
+            }
+        ]
+    },
+    "case": "status_strip",
+    "cursorUs": 15000000,
+    "data": "libs/plotcore/tests/td_m3_cases.hpp (the synthetic sources of td_golden_cases.hpp with laps, track sections, markers, device events, status channels, annotations and lap distance indexes)",
+    "datumUs": null,
+    "domain": "time",
+    "dprs": [
+        1,
+        2
+    ],
+    "focused": false,
+    "fonts": "tests/golden/fonts (Noto Sans), QtTextMetrics",
+    "offsetAxis": false,
+    "overrideLimitsBase": {
+    },
+    "pendingStripe": false,
+    "scheme": "Test Light",
+    "shows": "E: the status strip with a Bitfield and a Bool channel, filled where non-zero",
+    "sizeLogical": [
+        440,
+        300
+    ],
+    "slots": [
+        {
+            "distanceData": true,
+            "kind": "Main",
+            "lap": 0,
+            "number": 0,
+            "offsetM": 0,
+            "offsetUs": 0,
+            "source": "synthetic_a.ld"
+        }
+    ],
+    "type": "time_distance",
+    "zoom": [
+        0,
+        62000000
+    ]
+}

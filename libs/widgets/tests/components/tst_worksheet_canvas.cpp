@@ -42,7 +42,7 @@ project::WorksheetDef sheetOf(const World& w) {
         valuesListSpec({"Throttle", "Wheel Speed FL"}, project::Rect{0.75, 0.0, 1.0, 1.0}, 0, kValuesId));
     project::ComponentSpec gauge;
     gauge.id = Uuid::parse(kGaugeId);
-    gauge.type = "gauge_numeric"; // an MVP type this build does not register yet
+    gauge.type = "gauge_dial"; // a v1.0 type this build does not register (D-027)
     gauge.rect = project::Rect{0.5, 0.5, 1.0, 1.0};
     gauge.z = 2;
     def.components.push_back(gauge);
@@ -101,7 +101,7 @@ private Q_SLOTS:
         QCOMPARE(QString::fromLatin1(all[0]->type()), QStringLiteral("values_list"));
         QCOMPARE(QString::fromLatin1(all[1]->type()), QStringLiteral("time_distance"));
         QVERIFY(qobject_cast<PlaceholderComponent*>(all[2]) != nullptr);
-        QCOMPARE(QString::fromLatin1(all[2]->type()), QStringLiteral("gauge_numeric"));
+        QCOMPARE(QString::fromLatin1(all[2]->type()), QStringLiteral("gauge_dial"));
         // Fractional rectangles rounded like OffscreenRenderer: x0 = lround(l * w), ...
         const QRect content = c.contentsRect();
         QCOMPARE(content.size(), QSize(1001, 601));

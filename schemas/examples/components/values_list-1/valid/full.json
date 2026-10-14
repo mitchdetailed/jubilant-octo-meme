@@ -1,0 +1,22 @@
+{
+  "channels": [
+    {
+      "channel": "Engine RPM",
+      "displayUnit": "rpm",
+      "dps": 0
+    }
+  ],
+  "columns": {
+    "datum": false,
+    "delta": true,
+    "inlineUnits": true
+  },
+  "showHeading": true,
+  "autoSizeColumns": true,
+  "widths": {
+    "name": 120,
+    "value": 80,
+    "delta": 80,
+    "datum": 80
+  }
+}

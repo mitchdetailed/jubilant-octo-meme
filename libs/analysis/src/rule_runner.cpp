@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include <esses/analysis/beacon_pair_rule.hpp>
 #include <esses/analysis/rule_runner.hpp>
+#include <esses/analysis/track_sections_rule.hpp>
 #include <esses/analysis/whole_outing_rule.hpp>
 #include <esses/base/utf8.hpp>
 
@@ -61,6 +62,28 @@ void inheritVersionsIgnoringAnnotations(model::RangeGroupTree& next, const model
         const auto it = versions.find(g.path);
         g.version = it != versions.end() ? it->second : 1;
     });
+}
+
+// True when the two groups hold the same ranges apart from the phase-2 annotations.
+bool sameRangesIgnoringAnnotations(const model::RangeGroup& a, const model::RangeGroup& b) {
+    if (a.ranges.size() != b.ranges.size()) {
+        return false;
+    }
+    for (std::size_t i = 0; i < a.ranges.size(); ++i) {
+        model::Range x = a.ranges[i];
+        model::Range y = b.ranges[i];
+        x.stint = y.stint = 0;
+        x.pitStop = y.pitStop = false;
+        if (!(x == y)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// The parent of a track-sections rule's set groups ("Outings:Laps:Track Sections").
+std::string trackSectionsPrefix(const TrackSectionsRule& rule) {
+    return std::string(model::parentGroupPath(rule.settings().produces));
 }
 
 } // namespace
@@ -129,6 +152,21 @@ model::SidecarApplyReport RuleRunner::run(model::DataSource& src) const {
         layer.ranges = std::move(next);
         report.append(src.sidecar.applyRangeOverrides(layer));
         carryAnnotations(layer.ranges, previous);
+        // Track Sections groups built under laps that did not change stay until phase 2 lands again.
+        for (const std::shared_ptr<const IRangeRule>& rule : rules_) {
+            const auto* sections = dynamic_cast<const TrackSectionsRule*>(rule.get());
+            if (sections == nullptr || !sections->appliesTo(layer.name)) {
+                continue;
+            }
+            const model::RangeGroup* kept = previous.find(trackSectionsPrefix(*sections));
+            const model::RangeGroup* oldLaps = previous.find(sections->settings().parent);
+            const model::RangeGroup* newLaps = layer.ranges.find(sections->settings().parent);
+            if (kept != nullptr && oldLaps != nullptr && newLaps != nullptr &&
+                layer.ranges.find(kept->path) == nullptr &&
+                sameRangesIgnoringAnnotations(*oldLaps, *newLaps)) {
+                layer.ranges.setGroup(*kept);
+            }
+        }
         inheritVersionsIgnoringAnnotations(layer.ranges, previous);
     }
     return report;
@@ -159,6 +197,39 @@ Result<model::RangeGroupTree> RuleRunner::runPhase2(const model::DataSource& src
         }
         if (auto annotated = beacons->annotate(*l, speed, *laps, cancel); !annotated) {
             return Failure{annotated.error()};
+        }
+    }
+    return tree;
+}
+
+Result<model::RangeGroupTree> RuleRunner::runPhase2(const model::DataSource& src, std::string_view layer,
+                                                    const std::optional<store::Series>& speed,
+                                                    const std::shared_ptr<const TrackMap>& trackMap,
+                                                    const LapIndexLookup& indexOf,
+                                                    const CancelToken& cancel) const {
+    auto annotated = runPhase2(src, layer, speed, cancel);
+    if (!annotated) {
+        return Failure{annotated.error()};
+    }
+    model::RangeGroupTree tree = std::move(annotated).value();
+    const model::DataLayer* l = src.layer(layer);
+    for (const std::shared_ptr<const IRangeRule>& rule : rules_) {
+        const auto* sections = dynamic_cast<const TrackSectionsRule*>(rule.get());
+        if (l == nullptr || sections == nullptr || !sections->appliesTo(l->name)) {
+            continue;
+        }
+        tree.removeGroup(trackSectionsPrefix(*sections));
+        if (!trackMap) {
+            continue;
+        }
+        auto groups = sections->sections(tree, *trackMap, indexOf, cancel);
+        if (!groups) {
+            return Failure{groups.error()};
+        }
+        for (model::RangeGroup& g : *groups) {
+            const model::RangeGroup* old = l->ranges.find(g.path);
+            g.version = old == nullptr ? 1 : (old->ranges == g.ranges ? old->version : old->version + 1);
+            tree.setGroup(std::move(g));
         }
     }
     return tree;

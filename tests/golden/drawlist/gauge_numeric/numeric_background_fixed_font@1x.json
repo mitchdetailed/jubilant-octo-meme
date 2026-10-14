@@ -1,0 +1,14 @@
+{"case":"numeric_background_fixed_font","dpr":1,
+"static":{"w":180,"h":100,"dpr":1,"cmds":[
+{"k":"clear","c":"#ffffff"},
+{"k":"polyline","c":"#a0a4a8","w":1,"d":"solid","v":[4.5,4.5,175.5,4.5,175.5,95.5,4.5,95.5,4.5,4.5]}
+]}
+,"dynamic":{"w":180,"h":100,"dpr":1,"cmds":[
+{"k":"rect","c":"#fb8c00","r":[4,4,172,92]},
+{"k":"text","t":"49.3","x":21.73,"y":33.9,"style":"gauge","anchor":"middleLeft","c":"#202124","maxw":168,"scale":2.67},
+{"k":"text","t":"49.3","x":59.8,"y":78.9,"style":"gauge","anchor":"middleLeft","c":"#d32f2f","maxw":168,"scale":1.18}
+]}
+,"chrome":{"w":180,"h":100,"dpr":1,"cmds":[
+{"k":"rect","c":"#c8cbd0","r":[0,0,180,3]}
+]}
+}

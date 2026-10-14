@@ -94,6 +94,36 @@ build\<bench dir>\bin\esses-maths-bench --runs 7 --workers 1
 build\<bench dir>\bin\esses-maths-bench --digest > digest.txt
 ```
 
+## M3 channel-report rows (AC-M3-03)
+
+`bench/report_bench.cpp` (executable `esses-report-bench`, Qt-free, `std::chrono`) builds in memory one outing of
+50 flying laps of 90 s (4,500 s) with 30 F32 channels at the RW-2 rate mix (4 x 1 kHz, 12 x 500 Hz, 10 x 100 Hz,
+4 x 20 Hz; 49.9 M samples; smooth periodic signals with ripple; every fifth channel invalid for the first 0.1 s of
+each lap) and 12 sections per lap. The channel report has the headers `Outings:Laps` and the statistics avg, min,
+max, absMax, start, end, change and stdDev for every channel (12,000 cells). As in the application, the report runs
+on a `TaskPool` worker (the default worker count) at Background and the columns schedule their chunk tasks on the
+same pool. `--smoke` uses 5 laps and one run and checks the table against `ReportEngine::statistic` (ctest
+`bench.report_bench.smoke`, label `bench-smoke`); `--gate` exits 1 above a limit; `ESSES_BENCH_REPETITIONS` and
+`ESSES_BENCH_OUT` as for the other benches.
+
+| Row | Workload | Measured | Limit |
+|---|---|---|---|
+| `report.channel_50lap_30ch_8stat_cold` | a fresh `StatCache` and a fresh chunk cache: every chunk materialised from its in-memory provider during the report (no disk I/O) | **95-99 ms** | 300 ms (07 §12) |
+| `report.channel_50lap_30ch_8stat_cold_one_thread` | the same on the calling thread without a pool (every chunk built inline) | 420-432 ms | recorded |
+| `report.channel_50lap_30ch_8stat_resident` | a fresh `StatCache`, the chunks resident | 77-95 ms | recorded |
+| `report.channel_50lap_30ch_8stat_cached` | every cell from the `StatCache` | 1.4-1.5 ms | recorded |
+| `report.time_50lap_12sec` | `TimeReportEngine::build` over the 50 laps (eclectic, rolling minimum, total, two bands) | 0.17-0.20 ms | recorded |
+
+Measured on the reference machine (2026-10-14, a Release build of the Qt-free tree, 15 workers on 16 logical
+processors): the ranges are the medians of 7 runs in three invocations. The scan reads about 1.5 to 2 ns per
+sample on one thread (two interleaved lanes of sums and extremes with the first position of each extreme), so
+the one-thread cold figure is mostly the store's chunk materialisation; the engine prefetches the chunks of the
+next scans (at most 256 chunks ahead) so the pool builds them during the scan (D-197).
+
+```
+build\<bench dir>\bin\esses-report-bench --runs 7 --gate --json report.json
+```
+
 ## M2 text-import rows (AC-M2-13)
 
 `bench/formats_bench.cpp` (executable `esses-formats-bench`, Qt-free, `std::chrono`) writes on first use, into
@@ -164,3 +194,22 @@ pixel-identical to one pass), and Static buffer reuse (`LayerCache::storeStatic`
 build\m1-integ-rel\bin\esses-plot-bench --runs 5 --gate --json plot.json
 build\m1-integ-rel\bin\esses-open-bench --runs 5 --gate --json open.json
 ```
+
+## M3 animation row (AC-M3-10)
+
+`esses-plot-bench` gains the row of 04 §8.5 item 7 / 06 §2.2 on the same graph and window as `plot.cursor_move`
+(20 traces, 3,800 px trace area, DPR 1): an animation at x10 as `AnimationController` drives it, the cursor
+advanced by 10 x 33.3 ms of data per frame through `WorksheetViewModel::setCursor(..., CursorSource::Animation)`
+(the tick of `WorksheetViewModel::setAnimating`, a Cursor-only change), the graph's Dynamic rebuild and a
+synchronous repaint of its damage; 60 frames per run. A Static build submitted during the run is an error (the
+row then fails), so the figure is the Dynamic-only cost the criterion bounds.
+
+| Row | Workload | Measured | Limit |
+|---|---|---|---|
+| `plot.animation_frame_10x` | 60 frames of a x10 animation on the `plot.cursor_move` graph (Dynamic only) | **2.35 ms** | 4 ms (AC-M3-10) |
+
+Measured on the reference machine (2026-10-14, `win-msvc-bench` Release, Qt 6.7.2, `--runs 5`, other M3 builds
+running): median 2.35 ms (min 2.30, p95 2.41 ms), no Static build. In the same run `plot.cursor_move` took 2.39 ms
+and `plot.zoom_pan_step` 21.6 ms, above its 16 ms limit (M1 figures 1.53 and 11.96 ms in that configuration): the
+graph's Static layer now draws the M3 bands, scrollbars and key columns (D-201) and the machine was loaded, so the
+M1 gate needs a quiet re-measurement (milestone note M3, open issues).

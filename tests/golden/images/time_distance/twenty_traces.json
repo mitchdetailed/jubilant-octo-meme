@@ -1,6 +1,14 @@
 {
     "activeChannel": "Ch 07",
     "body": {
+        "display": {
+            "axis": {
+                "showXScrollbar": false,
+                "showYScrollbar": false
+            },
+            "showBands": false,
+            "showMarkers": false
+        },
         "groups": [
             {
                 "name": "Group 1",

@@ -1,0 +1,70 @@
+{
+    "activeChannel": "Corr Speed",
+    "body": {
+        "bins": {
+            "bandMode": "width",
+            "bandWidth": {
+                "unit": "km/h",
+                "v": 25
+            },
+            "dataMax": {
+                "unit": "km/h",
+                "v": 250
+            },
+            "dataMin": {
+                "unit": "km/h",
+                "v": 50
+            },
+            "greaterMaxBand": true,
+            "lessMinBand": true,
+            "mode": "even"
+        },
+        "style": "bar",
+        "traces": [
+            {
+                "channel": "Corr Speed"
+            }
+        ],
+        "yMode": "percent"
+    },
+    "caption": true,
+    "case": "histogram_bar_overlay",
+    "colourLegend": false,
+    "cursorUs": 14000000,
+    "data": "libs/plotcore/tests/td_golden_cases.hpp (synthetic rational data, sources synthetic_a/b/c.ld); cases in libs/plotcore/tests/plots_golden_cases.hpp",
+    "datumUs": null,
+    "domain": "time",
+    "dprs": [
+        1,
+        2
+    ],
+    "focused": false,
+    "fonts": "tests/golden/fonts (Noto Sans), QtTextMetrics",
+    "pendingStripe": false,
+    "scheme": "Test Light",
+    "sizeLogical": [
+        420,
+        260
+    ],
+    "slots": [
+        {
+            "distanceData": true,
+            "kind": "Main",
+            "lap": 0,
+            "number": 0,
+            "source": "synthetic_a.ld"
+        },
+        {
+            "distanceData": true,
+            "kind": "Overlay",
+            "lap": 0,
+            "number": 1,
+            "source": "synthetic_b.ld"
+        }
+    ],
+    "type": "histogram",
+    "zoom": [
+        0,
+        30000000
+    ]
+}

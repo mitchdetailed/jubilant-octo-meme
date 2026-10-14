@@ -1,0 +1,71 @@
+{
+    "activeChannel": "",
+    "body": {
+        "colourChannel": {
+            "axis": {
+                "bandCount": 4,
+                "bandMode": "count",
+                "mode": "even",
+                "palette": "rainbow"
+            },
+            "channel": "Brake Pres"
+        },
+        "cursorStyle": "cross",
+        "layout": "tiled",
+        "scales": {
+            "x": {
+                "max": {
+                    "unit": "km/h",
+                    "v": 250
+                },
+                "min": {
+                    "unit": "km/h",
+                    "v": 0
+                },
+                "mode": "manual"
+            }
+        },
+        "traces": [
+            {
+                "yChannel": "Throttle Pos"
+            },
+            {
+                "yChannel": "Ground Speed"
+            }
+        ],
+        "xChannel": "Corr Speed"
+    },
+    "caption": true,
+    "case": "scatter_tiled_colour",
+    "colourLegend": true,
+    "cursorUs": 33000000,
+    "data": "libs/plotcore/tests/td_golden_cases.hpp (synthetic rational data, sources synthetic_a/b/c.ld); cases in libs/plotcore/tests/plots_golden_cases.hpp",
+    "datumUs": null,
+    "domain": "time",
+    "dprs": [
+        1,
+        2
+    ],
+    "focused": false,
+    "fonts": "tests/golden/fonts (Noto Sans), QtTextMetrics",
+    "pendingStripe": false,
+    "scheme": "Test Dark",
+    "sizeLogical": [
+        480,
+        260
+    ],
+    "slots": [
+        {
+            "distanceData": true,
+            "kind": "Main",
+            "lap": 0,
+            "number": 0,
+            "source": "synthetic_a.ld"
+        }
+    ],
+    "type": "scatter",
+    "zoom": [
+        30000000,
+        36000000
+    ]
+}

@@ -1,0 +1,266 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:components/time_distance-1",
+  "title": "time_distance component body",
+  "description": "The body of a time_distance component (04 section 8.14; workbook-1 component header 04 section 7.3): display settings and ordered groups of traces. Channel references are names.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "display": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "traceStyle": {
+          "enum": ["line", "points"]
+        },
+        "lineWidth": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 10
+        },
+        "pointSize": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "showGrid": {
+          "type": "boolean"
+        },
+        "showMarkers": {
+          "type": "boolean"
+        },
+        "showBands": {
+          "type": "boolean"
+        },
+        "bandMode": {
+          "enum": ["sections", "none"]
+        },
+        "bandGroup": {
+          "description": "Range-group path of the section band.",
+          "type": "string"
+        },
+        "overlapMode": {
+          "enum": ["panels", "overlapped"]
+        },
+        "cursorStyle": {
+          "enum": ["line", "crosshair", "none"]
+        },
+        "cursorSnap": {
+          "type": "boolean"
+        },
+        "key": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "description": "labels | values | none (04 section 8.4).",
+              "enum": ["labels", "values", "none"]
+            },
+            "pos": {
+              "enum": ["left", "right"]
+            },
+            "values": {
+              "type": "boolean"
+            },
+            "stats": {
+              "description": "The measurements row (M).",
+              "type": "boolean"
+            }
+          }
+        },
+        "showStatusStrip": {
+          "type": "boolean"
+        },
+        "statusChannels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/channelName"
+          }
+        },
+        "showDeviceEvents": {
+          "type": "boolean"
+        },
+        "variance": {
+          "description": "The variance panel (F3, D-023): shown only with a visible overlay; manual min/max in seconds (distance mode) or metres (time mode).",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "show": {
+              "type": "boolean"
+            },
+            "heightFrac": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 0.9
+            },
+            "autoScale": {
+              "type": "boolean"
+            },
+            "min": {
+              "$ref": "#/definitions/unitValue"
+            },
+            "max": {
+              "$ref": "#/definitions/unitValue"
+            }
+          }
+        },
+        "axis": {
+          "$ref": "#/definitions/graphAxis"
+        }
+      }
+    },
+    "groups": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/tdGroup"
+      }
+    }
+  },
+  "definitions": {
+    "channelName": {
+      "description": "A channel as the workbook names it (D-013: resolved through mappings, aliases, case folding and the logged name); \"\" where the member is optional means none.",
+      "type": "string"
+    },
+    "colour": {
+      "description": "A colour \"#rrggbb\" (alpha ff) or \"#rrggbbaa\"; written in lower case (Rgba, 04 section 5.1).",
+      "type": "string",
+      "pattern": "^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$"
+    },
+    "dps": {
+      "description": "Display decimals.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 15
+    },
+    "graphAxis": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "showX": {
+          "type": "boolean"
+        },
+        "showY": {
+          "type": "boolean"
+        },
+        "showXScrollbar": {
+          "type": "boolean"
+        },
+        "showYScrollbar": {
+          "type": "boolean"
+        }
+      }
+    },
+    "scaleLine": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "colour": {
+          "$ref": "#/definitions/colour"
+        }
+      }
+    },
+    "tdGroup": {
+      "description": "One group of a graph (04 sections 8.2-8.3): edges [top, bottom] in panels mode, lo/hi in overlapped mode (fractions of the trace area, 0 = top); both persist so G round-trips.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "scaleMode": {
+          "enum": ["channel", "auto", "manual"]
+        },
+        "scaleMin": {
+          "$ref": "#/definitions/unitValue"
+        },
+        "scaleMax": {
+          "$ref": "#/definitions/unitValue"
+        },
+        "edges": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "lo": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "hi": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "lines": {
+          "description": "Scale lines: zero (default on when the scale crosses 0), min and max (at the channel override limits).",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "zero": {
+              "$ref": "#/definitions/scaleLine"
+            },
+            "min": {
+              "$ref": "#/definitions/scaleLine"
+            },
+            "max": {
+              "$ref": "#/definitions/scaleLine"
+            }
+          }
+        },
+        "traces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/tdTrace"
+          }
+        }
+      }
+    },
+    "tdTrace": {
+      "description": "One trace of a graph group (04 section 8.14).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel"],
+      "properties": {
+        "channel": {
+          "$ref": "#/definitions/channelName"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "displayUnit": {
+          "$ref": "#/definitions/unitSymbolOrEmpty"
+        },
+        "dps": {
+          "$ref": "#/definitions/dps"
+        }
+      }
+    },
+    "unitSymbolOrEmpty": {
+      "description": "A unit symbol or alias of the unit registry (units-1), or \"\" for the unitless unit; no leading or trailing white space.",
+      "type": "string",
+      "pattern": "^(\\S(.*\\S)?)?$"
+    },
+    "unitValue": {
+      "description": "A persisted number with its unit (D-010): {\"v\": number, \"unit\": symbol}, \"\" for a unitless value. The value is in the unit as written; readers convert, writers keep the written unit.",
+      "type": "object",
+      "required": ["v", "unit"],
+      "properties": {
+        "v": {
+          "type": "number"
+        },
+        "unit": {
+          "$ref": "#/definitions/unitSymbolOrEmpty"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

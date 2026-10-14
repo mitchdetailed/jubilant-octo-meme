@@ -1,0 +1,17 @@
+{"case":"bar_custom_origin_dark","dpr":1,
+"static":{"w":110,"h":240,"dpr":1,"cmds":[
+{"k":"clear","c":"#141517"},
+{"k":"rect","c":"#1a1b1e","r":[4,37,102,199]},
+{"k":"polyline","c":"#3a3d41","w":1,"d":"solid","v":[4.5,37.5,105.5,37.5,105.5,235.5,4.5,235.5,4.5,37.5]}
+]}
+,"dynamic":{"w":110,"h":240,"dpr":1,"cmds":[
+{"k":"rect","c":"#7e57c2","r":[4,144.79,102,27.64]},
+{"k":"lines","c":"#ff5252","w":2,"d":"solid","v":[4,155,106,155]},
+{"k":"text","t":"144.0","x":55,"y":142.79,"style":"keyValue","anchor":"bottomCentre","c":"#e6e6e6","maxw":102,"bg":"#141517"}
+]}
+,"chrome":{"w":110,"h":240,"dpr":1,"cmds":[
+{"k":"rect","c":"#2b2d31","r":[0,0,110,18]},
+{"k":"text","t":"Corr Speed","x":4,"y":9,"style":"caption","anchor":"middleLeft","c":"#e6e6e6","maxw":102},
+{"k":"polyline","c":"#4c9aff","w":2,"d":"solid","v":[1,1,109,1,109,239,1,239,1,1]}
+]}
+}

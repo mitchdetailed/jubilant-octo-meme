@@ -9,9 +9,13 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <limits>
+#include <optional>
+#include <string>
 #include <utility>
 #include <variant>
+#include <vector>
 
 namespace esses::analysis {
 
@@ -202,9 +206,18 @@ Result<UniformSignal> maxOfWheels(std::span<const UniformSignal* const> wheels, 
     return out;
 }
 
-// A usable speed channel of the layer as a UniformSignal in m/s, or NotFound with the reason.
-Result<UniformSignal> loadSpeed(const model::DataLayer& layer, const std::string& name,
-                                const units::UnitRegistry* units, const CancelToken& cancel) {
+// What an input channel of the module measures.
+enum class InputKind : std::uint8_t { Speed, LongG };
+
+constexpr double kStandardGravity = 9.80665; // m/s^2 per G (units.json)
+
+// A usable input channel of the layer as a UniformSignal in base units (m/s for a speed, m/s^2 for the
+// longitudinal G), or NotFound with the reason. A speed channel without a unit (or read without a registry)
+// is taken as m/s; a longitudinal-G channel without a unit (or read without a registry) is taken in G, the
+// unit the gCorrection setting names (03 section 9.1 item 3).
+Result<UniformSignal> loadInput(const model::DataLayer& layer, const std::string& name,
+                                const units::UnitRegistry* units, const CancelToken& cancel,
+                                InputKind kind = InputKind::Speed) {
     const model::Channel* c = layer.find(name);
     if (c == nullptr) {
         c = layer.findLogged(name);
@@ -222,13 +235,18 @@ Result<UniformSignal> loadSpeed(const model::DataLayer& layer, const std::string
     }
     const auto* u = std::get_if<store::UniformSeries>(&c->series);
     if (u == nullptr || !u->rate.valid()) {
-        return unusable("timestamped speed channels are not supported yet");
+        return unusable("timestamped input channels are not supported yet");
     }
+    const bool speed = kind == InputKind::Speed;
     units::Converter toMps;
+    if (!speed) {
+        toMps.a = kStandardGravity;
+    }
     if (units != nullptr && c->desc.unit != units::kNoUnit && units->contains(c->desc.unit)) {
-        if (const std::optional<units::UnitId> mps = units->find("m/s");
-            mps && units->quantityOf(c->desc.unit) != units->quantityOf(*mps)) {
-            return unusable("the channel's unit is not a speed");
+        if (const std::optional<units::UnitId> base = units->find(speed ? "m/s" : "m/s/s");
+            base && units->quantityOf(c->desc.unit) != units->quantityOf(*base)) {
+            return unusable(speed ? "the channel's unit is not a speed"
+                                  : "the channel's unit is not an acceleration");
         }
         toMps = units->toBase(c->desc.unit);
     }
@@ -395,19 +413,53 @@ Result<CorrectedSpeedResult> CorrectedSpeed::compute(const CorrectedSpeedSetting
                                                      const units::UnitRegistry* units,
                                                      const CancelToken& cancel) {
     CorrectedSpeedResult out;
-    if (settings.method == SpeedMethod::GCorrection) {
-        Error e{ErrorCode::Unsupported, "the gCorrection method arrives in M3 (D-044)", {}};
-        e.context.detail = "/method";
-        return Failure{std::move(e)};
-    }
     const auto failed = [](const Result<UniformSignal>& r) {
         return !r && r.error().code != ErrorCode::NotFound; // NotFound: unusable channel, try the next
     };
+    const auto resolvedName = [&](const std::string& name) {
+        const model::Channel* c = layer.find(name);
+        if (c == nullptr) {
+            c = layer.findLogged(name);
+        }
+        return c != nullptr ? c->desc.name : name;
+    };
+    const auto noSpeed = [&](std::string message, std::optional<std::string> channel) {
+        Error e{ErrorCode::NotFound, std::move(message), {}};
+        e.context.detail = "E-CSD-NO-SPEED";
+        e.context.layer = layer.name;
+        e.context.channel = std::move(channel);
+        return Failure{std::move(e)};
+    };
+    if (settings.method == SpeedMethod::GCorrection) {
+        // Item 3: no fallback (the module's inputs are the two channels named here).
+        const GCorrectionSettings& g = settings.gCorrection;
+        auto wheel = loadInput(layer, g.speedChannel, units, cancel);
+        if (failed(wheel)) {
+            return Failure{wheel.error()};
+        }
+        if (!wheel) {
+            return noSpeed("gCorrection: " + wheel.error().message, g.speedChannel);
+        }
+        auto accel = loadInput(layer, g.longGChannel, units, cancel, InputKind::LongG);
+        if (failed(accel)) {
+            return Failure{accel.error()};
+        }
+        if (!accel) {
+            return noSpeed("gCorrection: " + accel.error().message, g.longGChannel);
+        }
+        auto speed = gCorrection(*wheel, *accel, g, settings.clamp);
+        if (!speed) {
+            return Failure{speed.error()};
+        }
+        out.speedMps = std::move(speed).value();
+        out.inputs = {resolvedName(g.speedChannel), resolvedName(g.longGChannel)};
+        return out;
+    }
     if (settings.method == SpeedMethod::FastestWheel) {
         std::vector<UniformSignal> wheels;
         bool usable = !settings.fastestWheelChannels.empty();
         for (const std::string& name : settings.fastestWheelChannels) {
-            auto s = loadSpeed(layer, name, units, cancel);
+            auto s = loadInput(layer, name, units, cancel);
             if (failed(s)) {
                 return Failure{s.error()};
             }
@@ -431,24 +483,29 @@ Result<CorrectedSpeedResult> CorrectedSpeed::compute(const CorrectedSpeedSetting
         }
         out.diagnostics.emplace_back("W-CSD-FALLBACK");
     }
+    // Item 2: the candidates in list order, read until the first usable one (the rest stay nullopt, unread).
+    std::vector<std::optional<UniformSignal>> candidates;
+    candidates.reserve(settings.alternateListChannels.size());
     for (const std::string& name : settings.alternateListChannels) {
-        auto s = loadSpeed(layer, name, units, cancel);
+        auto s = loadInput(layer, name, units, cancel);
         if (failed(s)) {
             return Failure{s.error()};
         }
         if (!s) {
+            candidates.emplace_back(std::nullopt);
             continue;
         }
-        out.speedMps = std::move(s).value();
-        applyClamp(out.speedMps, settings.clamp);
-        const model::Channel* c = layer.find(name);
-        out.inputs.push_back(c != nullptr ? c->desc.name : name);
-        return out;
+        candidates.emplace_back(std::move(s).value());
+        break;
     }
-    Error e{ErrorCode::NotFound, "no usable speed channel for Corr Speed", {}};
-    e.context.detail = "E-CSD-NO-SPEED";
-    e.context.layer = layer.name;
-    return Failure{std::move(e)};
+    auto chosen = alternateList(candidates, settings.clamp);
+    if (!chosen) {
+        return noSpeed("no usable speed channel for Corr Speed", std::nullopt);
+    }
+    const model::Channel* c = layer.find(settings.alternateListChannels[chosen->index]);
+    out.inputs.push_back(c != nullptr ? c->desc.name : settings.alternateListChannels[chosen->index]);
+    out.speedMps = std::move(chosen->speedMps);
+    return out;
 }
 
 Result<UniformSignal> CorrectedSpeed::fastestWheel(const UniformSignal& a, const UniformSignal& b,

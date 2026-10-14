@@ -243,7 +243,7 @@ project::ComponentSpec valuesListSpec(const std::vector<std::string>& channels, 
     return spec;
 }
 
-World::World(const std::string& domain, bool markGuiThreadNoBlock)
+World::World(const std::string& domain, bool markGuiThreadNoBlock, qt::ProjectSession* session)
     : rt([markGuiThreadNoBlock] {
           qt::AppRuntimeOptions o;
           o.workers = 4;
@@ -251,7 +251,7 @@ World::World(const std::string& domain, bool markGuiThreadNoBlock)
           o.markGuiThreadNoBlock = markGuiThreadNoBlock;
           return o;
       }()),
-      maths(rt.pool(), rt.dispatcher(), shippedUnits()), distance(maths, rt.dispatcher()),
+      maths(rt.pool(), rt.dispatcher(), shippedUnits()), distance(maths, rt.dispatcher()), selection(session),
       render(rt.pool(), rt.dispatcher(), selection, maths, distance), scheme(shippedScheme("light")) {
     sheet.id = uuidRandom();
     sheet.name = "Sheet";

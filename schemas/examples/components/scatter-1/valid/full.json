@@ -1,0 +1,66 @@
+{
+  "xChannel": "Corr Speed",
+  "traces": [
+    {
+      "yChannel": "G Force Lat",
+      "visible": true,
+      "yDelayUs": 0
+    }
+  ],
+  "colourChannel": {
+    "channel": "Throttle Pos",
+    "axis": {
+      "mode": "even",
+      "bandMode": "count",
+      "bandCount": 8,
+      "palette": "rainbow"
+    }
+  },
+  "gating": {
+    "channel": "Corner Gate"
+  },
+  "layout": "overlapped",
+  "tileCols": 0,
+  "style": "points",
+  "pointSize": 2,
+  "trend": {
+    "type": "linear",
+    "order": 2,
+    "throughZero": false,
+    "showEquation": true,
+    "significantDigits": 4
+  },
+  "intervalAverage": {
+    "enabled": false,
+    "binWidth": {
+      "v": 5,
+      "unit": "km/h"
+    }
+  },
+  "scales": {
+    "x": {
+      "mode": "channel"
+    },
+    "y": {
+      "mode": "manual",
+      "min": {
+        "v": -3,
+        "unit": "G"
+      },
+      "max": {
+        "v": 3,
+        "unit": "G"
+      }
+    },
+    "z": {
+      "mode": "channel"
+    }
+  },
+  "cursorStyle": "cross",
+  "density": {
+    "auto": true,
+    "threshold": 1000000,
+    "bins": [256, 256]
+  },
+  "showGrid": true
+}

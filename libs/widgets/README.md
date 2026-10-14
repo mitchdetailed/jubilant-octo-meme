@@ -450,3 +450,249 @@ built; D-179 (proposed) records where it departs from 05 §8.1 and 06 §5.4, §6
 | `tests/ui/tst_mapping_panel` | AC-M2-11 in the shell: a CSV with unknown units beside an `.ld`, the panel above the worksheet area, publication blocked, Resolve as one step with CTRL+Z/CTRL+Y, CTRL+S writing the unit map, a silent next open; Save then Open Anyway, a later file asking only for what the map lacks |
 | `tests/ui/tst_project_recovery` | AC-M2-06 in the shell: a reopen restores the previous data, selection, single colour, filter and worksheet; a kill after the autosave leaves the files intact and the next open prompts, waits, recovers (options, the graph's channel, the journalled selection) and saves with CTRL+S; Later and Discard |
 | `tests/ui/keymap/tst_keymap` (M2 rows) | `edit.undo`, `edit.redo` (keys, also from the Data window), `tools.options`, `data.lap_stretch_toggle`, `view.messages_window`, `view.reset_docks` (menu-only rows through their action); the editors' rows (D-180): `tools.maths_editor`, `tools.channel_status`, `view.channel_status`, `tools.channel_editor`, `tools.aliases`, `tools.mappings`, `tools.details`, `tools.lap_editor`, `data.filter_all_sources`, `cursor.insert_marker` and the nine `channel.*` keys over the focused graph |
+
+## M3 contract (07 §6.1; `docs/milestones/M3.md` §2; D-193)
+
+New roots (the `components` glob is recursive; `properties_shell` is a new entry of the root list in
+`CMakeLists.txt`). Component headers stay flat in `include/esses/widgets/components/`:
+
+| Root | Headers | Contents | Design |
+|---|---|---|---|
+| `src/components/time_distance/` | `time_distance_graph.hpp` | `TimeDistanceGraph` (source moved here from `src/components/`) | 04 §8 |
+| `src/components/plots/` | `scatter_plot.hpp`, `histogram.hpp`, `outing_graph.hpp`, `numeric_gauge.hpp`, `bar_gauge.hpp`, `layered_component.hpp` | `ScatterPlot` (`scatter`), `Histogram` (`histogram`), `OutingGraph` (`outing`; moved here with its owner, D-198 (h)), `NumericGauge` (`gauge_numeric`), `BarGauge` (`gauge_bar`), `LayeredComponent` | 04 §9-11, §16-17 |
+| `src/components/reports_track/` | `channel_report.hpp`, `time_report.hpp`, `track_position.hpp`, `track_map_window.hpp`, `track_editor.hpp` | `ChannelReport`, `TimeReport`, `TrackPosition`, `TrackMapWindow` (the Track Map dock's content), `TrackEditor` | 04 §12-14, 06 §9, §13.5 |
+| `src/properties_shell/` | `include/esses/widgets/properties_shell/` | `PropertiesDialog` (`openFor`, `find`), `FieldBinder` (`FieldKind`, `FieldBinding`), `ZoomSummaryBar`, `CorrectedSpeedDialog`, `LayoutEditor`, `CommandPalette`, `AnimationController`, `ComponentClipboard` | 06 §4.2-4.5, §12, §13.6, §15; 04 §7.2 |
+
+`registerBuiltinComponents()` registers all ten MVP types; `ComponentWidget::openProperties` calls
+`PropertiesDialog::openFor` (D-193 (f)). The shell work of 07 §6.1 that lives in shared M1 files (`WorksheetCanvas`
+multi-select, splitters, maximise and clipboard; `MainWindow`'s zoom summary bar, Track Map dock, palette,
+animation and Layout Editor wiring; the L/K/G/S and remaining hotkey rows; the shared behaviours in
+`component_widget.cpp`) belongs to the properties/shell work; the component owners ask through the coordinator.
+
+### M3-STUB items the implementing agents must replace
+
+- `src/components/reports_track/`: replaced (below, "M3: the reports and track components"). Their
+  `overlayPolicy()` (04 §7.4) and `commandContext()` (06 §14.2) are final.
+- `src/properties_shell/`: replaced (below, "M3: properties and shell"; was `PropertiesDialog` but `component`
+  and `binder`, `FieldBinder::load`/`store`/`validate`/`schemaPointers`, `ZoomSummaryBar`'s painting and mouse,
+  `CorrectedSpeedDialog`, `LayoutEditor`, `CommandPalette`, `AnimationController`'s driving of the worksheet,
+  `ComponentClipboard::toMimeData`/`fromMimeData`/`placeForPaste`).
+
+Final (tested by `tests/components/tst_m3_components_contract.cpp` and
+`tests/properties_shell/tst_properties_shell_contract.cpp`): the registrations, overlay policies and key
+contexts; `TrackMapWindow::setContext`/`context`; `FieldBinder::bind`/`bindings`/`boundPointers`/`isBound` (a
+`Custom` row binds its subtree); `AnimationController::kRates` and its state signals;
+`ComponentClipboard::kMimeType` and `Payload`. `tst_worksheet_canvas` now uses the v1.0 type `gauge_dial` as its
+unregistered component.
+
+Deviation: `PropertiesDialog::openFor` instead of `open`, which would hide `QDialog::open()` (MSVC C4263).
+
+### M3: the plots components (as built, D-198)
+
+`src/components/plots/` holds `ScatterPlot`, `Histogram`, `OutingGraph`, `NumericGauge` and `BarGauge`; every
+`M3-STUB` of the root is replaced. They derive from `LayeredComponent` (`layered_component.hpp`, a public base
+added by this work), which gives them `TimeDistanceGraph`'s layer pipeline with their plotcore builders
+(`ScatterGeometry`, `HistogramGeometry`, `OutingGeometry`, `GaugeGeometry`): the Static build and raster on the
+TaskPool through `RenderService`, the Dynamic and Chrome lists on the GUI thread, the 100 ms pending stripe and a
+50 ms retry of values waiting for a chunk, the 30 s release of a hidden component, `renderToImage` (the current
+composite; another DPR rebuilds Dynamic and Chrome over the scaled Static image) and `hitAt` from the Static hit
+regions. Each component names the change bits that rebuild its Static layer (04 §7.4): scatter and histogram
+every view change but the cursor and the datum; the outing graph and the gauges keep Zoom and Offsets on the
+Dynamic layer too. Spec edits go out as `specEditRequested` (the canvas's undo command) and come back through
+`applySpec`.
+
+| Component | Behaviours | Export Data (CSV) |
+|---|---|---|
+| `ScatterPlot` | G overlapped → tiled → average, S points → pointsTrend → trend, Y cross → ring → none, K/L legends (`handleCommand`); LEFT/RIGHT and CTRL step one/ten Main points; a click picks the nearest Main point within 8 logical px (`nearestPoint`'s tag) and sets the cursor; box zoom (double-click, move, click; ESC), wheel x0.8 and an axis double-click (restore) on its own axes, as widget view state injected as manual scales (`adjustInputs`, `ScatterGeometry::axes`); `component.copy_equation` copies the drawn Main equation; ENTER adds a Y trace, CTRL+ENTER sets X | `set,x,y[,z]` per point of every set, `<Y>@<slot>` |
+| `Histogram` | G overlapped ↔ tiled, S bar → line → text, K/L; a click on a bin of a tile makes its trace active; the wheel zooms the worksheet about the cursor; ENTER adds a trace | `bin_lo,bin_hi,<trace@slot>...` in the y mode |
+| `OutingGraph` | the zoom rectangle's ends (setZoom) and bottom edge (pan at constant span) from `zoomRect()` with a 5 logical px grab (`hitAt` reports `ZoomSpan` and the `HandleKind`); a click or drag places the cursor; the wheel (x0.8 about the pointer) and the rubber band (ESC) set the worksheet zoom; a double-click on a lap cell zooms to it; S line ↔ points, L key labels ↔ none; like-units grouping; `enableOverlays` widens `overlayPolicy()` to AllOverlays | `Time [s]` and its channels in Main |
+| `NumericGauge`, `BarGauge` | ALT+n (`component.colour_band [n]`) toggles colour band n (a band beyond the list is a handled no-op); the channel drop replaces the channel | `Time [s]` and the channel in Main |
+
+Exports run on the TaskPool (`plots::runOffGui`: `RenderService` with a key of their own, Background) while the GUI
+thread waits in a local event loop that excludes user input; the ranges are 04 §7.2 item 8's. ALT+n is not handled
+by scatter and histogram (a `BandAxis` has no per-band visibility, D-198 (f)); the display commands a component
+does not handle return false so that the shell's generic behaviour applies (`ComponentWidget::handleCommand`).
+For the shell work: `component.copy_equation` (Component menu only) and the Export Data dialog (an `ExportSink`
+over the chosen file) are to be registered and wired in `MainWindow`; the keymap rows L, K, G, S, ALT+n and Y
+(summary) can become `implemented` with their `KEYMAP_TEST`s over these components.
+
+Tests (offscreen): `tst_scatter_plot` (points and the Dynamic-only cursor, Overlay 0 beneath Main in its colour,
+the click pick and LEFT/RIGHT, the cycles and toggles, the trend equation and Copy Equation, box zoom, wheel,
+ESC and the axis restore, the colour legend, the CSV), `tst_histogram` (ten bin hit regions, the cursor bin on
+the Dynamic layer, outlined overlays beneath Main, the cycles, the active trace by a click, the wheel, the CSV
+against a count made in the test), `tst_outing_graph` (a zoom and a cursor move rebuild no traces, the handles,
+a lap's double-click, the wheel, the rubber band and ESC, the cursor click, S/L, like-units grouping,
+`enableOverlays`, the CSV), `tst_gauges` (Main and the reference at the cursor against the source's formula,
+Dynamic-only cursor and zoom, colour bands and ALT+n with the no-op beyond the list, background mode, the
+channel drop, the bar from its origin and the reference marker, `bandMode` bar, the CSV over the current and the
+padded range); shared helpers in `tests/components/plots_test_support.hpp` (header only). Pixel goldens:
+`tests/golden/images/tst_golden_plots.cpp` (three cases per component, provisional Windows renders, D-127).
+
+### M3: the time_distance completion (`src/components/time_distance/`, as built, D-201)
+
+`TimeDistanceGraph` covers parity-first §5.4 / 04 §8 over `plot::TimeDistanceBuilder` (the builder's M3 parts are in
+`libs/plotcore/README.md`, "M3: the time_distance completion"):
+
+- **Inputs**: after `RenderService::prepareInputs` the graph applies the WorksheetViewModel's pending alignment
+  offsets (a sub-axis drag or a key burst moves the traces at once, 04 §3.3 item 4) and the project's channel
+  override scale limits (`ProjectSession::overrides()` through the selection's session, in base units:
+  `ResolvedChannel::limitMin`/`limitMax`). Each Static build also returns a `plot::TdStaticInfo` (band entries,
+  markers, measurement positions, scales, the scrollbar extent), kept for the mouse and the tooltips.
+- **Commands** (`handleCommand`; the shell offers them to the focused component first): F3 `graph.variance`, M
+  `graph.measurements`, E `graph.status_errors`, SHIFT+E `graph.device_events`, Y `cursor.style` (line →
+  crosshair → none), G `component.cycle_layout` (panels ↔ overlapped), S `component.cycle_style` (line ↔ points)
+  as undoable body edits; CTRL+SHIFT+C `graph.copy_cursor_values` (`name\tvalue\tunit` per configured channel at
+  the Main cursor; with a datum `name\tvalue@main\tvalue@datum\tdelta\tunit`); ALT+UP/DOWN/F2 `zoom.v_in`/
+  `v_out`/`v_full` and SHIFT+UP/DOWN `pan.up`/`down` on the active group's vertical zoom (local view state, not
+  persisted); the programmatic forms of the mouse rows `zoom.rubber_band` (a band from the cursor),
+  `zoom.full_axis` (`["y"]` vertical), `zoom.wheel` (`[notches]` about the cursor), `pan.drag_axis`
+  (`[fraction]`), `cursor.place` (`[x]` snapped) and `offset.drag` (`[reference, amount]`, one commit).
+- **Offsets** (AC-M3-09): the offset keys and O are the shell's rows on the WorksheetViewModel; the focused graph
+  reports each visible slot's offset step (`WorksheetViewModel::setSourceSamplePeriod`: one sample period of the
+  active channel in that slot's source), so a range moves by its own source's period, 0.25 m in distance. A
+  sub-axis drag holds the commit (`beginOffsetDrag`/`endOffsetDrag`) and commits once at the release.
+- **Mouse**: cursor placement honours `cursorSnap`; double-click a range or section band entry: zoom to it (a click
+  there never moves the cursor); the scrollbar thumb drag pans, a click on its track pages (±90 %), a double-click
+  is full zoom (F2; the vertical bar: full vertical); dragging a y axis or the vertical thumb pans vertically; ALT
+  + rubber band zooms the active group vertically, CTRL a box; dragging a Lo/Hi handle (overlapped) or a panel
+  splitter (in the axis strip) edits `lo`/`hi` or the edges at the release (one undo command); hovering a min/max
+  measurement draws its position line (Dynamic, widget-local) and a double-click moves the cursor there;
+  tooltips name markers, annotations, device events, band entries, offsets and status rows (a bit field as its
+  set bits); right-click an annotation: Edit / Remove (undoable sidecar edits through
+  `DataSelectionModel::commitSidecar`; Add Annotation is the shell's `cursor.add_annotation`).
+- **Layers**: the datum appearing or disappearing rebuilds the Static layer (the key's value@datum and Δ
+  columns); moving it stays Dynamic only. Export Data writes the graph's channels as CSV through the plots
+  work's `plots::timeSeriesCsv` on the pool (`plots_common.hpp`).
+- **Tests** (offscreen): `tests/components/tst_time_distance_m3` (the body commands and what they show, F3 with
+  and without overlays, the datum's Static/Dynamic split, the measurement hover line and double-click, band
+  double-clicks, the scrollbar, the vertical zoom by keys, rubber band and scrollbar, splitter and Hi-handle
+  drags, the offset sub-axis drag with pending offsets in the inputs and one commit at the release, per-source
+  offset steps, copy of the cursor values, the CSV, annotation Add / Edit / Remove (the menu's Remove included)
+  through the selection's SidecarCommit hook with their undo texts, the project's override limits scaling the
+  group and drawing the min / max lines, tooltips of annotations, device events and status rows; the test `World`
+  takes an optional `ProjectSession` for the selection);
+  `tst_time_distance_graph` (M1) now places the datum before measuring that a datum move is Dynamic only. Pixel
+  goldens: the thirteen M3 cases of `tests/golden/images/tst_golden_images.cpp` (provisional Windows renders).
+- **For the shell work**: the graph answers `zoom.v_in`, `zoom.v_out`, `zoom.v_full`, `pan.up`, `pan.down` and
+  `graph.copy_cursor_values` (their rows can become `implemented` with `KEYMAP_TEST`s over the graph) and the mouse
+  rows' programmatic forms above (`zoom.rubber_band`, `zoom.full_axis`, `zoom.wheel`, `pan.drag_axis`,
+  `cursor.place`, `offset.drag`), which can be offered to the focused component like the dispatch rows.
+
+### M3: the reports and track components (as built, D-199)
+
+`src/components/reports_track/` holds `ChannelReport`, `TimeReport`, `TrackPosition`, `TrackMapWindow` and
+`TrackEditor`; every `M3-STUB` of the root is replaced.
+
+- **Report tables** (`report_table.hpp`, private): two `QTableView`s over one `ReportStyleProxy` and one selection
+  model, the left one showing column 0 only (the frozen row labels), their vertical scrolling coupled; column widths
+  come from the cells' text metrics and the layout is settled before a Print to Clipboard, so a table always
+  renders the same; the caption bar (04 §7.3) above and the focus border (scheme `cptFocusBorder`) around; fonts
+  `reportTable`/`reportHeading`, colours `data*`. The proxy maps `qt::ReportModel`'s styling roles to
+  `Qt::BackgroundRole` (the highlight or band colour at 45 % over the table background) and `Qt::FontRole`
+  (italic untrusted rows, Missing and Error cells; bold fastest times and summary rows).
+- **`ChannelReport`**: a `qt::ReportModel` over `RenderService::pool()`/`dispatcher()`/`statCache()`; the body's
+  `report` (`ReportSpec::fromJson`), `layout`, `deltaVsOverlay0`, `highlight` (on with #2060ff/#ff3030 by default)
+  and `timeFormat`; refresh on Selection and on Data of a source of the selection, and on Zoom and Domain while
+  `report.options.zoomLinked`; `addChannel` appends the channel with avg, min and max (one spec edit); Export Data
+  writes the table as CSV, `copyTsv` puts it on the clipboard (also the table's context menu), Print to Clipboard is
+  `QWidget::render`. G (`component.cycle_layout`) flips the layout through the shell's generic edit.
+- **`TimeReport`**: the same over `TimeReportSpec::fromJson(body)` and `timeFormat`; `toggleBand(n)`, also
+  `handleCommand("component.colour_band", [n])` and ALT+n in `keyPressEvent` where no command runs, flips
+  `bands[n].visible` (one spec edit; a band beyond the list does nothing).
+- **`TrackPosition`**: its own copy of the layer pipeline (Static on Size, Scheme, Selection, Data, Offsets, Scale
+  and `TrackMapService::mapChanged`; Dynamic on Cursor, Datum, Zoom, Domain) over `plot::TrackGeometry`; the map is
+  `ComponentBuildInputs::trackMap` from `RenderService::prepareInputs`. PLUS / "=" / MINUS (`track.zoom_in`/
+  `zoom_out` through `handleCommand`, or the keys themselves), the wheel about the pointer, a drag and a
+  double-click (fit, `track.fit`) while focused; each step edits the body's `scale` at once and the gesture is one
+  spec edit 400 ms after it rests; a backgrounded map ignores presses.
+- **`TrackMapWindow`**: the embedded `TrackPosition` rebuilt over each worksheet context (links forced on, the
+  dock's spec kept; its edits apply at once, not undoable); the actions Fit, Show Sections, Show Section Labels,
+  Track Editor..., Regenerate Track... (the last two signal the shell); a "No worksheet" note without a context.
+- **`TrackEditor`** (`(ProjectSession&, DataSelectionModel&, MathsService&, TrackMapService&, parent)`; the
+  contract's `SourceLoader` parameter is gone): the lap picker over every lap of the open sources (Main by
+  default), GPS (inner/outer laps, smoothing) or Speed + Lateral G (the lateral channel among the source's
+  acceleration channels, "positive to the right"); Generate through `TrackMapService::generate` (a pending maths
+  input retries on `channelReady`/`statusChanged`) with a preview and the closure error / RMS fit; Accept writes the
+  map with default sections (`SectionDetector::defaults`) as one `TrackMapCommand` (a later Accept keeps the user
+  sections that still fit); the sections table with add (numerically, or from `setCursorSpan`'s span), edit,
+  delete (each one command; >= 10 m and on the track); Regenerate Default Sections; rename and delete of the
+  track file; "Auto-generate on open" (`trackMaps.autoGenerateOnOpen`, a `SetProjectOptionsCommand`).
+
+Tests (offscreen, `tests/components/reports_track/`, helpers in `rt_support.hpp` over the qtmodel fixtures
+`libs/qtmodel/tests/reports/report_track_fixtures.hpp`, header only): `tst_channel_report` (the frozen column,
+cells, highlight tints, italic untrusted rows, refresh on selection, data and the zoom link, the body's layout and
+delta columns, `addChannel`, CSV and TSV, caption, fonts, the focus border, Print to Clipboard at DPR 2),
+`tst_time_report` (laps, sections and summaries, band tints and bold fastest times, ALT+n and `handleCommand`,
+italic untrusted laps, the time format, refresh, CSV and TSV), `tst_track_position` (the venue map and the cursor
+dot at the hand-computed track position, Dynamic-only cursor, zoom and domain changes, the banner and a map
+arriving, the Track commands through a `KeymapBinder`, keys, wheel about the pointer, drag, double-click, one spec
+edit per gesture, a background map, Print to Clipboard against `OffscreenRenderer`), `tst_track_map_window`,
+`tst_track_editor` (generation of the AC-M3-04 synthetic circuit within 2 m RMS, Accept with default sections
+>= 10 m, undo/redo of the file, user sections persisting and reloading, regeneration keeping them, rename, delete,
+the project option, a missing Speed+LatG input) and `tst_reports_track_goldens` (three cases per component at DPR
+1 and 2: provisional pixel goldens under `tests/golden/images/{channel_report,time_report,track_position}`, exact
+table goldens under `tests/golden/tables/` and DrawList JSON goldens `tests/golden/drawlist/track_position/
+widget_*`).
+
+### M3: properties and shell (`src/properties_shell/`, the shell files; as built, D-200)
+
+Every `M3-STUB` of `src/properties_shell/` is replaced. New public headers beside the contract's:
+`field_editors.hpp` (the editors a `FieldBinder` binds, `jsonptr`, `SchemaTree`), `shell_dialogs.hpp`
+(`SelectWorksheetDialog`, `UnitsListDialog`, `OpenLogDialog`) and `component_commands.hpp`
+(`genericComponentEdit`, `hasGenericComponentEdit`); private `property_pages.hpp` (the tabs and binding tables
+of the ten MVP types). Shell files: `worksheet_canvas.{hpp,cpp}` (rewritten), `main_window.hpp`,
+`main_window.cpp`, `main_window_impl.hpp` (the `MainWindow::Impl`, now shared by two sources) and
+`main_window_m3.cpp` (the M3 widgets, menus and commands); `component_widget.hpp` gains `handleCommand` and
+`captionBarHeight`.
+
+- **`ComponentWidget::handleCommand(id, args)`** (default false): the shell offers the rows only a component can
+  carry out to the focused component (`zoom.v_*`, `pan.up`/`down`, `graph.copy_cursor_values`, `track.*`,
+  `component.copy_equation` and the mouse rows' programmatic forms); a row is enabled while the focused
+  component's key context is one of the row's; the worksheet rows of hotkey batch 1 go to the focused component
+  first while the keyboard is in the canvas. Rows a component does not take that edit its body (L, K, G, S,
+  ALT+n, Y, E, SHIFT+E, F3, M) are `genericComponentEdit`, one spec edit each.
+- **`FieldBinder`**: `load`/`store`/`validate`/`schemaPointers` and `setSchema`, `loadJson`/`storeJson`,
+  `editorFor`, `isModified`. A row whose editor still shows what `load()` put there leaves the body's member as
+  it was (absent stays absent, numbers exact); a changed row is validated against the body schema's node of its
+  pointer. Leaf editors are plain Qt widgets (`NumberEdit` keeps the exact value until edited); subtrees are
+  `FieldEditor`s (`UnitValueEdit`, `FieldForm`, `RecordListEditor`, `FixedArrayEdit`, `OptionalEditor`), whose
+  `leafEditor(pointer)` reaches any descendant (creating records on the way).
+- **`PropertiesDialog`**: modeless, one per component (`openFor`/`find`), tabs from `property_pages.cpp`, the
+  "Component" header group (caption, links, legend) on the Display tab through an internal binder; Apply/OK one
+  spec edit "Edit <type> properties", Cancel restores the spec at open; refreshes on
+  `WorksheetCanvas::componentSpecApplied` (undo/redo), closes with its component; `focusChannel` (CTRL+N);
+  geometry per type through `setGeometryStore` (layout.json `dialogs."properties.<type>"`).
+- **`WorksheetCanvas`**: in-place sync (widgets keep their state when their id remains), selection (click,
+  CTRL+click, band on empty canvas, `selectAll`), move/resize/splitter/nudge with grid snap and the 4 x 4 cell
+  minimum, `sendToBackground`/`bringToFront`, `setLayoutLocked`; every layout change is `layoutEdited(text,
+  mergeKey)`, a merged `WorkbookCommand` in the shell; a press on a component's own control in the edge zone
+  stays the component's.
+- **`ComponentClipboard`**: the payload as MIME type and text/plain; `placeForPaste` keeps sizes in whole cells,
+  offsets one cell per paste into the same worksheet (the shell counts per worksheet and clipboard content),
+  fresh ids. `MainWindow::copyComponents`/`cutComponents`/`pasteComponents`/`deleteComponents`.
+- **`CommandPalette`** (CTRL+SHIFT+P): providers for `>`, `@`, `#`; invocation after the popup closed with the
+  previous focus restored (the context a key would see); prefix matches, then recent (`palette.recent`), then
+  title; argument rows per keymap row; `?` lists disabled commands.
+- **`AnimationController`**: drives `WorksheetViewModel::setAnimating`/`setAnimationRate`, keeps its state
+  without a worksheet, follows worksheet switches, stops at the end of the outing; `data.animate` (A, tool bar)
+  and `data.animation_rate [rate]` (Data > Animation Rate, `options.animation.rate`, one undo step).
+- **`ZoomSummaryBar`**: above the worksheet tabs; `buildDrawList(Summary, LayoutContext, Scheme)` (DrawList
+  goldens `tests/golden/drawlist/zoom_summary/`, provisional PNGs `tests/golden/images/zoom_summary/`); click
+  sets the cursor, drag moves the span, SHIFT+click extends it (`zoom.extend`), double-click zooms full.
+- **`CorrectedSpeedDialog`** (Tools): the module's settings, enabled flag and `options.lapStretch` as one
+  `SetProjectOptionsCommand`. **`LayoutEditor`** (CTRL+F7): the workbook/worksheet tree and its edits as the
+  qtmodel workbook commands, Lock Layout (`ui.layoutLocked`), import/export through `Prompts`.
+- **Shell** (`MainWindow`): the zoom summary bar, the Track Map dock (`trackmap`, AutoHide right) and one
+  `TrackMapService` (`trackMaps()`) for RenderService, SourceLoader, the dock and the Track Editor; the M3 rows
+  of 06 §14.4 (file, view, tools, component, offset, cursor rows), full screen, Print to Clipboard, Export Data,
+  `component.copy_equation` (menu only); `setPrompts` replaces the file, folder, text and choice dialogs.
+
+Tests (offscreen): `tests/properties_shell/` `tst_properties_roundtrip` (AC-M3-08: every body-schema leaf of
+the ten types bound, mutated, applied as one undo step, saved and reopened identical, full and empty bodies),
+`tst_field_binder`, `tst_component_clipboard` (AC-M3-11), `tst_palette` (AC-M3-12, with the key-versus-palette
+harness), `tst_zoom_summary_bar` (DrawList JSON goldens exact, PNGs provisional), `tst_corrected_speed_dialog`,
+`tst_layout_editor`, `tst_properties_shell_contract`; `tests/shell/` `tst_worksheet_canvas_m3` (selection,
+gestures, splitters, nudge, z order, lock), `tst_shell_m3` (summary bar, Track Map dock, animation without
+Static builds, the dialogs of the rows, full screen, offsets and annotations, merged geometry edits, the
+component rows following the focus, projects and Close All); `tests/ui/keymap/keymap_m3_cases.hpp` (every M3
+keymap row, mouse rows by pointer events). AC-M3-10: `bench/plot_bench` `plot.animation_frame_10x`.

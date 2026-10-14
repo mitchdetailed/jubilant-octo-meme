@@ -4,7 +4,12 @@
 #include "paint_internal.hpp"
 
 #include <esses/base/taskpool.hpp>
+#include <esses/plotcore/gauge_geometry.hpp>
+#include <esses/plotcore/histogram_geometry.hpp>
+#include <esses/plotcore/outing_geometry.hpp>
+#include <esses/plotcore/scatter_geometry.hpp>
 #include <esses/plotcore/time_distance_builder.hpp>
+#include <esses/plotcore/track_geometry.hpp>
 #include <esses/qtrender/layer_cache.hpp>
 #include <esses/qtrender/offscreen_renderer.hpp>
 #include <esses/qtrender/qt_text_metrics.hpp>
@@ -93,20 +98,68 @@ ComponentBuilders OffscreenRenderer::placeholderBuilders() {
     return b;
 }
 
+namespace {
+
+// The three builders of a plotcore builder class with the TimeDistanceBuilder shape.
+template <class Geometry> ComponentBuilders buildersOf() {
+    ComponentBuilders b;
+    b.buildStatic = [](const plot::ComponentBuildInputs& in, const CancelToken& cancel) {
+        return Geometry::buildStatic(in, cancel);
+    };
+    b.buildDynamic = [](const plot::ComponentBuildInputs& in) { return Geometry::buildDynamic(in); };
+    b.buildChrome = [](const plot::ComponentBuildInputs& in, bool pending) {
+        return Geometry::buildChrome(in, pending);
+    };
+    return b;
+}
+
+} // namespace
+
 ComponentBuilders OffscreenRenderer::builtinBuilders(std::string_view type) {
     if (type == "time_distance") {
+        return buildersOf<plot::TimeDistanceBuilder>();
+    }
+    // The M3 drawn components (07 section 6.1); their builders are plotcore's (M3-STUBs until implemented,
+    // whose Unsupported Static build renders the "Render failed" placeholder).
+    if (type == "outing") {
+        return buildersOf<plot::OutingGeometry>();
+    }
+    if (type == "scatter") {
+        return buildersOf<plot::ScatterGeometry>();
+    }
+    if (type == "histogram") {
+        return buildersOf<plot::HistogramGeometry>();
+    }
+    if (type == "track_position") {
+        return buildersOf<plot::TrackGeometry>();
+    }
+    if (type == "gauge_numeric") {
         ComponentBuilders b;
         b.buildStatic = [](const plot::ComponentBuildInputs& in, const CancelToken& cancel) {
-            return plot::TimeDistanceBuilder::buildStatic(in, cancel);
+            return plot::GaugeGeometry::buildNumericStatic(in, cancel);
         };
         b.buildDynamic = [](const plot::ComponentBuildInputs& in) {
-            return plot::TimeDistanceBuilder::buildDynamic(in);
+            return plot::GaugeGeometry::buildNumericDynamic(in);
         };
         b.buildChrome = [](const plot::ComponentBuildInputs& in, bool pending) {
-            return plot::TimeDistanceBuilder::buildChrome(in, pending);
+            return plot::GaugeGeometry::buildNumericChrome(in, pending);
         };
         return b;
     }
+    if (type == "gauge_bar") {
+        ComponentBuilders b;
+        b.buildStatic = [](const plot::ComponentBuildInputs& in, const CancelToken& cancel) {
+            return plot::GaugeGeometry::buildBarStatic(in, cancel);
+        };
+        b.buildDynamic = [](const plot::ComponentBuildInputs& in) {
+            return plot::GaugeGeometry::buildBarDynamic(in);
+        };
+        b.buildChrome = [](const plot::ComponentBuildInputs& in, bool pending) {
+            return plot::GaugeGeometry::buildBarChrome(in, pending);
+        };
+        return b;
+    }
+    // values_list, channel_report and time_report are table widgets (QWidget::render); unknown types.
     return placeholderBuilders();
 }
 

@@ -1,5 +1,21 @@
 {
-    "$comment": "Provenance of the PNGs in this directory (tests/golden/images/tst_golden_images.cpp). Pixel goldens are authoritative on ubuntu only (D-127): replace them from the qt-app ubuntu artefact (<build>/tests/golden/artefacts) and set generatedOn to linux.",
+    "$comment": "Provenance of the PNGs in this directory (tests/golden/images/tst_golden_images.cpp). Pixel goldens are authoritative on ubuntu only (D-127): replace them from the qt-app ubuntu artefact (<build>/tests/golden/artefacts) and set generatedOn to linux. \"cases\" lists the provisional cases (compared in report mode until replaced): \"windows\" = rendered locally on Windows, \"linux-stale\" = an ubuntu PNG the time_distance completion changed (dark_scheme: the datum's key columns).",
+    "cases": {
+        "annotations_events": "windows",
+        "bands_sections": "windows",
+        "dark_full_anatomy": "windows",
+        "dark_scheme": "linux-stale",
+        "datum_key": "windows",
+        "measurements": "windows",
+        "offset_axis_distance": "windows",
+        "offset_axis_time": "windows",
+        "overlapped": "windows",
+        "scale_lines_crosshair": "windows",
+        "status_strip": "windows",
+        "variance_banner": "windows",
+        "variance_distance": "windows",
+        "variance_time": "windows"
+    },
     "generatedOn": "linux",
     "platform": "offscreen",
     "qt": "6.12.0",

@@ -1,0 +1,64 @@
+{
+    "activeChannel": "Ground Speed",
+    "body": {
+        "binLabelStep": 2,
+        "bins": {
+            "bandCount": 12,
+            "bandMode": "count",
+            "mode": "even"
+        },
+        "condensedAxes": true,
+        "layout": "tiled",
+        "style": "line",
+        "tileCols": 1,
+        "traces": [
+            {
+                "channel": "Corr Speed"
+            },
+            {
+                "channel": "Ground Speed"
+            }
+        ],
+        "yMode": "count"
+    },
+    "caption": true,
+    "case": "histogram_lines_tiled",
+    "colourLegend": false,
+    "cursorUs": 40000000,
+    "data": "libs/plotcore/tests/td_golden_cases.hpp (synthetic rational data, sources synthetic_a/b/c.ld); cases in libs/plotcore/tests/plots_golden_cases.hpp",
+    "datumUs": null,
+    "domain": "time",
+    "dprs": [
+        1,
+        2
+    ],
+    "focused": false,
+    "fonts": "tests/golden/fonts (Noto Sans), QtTextMetrics",
+    "pendingStripe": false,
+    "scheme": "Test Dark",
+    "sizeLogical": [
+        420,
+        320
+    ],
+    "slots": [
+        {
+            "distanceData": true,
+            "kind": "Main",
+            "lap": 1,
+            "number": 0,
+            "source": "synthetic_a.ld"
+        },
+        {
+            "distanceData": true,
+            "kind": "Overlay0",
+            "lap": 1,
+            "number": 0,
+            "source": "synthetic_b.ld"
+        }
+    ],
+    "type": "histogram",
+    "zoom": [
+        0,
+        60000000
+    ]
+}

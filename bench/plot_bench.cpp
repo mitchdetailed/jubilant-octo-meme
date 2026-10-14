@@ -12,6 +12,11 @@
 //                       the Dispatcher -> rasterised (LayerCache::rasteriseStatic) -> a synchronous full
 //                       repaint.
 //                                                                                                Limit 16 ms.
+//   plot.animation_frame_10x  (M3, AC-M3-10) one animation frame at 10x: the cursor advanced by 10 x 33 ms as
+//                       WorksheetViewModel's animation tick does (CursorSource::Animation, a Cursor-only
+//                       change)
+//                       -> the graph's Dynamic layer -> a synchronous repaint of its damage; no Static build.
+//                                                                                                 Limit 4 ms.
 // Each row is the median over --runs runs (default 5, D-042) of the per-run median; the reference machine is
 // the developer's (bench/workloads.md). Prints one line per row and writes --json; --gate makes a row over
 // its limit exit 1. --smoke: a 2 min file and 1 run (ctest bench.plot_bench.smoke checks the harness, not the
@@ -50,6 +55,9 @@ namespace {
 constexpr int kTimeoutMs = 120000;
 constexpr double kCursorLimitMs = 4.0;
 constexpr double kZoomPanLimitMs = 16.0;
+constexpr double kAnimationLimitMs = 4.0;   // AC-M3-10: CPU per frame at 10x
+constexpr double kAnimationRate = 10.0;     // the bench rate of AC-M3-10 (the Data menu offers up to x4)
+constexpr Micros kAnimationTickUs = 33'333; // WorksheetViewModel's 30 Hz tick
 
 double msSince(const QElapsedTimer& t) {
     return static_cast<double>(t.nsecsElapsed()) / 1e6;
@@ -128,6 +136,7 @@ int main(int argc, char** argv) {
 
     widgets::registerBuiltinComponents();
     std::vector<double> cursorRunMedians;
+    std::vector<double> animationRunMedians;
     std::vector<double> zoomRunMedians;
     QJsonArray runRows;
     QJsonObject phases;
@@ -227,9 +236,28 @@ int main(int argc, char** argv) {
             }
         };
 
+        // AC-M3-10: frames of a 10x animation over the Main lap, each a Cursor-only change.
+        const auto animationSequence = [&](std::vector<double>& into) {
+            const int submitted = g.staticBuildsSubmitted();
+            constexpr int kFrames = 60;
+            const auto step = static_cast<Micros>(kAnimationRate * static_cast<double>(kAnimationTickUs));
+            h.view().setCursor(lap / 10, qt::CursorSource::Programmatic);
+            for (int i = 0; i < kFrames; ++i) {
+                QElapsedTimer timer;
+                timer.start();
+                h.view().setCursor(h.view().state().cursorT + step, qt::CursorSource::Animation);
+                g.repaint(g.lastDynamicDamage());
+                into.push_back(msSince(timer));
+            }
+            if (g.staticBuildsSubmitted() != submitted) {
+                err << "plot_bench: an animation frame submitted a Static build\n";
+            }
+        };
+
         std::vector<double> warm;
         zoomSequence(warm); // warm-up: every zoom level's chunks resident
         cursorSequence(warm);
+        animationSequence(warm);
         if (parser.isSet(stagesOpt)) {
             // The current view's Static build (the graph's own inputs) on the pool, waited for here (the
             // bench thread may block in this diagnostic), then rasterised into a fresh LayerCache: all
@@ -315,9 +343,13 @@ int main(int argc, char** argv) {
             zoomSequence(zoom);
             static_cast<void>(bench::spinUntil([&] { return h.idle() && g.staticUpToDate(); }, kTimeoutMs));
             cursorSequence(cursor);
+            std::vector<double> animation;
+            animationSequence(animation);
             const bench::Stats zs = bench::statsOf(zoom);
             const bench::Stats cs = bench::statsOf(cursor);
+            const bench::Stats as = bench::statsOf(animation);
             cursorRunMedians.push_back(cs.median);
+            animationRunMedians.push_back(as.median);
             zoomRunMedians.push_back(zs.median);
             zoomSamples += zoom.size();
             out << QStringLiteral("run %1: cursor median %2 ms (p95 %3, max %4); zoom/pan median %5 ms (p95 "
@@ -329,9 +361,16 @@ int main(int argc, char** argv) {
                        .arg(zs.median, 0, 'f', 3)
                        .arg(zs.p95, 0, 'f', 3)
                        .arg(zs.max, 0, 'f', 3);
+            out << QStringLiteral("run %1: animation frame at x%2 median %3 ms (p95 %4, max %5)\n")
+                       .arg(r + 1)
+                       .arg(kAnimationRate)
+                       .arg(as.median, 0, 'f', 3)
+                       .arg(as.p95, 0, 'f', 3)
+                       .arg(as.max, 0, 'f', 3);
             out.flush();
             runRows.append(QJsonObject{{QStringLiteral("cursor"), bench::toJson(cs)},
-                                       {QStringLiteral("zoomPan"), bench::toJson(zs)}});
+                                       {QStringLiteral("zoomPan"), bench::toJson(zs)},
+                                       {QStringLiteral("animation"), bench::toJson(as)}});
         }
         // The warm-up's phases are left out (the first entries of the phase vectors).
         const auto measured = [](std::vector<double> v, std::size_t skip) {
@@ -362,11 +401,13 @@ int main(int argc, char** argv) {
     bench::report(rows, QStringLiteral("plot.cursor_move"), bench::statsOf(cursorRunMedians), kCursorLimitMs);
     bench::report(rows, QStringLiteral("plot.zoom_pan_step"), bench::statsOf(zoomRunMedians),
                   kZoomPanLimitMs);
+    bench::report(rows, QStringLiteral("plot.animation_frame_10x"), bench::statsOf(animationRunMedians),
+                  kAnimationLimitMs);
     const QString jsonPath =
         parser.isSet(jsonOpt) ? parser.value(jsonOpt) : bench::defaultJsonPath(QStringLiteral("plot_bench"));
     if (!jsonPath.isEmpty()) {
         const QJsonObject doc{{QStringLiteral("bench"), QStringLiteral("plot_bench")},
-                              {QStringLiteral("ac"), QStringLiteral("AC-M1-02")},
+                              {QStringLiteral("ac"), QStringLiteral("AC-M1-02, AC-M3-10")},
                               {QStringLiteral("cpu"), QSysInfo::currentCpuArchitecture()},
                               {QStringLiteral("os"), QSysInfo::prettyProductName()},
                               {QStringLiteral("threads"), QThread::idealThreadCount()},
@@ -388,6 +429,10 @@ int main(int argc, char** argv) {
     }
     const bool pass =
         rows.value(QStringLiteral("plot.cursor_move")).toObject().value(QStringLiteral("pass")).toBool() &&
-        rows.value(QStringLiteral("plot.zoom_pan_step")).toObject().value(QStringLiteral("pass")).toBool();
+        rows.value(QStringLiteral("plot.zoom_pan_step")).toObject().value(QStringLiteral("pass")).toBool() &&
+        rows.value(QStringLiteral("plot.animation_frame_10x"))
+            .toObject()
+            .value(QStringLiteral("pass"))
+            .toBool();
     return parser.isSet(gateOpt) && !pass ? 1 : 0;
 }

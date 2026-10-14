@@ -132,3 +132,22 @@ Every rendered image (and `*.diff.png` on failure) is written to `<build>/libs/q
   logical metric times `dpr`, and a process-unique id keeps two snapshots that share a generation apart.
 - Added `image_diff.hpp` (the comparison rule of 04 §6.7 item 4) for the goldens (`tests/golden`) and the render
   parity test (`tests/ui/tst_render_parity`).
+
+## M3 contract (07 §6.1; D-193)
+
+`OffscreenRenderer::builtinBuilders` (final) maps `outing`, `scatter`, `histogram`, `track_position`,
+`gauge_numeric` and `gauge_bar` to their `esses_plotcore` builders (`OutingGeometry`, `ScatterGeometry`,
+`HistogramGeometry`, `TrackGeometry`, `GaugeGeometry`); the table components (`values_list`, `channel_report`,
+`time_report`) and unknown types keep the placeholder. While a builder is an `M3-STUB` its Static build fails
+with Unsupported and the component renders the "Render failed" placeholder.
+
+### Scaled text runs (M3 plots work, D-198 (b))
+
+`plot::TextRun::scale` multiplies the point size of the run's style (the numeric gauge's dynamic font, 04 §16
+item 1). `RasterBackend` draws, measures (placement, elision) and bounds a scaled run with the style's font at
+that size: `schemeFontEntry(fonts, style, rotated, scale)` keeps one font per thread and scale (the cache slot
+carries the scale in thousandths above the style slot), and the static-text key includes the scale. A run with
+scale 1 takes the M1 path unchanged, so no layer and no golden changed. `LayerCache::dynamicDamage` covers a
+scaled run through the same bounds. Tested by `qtrender.tst_text_scale` (ink growing with the scale, elision and
+the background box at the scaled size, the Dynamic damage covering the scaled ink, the JSON form) and through
+the numeric gauges of `golden.tst_golden_plots`.

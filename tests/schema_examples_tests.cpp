@@ -6,7 +6,9 @@
 // is a valid draft-07 schema whose patterns compile as ECMAScript std::regex, every example under
 // schemas/examples/<schema-id>/valid validates, and every example under .../invalid fails with an error at
 // the JSON pointer its expect.json entry names. tools/check_schemas.py runs the same examples through its own
-// draft-07 subset validator, so the two validators are cross-checked on every example.
+// draft-07 subset validator, so the two validators are cross-checked on every example. The component body
+// schemas (schemas/components/<type>-<version>, id "components/<type>-<version>", M3 contract) are included,
+// and every component body of the shipped workbooks (data/workbooks) validates against its type's schema.
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json-schema.hpp>
 #include <nlohmann/json.hpp>
@@ -55,13 +57,17 @@ std::vector<fs::path> sortedFiles(const fs::path& dir, const std::string& suffix
     return out;
 }
 
-// schema id ("sidecar-1") -> schema document
+// schema id ("sidecar-1", "components/time_distance-1") -> schema document
 std::map<std::string, json> loadSchemas() {
     std::map<std::string, json> out;
     const std::string suffix = ".schema.json";
     for (const auto& path : sortedFiles(schemasDir(), suffix)) {
         const std::string name = path.filename().string();
         out.emplace(name.substr(0, name.size() - suffix.size()), readJson(path));
+    }
+    for (const auto& path : sortedFiles(schemasDir() / "components", suffix)) {
+        const std::string name = path.filename().string();
+        out.emplace("components/" + name.substr(0, name.size() - suffix.size()), readJson(path));
     }
     return out;
 }
@@ -151,6 +157,41 @@ TEST_CASE("schemas: invalid examples fail at the expected JSON pointer", "[unit]
             ++checked;
         }
         CHECK(expect.size() == files.size());
+    }
+    CHECK(checked > 0);
+}
+
+TEST_CASE("schemas: every MVP component type has a body schema", "[unit]") {
+    const auto schemas = loadSchemas();
+    for (const char* type : {"time_distance", "outing", "scatter", "histogram", "channel_report",
+                             "time_report", "track_position", "values_list", "gauge_numeric", "gauge_bar"}) {
+        INFO("component type " << type);
+        CHECK(schemas.count(std::string("components/") + type + "-1") == 1);
+    }
+}
+
+TEST_CASE("schemas: the shipped workbooks' component bodies validate against their component schemas",
+          "[unit]") {
+    const auto schemas = loadSchemas();
+    std::size_t checked = 0;
+    for (const auto& path : sortedFiles(schemasDir().parent_path() / "data" / "workbooks", ".json")) {
+        const json workbook = readJson(path);
+        for (const json& sheet : workbook.at("worksheets")) {
+            for (const json& c : sheet.value("components", json::array())) {
+                const std::string id = "components/" + c.at("type").get<std::string>() + "-" +
+                                       std::to_string(c.value("version", 1));
+                INFO(path.filename().string() << " " << id);
+                const auto schema = schemas.find(id);
+                REQUIRE(schema != schemas.end());
+                nlohmann::json_schema::json_validator validator;
+                validator.set_root_schema(schema->second);
+                CollectingErrors errors;
+                validator.validate(c.value("body", json::object()), errors);
+                INFO(errors.describe());
+                CHECK(errors.errors.empty());
+                ++checked;
+            }
+        }
     }
     CHECK(checked > 0);
 }

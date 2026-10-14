@@ -1,0 +1,207 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:components/histogram-1",
+  "title": "histogram component body",
+  "description": "The body of a histogram component (04 section 11.2): traces, bins as a BandAxis, y mode and scale, style and layout, colour and gating channels.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "traces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["channel"],
+        "properties": {
+          "channel": {
+            "$ref": "#/definitions/channelName"
+          },
+          "visible": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "bins": {
+      "$ref": "#/definitions/bandAxis"
+    },
+    "yMode": {
+      "enum": ["count", "percent", "time"]
+    },
+    "yScale": {
+      "$ref": "#/definitions/scaleSpec"
+    },
+    "excludeUntrusted": {
+      "type": "boolean"
+    },
+    "stackLines": {
+      "type": "boolean"
+    },
+    "style": {
+      "enum": ["bar", "line", "text"]
+    },
+    "layout": {
+      "enum": ["overlapped", "tiled"]
+    },
+    "tileCols": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 32
+    },
+    "binLabelStep": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
+    },
+    "condensedAxes": {
+      "type": "boolean"
+    },
+    "colourChannel": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "channel": {
+          "$ref": "#/definitions/channelName"
+        },
+        "axis": {
+          "description": "null: no colour channel.",
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/definitions/bandAxis"
+            }
+          ]
+        }
+      }
+    },
+    "gating": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "channel": {
+          "$ref": "#/definitions/channelName"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "bandAxis": {
+      "description": "BandAxis (04 section 7.3): the definition of a band axis, never the generated bands. even: bands from dataMin/dataMax and bandWidth (bandMode width) or bandCount (count); arbitrary: bands[] as written. lessMinBand/greaterMaxBand add open bands outside [dataMin, dataMax].",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": ["even", "arbitrary"]
+        },
+        "bandMode": {
+          "enum": ["width", "count"]
+        },
+        "dataMin": {
+          "description": "Absent: the channel's scale.",
+          "$ref": "#/definitions/unitValue"
+        },
+        "dataMax": {
+          "$ref": "#/definitions/unitValue"
+        },
+        "bandWidth": {
+          "$ref": "#/definitions/unitValue"
+        },
+        "bandCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "palette": {
+          "description": "Palette name of the scheme (\"rainbow\", \"twoColour\", ...).",
+          "type": "string"
+        },
+        "colour1": {
+          "$ref": "#/definitions/colour"
+        },
+        "colour2": {
+          "$ref": "#/definitions/colour"
+        },
+        "reverse": {
+          "type": "boolean"
+        },
+        "centred": {
+          "type": "boolean"
+        },
+        "lessMinBand": {
+          "type": "boolean"
+        },
+        "greaterMaxBand": {
+          "type": "boolean"
+        },
+        "continuous": {
+          "type": "boolean"
+        },
+        "bands": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["min", "max"],
+            "properties": {
+              "min": {
+                "$ref": "#/definitions/unitValue"
+              },
+              "max": {
+                "$ref": "#/definitions/unitValue"
+              },
+              "colour": {
+                "$ref": "#/definitions/colour"
+              }
+            }
+          }
+        }
+      }
+    },
+    "channelName": {
+      "description": "A channel as the workbook names it (D-013: resolved through mappings, aliases, case folding and the logged name); \"\" where the member is optional means none.",
+      "type": "string"
+    },
+    "colour": {
+      "description": "A colour \"#rrggbb\" (alpha ff) or \"#rrggbbaa\"; written in lower case (Rgba, 04 section 5.1).",
+      "type": "string",
+      "pattern": "^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$"
+    },
+    "scaleSpec": {
+      "description": "A scale (04 sections 8.3, 10.2, 11.2, 17): channel = the channel override or the autoscale, auto = from the data shown, manual = min and max as written.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": ["channel", "auto", "manual"]
+        },
+        "min": {
+          "$ref": "#/definitions/unitValue"
+        },
+        "max": {
+          "$ref": "#/definitions/unitValue"
+        }
+      }
+    },
+    "unitSymbolOrEmpty": {
+      "description": "A unit symbol or alias of the unit registry (units-1), or \"\" for the unitless unit; no leading or trailing white space.",
+      "type": "string",
+      "pattern": "^(\\S(.*\\S)?)?$"
+    },
+    "unitValue": {
+      "description": "A persisted number with its unit (D-010): {\"v\": number, \"unit\": symbol}, \"\" for a unitless value. The value is in the unit as written; readers convert, writers keep the written unit.",
+      "type": "object",
+      "required": ["v", "unit"],
+      "properties": {
+        "v": {
+          "type": "number"
+        },
+        "unit": {
+          "$ref": "#/definitions/unitSymbolOrEmpty"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

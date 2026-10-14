@@ -24,6 +24,12 @@
 // 500 ms by a Background task (02 section 4 sidecar rule 4; edits in between coalesce into one write, a later
 // document never loses to an earlier write), or at once when the source closes or the loader goes (D-190).
 // connectSourceLoader() wires the loader to the selection and the Messages dock.
+// M3 (the track work, D-195, D-199): with setTrackMaps, phase 2 also builds the Track Sections groups
+// (RuleRunner::runPhase2 with the source's venue map and the laps' DistanceIndexes from the DistanceService,
+// each lap measured forward from a BCN start or backwards from its end beacon) and merges them into the
+// newest snapshot with the same marker set; it runs again when the venue's map changes
+// (TrackMapService::mapChanged) and when more lap indexes are ready (DistanceService::distanceReady). Its
+// task key gains /t<map generation>/i<indexed laps> while a map is bound.
 //
 // M2 (07 section 5.1, 05 sections 2 and 8.1, 06 section 13.8): the MappingPanel hand-off. With the hand-off
 // on, open() submits task A through ImporterRegistry::load with a MappingHook; an open whose step 4 leaves
@@ -84,6 +90,7 @@ class Dispatcher;
 class DistanceService;
 class MathsService;
 class MessagesModel;
+class TrackMapService;
 
 class SourceLoader final : public QObject {
     Q_OBJECT
@@ -98,7 +105,9 @@ public:
     const analysis::RuleRunner& ruleRunner() const noexcept { return rules_; }
     // Optional services a published source is registered with (built-in maths prefetch, AC-M1-10).
     void setMathsService(MathsService* maths);
-    void setDistanceService(DistanceService* distance) { distance_ = distance; }
+    void setDistanceService(DistanceService* distance);
+    // M3: the track maps phase 2 builds the Track Sections groups from (null: none, the M2 behaviour).
+    void setTrackMaps(TrackMapService* maps);
     // Read <log>.<ext>.sidecar.json on open and write it on commitSidecar (default true; tests turn it off).
     void setUseSidecars(bool on) { useSidecars_ = on; }
     // Asynchronous; one sourcePublished() or openFailed() per call.
@@ -185,6 +194,9 @@ private:
     void published(const std::filesystem::path& path, std::shared_ptr<const model::DataSource> source,
                    std::vector<formats::ImportLogEntry> log);
     void startPhase2(const model::SourceId& source, const std::string& layer);
+    // Phase 2 again for every layer of the open sources whose venue is `venue` (all of them when nullopt).
+    void restartPhase2(const std::optional<std::string>& venue);
+    bool hasTrackSectionsRule() const;
     void phase2Finished(const std::shared_ptr<const model::DataSource>& annotated,
                         const std::string& canonical, const std::string& markers, const std::string& run,
                         std::optional<model::RangeGroupTree> tree);
@@ -202,6 +214,8 @@ private:
     analysis::RuleRunner rules_;
     MathsService* maths_ = nullptr;
     DistanceService* distance_ = nullptr;
+    TrackMapService* trackMaps_ = nullptr;
+    std::uint64_t trackGeneration_ = 1; // bumps on every map change: part of the phase-2 key
     bool useSidecars_ = true;
     int pending_ = 0;
     std::vector<std::shared_ptr<const model::DataSource>> open_; // open order

@@ -11,12 +11,16 @@
 // without the phase-2 annotations (an annotation never bumps a version), and a range whose id, start and end
 // are unchanged keeps its previous stint and pitStop until phase 2 lands again. It replaces esses_model's
 // rebuildWholeOutingRanges as the DataSource::RangeRebuild of every snapshot from M1 on (esses-cli laps,
-// SourceLoader, sidecar edits). Phase 2 (beacon-pair stint and pitStop annotations) runs on a worker under
-// the task key ranges/<sourceId>/<layer>/<markerSetHash> and returns the annotated tree for the GUI to
-// publish; it keeps every group version.
+// SourceLoader, sidecar edits). Phase 2 (beacon-pair stint and pitStop annotations; with a track map, the
+// Track Sections groups) runs on a worker under the task key ranges/<sourceId>/<layer>/<markerSetHash> and
+// returns the annotated tree for the GUI to publish; it keeps every other group version. Phase 1 keeps the
+// Track Sections groups of the previous tree while the laps group they were built under is unchanged
+// (ignoring annotations): an edit that leaves the laps as they were does not drop them.
 #pragma once
 
 #include <esses/analysis/range_rule.hpp>
+#include <esses/analysis/track_map.hpp>
+#include <esses/analysis/track_sections_rule.hpp>
 #include <esses/base/cancel.hpp>
 #include <esses/base/result.hpp>
 #include <esses/model/range.hpp>
@@ -64,6 +68,16 @@ public:
     Result<model::RangeGroupTree> runPhase2(const model::DataSource& src, std::string_view layer,
                                             const std::optional<store::Series>& speed,
                                             const CancelToken& cancel) const;
+    // Phase 2 with the track-sections pass (02 section 4.5): the annotations as above, then for every
+    // TrackSectionsRule that applies to the layer the groups under its sets' parent ("Outings:Laps:Track
+    // Sections") are replaced by TrackSectionsRule::sections over `trackMap` with the lap indexes of
+    // `indexOf` (a null map removes them). A Track Sections group keeps the version of the same path in the
+    // layer's tree when its ranges are unchanged and bumps it otherwise (1 when new, D-140); no other group
+    // version changes. NotFound for an unknown layer; Cancelled.
+    Result<model::RangeGroupTree> runPhase2(const model::DataSource& src, std::string_view layer,
+                                            const std::optional<store::Series>& speed,
+                                            const std::shared_ptr<const TrackMap>& trackMap,
+                                            const LapIndexLookup& indexOf, const CancelToken& cancel) const;
 
     std::span<const std::shared_ptr<const IRangeRule>> rules() const noexcept { return rules_; }
 

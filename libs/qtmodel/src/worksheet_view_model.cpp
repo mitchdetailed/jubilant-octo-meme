@@ -588,9 +588,41 @@ void WorksheetViewModel::setOffsetAxis(bool on) {
 }
 
 void WorksheetViewModel::offsetRange(const model::RangeRef& r, int steps) {
-    const double step = state_.domain == plot::Domain::Time ? static_cast<double>(activeSamplePeriod())
+    const double step = state_.domain == plot::Domain::Time ? static_cast<double>(samplePeriodOf(r.src))
                                                             : analysis::DistanceIndex::kStepM;
     dragOffset(r, step * steps);
+}
+
+Micros WorksheetViewModel::samplePeriodOf(const model::SourceId& source) const {
+    const auto it = sourcePeriods_.find(source);
+    return it != sourcePeriods_.end() && it->second > 0 ? it->second : activeSamplePeriod();
+}
+
+void WorksheetViewModel::setSourceSamplePeriod(const model::SourceId& source, Micros periodUs) {
+    if (periodUs > 0) {
+        sourcePeriods_[source] = periodUs;
+    } else {
+        sourcePeriods_.erase(source);
+    }
+}
+
+void WorksheetViewModel::offsetRangeBy(const model::RangeRef& r, double amount) {
+    dragOffset(r, amount);
+}
+
+void WorksheetViewModel::beginOffsetDrag() {
+    ++offsetDragDepth_;
+    offsetTimer_->stop();
+}
+
+void WorksheetViewModel::endOffsetDrag() {
+    if (offsetDragDepth_ > 0) {
+        --offsetDragDepth_;
+    }
+    if (offsetDragDepth_ == 0) {
+        offsetTimer_->stop();
+        commitOffsets();
+    }
 }
 
 void WorksheetViewModel::dragOffset(const model::RangeRef& r, double delta) {
@@ -607,7 +639,9 @@ void WorksheetViewModel::dragOffset(const model::RangeRef& r, double delta) {
     it->second += delta;
     state_.offsetAxis = true;
     ++state_.version;
-    offsetTimer_->start();
+    if (offsetDragDepth_ == 0) {
+        offsetTimer_->start();
+    }
     Q_EMIT changed(plot::mask(plot::Change::Offsets));
 }
 

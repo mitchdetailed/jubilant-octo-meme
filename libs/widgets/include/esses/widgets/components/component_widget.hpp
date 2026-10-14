@@ -11,8 +11,8 @@
 //
 // WorksheetContext (06 section 4.4) gives a component its WorksheetViewModel, DataSelectionModel,
 // MathsService, RenderService, scheme and CommandRegistry. Registration: registerBuiltinComponents()
-// (components/ builtin_components.cpp) registers the M1 types time_distance and values_list; nothing
-// registers itself statically (static-library initialisers are dropped by the linker).
+// (components/ builtin_components.cpp) registers the ten MVP types (since the M3 contract); nothing registers
+// itself statically (static-library initialisers are dropped by the linker).
 //
 // Wiring (M1): the base class connects itself to its context, so the shell forwards nothing:
 //   WorksheetViewModel::changed        -> onViewChanged(view.state(), mask) without the Size bit (the
@@ -47,6 +47,7 @@
 #include <QPointF>
 #include <QString>
 #include <QStringList>
+#include <QVariant>
 #include <QWidget>
 #include <cstdint>
 #include <functional>
@@ -124,7 +125,7 @@ public:
     virtual QStringList contextCommands() const; // command ids of the Component menu / context menu
     virtual bool exportData(ExportSink& sink, const ExportOptions& options) const;
     virtual QImage renderToImage(qreal dpr) const; // Print to Clipboard: current layers, never blocks
-    virtual void openProperties(int tabIndex = 0); // F5 / CTRL+N (PropertiesDialog in M3)
+    virtual void openProperties(int tabIndex = 0); // F5 / CTRL+N: PropertiesDialog::openFor (M3)
     // Added in M1: the first context of the key chain while this component has the focus (06 section 14.2:
     // Graph for time_distance, Summary/Track for the later types); Component by default.
     virtual qt::CommandContext commandContext() const;
@@ -136,6 +137,15 @@ public:
     // rubber band). Returns true when there was one; the shell offers ESC here before view.return_focus.
     // False by default.
     virtual bool cancelTransient();
+    // Added in M3 (06 section 14.4 "Components general" and the graph, summary and track rows): a command
+    // the shell offers the focused component first (zoom.v_in, pan.up, track.zoom_in,
+    // graph.copy_cursor_values, component.export_data, ...). True when the component handled it. False by
+    // default: the shell then applies its generic behaviour (the body toggles and cycles of L, K, G, S,
+    // ALT+n, F3, M, E, SHIFT+E, Y; widgets src/properties_shell/component_commands.cpp) or tells the user the
+    // component has no such command.
+    virtual bool handleCommand(const QString& id, const QVariantList& args);
+    // Added in M3: the caption bar height in logical px (the canvas's move zone, the maximise zone).
+    int captionBarHeight() const { return captionHeight(); }
 
     WorksheetContext& context() noexcept { return context_; }
 
@@ -180,7 +190,7 @@ private:
     bool focusedComponent_ = false;
 };
 
-// Registers the M1 component types (time_distance, values_list). Idempotent.
+// Registers the ten MVP component types (04 sections 8-17). Idempotent.
 void registerBuiltinComponents();
 
 } // namespace esses::widgets

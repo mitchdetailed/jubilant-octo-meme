@@ -283,6 +283,12 @@ inline const SyntheticSource& sourceOf(const Fixture& fx, char id) {
     return id == 'a' ? fx.a : (id == 'b' ? fx.b : fx.c);
 }
 
+// The M1 cases draw what M1 drew: the M3 bands and scrollbars, shown by default since M3 (04 section 8.14),
+// are switched off in their bodies, so their goldens did not change with the M3 builder.
+inline std::string m1Display() {
+    return R"("showBands":false,"showMarkers":false,"axis":{"showXScrollbar":false,"showYScrollbar":false})";
+}
+
 inline std::vector<GoldenCase> goldenCases(const Fixture& fx) {
     const std::string speedGroup =
         R"({"name":"Speed","scaleMode":"channel","traces":[{"channel":"Corr Speed","displayUnit":"km/h","dps":1}]})";
@@ -295,8 +301,8 @@ inline std::vector<GoldenCase> goldenCases(const Fixture& fx) {
         c.name = "single_trace";
         c.zoom = {0.0, 60.0 * 1e6};
         c.cursorT = 20 * kSec;
-        c.body = R"({"display":{"traceStyle":"line","lineWidth":1,"showGrid":true},"groups":[)" + speedGroup +
-                 "]}";
+        c.body = R"({"display":{"traceStyle":"line","lineWidth":1,"showGrid":true,)" + m1Display() +
+                 R"(},"groups":[)" + speedGroup + "]}";
         c.activeChannel = "Corr Speed";
         c.slots = {{'a', 0, SlotKind::Main, 0}};
         cases.push_back(c);
@@ -319,7 +325,7 @@ inline std::vector<GoldenCase> goldenCases(const Fixture& fx) {
             }
             groups += "]}";
         }
-        c.body = R"({"groups":[)" + groups + "]}";
+        c.body = R"({"display":{)" + m1Display() + R"(},"groups":[)" + groups + "]}";
         c.activeChannel = "Ch 07";
         c.slots = {{'a', 0, SlotKind::Main, 0}};
         cases.push_back(c);
@@ -329,7 +335,8 @@ inline std::vector<GoldenCase> goldenCases(const Fixture& fx) {
         c.name = "like_units_group";
         c.zoom = {0.0, 60.0 * 1e6};
         c.cursorT = 31 * kSec;
-        c.body = R"({"groups":[{"name":"Speed","scaleMode":"channel","traces":[{"channel":"Corr Speed"},)"
+        c.body = R"({"display":{)" + m1Display() +
+                 R"(},"groups":[{"name":"Speed","scaleMode":"channel","traces":[{"channel":"Corr Speed"},)"
                  R"({"channel":"Ground Speed"}]}]})";
         c.activeChannel = "Ground Speed";
         c.slots = {{'a', 0, SlotKind::Main, 0}};
@@ -340,7 +347,8 @@ inline std::vector<GoldenCase> goldenCases(const Fixture& fx) {
         c.name = "two_panels";
         c.zoom = {5.0 * 1e6, 45.0 * 1e6};
         c.cursorT = 22'500'000;
-        c.body = R"({"groups":[)" + speedGroup.substr(0, speedGroup.size() - 1) + R"(,"edges":[0,0.6]},)" +
+        c.body = R"({"display":{)" + m1Display() + R"(},"groups":[)" +
+                 speedGroup.substr(0, speedGroup.size() - 1) + R"(,"edges":[0,0.6]},)" +
                  throttleGroup.substr(0, throttleGroup.size() - 1) + R"(,"edges":[0.6,1]}]})";
         c.activeChannel = "Throttle Pos";
         c.slots = {{'a', 1, SlotKind::Main, 0}};
@@ -353,7 +361,8 @@ inline std::vector<GoldenCase> goldenCases(const Fixture& fx) {
         const auto chain = fx.a.chainFor(fx.a.laps[1].start);
         c.zoom = {0.0, chain->distAt(fx.a.laps[1].end)};
         c.cursorT = 30 * kSec;
-        c.body = R"({"groups":[)" + speedGroup + "," + throttleGroup + "]}";
+        c.body =
+            R"({"display":{)" + m1Display() + R"(},"groups":[)" + speedGroup + "," + throttleGroup + "]}";
         c.activeChannel = "Corr Speed";
         c.slots = {{'a', 1, SlotKind::Main, 0}, {'b', 1, SlotKind::Overlay, 1}};
         cases.push_back(c);
@@ -365,7 +374,8 @@ inline std::vector<GoldenCase> goldenCases(const Fixture& fx) {
         c.zoom = {5.0 * 1e6, 45.0 * 1e6};
         c.cursorT = 22'500'000;
         c.datumT = 10 * kSec;
-        c.body = R"({"display":{"key":{"pos":"right"}},"groups":[)" + speedGroup + "," + throttleGroup + "]}";
+        c.body = R"({"display":{"key":{"pos":"right"},)" + m1Display() + R"(},"groups":[)" + speedGroup +
+                 "," + throttleGroup + "]}";
         c.activeChannel = "Corr Speed";
         c.slots = {{'a', 1, SlotKind::Main, 0}, {'b', 1, SlotKind::Overlay, 1}};
         cases.push_back(c);
@@ -377,7 +387,7 @@ inline std::vector<GoldenCase> goldenCases(const Fixture& fx) {
         c.cursorT = 40 * kSec;
         c.singleColourMain = true;
         c.body =
-            R"({"groups":[)" + speedGroup +
+            R"({"display":{)" + m1Display() + R"(},"groups":[)" + speedGroup +
             R"(,{"name":"Gear","scaleMode":"manual","scaleMin":0,"scaleMax":7,"traces":[{"channel":"Gear"}]}]})";
         c.activeChannel = "Gear";
         c.slots = {{'a', 0, SlotKind::Main, 0},
@@ -394,7 +404,7 @@ inline std::vector<GoldenCase> goldenCases(const Fixture& fx) {
         c.focused = true;
         c.zoom = {0.0, 1500.0};
         c.cursorT = 12 * kSec;
-        c.body = R"({"groups":[)" + speedGroup + "]}";
+        c.body = R"({"display":{)" + m1Display() + R"(},"groups":[)" + speedGroup + "]}";
         c.activeChannel = "Corr Speed";
         c.slots = {{'a', 0, SlotKind::Main, 0}, {'c', 0, SlotKind::Overlay, 1}};
         cases.push_back(c);

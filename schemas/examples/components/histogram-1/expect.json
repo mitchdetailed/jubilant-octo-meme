@@ -1,0 +1,10 @@
+{
+  "bad-y-mode.json": {
+    "pointer": "/yMode",
+    "why": "the y mode is count, percent or time"
+  },
+  "bins-without-unit.json": {
+    "pointer": "/bins/bandWidth",
+    "why": "a band width carries its unit"
+  }
+}

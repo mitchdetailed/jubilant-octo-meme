@@ -1,0 +1,120 @@
+{
+  "generator": {
+    "tool": "tools/gen_track_fixtures.py",
+    "version": "1.0.0",
+    "seed": 20261014
+  },
+  "licence": "CC0-1.0",
+  "origin": {
+    "lat": 45.0612,
+    "lon": 7.4287,
+    "alt": 250.0
+  },
+  "frame": "ENU metres about origin (local tangent plane of the WGS-84 ellipsoid at origin.alt)",
+  "lengthM": 2975.1576,
+  "direction": "ccw",
+  "headingAtStartDeg": 20.0,
+  "lap": {
+    "startUs": 1000000,
+    "endUs": 74807897,
+    "signalEndUs": 75807897
+  },
+  "corners": [
+    {
+      "name": "T1",
+      "angleDeg": 90.0,
+      "radiusM": 50.0,
+      "startM": 200.0,
+      "endM": 293.5398,
+      "apexM": 246.7699
+    },
+    {
+      "name": "T2",
+      "angleDeg": -40.0,
+      "radiusM": 110.0,
+      "startM": 638.2835,
+      "endM": 730.078,
+      "apexM": 684.1808
+    },
+    {
+      "name": "T3",
+      "angleDeg": 130.0,
+      "radiusM": 40.0,
+      "startM": 850.078,
+      "endM": 955.8352,
+      "apexM": 902.9566
+    },
+    {
+      "name": "T4",
+      "angleDeg": 160.0,
+      "radiusM": 18.0,
+      "startM": 1849.8922,
+      "endM": 1910.1577,
+      "apexM": 1880.0249
+    },
+    {
+      "name": "T5",
+      "angleDeg": -70.0,
+      "radiusM": 90.0,
+      "startM": 1990.1577,
+      "endM": 2115.1134,
+      "apexM": 2052.6355
+    },
+    {
+      "name": "T6",
+      "angleDeg": 60.0,
+      "radiusM": 70.0,
+      "startM": 2413.8892,
+      "endM": 2502.193,
+      "apexM": 2458.0411
+    },
+    {
+      "name": "T7",
+      "angleDeg": 42.0,
+      "radiusM": 120.0,
+      "startM": 2622.193,
+      "endM": 2725.1576,
+      "apexM": 2673.6753
+    }
+  ],
+  "kinks": [
+    {
+      "name": "K1",
+      "angleDeg": -12.0,
+      "radiusM": 400.0,
+      "startM": 2215.1134,
+      "endM": 2313.8892,
+      "apexM": 2264.5013
+    }
+  ],
+  "lines": {
+    "halfWidthM": 6.0,
+    "inner": "left (inside of the ccw loop)",
+    "outer": "right"
+  },
+  "gps": {
+    "rateHz": 10,
+    "noiseSigmaM": 1.5,
+    "noise": "white, each ENU axis",
+    "dropout": {
+      "startUs": 61931350,
+      "endUs": 63931350,
+      "file": "lap.gps.csv"
+    }
+  },
+  "imu": {
+    "rateHz": 50,
+    "speedScale": 1.008,
+    "speedSigmaMps": 0.05,
+    "latAccelSigmaMps2": 0.25,
+    "latAccelBiasMps2": 0.08,
+    "latAccelSign": "positive to the left (ISO 8855)"
+  },
+  "profile": {
+    "latGripMps2": 15.0,
+    "brakeMps2": 14.0,
+    "tractionMps2": 6.0,
+    "topSpeedMps": 75.0,
+    "lapTimeS": 73.807897
+  }
+}

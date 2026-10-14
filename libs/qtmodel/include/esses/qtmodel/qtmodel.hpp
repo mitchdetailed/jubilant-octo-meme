@@ -22,9 +22,11 @@
 #include <esses/qtmodel/messages_model.hpp>
 #include <esses/qtmodel/project_session.hpp>
 #include <esses/qtmodel/render_service.hpp>
+#include <esses/qtmodel/report_model.hpp>
 #include <esses/qtmodel/session_restore.hpp>
 #include <esses/qtmodel/settings_store.hpp>
 #include <esses/qtmodel/source_loader.hpp>
+#include <esses/qtmodel/track_map_service.hpp>
 #include <esses/qtmodel/undo_commands.hpp>
 #include <esses/qtmodel/values_model.hpp>
 #include <esses/qtmodel/worksheet_view_model.hpp>

@@ -1,0 +1,102 @@
+{
+    "activeChannel": "Corr Speed",
+    "body": {
+        "display": {
+            "axis": {
+                "showXScrollbar": false,
+                "showYScrollbar": false
+            },
+            "showBands": false,
+            "showMarkers": false,
+            "variance": {
+                "heightFrac": 0.25,
+                "show": true
+            }
+        },
+        "groups": [
+            {
+                "name": "Speed",
+                "scaleMode": "channel",
+                "traces": [
+                    {
+                        "channel": "Corr Speed",
+                        "displayUnit": "km/h",
+                        "dps": 1
+                    }
+                ]
+            },
+            {
+                "name": "Throttle",
+                "scaleMax": {
+                    "unit": "%",
+                    "v": 100
+                },
+                "scaleMin": {
+                    "unit": "%",
+                    "v": 0
+                },
+                "scaleMode": "manual",
+                "traces": [
+                    {
+                        "channel": "Throttle Pos"
+                    }
+                ]
+            }
+        ]
+    },
+    "case": "variance_distance",
+    "cursorUs": 30000000,
+    "data": "libs/plotcore/tests/td_m3_cases.hpp (the synthetic sources of td_golden_cases.hpp with laps, track sections, markers, device events, status channels, annotations and lap distance indexes)",
+    "datumUs": null,
+    "domain": "distance",
+    "dprs": [
+        1,
+        2
+    ],
+    "focused": false,
+    "fonts": "tests/golden/fonts (Noto Sans), QtTextMetrics",
+    "offsetAxis": false,
+    "overrideLimitsBase": {
+    },
+    "pendingStripe": false,
+    "scheme": "Test Light",
+    "shows": "F3 in distance mode: dt(d) of Overlay 0 and Overlay 1 against Main in their key colours",
+    "sizeLogical": [
+        440,
+        320
+    ],
+    "slots": [
+        {
+            "distanceData": true,
+            "kind": "Main",
+            "lap": 1,
+            "number": 0,
+            "offsetM": 0,
+            "offsetUs": 0,
+            "source": "synthetic_a.ld"
+        },
+        {
+            "distanceData": true,
+            "kind": "Overlay0",
+            "lap": 1,
+            "number": 0,
+            "offsetM": 0,
+            "offsetUs": 0,
+            "source": "synthetic_b.ld"
+        },
+        {
+            "distanceData": true,
+            "kind": "Overlay",
+            "lap": 2,
+            "number": 1,
+            "offsetM": 0,
+            "offsetUs": 0,
+            "source": "synthetic_a.ld"
+        }
+    ],
+    "type": "time_distance",
+    "zoom": [
+        0,
+        2798.25308933258
+    ]
+}

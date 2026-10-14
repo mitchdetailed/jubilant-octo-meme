@@ -186,13 +186,14 @@ private Q_SLOTS:
             for (QAction* a : w.mainToolBar().actions()) {
                 ids << (a->isSeparator() ? QStringLiteral("|") : a->objectName());
             }
-            QCOMPARE(ids, (QStringList{QStringLiteral("file.open_log"), QStringLiteral("file.save_project"),
-                                       QStringLiteral("|"), QStringLiteral("data.toggle_domain"),
-                                       QStringLiteral("data.overlays_toggle"),
-                                       QStringLiteral("data.single_colour_main"),
-                                       QStringLiteral("data.lap_stretch_toggle"), QStringLiteral("|"),
-                                       QStringLiteral("schemeSelector"), QStringLiteral("|"),
-                                       QStringLiteral("edit.undo"), QStringLiteral("edit.redo")}));
+            QCOMPARE(ids,
+                     (QStringList{QStringLiteral("file.open_log"), QStringLiteral("file.save_project"),
+                                  QStringLiteral("|"), QStringLiteral("data.toggle_domain"),
+                                  QStringLiteral("data.overlays_toggle"),
+                                  QStringLiteral("data.single_colour_main"),
+                                  QStringLiteral("data.lap_stretch_toggle"), QStringLiteral("data.animate"),
+                                  QStringLiteral("|"), QStringLiteral("schemeSelector"), QStringLiteral("|"),
+                                  QStringLiteral("edit.undo"), QStringLiteral("edit.redo")}));
             QVERIFY(w.actions().action(QStringLiteral("data.toggle_domain"))->isCheckable());
             QAction* overlays = w.actions().action(QStringLiteral("data.overlays_toggle"));
             QVERIFY(overlays->isCheckable());
@@ -207,12 +208,14 @@ private Q_SLOTS:
             QVERIFY(!print->isEnabled());
             QVERIFY(print->toolTip().contains(QStringLiteral("planned for v1.0")));
             QVERIFY(w.commands().dumpJson().contains(QStringLiteral("\"view.data_window\"")));
-            // The docks with their 06 section 3.2 defaults (M1, and Channel Status from M2).
+            // The docks with their 06 section 3.2 defaults (M1, Channel Status from M2, Track Map from M3).
             QCOMPARE(w.docks().dockIds(),
-                     (QStringList{kData, kChannels, kValues, kMessages, QStringLiteral("channelstatus")}));
+                     (QStringList{kData, kChannels, kValues, kMessages, QStringLiteral("channelstatus"),
+                                  QStringLiteral("trackmap")}));
             QCOMPARE(w.docks().state(kData), DockState::Docked);
             QCOMPARE(w.docks().state(kMessages), DockState::AutoHide);
             QCOMPARE(w.docks().state(QStringLiteral("channelstatus")), DockState::Closed);
+            QCOMPARE(w.docks().state(QStringLiteral("trackmap")), DockState::AutoHide);
             // The shipped workbook: two worksheets, "Overlay" active (its activeWorksheet), components
             // placed.
             QCOMPARE(w.worksheetCount(), 2);

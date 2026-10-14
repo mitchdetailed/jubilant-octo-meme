@@ -35,6 +35,10 @@
 #include <string>
 #include <vector>
 
+namespace esses::qt {
+class ProjectSession;
+} // namespace esses::qt
+
 namespace esses::widgets::cmptest {
 
 std::filesystem::path repoRoot();
@@ -67,8 +71,10 @@ project::ComponentSpec valuesListSpec(const std::vector<std::string>& channels, 
 // The qtmodel services of one workspace with one worksheet, and its WorksheetContext.
 struct World {
     // markGuiThreadNoBlock: the calling (GUI) thread carries ThreadRole::NoBlock (AC-M1-12); the caller
-    // resets the role after the World is gone.
-    explicit World(const std::string& domain = "time", bool markGuiThreadNoBlock = false);
+    // resets the role after the World is gone. `session` (optional) is the selection's project session (its
+    // channel overrides reach the graphs).
+    explicit World(const std::string& domain = "time", bool markGuiThreadNoBlock = false,
+                   qt::ProjectSession* session = nullptr);
     ~World();
     World(const World&) = delete;
     World& operator=(const World&) = delete;

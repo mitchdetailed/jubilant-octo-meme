@@ -156,8 +156,8 @@ TEST_CASE("keymap: the shipped default holds every row of the 06 section 14.4 ta
     CHECK(keysOf("view.channel_status", "global").empty());
 }
 
-TEST_CASE("keymap: hotkey batch 1 is implemented in M1, M2 rows as they land, every other row is planned or "
-          "reserved",
+TEST_CASE("keymap: hotkey batch 1 is implemented in M1, M2 and M3 rows as they land, every other row is "
+          "planned or reserved",
           "[unit]") {
     const Keymap k = shipped();
     const std::set<std::string> batch1Areas{"view", "data", "zoom", "pan", "cursor", "datum"};
@@ -167,9 +167,10 @@ TEST_CASE("keymap: hotkey batch 1 is implemented in M1, M2 rows as they land, ev
         CHECK_FALSE(b.doc.empty());
         switch (b.status) {
         case KeymapStatus::Implemented:
-            // The closed milestone (M1) or the one in progress (M2), whose rows turn implemented as they land
-            // (tools/check_keymap_coverage.py); a menu-only M2 row may have no key (06 section 14.3).
-            CHECK((b.milestone == "M1" || b.milestone == "M2"));
+            // A closed milestone (M1, M2) or the one in progress (M3), whose rows turn implemented as they
+            // land (tools/check_keymap_coverage.py); a menu-only or mouse row of M2/M3 may have no key (06
+            // section 14.3).
+            CHECK((b.milestone == "M1" || b.milestone == "M2" || b.milestone == "M3"));
             if (b.milestone == "M1") {
                 implemented.insert(b.command);
                 CHECK(batch1Areas.count(b.command.substr(0, b.command.find('.'))) == 1);
@@ -232,9 +233,9 @@ TEST_CASE("keymap: hotkey batch 1 is implemented in M1, M2 rows as they land, ev
          {"view.data_window", "data.select_fastest", "data.toggle_overlay", "data.toggle_domain"}) {
         CHECK(implemented.count(id) == 1);
     }
-    // Summary-context rows of batch-1 commands wait for the summary components (M3).
+    // Summary-context rows of batch-1 commands landed with the summary components (M3).
     for (const KeyBinding* b : k.rowsFor("zoom.in")) {
-        CHECK(b->status == (b->context == "graph" ? KeymapStatus::Implemented : KeymapStatus::Planned));
+        CHECK(b->status == KeymapStatus::Implemented);
     }
 }
 

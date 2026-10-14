@@ -1,0 +1,131 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:components/gauge_bar-1",
+  "title": "gauge_bar component body",
+  "description": "The body of a gauge_bar component (04 section 17 item 5): one channel, the scale, orientation and origin, the bar colour, the scale labels and the colour bands.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "channel": {
+      "$ref": "#/definitions/channelName"
+    },
+    "displayUnit": {
+      "$ref": "#/definitions/unitSymbolOrEmpty"
+    },
+    "scale": {
+      "$ref": "#/definitions/scaleSpec"
+    },
+    "orientation": {
+      "enum": ["vertical", "horizontal"]
+    },
+    "originStyle": {
+      "enum": ["min", "zero", "max", "custom"]
+    },
+    "customOrigin": {
+      "$ref": "#/definitions/unitValue"
+    },
+    "barColour": {
+      "description": "null: the channel colour.",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/definitions/colour"
+        }
+      ]
+    },
+    "scaleDps": {
+      "$ref": "#/definitions/dps"
+    },
+    "showScale": {
+      "type": "boolean"
+    },
+    "colourBands": {
+      "$ref": "#/definitions/colourBands"
+    },
+    "bandLines": {
+      "enum": ["none", "lines", "fill"]
+    },
+    "bandMode": {
+      "enum": ["none", "bar"]
+    }
+  },
+  "definitions": {
+    "channelName": {
+      "description": "A channel as the workbook names it (D-013: resolved through mappings, aliases, case folding and the logged name); \"\" where the member is optional means none.",
+      "type": "string"
+    },
+    "colour": {
+      "description": "A colour \"#rrggbb\" (alpha ff) or \"#rrggbbaa\"; written in lower case (Rgba, 04 section 5.1).",
+      "type": "string",
+      "pattern": "^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$"
+    },
+    "colourBands": {
+      "description": "ColourBands (04 section 7.3): ALT+n toggles band n; open extends a band below min or above max.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "min": {
+            "$ref": "#/definitions/unitValue"
+          },
+          "max": {
+            "$ref": "#/definitions/unitValue"
+          },
+          "open": {
+            "enum": ["none", "below", "above"]
+          },
+          "colour": {
+            "$ref": "#/definitions/colour"
+          },
+          "visible": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "dps": {
+      "description": "Display decimals.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 15
+    },
+    "scaleSpec": {
+      "description": "A scale (04 sections 8.3, 10.2, 11.2, 17): channel = the channel override or the autoscale, auto = from the data shown, manual = min and max as written.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": ["channel", "auto", "manual"]
+        },
+        "min": {
+          "$ref": "#/definitions/unitValue"
+        },
+        "max": {
+          "$ref": "#/definitions/unitValue"
+        }
+      }
+    },
+    "unitSymbolOrEmpty": {
+      "description": "A unit symbol or alias of the unit registry (units-1), or \"\" for the unitless unit; no leading or trailing white space.",
+      "type": "string",
+      "pattern": "^(\\S(.*\\S)?)?$"
+    },
+    "unitValue": {
+      "description": "A persisted number with its unit (D-010): {\"v\": number, \"unit\": symbol}, \"\" for a unitless value. The value is in the unit as written; readers convert, writers keep the written unit.",
+      "type": "object",
+      "required": ["v", "unit"],
+      "properties": {
+        "v": {
+          "type": "number"
+        },
+        "unit": {
+          "$ref": "#/definitions/unitSymbolOrEmpty"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

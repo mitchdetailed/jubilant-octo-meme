@@ -1,0 +1,123 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:components/gauge_numeric-1",
+  "title": "gauge_numeric component body",
+  "description": "The body of a gauge_numeric component (04 section 16 item 4): one channel, its display unit and decimals, units, the font and the colour bands that colour the text or the background.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "channel": {
+      "$ref": "#/definitions/channelName"
+    },
+    "displayUnit": {
+      "$ref": "#/definitions/unitSymbolOrEmpty"
+    },
+    "displayDps": {
+      "description": "Absent: the channel override's decimals.",
+      "$ref": "#/definitions/dps"
+    },
+    "showUnits": {
+      "type": "boolean"
+    },
+    "dynamicFont": {
+      "type": "boolean"
+    },
+    "font": {
+      "description": "null: the scheme's gauge font.",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["family", "pointSize"],
+          "properties": {
+            "family": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pointSize": {
+              "type": "number",
+              "minimum": 6,
+              "maximum": 400
+            },
+            "bold": {
+              "type": "boolean"
+            },
+            "italic": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    },
+    "colourBands": {
+      "$ref": "#/definitions/colourBands"
+    },
+    "bandMode": {
+      "enum": ["text", "background"]
+    }
+  },
+  "definitions": {
+    "channelName": {
+      "description": "A channel as the workbook names it (D-013: resolved through mappings, aliases, case folding and the logged name); \"\" where the member is optional means none.",
+      "type": "string"
+    },
+    "colour": {
+      "description": "A colour \"#rrggbb\" (alpha ff) or \"#rrggbbaa\"; written in lower case (Rgba, 04 section 5.1).",
+      "type": "string",
+      "pattern": "^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$"
+    },
+    "colourBands": {
+      "description": "ColourBands (04 section 7.3): ALT+n toggles band n; open extends a band below min or above max.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "min": {
+            "$ref": "#/definitions/unitValue"
+          },
+          "max": {
+            "$ref": "#/definitions/unitValue"
+          },
+          "open": {
+            "enum": ["none", "below", "above"]
+          },
+          "colour": {
+            "$ref": "#/definitions/colour"
+          },
+          "visible": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "dps": {
+      "description": "Display decimals.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 15
+    },
+    "unitSymbolOrEmpty": {
+      "description": "A unit symbol or alias of the unit registry (units-1), or \"\" for the unitless unit; no leading or trailing white space.",
+      "type": "string",
+      "pattern": "^(\\S(.*\\S)?)?$"
+    },
+    "unitValue": {
+      "description": "A persisted number with its unit (D-010): {\"v\": number, \"unit\": symbol}, \"\" for a unitless value. The value is in the unit as written; readers convert, writers keep the written unit.",
+      "type": "object",
+      "required": ["v", "unit"],
+      "properties": {
+        "v": {
+          "type": "number"
+        },
+        "unit": {
+          "$ref": "#/definitions/unitSymbolOrEmpty"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

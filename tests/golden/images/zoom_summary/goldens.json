@@ -1,0 +1,6 @@
+{
+    "$comment": "Provenance of the PNGs in this directory (libs/widgets/tests/properties_shell/tst_zoom_summary_bar.cpp). Pixel goldens are authoritative on ubuntu only (D-127): replace them from the qt-app ubuntu artefact and set generatedOn to linux.",
+    "generatedOn": "windows",
+    "platform": "offscreen",
+    "qt": "6.7.2"
+}

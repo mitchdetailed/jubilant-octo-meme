@@ -84,6 +84,21 @@ GCC/Clang so the `DrawList` goldens match MSVC bit for bit.
   synthetic rational data, `FixedTextMetrics`, schemes built in code) are reusable by the pixel goldens.
   `ESSES_UPDATE_GOLDENS=1` rewrites the files (they are platform independent); a mismatch writes
   `<case>@<dpr>x.actual.json` next to the test binary.
+- M3 (`m3_*_tests.cpp`, helpers in `m3_golden_support.hpp`): `m3_layout_tests.cpp` (point sets against a
+  brute-force search with ties, tags, outside and NaN points; `BandLayout` stacking, clipping, labels and hits;
+  the `KeyLayout` columns, the default columns equal to the M1 layout and DrawLists; `ScaleSpec`/`ColourBands`
+  JSON and `colourBandOf`), `m3_body_tests.cpp` (the outing, track_position, scatter and histogram bodies:
+  `parse(x).toJson() == x` for the schema examples, errors with pointers, channel order),
+  `m3_outing_track_tests.cpp` (the outing's lap band, zoom rectangle, overlays and cancellation;
+  `TrackGeometry::fit`, the origin rule of `trackDistanceAt`, sections, dots, zoom span, banners) and
+  `m3_plots_tests.cpp` (scatter frame, point-set tags, trend and equation, cursor ring, tiles, colour bands and
+  legend, density, interval average; histogram slots, sub-bars, outlined overlays, lines, text table, bin hits;
+  the end-to-end builds through `ScatterBinner` and `HistogramBinner`, which warn and skip while those are
+  stubs). **`DrawList` JSON goldens** at DPR 1 and 2 in
+  `tests/golden/drawlist/{band_layout,key_layout,outing,track_position,scatter,histogram}/`: the band and key
+  layouts from fixed rows, the outing from the synthetic sources (columns made resident first), the track from an
+  octagonal circuit with constant-speed laps, scatter and histogram from scenes computed by brute force in the
+  test (so the goldens pin the drawing independently of the binners) with bands given in the test.
 
 ## Deviations from the design documents
 
@@ -105,3 +120,164 @@ GCC/Clang so the `DrawList` goldens match MSVC bit for bit.
 - `DrawList` gained builder helpers (`clear`, `scissor`, `filledRect`, `polyline`, `lines`, `points`,
   `rectOutline`, `textRun`), `textOf` and `toJson`; `LayoutContext`, `HitResult` and
   `KeyRow`/`KeyGeometry`/`AxisSpec`/`AxisTick` are defined here (04 names them without declaring them).
+
+## M3 (07 §6.1; `docs/milestones/M3.md` §2; D-193, D-196)
+
+| Header | Contents | Design |
+|---|---|---|
+| `band_layout.hpp` | `BandCell`, `BandMarkerKind`, `BandMarker`, `BandLayoutInput`, `BandColours`, `BandGeometry`, `BandLayout` | 04 §8.1, §8.11 |
+| `key_layout.hpp` | `KeyMeasurement`, `KeyColumns`, `KeyCell`, `KeyGeometry::cellRect`/`valueLines`, the column-aware `KeyLayout::layout`, `emitDatumValues`, `emitMeasurements` | 04 §8.4, §8.7 |
+| `hit_tester.hpp` | the M3 `HitKind`/`HandleKind` values and `HitResult` members, `hitAll`, point sets (`addPoints`/`nearestPoint` with tags) | 04 §5.5, §10.1 item 7 |
+| `component_bodies.hpp` | `ChannelUse`, `componentChannelUses`, `ScaleSpec`, `BandOpen`, `ColourBand` and their JSON helpers | D-193 (f), 04 §7.3 |
+| `outing_geometry.hpp`, `track_geometry.hpp`, `scatter_geometry.hpp`, `histogram_geometry.hpp` | the bodies and the three builders of each type; `TrackFit`, `TrackGeometry::fit`/`trackDistanceAt`, `OutingGeometry::zoomRect` | 04 §9-11, §14 |
+| `gauge_geometry.hpp` | `GaugeNumericBody`, `GaugeBarBody`, `GaugeGeometry` | 04 §16-17 |
+| `draw_list.hpp` (M3), `scatter_geometry.hpp`, `histogram_geometry.hpp` | `TextRun::scale`; `ScatterExportSet`, `ScatterAxes`, `ScatterGeometry::exportSets`/`axes`; `HistogramExportColumn`, `HistogramExport`, `HistogramGeometry::exportTable` (D-198) | 04 §10.1 items 8 and 10, §11.1 item 10, §16 item 1 |
+
+`ComponentBuildInputs` gains `trackMap` (the map of the Main source's venue, filled by `esses_qtmodel`). Every
+geometry builder has `TimeDistanceBuilder`'s shape (`buildStatic` on a worker, `buildDynamic` and `buildChrome` on
+the GUI thread), so `OffscreenRenderer` and the widgets use them alike. Internal helpers live in `src/geometry/`:
+`geometry_common` (scheme roles, Quads, channel lookup, SummaryPyramid scales, unit conversion of `{v, unit}`
+limits, a slot's visible span cut per lap with its trust flag, caption / pending / focus / banner Chrome),
+`body_json.hpp` (the shared schema definitions and the "typed members written over `rest`" rule), and
+`plot_scenes.hpp` with `plot_tiles.cpp` (the scatter/histogram frame, scene and emit split and the shared tiles).
+
+As built (D-196 records the departures):
+
+- **BandLayout**: bands of round(14 x dpr) px stacked from the top, omitted when hidden; each band is filled, its
+  cells and markers clipped to it, and closed by a frame line. Cells draw their edges as ticks (a shared edge
+  once; the outing's lap boundaries); range labels are elided to their cell, section labels drawn only when they
+  fit; section fill: the cell colour, else `sectionCorner`/`sectionStraight` by category. Overlapping range cells
+  share the one row, later cells on top. Markers: beacons as ticks, annotations as rectangles, device events as
+  triangles (a Quads command). Hits: `Band` (`band` = cell index, `slot`), `Section` (`section`),
+  `Marker`/`Annotation` (`markerId`); later cells and markers win.
+- **KeyLayout**: with a datum a value line holds value@main, value@datum and delta right-aligned in that order;
+  measurements add one line per measurement under the row's value lines with min, max and avg (`Measurement`
+  style; colour 0 = the text colour). Widths add the shown cells after a pad each; when the 40 % clamp leaves no
+  room for the label the cells shrink proportionally. The default `KeyColumns` give the M1 layout exactly
+  (tested), so the value cell, `emitValues` and the M1 goldens do not move. `KeyGeometry::valueLines` records each
+  row's value lines.
+- **HitTester point sets**: finite points bucketed over the set's bounds on a 64 x 64 grid (outside points in
+  the edge buckets); a query visits the buckets of its square; ties: the lower index within a set, the later set
+  across sets; optional per-point tags.
+- **Bodies**: strict about types and enums (Invalid with a JSON pointer), tolerant about absence; `toJson` writes
+  typed members over `rest` (a member the source had is replaced, a new one only when it differs from its
+  default), and a BandAxis that reads back unchanged keeps the source's form, so `parse(x).toJson() == x`.
+  Limits are `{v, unit}`.
+- **Outing**: whole-outing x (time since the outing start, or metres through the Main chain re-origined there);
+  its own layout (caption, the lap band over the trace area, key column, 36 px axis strip, panels by `edges`, x
+  axis), independent of `TimeDistanceBuilder::layoutOf`; traces from `decimateSummary` only; laps from the
+  source's `Outings:Laps` group, else the chain pieces, else the Main range (the Main lap tinted);
+  `enableOverlays` (time mode) draws the other visible slots aligned at lap start beneath Main. Dynamic: the zoom
+  rectangle (`cursorZoom` at alpha 0x40 with a 0xC0 outline), the cursor line, key values per drawn slot. The
+  widget derives the zoom handles from `zoomRect()`.
+- **Track**: `fit` centres the bounding box of the rotated lines (map + body rotation) at the largest scale;
+  manual multiplies it by `zoom` and shifts by `(panX, panY)` metres; sizes: `cursor` = dot diameter, `detail` =
+  centreline width, `material` = extra zoom-span width per side; only the first section set (Default) is drawn
+  (colours beneath the centreline, marks across it, labels beside the mid-point). Positions interpolate the
+  centreline (a closed map wraps through its first point); `trackDistanceAt` applies the origin rule (a lap starts
+  at a beacon when its layer has an enabled BCN at its start, or no BCN at all).
+- **Scatter / histogram**: `scatterFrame`/`histogramFrame` (layout, scales, bands) read no samples; the scene
+  comes from `ScatterBinner`/`TrendFit`/`HistogramBinner` on the worker; a binner failing with Cancelled or
+  Unsupported fails the Static build, other failures drop that slot. Scatter: channel and auto scales both use
+  the Main source's whole-column SummaryPyramid; point colours by colour band (the BandAxis rule applied
+  locally) and trend curves by Horner from the coefficients, so the drawing does not depend on the binner;
+  density above the threshold as 16 Quads levels of the set's colour; cursor styles ring, cross (crosshair) and
+  none, the datum as a hollow square. Histogram: equal-width bin slots labelled at their boundaries every
+  `binLabelStep`; y auto = 0 to the largest value; `stackLines` lifts trace n by n x 12 px; `condensedAxes`
+  labels the bottom row of tiles; text style = a table of bins x sets. Point sets: the Main sets only, tagged
+  with each point's Main-lap time.
+
+- **Gauges** (the plots work, D-198): `GaugeNumericBody`/`GaugeBarBody` read and write like the other bodies
+  (`parse(x).toJson() == x` for the schema examples; the `font` object is checked: a family and a point size of
+  6..400). Both read their one channel at the cursor for Main and the reference overlay (the second visible
+  slot) by the Values window's rule; "(missing)", "…" (pending) and "-" (invalid). Numeric: the value in the top 65 %
+  of the content (all of it without a reference), the unit after it (`GaugeUnits`), the reference beneath at no
+  more than half the main scale in its key colour; `dynamicFont` sizes the value with `TextRun::scale` for the
+  widest value the channel can show (its SummaryPyramid extremes, digits as '8'), never below 6 pt of the
+  scheme's `gauge` font; without it the scale is the body font's point size over the scheme's. The first visible
+  colour band holding the value colours the text or fills the content. Bar: the scale strip (left of a vertical
+  track, under a horizontal one; `scaleDps` labels), band lines across the track or a 4 px band strip
+  (`bandLines`), the track, the bar from the clamped origin to the clamped value (`bandMode` bar recolours it),
+  the reference as a 2 px marker line, the value text at the bar end. Scales `channel`/`auto` from the Main
+  channel's summary, `manual` converted.
+- **`TextRun::scale`** (`draw_list.hpp`, D-198 (b)): a per-run factor on the style's point size, in the DrawList
+  JSON only when it is not 1 (no M1 or geometry golden changed); builders measure a scaled run as the style's
+  metrics times the scale.
+- **Exports and axes** (D-198 (d), (e)): `ScatterGeometry::exportSets` and `HistogramGeometry::exportTable` gather
+  as `buildStatic` does (the scatter's `gatherSlot`, the histogram's scene, now shared by both paths), Main first;
+  `ScatterGeometry::axes` returns the frame's tiles and scales (no samples) for the widget's own axis zoom and
+  point picking. The scatter and histogram builders pass each channel's descriptor `Interp` to the binners (x, y
+  and the colour channel; gating stays `Previous`; M3 open issue 7).
+- **Tests**: `m3_gauge_tests.cpp` (the bodies, values against the synthetic series formatted with
+  `std::to_chars`, colour bands and their unit conversion, the dynamic and fixed font scales, every origin style
+  in both orientations, the reference marker, band lines and fill, `scaleDps`, and the gauge DrawList goldens of
+  `tests/golden/drawlist/gauge_numeric`, `gauge_bar`); `plots_golden_cases.hpp` holds the fifteen cases (three
+  each of scatter, histogram, outing, gauge_numeric, gauge_bar) shared with the pixel goldens of
+  `tests/golden/images/tst_golden_plots.cpp`.
+
+Every `M3-STUB` of `esses_plotcore` is replaced. Final: `HitTester::hitAll`, `clear`/`empty` over the point sets,
+the M1 `HitKind` values (the new ones appended after `Handle`), `componentChannelUses`, `OutingBody::channelNames`
+(`tests/m3_contract_tests.cpp`). The M1 builder sets `HitResult`s through a helper because the struct grew
+(GCC/Clang `-Wmissing-field-initializers`).
+
+Consumers: `esses_qtrender` (`OffscreenRenderer::builtinBuilders` calls every geometry builder), `esses_qtmodel`
+(`componentChannelUses` in `componentChannels`), `esses_widgets` (the components and `HitResult`; the scatter
+widget reads a clicked point's Main-lap time from `nearestPoint`'s tag and its axes from `ScatterGeometry::axes`,
+the outing widget derives its zoom handles from `zoomRect()`, the plots components export through `exportSets`,
+`exportTable` and their samples; the time_distance completion uses `BandLayout` and the `KeyLayout` columns).
+
+### M3: the time_distance completion (as built, D-201)
+
+`TimeDistanceBuilder` covers the whole of 04 §8 (`src/time_distance_builder.cpp`; `time_distance_builder.hpp`):
+
+- **Body**: every member of `schemas/components/time_distance-1` is typed (`pointSize`, `showMarkers`, `showBands`,
+  `bandMode`, `bandGroup`, `overlapMode`, `cursorStyle`, `cursorSnap`, `key.stats`, `showStatusStrip`,
+  `statusChannels`, `showDeviceEvents`, `variance {show, heightFrac, autoScale, min, max}`, `axis.showXScrollbar`/
+  `showYScrollbar`, the groups' `lo`/`hi` and `lines.{zero,min,max}.{enabled,colour}`); the new enums are checked
+  (Invalid with the member's pointer); `{v, unit}` is always written with its unit (schema `unitValue`).
+  `parse(x).toJson() == x` holds for `schemas/examples/components/time_distance-1/valid/full.json`.
+- **Layout** (`layoutOf`): the range / section / marker bands (`BandLayout`, 14 px each) over the trace area under
+  the caption; below the panels the status strip (10 px per status channel), the variance panel (`heightFrac` of
+  the trace area, only with a visible overlay), the x axis, the offset axis (two 12 px sub-axes while
+  `ViewState::offsetAxis`) and the horizontal scrollbar; overlapped mode lays each group over its `[lo, hi]` of
+  the whole area with Lo/Hi handles at the right edge and the key listing the groups in turn; the active group's
+  vertical scrollbar in its axis strip; the key's datum and measurement columns (`KeyColumns`). With the M3
+  elements off, the layout and every list equal the M1 builder's (the M1 cases switch the default-on bands and
+  scrollbars off in their bodies, `td_golden_cases.hpp` `m1Display()`).
+- **Static** additions: bands (the visible slots' ranges, overlays first so Main is on top; the other ranges of
+  the Main range's group, so zooming out shows the neighbouring laps; a slot cell mostly under Main's lends Main
+  its name: one label "Main | overlay"), sections of `bandGroup` coloured by their child group (Corners /
+  Straights / a user category), beacons (BCN, SOL, EOL), device events (`showDeviceEvents`) and the Main source's
+  sidecar annotations with their dotted lines; scale lines min / max at `ResolvedChannel::limitMin`/`limitMax`;
+  the status strip (status channels decimated with the traces, a filled span wherever a column is non-zero; names
+  left of the strip); the variance panel (one `analysis::VarianceTable` per visible overlay against Main, offsets
+  of both slots, `Δt [s]` in distance and `Δd [m]` in time, NaN columns blank, autoscale over the tables and 0
+  with 10 % headroom, else the manual `{v, unit}` limits); the offset sub-axes (ticks in each slot's own
+  coordinate, the offset written at the right end by `offsetText`); the horizontal scrollbar (the zoom over the
+  Main outing extent); measurements (min / max / avg of the valid samples over the visible span per trace and
+  slot, read chunk by chunk with `Column::require` on the worker; `KeyLayout::emitMeasurements`). Hit regions:
+  `Band`, `Section`, `Marker`, `Annotation`, `StatusRow`, `Variance`, `OffsetAxis` (`OffsetMain` /
+  `OffsetReference`), `ScrollBar` (`ScrollThumb` or the track; `group` for the vertical one), `Handle` (`GroupLo`,
+  `GroupHi`; `PanelSplitter` left of the trace area, so a click in a panel always places the cursor),
+  `KeyMeasurement`; overlapped mode adds the whole area as a Panel of the active group.
+- **Dynamic** additions: the cursor style (`none` hides the main cursor line; `crosshair` adds a dotted horizontal
+  line at the active channel's Main value), cursor lines through the status strip and the variance panel, and
+  value@datum and Δ (main - datum, signed) per slot line while a datum is shown.
+- **Chrome** addition: "variance needs distance data" in the variance panel when a lap of Main or of an overlay
+  has no `DistanceIndex` (a chain piece without `idx`).
+- **Widget-local state** (`TdLocalState`, the overloads of `buildStatic`/`buildDynamic`): the vertical zoom per
+  group (`TdGroupZoom`, the shown fraction of the group's scale) and the scales the last Static build drew (so the
+  crosshair lines up); `TdStaticInfo` reports what a Static build placed (band entries, markers, measurement
+  positions, scales, the scrollbar extent, `varianceTables` for AC-M3-05). `ResolvedChannel` gains `limitMin`/
+  `limitMax` (the override limits in base units; Channel scaling and the min/max lines use them).
+- **KeyLayout**: the column-aware layout keeps up to 30 % of the clamped column for the labels and shrinks the
+  cells below that (`kMinLabelFraction`), so a datum on a narrow graph no longer elides the channel names away.
+- **Tests**: `td_m3_tests.cpp` (body members and errors, the layout stack, variance tables per overlay and none
+  without one against `VarianceTable` and its autoscale, measurements against a sample-by-sample reference, the
+  datum key, offset texts and sub-axis hits, bands with categories, markers, annotations and SHIFT+E, the status
+  strip's spans, overlapped regions and handles, splitters, the scrollbar, scale lines and Channel scaling with
+  limits, the crosshair, cursor style none, the vertical zoom) and the DrawList JSON goldens of the thirteen M3
+  cases of `td_m3_cases.hpp` at DPR 1 and 2 in `tests/golden/drawlist/time_distance/` (the M1 `dark_scheme`
+  golden changed with the datum columns). `td_m3_cases.hpp` decorates the synthetic sources with a Normal layer
+  (laps, track sections with categories, beacons, device events, Bitfield/Bool status channels), sidecar
+  annotations and an `analysis::DistanceIndex` per lap.

@@ -1,0 +1,81 @@
+{
+  "$schema": "urn:esses:track-1",
+  "schemaVersion": 1,
+  "name": "Test Circuit",
+  "venue": "Test Circuit",
+  "origin": {
+    "lat": -33.4479,
+    "lon": 149.552,
+    "alt": 862
+  },
+  "rotationDeg": 0,
+  "direction": "cw",
+  "closed": true,
+  "length": {
+    "v": 40,
+    "unit": "m"
+  },
+  "generatedFrom": {
+    "method": "gps",
+    "source": "xxh3:00000000000000000000000000000000",
+    "lap": "00000000-0000-0000-0000-000000000000"
+  },
+  "lines": {
+    "centre": [
+      [0, 0, 0],
+      [10, 0, 10],
+      [10, 10, 20],
+      [0, 10, 30],
+      [0, 0, 40]
+    ],
+    "inner": [],
+    "outer": []
+  },
+  "sections": [
+    {
+      "id": "s1",
+      "set": "Default",
+      "name": "Straight 1",
+      "startDist": {
+        "v": 0,
+        "unit": "m"
+      },
+      "endDist": {
+        "v": 20,
+        "unit": "m"
+      },
+      "category": "straight",
+      "userDefined": false
+    },
+    {
+      "id": "t1",
+      "set": "Default",
+      "name": "Turn 1",
+      "startDist": {
+        "v": 20,
+        "unit": "m"
+      },
+      "endDist": {
+        "v": 40,
+        "unit": "m"
+      },
+      "category": "corner",
+      "userDefined": false
+    },
+    {
+      "id": "u1",
+      "set": "Driver Notes",
+      "name": "Back half",
+      "startDist": {
+        "v": 0.02,
+        "unit": "km"
+      },
+      "endDist": {
+        "v": 0.04,
+        "unit": "km"
+      },
+      "category": "Fast",
+      "userDefined": true
+    }
+  ]
+}

@@ -18,4 +18,5 @@
 #include <esses/project/schema_registry.hpp>
 #include <esses/project/scheme.hpp>
 #include <esses/project/shipped_data.hpp>
+#include <esses/project/track_map_file.hpp>
 #include <esses/project/workbook_file.hpp>
