@@ -38,7 +38,7 @@ def _strict_json(v):
     return v
 
 OUT = os.path.join(REPO, "fixtures", "private", "s1")
-DEFAULT_ROOTS = ["C:/Users/mitch/Documents", "C:/Users/mitch/Downloads", "C:/Users/mitch/Desktop", "C:/MoTeC"]
+DEFAULT_ROOTS = [os.path.expanduser("~/" + d) for d in ("Documents", "Downloads", "Desktop")] + ["C:/MoTeC"]
 FORMAT_TAG = b"MoTeC CSV File"
 
 

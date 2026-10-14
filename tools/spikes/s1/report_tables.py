@@ -11,7 +11,7 @@ import os
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 OUT = os.path.join(REPO, "fixtures", "private", "s1")
-HOME = "C:\\Users\\mitch\\"
+HOME = os.path.expanduser("~") + "\\"
 
 SHORT = {
     "device-raw: logger file as downloaded": "logger, as downloaded",
@@ -24,7 +24,7 @@ SHORT = {
 
 
 def short_path(p):
-    p = p.replace(HOME + "Documents\\AntiGravity Projects\\V8 of log file converter\\Reference information\\", "conv-ref\\")
+    p = p.replace(os.environ.get("ESSES_CONVERTER_REF_DIR", HOME + "converter\\Reference information\\"), "conv-ref\\")
     p = p.replace(HOME, "~\\")
     return p
 
