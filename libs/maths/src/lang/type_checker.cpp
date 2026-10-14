@@ -409,7 +409,7 @@ private:
             return;
         }
         if (info_[ref].unresolved) {
-            n.unit = *u; // without data the requested unit is all there is to type the reference with
+            n.unit = u; // without data the requested unit is all there is to type the reference with
             n.type.unit = *u;
             normalise(n.type);
             return;
@@ -432,7 +432,7 @@ private:
                    "request a unit of " + (hasQuantity ? have.name : std::string("the channel's quantity")));
             return;
         }
-        n.unit = *u;
+        n.unit = u;
         n.type.unit = *u;
         normalise(n.type);
         const Result<units::Converter> conv = units_.converter(t.unit, *u);

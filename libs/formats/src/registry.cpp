@@ -628,6 +628,10 @@ ImporterRegistry::beginOpen(const std::shared_ptr<const ByteSource>& source, Imp
         st->unitMap = it->second;
     }
     const Dictionary* dictionary = options.applyDictionary ? reader.dictionary() : nullptr;
+    const UnitMappingProfile* unitMap = nullptr; // the unit map every channel resolves against, if any
+    if (const std::optional<UnitMappingProfile>& m = st->unitMap) {
+        unitMap = &*m;
+    }
     for (LayerIx li = 0; li < probe.layers.size(); ++li) {
         const LayerInfo& info = probe.layers[li];
         for (ChannelIx ci = 0; ci < info.channels.size(); ++ci) {
@@ -670,7 +674,7 @@ ImporterRegistry::beginOpen(const std::shared_ptr<const ByteSource>& source, Imp
                 d.dtype =
                     *dtype; // the dictionary's storage dtype (05 section 8.3), when the reader can store it
             }
-            auto resolved = resolveChannel(*st, p, c, st->unitMap ? &*st->unitMap : nullptr);
+            auto resolved = resolveChannel(*st, p, c, unitMap);
             if (!resolved) {
                 return withPath(resolved.error());
             }

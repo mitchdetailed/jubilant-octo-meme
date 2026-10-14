@@ -60,13 +60,17 @@ public:
     // colour scheme when following the OS is on.
     void restoreActive();
     // "Follow OS light/dark" (user setting, off by default): on, the shipped scheme matching the OS colour
-    // scheme is applied now and by every applySystemScheme() (the shell calls it on
-    // QStyleHints::colorSchemeChanged).
+    // scheme is applied now and by every applySystemScheme() (the shell calls it with the scheme that
+    // QStyleHints::colorSchemeChanged reports).
     bool followsSystem() const;
     void setFollowSystem(bool on);
-    // Applies the shipped scheme of the OS colour scheme when following the OS is on and the OS reports light
-    // or dark; false when nothing changed.
+    // Applies the shipped scheme of the OS colour scheme (QStyleHints::colorScheme()) when following the OS
+    // is on and the OS reports light or dark; false when nothing changed.
     bool applySystemScheme();
+    // The same for the colour scheme `os` the OS reports (Unknown: nothing to follow), as colorSchemeChanged
+    // carries it. QStyleHints::colorScheme() is whatever the platform theme reports; the Qt 6.8
+    // QStyleHints::setColorScheme() only asks the theme, which may apply it later or ignore it (offscreen).
+    bool applySystemScheme(Qt::ColorScheme os);
 
     // <config>/schemes (created on demand by the file operations).
     std::filesystem::path userSchemeDir() const;

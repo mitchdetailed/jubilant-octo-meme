@@ -4,6 +4,34 @@ All notable changes are recorded here, newest first. The project follows semanti
 
 ## Unreleased (M2)
 
+- Fixes for the first CI run of the public repository (pull request 2). `bench.maths_bench.smoke` aborted on
+  Linux with "ChunkCache destroyed while Columns still use it": the readiness block of `esses-maths-bench` (and
+  its `--digest` mode) declared the `TaskPool` before the `ChunkCache`, so the cache was destroyed first, while a
+  worker could still hold the shared state of the task it had just run, and through it the result's `Column`
+  (a worker publishes a result, wakes the requester, then runs the continuations and completes the task). The
+  cache is now declared before the pool, which joins its workers before the cache goes; the other benchmarks,
+  the tests' runtimes and `AppRuntime` already had that order. Linux's scheduler tends to run the woken
+  requester at once and preempt the worker inside that window; Windows usually wakes it on another processor,
+  but the abort reproduces there with the benchmark pinned to one logical processor. The same pinned runs
+  showed a second race: a timed run's fresh graph could join the warm-up run's still-completing task of the
+  same key and skip an evaluation ("expected one evaluation per output"); each run now starts once the pool
+  has completed every task. Regression test `maths.math graph teardown: ...` holds a worker inside the window
+  and checks that the cache keeps the result's chunks until the pool has joined. A save over a directory
+  standing where a document belongs (`qtmodel.tst_project_recovery`) threw `std::ios_base::failure` on Linux:
+  libstdc++'s file buffer throws a failed read (POSIX opens a directory, the read fails with EISDIR) whatever
+  the stream's exception mask, and `istreambuf_iterator` lets it through. `jsonio::readFile` (the save, backup
+  and journal path) returns Io instead, as do the other whole-file readers (sidecar, unit table, the settings
+  schemas of the built-in maths modules, the project session's document reads, `esses-cli`); regression tests
+  in `base`, `project`, `model` and `units`. `SchemeSelector::applySystemScheme(Qt::ColorScheme)` applies the
+  scheme the OS reports, and the shell passes the one `QStyleHints::colorSchemeChanged` carries;
+  `widgets.tst_scheme_selector` drives light, dark and Unknown through it on every Qt version, and checks a
+  Qt 6.8 `QStyleHints::setColorScheme()` request against what the platform theme then reports (the old check
+  expected the request to take effect, which the offscreen platform of Qt 6.12 does not do; on Qt 6.7 it was
+  compiled out). clang-tidy 19 (the `lint` job): the 25 findings are fixed without NOLINT (unchecked
+  `std::optional` access in the maths graph, compiler and kernels and in the text importer, a `std::string`
+  parameter taken by value, two optional-to-value-to-optional conversions), and the run over every Qt-free
+  translation unit is clean.
+
 - Review fixes in `esses-cli` (AC-M2-01, AC-M2-08, AC-M2-14; D-008). `eval --rate` and `export --rate` are exact:
   each of `<Hz>`, `<num>` and `<den>` is an unsigned decimal with an optional fraction and exponent, converted
   exactly and reduced (`20.5/1` is 41/2 Hz, which was truncated to 20 Hz; `33.3333` is 333333/10000, which was

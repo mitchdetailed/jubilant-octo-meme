@@ -451,7 +451,8 @@ private:
     // ---- conditions (03 section 4.3 rule 8) -----------------------------------------------------------
 
     bool conditionHolds(const MathModule& m, Diagnostics* out = nullptr) const {
-        if (!m.condition || m.condition->find_first_not_of(" \t\r\n") == std::string::npos) {
+        const std::string* condition = m.condition ? &*m.condition : nullptr;
+        if (condition == nullptr || condition->find_first_not_of(" \t\r\n") == std::string::npos) {
             return true;
         }
         const auto cached = conditions_.find(&m);
@@ -462,7 +463,7 @@ private:
             return cached->second.first;
         }
         Diagnostics diags;
-        const bool holds = evaluateCondition(m, diags);
+        const bool holds = evaluateCondition(m, *condition, diags);
         conditions_.emplace(&m, std::make_pair(holds, diags));
         if (out != nullptr) {
             *out = diags;
@@ -470,7 +471,7 @@ private:
         return holds;
     }
 
-    bool evaluateCondition(const MathModule& m, Diagnostics& diags) const {
+    bool evaluateCondition(const MathModule& m, const std::string& condition, Diagnostics& diags) const {
         const auto conditionError = [&](const std::string& message) {
             Diagnostic d;
             d.code = "E-CONDITION";
@@ -482,7 +483,7 @@ private:
         if (units_ == nullptr) {
             return conditionError("no unit registry");
         }
-        const graph::ParsedText& parsed = parse(*m.condition);
+        const graph::ParsedText& parsed = parse(condition);
         if (parsed.error || parsed.ast == nullptr) {
             return conditionError(parsed.error ? parsed.error->message : std::string("does not parse"));
         }
@@ -1535,8 +1536,8 @@ private:
             n.compileError = plan.error();
             if (!hasError(n.compileDiags)) {
                 Diagnostic d;
-                d.code = graph::isDiagnosticCode(plan.error().context.detail) ? *plan.error().context.detail
-                                                                              : std::string("E-EVAL");
+                const std::optional<std::string>& detail = plan.error().context.detail;
+                d.code = detail && graph::isDiagnosticCode(detail) ? *detail : std::string("E-EVAL");
                 d.level = Diagnostic::Error;
                 d.message = plan.error().message;
                 n.compileDiags.push_back(std::move(d));
@@ -1589,8 +1590,8 @@ private:
             }
         }
         Diagnostic d;
-        d.code = graph::isDiagnosticCode(n.defError->context.detail) ? *n.defError->context.detail
-                                                                     : std::string("E-EVAL");
+        const std::optional<std::string>& detail = n.defError->context.detail;
+        d.code = detail && graph::isDiagnosticCode(detail) ? *detail : std::string("E-EVAL");
         d.level = Diagnostic::Error;
         d.message = n.defError->message;
         n.diags.push_back(std::move(d));

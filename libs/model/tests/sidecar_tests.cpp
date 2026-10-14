@@ -110,6 +110,17 @@ TEST_CASE("sidecar: a missing file is an empty document", "[unit]") {
     CHECK(r->layer("Normal").empty());
 }
 
+TEST_CASE("sidecar: a directory where the sidecar belongs is an Io error, never an exception", "[unit]") {
+    const auto dir = test::scratchDir("sidecar-directory");
+    const fs::path path = dir / "log.ld.sidecar.json";
+    fs::create_directories(path);
+    Result<SidecarDocument> r = fail(ErrorCode::Internal, "not called");
+    REQUIRE_NOTHROW(r = SidecarDocument::load(path)); // libstdc++ throws reading a directory POSIX opened
+    REQUIRE_FALSE(r.ok());
+    CHECK(r.error().code == ErrorCode::Io);
+    CHECK(r.error().context.path == path);
+}
+
 TEST_CASE("sidecar: the schema's valid examples load and round-trip canonically", "[unit][schema]") {
     const auto files = test::exampleFiles("sidecar-1", "valid");
     REQUIRE(files.size() >= 3);

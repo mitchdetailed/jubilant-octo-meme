@@ -396,7 +396,7 @@ MainWindow::MainWindow(qt::AppRuntime& runtime, Paths paths, QWidget* parent)
     d.schemeSelector->restoreActive();
     if (QGuiApplication::styleHints() != nullptr) {
         connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged, this,
-                [this] { impl_->schemeSelector->applySystemScheme(); });
+                [this](Qt::ColorScheme os) { impl_->schemeSelector->applySystemScheme(os); });
     }
     if (const std::shared_ptr<const project::Scheme> scheme = d.session->scheme(); scheme != nullptr) {
         QApplication::setPalette(SchemeSelector::palette(*scheme));

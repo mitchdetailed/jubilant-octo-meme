@@ -338,6 +338,11 @@ Result<std::string> readFile(const std::filesystem::path& path) {
     } catch (const std::bad_alloc&) {
         return fail(ErrorCode::OutOfMemory, "out of memory reading '" + path.generic_string() + "'",
                     std::move(ctx));
+    } catch (const std::ios_base::failure&) {
+        // libstdc++'s filebuf throws from underflow() when the read fails, whatever the stream's exception
+        // mask, and istreambuf_iterator lets it through: a directory opens on POSIX and its read fails with
+        // EISDIR (a save over a directory standing where a document belongs).
+        return fail(ErrorCode::Io, "cannot read '" + path.generic_string() + "'", std::move(ctx));
     }
 }
 

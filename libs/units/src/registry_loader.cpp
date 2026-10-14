@@ -711,7 +711,13 @@ Result<std::string> readText(const std::filesystem::path& path) {
         ctx.path = path;
         return fail(ErrorCode::Io, "cannot open the unit table", std::move(ctx));
     }
-    std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    std::string text;
+    try {
+        text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    } catch (const std::ios_base::failure&) {
+        // libstdc++'s filebuf throws a failed read (a directory: EISDIR) whatever the exception mask
+        in.setstate(std::ios_base::badbit);
+    }
     if (in.bad()) {
         ErrorContext ctx;
         ctx.path = path;

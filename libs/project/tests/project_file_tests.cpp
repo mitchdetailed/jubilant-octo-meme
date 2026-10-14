@@ -211,6 +211,21 @@ TEST_CASE("project file: saveWithBackup backs up before it writes", "[unit]") {
     CHECK(pt::readAll(dir.path() / "backup" / "project.20261013-090000.json") == "{\"v\": 2}\n");
 }
 
+// A directory standing where the document belongs (the project recovery test's failed save): Io, never an
+// exception (libstdc++ throws from reading a directory, which POSIX lets a stream open), and nothing written.
+TEST_CASE("project file: saveWithBackup over a directory is an Io error", "[unit]") {
+    pt::TempDir dir("project-save-over-dir");
+    const auto target = dir.path() / "channels" / "mappings.json";
+    std::filesystem::create_directories(target);
+    const auto now = std::chrono::sys_days{std::chrono::year{2026} / 10 / 14} + std::chrono::hours{9};
+    Result<void> saved = fail(ErrorCode::Internal, "not called");
+    REQUIRE_NOTHROW(saved = saveWithBackup(dir.path(), target, std::string("{}\n"), now));
+    REQUIRE_FALSE(saved.ok());
+    CHECK(saved.error().code == ErrorCode::Io);
+    CHECK(std::filesystem::is_directory(target));
+    CHECK_FALSE(std::filesystem::exists(dir.path() / "backup"));
+}
+
 TEST_CASE("project file: load reports Io and Format with the path", "[unit]") {
     pt::TempDir dir("project-load");
     std::vector<std::string> log;

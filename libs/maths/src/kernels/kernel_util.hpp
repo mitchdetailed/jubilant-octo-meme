@@ -222,7 +222,7 @@ inline WindowShape windowShape(std::uint64_t n) noexcept {
 
 // ---- runtime failures (Kernel::status) --------------------------------------------------------------------
 
-inline Failure kernelError(std::string_view code, std::string message) {
+inline Failure kernelError(std::string_view code, const std::string& message) {
     ErrorContext ctx;
     ctx.detail = std::string(code);
     return Failure{Error{ErrorCode::Invalid, std::string(code) + ": " + message, ctx}};

@@ -454,6 +454,15 @@ TEST_CASE("registry load: loadFiles reads files and reports their paths", "[unit
         CHECK(r.error().code == ErrorCode::Io);
         CHECK(r.error().context.path == dir / "missing.json");
     }
+    SECTION("a directory where the table belongs is an Io error naming it, never an exception") {
+        const std::filesystem::path folder = dir / "folder.json";
+        std::filesystem::create_directories(folder);
+        Result<UnitRegistry> r = fail(ErrorCode::Internal, "not called");
+        REQUIRE_NOTHROW(r = UnitRegistry::loadFiles(folder)); // libstdc++ throws reading a directory
+        REQUIRE_FALSE(r.ok());
+        CHECK(r.error().code == ErrorCode::Io);
+        CHECK(r.error().context.path == folder);
+    }
     SECTION("an invalid user file fails with its path") {
         writeFile(user, userDoc(R"({"name": "X", "family": "X", "dim": [1,0,0,0,0,0,0], "base": "m",
                                     "units": [{"symbol": "km/h"}]})"));

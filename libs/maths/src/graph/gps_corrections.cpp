@@ -189,7 +189,13 @@ Result<std::string> readText(const std::filesystem::path& path) {
     if (!in) {
         return fail(ErrorCode::Io, "cannot open the settings schema", std::move(c));
     }
-    std::string text{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+    std::string text;
+    try {
+        text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    } catch (const std::ios_base::failure&) {
+        // libstdc++'s filebuf throws a failed read (a directory: EISDIR) whatever the exception mask
+        in.setstate(std::ios_base::badbit);
+    }
     if (in.bad()) {
         return fail(ErrorCode::Io, "cannot read the settings schema", std::move(c));
     }
@@ -220,11 +226,12 @@ Result<std::vector<BuiltinOutput>> GpsCorrectionsModule::expand(const model::Opa
     }
     auto s = std::make_shared<const GpsSettings>(std::move(parsed).value());
     const std::optional<units::QuantityId> angle = units.quantityByName("Angle");
+    const std::optional<std::string>& prefix = s->prefix;
     std::vector<BuiltinOutput> outputs;
     for (const bool latitude : {true, false}) {
         const std::string& input = latitude ? s->latitude : s->longitude;
         BuiltinOutput o;
-        o.name = s->prefix ? *s->prefix + input : input;
+        o.name = prefix ? *prefix + input : input;
         o.inputs = {s->latitude, s->longitude};
         o.required = {s->latitude, s->longitude};
         o.missingSummary = std::string(kNoGps);
@@ -232,12 +239,12 @@ Result<std::vector<BuiltinOutput>> GpsCorrectionsModule::expand(const model::Opa
         o.interp = store::Interp::Linear;
         o.display.dps = 6;
         o.display.colourIndex = -1;
-        if (s->prefix && angle) {
+        if (prefix && angle) {
             // A new channel: the values in the Angle base unit (a shadowing output keeps the input's unit).
             o.quantity = *angle;
             o.resultUnit = units.quantity(*angle).base;
         }
-        const bool prefixed = s->prefix.has_value();
+        const bool prefixed = prefix.has_value();
         o.evaluate = [s, latitude, prefixed](const EvalContext& ctx,
                                              std::span<const UniformSignal> /*upstream*/,
                                              Diagnostics& /*out*/) -> Result<UniformSignal> {

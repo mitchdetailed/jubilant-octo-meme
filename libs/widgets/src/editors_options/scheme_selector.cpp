@@ -220,13 +220,12 @@ void SchemeSelector::setFollowSystem(bool on) {
 }
 
 bool SchemeSelector::applySystemScheme() {
-    if (!followsSystem()) {
-        return false;
-    }
-    const Qt::ColorScheme os = QGuiApplication::styleHints() == nullptr
-                                   ? Qt::ColorScheme::Unknown
-                                   : QGuiApplication::styleHints()->colorScheme();
-    if (os == Qt::ColorScheme::Unknown) {
+    const QStyleHints* hints = QGuiApplication::styleHints();
+    return applySystemScheme(hints == nullptr ? Qt::ColorScheme::Unknown : hints->colorScheme());
+}
+
+bool SchemeSelector::applySystemScheme(Qt::ColorScheme os) {
+    if (!followsSystem() || os == Qt::ColorScheme::Unknown) {
         return false;
     }
     const std::shared_ptr<const project::Scheme> target = session_.shippedScheme(os == Qt::ColorScheme::Dark);
