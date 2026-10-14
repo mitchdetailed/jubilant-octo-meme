@@ -27,8 +27,9 @@ REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 sys.path.insert(0, os.path.join(REPO, "tools"))
 import ld_ref_decode as ref  # noqa: E402
 
-CONV_DIR = ("C:/Users/mitch/Documents/AntiGravity Projects/QT C++ Log Viewer/"
-            "Reference projects/V8 of log file converter")
+CONV_DIR = os.environ.get(
+    "ESSES_CONVERTER_PY_DIR",
+    os.path.expanduser("~/Documents/converter-python"))  # private converter checkout
 sys.dont_write_bytecode = True        # never write .pyc files into the converter's folder
 sys.path.append(site.getusersitepackages())
 sys.path.append(CONV_DIR)

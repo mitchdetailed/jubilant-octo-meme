@@ -20,3 +20,6 @@ conv_samples/
 # expectations are committed (05 section 9.1)
 fixtures/motec.ld/synthetic-*/input.ld
 fixtures/motec.ld/synthetic-*/input.ldx
+
+# Texts withheld from the published repository until there is a working model (D-192); restore before release
+docs/unpublished/

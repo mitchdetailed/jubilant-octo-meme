@@ -33,5 +33,5 @@ decision log. Conduct problems are handled privately by the maintainer.
 ## Project name
 
 "Esses" is the working name, held by the maintainer for the project. No trademark search is scheduled and the
-name may change before the first public release (`TRADEMARK.md`); the codename lives in one prefix table,
+name may change before the first public release (D-003); the codename lives in one prefix table,
 `cmake/naming.cmake`, so a rename is a scripted search-and-replace.
