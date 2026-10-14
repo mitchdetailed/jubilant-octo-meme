@@ -812,9 +812,9 @@ Rewritten on 2026-10-10 after the review. The list is deduplicated across this d
 | D-181 | `esses-cli export` and `fixture diff` as built (refines D-090; 05 §9.2, 07 §5.1, §5.5) | no | M2 integration |
 | D-182 | Maths units found in the user's maths: `[ratio]` on a unitless channel, `l/100km` and `psi (sg)` (refines D-164, D-010; 03 §2.4 rule 5) | no | M2 integration, AC-M2-01 |
 | D-183 | AC-M2-10 on the 0.1 whole-node path: measured, not met; the two-frame gate moves to M5 (withdrawn 2026-10-13: superseded by D-191, AC-M2-10 met) | no (withdrawn) | M2 integration, AC-M2-10 |
-| D-184 | AC-M2-14 reads the fixture's own channel name (amends 07 §5.2 AC-M2-14) | **yes** | M2 integration, AC-M2-14 |
+| D-184 | AC-M2-14 reads the fixture's own channel name (amends 07 §5.2 AC-M2-14) | **yes** (confirmed 2026-10-14) | M2 integration, AC-M2-14 |
 | D-185 | Maths engine corrections of the M2 review: result rate through statistics, integer and Bool dtypes, non-finite results, literal factors, table axis units, the power switch's hash, synthesised self references, filter windows, stepping constants, recursive `previous_sample`, the math window in the selection key, variance across sources, timestamped rates (refines D-021, D-022, D-164, D-170, D-171; amends 03 §3.2, §4.4, §5.2, §5.4, §5.6, §6.4–6.6, §7.2, §7.6, §8) | no | M2 review, AC-M2-02 |
-| D-186 | `scale_offset` is computed in the unit of its offset (amends 03 §4.4) | **yes** | M2 review |
+| D-186 | `scale_offset` is computed in the unit of its offset (amends 03 §4.4) | **yes** (confirmed 2026-10-14) | M2 review |
 | D-187 | The journal as a per-session snapshot: write-ahead save, autosave beside a deferred recovery, Recover adopts, case-only renames (amends D-172 (h)–(i); 02 §6.8) | no | M2 review, AC-M2-06 |
 | D-188 | `esses-cli maths check` reports MathGraph's nodes (refines D-166; 03 §13, AC-M2-01) | no | M2 review, AC-M2-01 |
 | D-189 | Seven keymap rows of milestone M2 move to M3; the workbook rows are built (amends 06 §14.1's milestone column, D-178 (e)) | no | M2 review |
@@ -1769,7 +1769,7 @@ dialect stays an open issue of M2. The command as 07 §5.2 writes it fails (`E-U
 1): this entry changes an acceptance criterion, so it needs the maintainer's answer. The alternative that keeps
 the criterion as written is a registry-level dictionary for importers without one (M2 open issue 7: `SPEED` ->
 `Ground Speed` for the sim-exporter dialect).
-**User must confirm:** yes (it changes an acceptance criterion).
+**User must confirm:** yes (it changes an acceptance criterion). **Confirmed by the user on 2026-10-14.**
 
 #### D-185 Maths engine corrections of the M2 review (refines D-021, D-022, D-164, D-170, D-171; amends 03 §3.2, §4.4, §5.2, §5.4, §5.6, §6.4–6.6, §7.2, §7.6, §8)
 **Context.** The M2 review probed the engine through `esses-cli` and project exports and found results that 03 does
@@ -1842,7 +1842,7 @@ user reads.
 **Consequences.** A °C or °F channel scales as displayed; zeroing at the cursor (scale 1) is unchanged; an offset
 given in K on a °C display applies in K. `maths.math graph items: scale_offset computes in the offset's unit ...` and
 `maths.math graph review: scale_offset scales a temperature in the offset's unit`. Chosen, not observed.
-**User must confirm:** yes (it changes the computation 03 §4.4 specifies).
+**User must confirm:** yes (it changes the computation 03 §4.4 specifies). **Confirmed by the user on 2026-10-14.**
 
 #### D-187 The journal as a per-session snapshot: write-ahead save, autosave beside a deferred recovery, Recover adopts, case-only renames (amends D-172 (h)–(i); 02 §6.8)
 **Context.** The review reproduced four ways to lose data with D-172's journal: (1) a workbook renamed only in letter
