@@ -5,7 +5,7 @@
 // way the application does for a project and writes the chosen channels, logged and maths alike, through a
 // CSV writer.
 //   esses-cli export [<project>] <log> [--channels "A,B"] [--range "Outings:Laps/3"] [--format csv|motec.csv]
-//                    [--rate <Hz>] [--units "A=km/h,B=deg C"] [--layer Normal] -o <file.csv>
+//                    [--rate <Hz>|<num>/<den>] [--units "A=km/h,B=deg C"] [--layer Normal] -o <file.csv>
 // With a project (its folder or project.json): the project's mappings and unit maps apply at open (05 section
 // 2 step 4), its maths modules in project order, the sidecar's local maths, the corrected speed and distance
 // module with the project's settings and enable flag, the GPS corrections where both GPS inputs are logged,
@@ -35,7 +35,7 @@ struct ExportOptions {
     std::string range;                         // "Outings:Laps/3"
     std::string layer = "Normal";
     std::string format = "csv";     // csv | motec.csv
-    std::string rate;               // "" = the writer's default grid
+    std::string rate;               // "" = the writer's default grid; else exact (parseRate), <= 1 MHz
     std::vector<std::string> units; // "Channel=unit" display units (over the project's overrides)
     std::optional<std::filesystem::path> output;
     std::string importerId;

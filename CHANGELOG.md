@@ -4,6 +4,22 @@ All notable changes are recorded here, newest first. The project follows semanti
 
 ## Unreleased (M2)
 
+- Review fixes in `esses-cli` (AC-M2-01, AC-M2-08, AC-M2-14; D-008). `eval --rate` and `export --rate` are exact:
+  each of `<Hz>`, `<num>` and `<den>` is an unsigned decimal with an optional fraction and exponent, converted
+  exactly and reduced (`20.5/1` is 41/2 Hz, which was truncated to 20 Hz; `33.3333` is 333333/10000, which was
+  rounded to thousandths); a sign, a zero, a non-number or a num or den beyond 32 bits once reduced is exit 2 with
+  the reason, and `export` checks its `--rate` before opening the log. `maths check` reports a module's condition
+  as a row of its own whatever the module holds (with the graph's `E-CONDITION` when it refuses the condition) and
+  counts it: its codes and parse errors in the summary, a condition in error as a module error and exit 1 (a
+  module with only a built-in item and a broken condition checked as 0 errors, exit 0); a built-in module that
+  fails to register is a module error too, and the text summary ends with the module errors. `validate` reads a
+  `$schema` major without `std::stoi`: a major beyond the integer range made the whole batch stop with "internal
+  error: stoi" and is now that document's newer-major error; the newer-major search lists the schema folder once
+  instead of probing every number below the major (`project-2147483647` took billions of file checks); a
+  `schemaVersion` beyond the integer range is newer than any instead of wrapping round. The other `std::stoi`
+  calls on document input are gone: `SchemaRegistry::schemaOf` and the text importer's header rows
+  (`TextProfile::toJson` and the analysis return Invalid for a row that is not a number instead of throwing).
+
 - Fixes from the verification of D-190 (AC-M2-06): a save that fails part-way no longer moves the files of
   renamed or removed workbooks, unit maps and modules to `backup/` (until a save succeeds, `project.json` on disk
   still names them); an autosave whose journal file another instance deleted (a Discard on its recovery prompt)

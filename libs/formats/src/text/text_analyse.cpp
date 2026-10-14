@@ -11,10 +11,12 @@
 #include <esses/model/marker.hpp>
 
 #include <algorithm>
+#include <charconv>
 #include <cmath>
 #include <cstring>
 #include <deque>
 #include <set>
+#include <system_error>
 #include <utility>
 
 namespace esses::formats::text {
@@ -31,6 +33,17 @@ constexpr std::size_t kCarryWindow = std::size_t{64} << 10; // computeCarryIns' 
 // The @auto header rule's "numeric" data row: 05 section 7.3 says 80 %; text columns (one in three) are
 // common enough that half is used (docs/formats/text.md).
 constexpr double kNumericRow = 0.5;
+
+// A row number the profile holds as text (TextProfile::Header, "3"); nullopt for anything else, never an
+// exception (the header's fields are public strings).
+std::optional<std::size_t> profileRow(const std::string& text) {
+    std::size_t n = 0;
+    const std::from_chars_result r = std::from_chars(text.data(), text.data() + text.size(), n);
+    if (r.ec != std::errc() || r.ptr != text.data() + text.size()) {
+        return std::nullopt;
+    }
+    return n;
+}
 
 struct HeadLine {
     std::string_view text;
@@ -392,8 +405,8 @@ void Analyser::readHeadLines() {
         h.blank = isBlank(line);
         head_.push_back(h);
     }
-    if (cur.error()) {
-        readError_ = *cur.error();
+    if (auto e = cur.error()) {
+        readError_ = *e;
     }
     headComplete_ = longLine_ == 0 && !readError_ && cur.pos() >= L_->text.size();
 }
@@ -771,15 +784,24 @@ Result<void> Analyser::findHeader() {
             info(code::kAutoUnitsRow, unitsLine_ ? "units row found" : "no units row",
                  unitsLine_ ? "yes" : "no");
         } else if (p_.header.unitsRow != "null" && !p_.header.unitsRow.empty()) {
-            const auto u = static_cast<std::size_t>(std::stoi(p_.header.unitsRow));
-            if (u < rows.size()) {
-                unitsLine_ = rows[u];
+            const std::optional<std::size_t> u = profileRow(p_.header.unitsRow);
+            if (!u) {
+                return fail(ErrorCode::Invalid,
+                            "the profile's unitsRow '" + p_.header.unitsRow + "' is not a row number");
+            }
+            if (*u < rows.size()) {
+                unitsLine_ = rows[*u];
             }
         }
     }
     std::size_t dataPos = std::max(namesPos, unitsLine_ ? rowPos(*unitsLine_) : namesPos) + 1;
     if (p_.header.dataRow != "auto" && !p_.header.dataRow.empty()) {
-        dataPos = static_cast<std::size_t>(std::stoi(p_.header.dataRow));
+        const std::optional<std::size_t> d = profileRow(p_.header.dataRow);
+        if (!d) {
+            return fail(ErrorCode::Invalid,
+                        "the profile's dataRow '" + p_.header.dataRow + "' is not a row number");
+        }
+        dataPos = *d;
     }
     // Data rows are always counted among non-blank lines from here on.
     while (dataPos < rows.size() && head_[rows[dataPos]].blank) {
@@ -968,8 +990,8 @@ void Analyser::scanRows() {
         lastLength = line.size();
         ++row;
     }
-    if (cur.error()) {
-        readError_ = *cur.error();
+    if (auto e = cur.error()) {
+        readError_ = *e;
         return;
     }
     if (row > 0 && (samples_.empty() || samples_.back().row != lastRow) && lastLength <= kSampleBudget) {

@@ -155,3 +155,56 @@ TEST_CASE("validate: --all walks the trees and the schema files and leaves the p
     CHECK(fileNamed(onlyPrivate, "expected.json") == nullptr);
     CHECK(fileNamed(onlyPrivate, "secret.json") != nullptr);
 }
+
+// A "$schema" major or a schemaVersion beyond int is one document's problem: before, std::stoi threw on the
+// major and the whole batch stopped with "internal error: stoi", a major that fits an int was counted down
+// one file probe at a time, get<int> wrapped a huge schemaVersion round to a current one, and a long https id
+// overflowed std::regex's stack.
+TEST_CASE("validate: a huge major or schemaVersion makes that document invalid, not the batch", "[unit]") {
+    const TempTree tree;
+    tree.write("a/1-huge-major.json", R"({"$schema": "urn:esses:project-999999999999999999999999999999",)"
+                                      R"( "schemaVersion": 1, "name": "P"})");
+    tree.write("a/2-int-max-major.json",
+               R"({"$schema": "urn:esses:mappings-2147483647", "schemaVersion": 1, "mappings": []})");
+    tree.write("a/3-unknown-huge.json",
+               R"({"$schema": "urn:esses:nothing-99999999999999999999", "schemaVersion": 1})");
+    tree.write("a/4-huge-minor.json",
+               R"({"$schema": "urn:esses:mappings-1", "schemaVersion": 4294967297, "mappings": []})");
+    tree.write("a/5-good.json", R"({"$schema": "urn:esses:mappings-1", "schemaVersion": 1, "mappings": []})");
+    std::string longHttps = R"({"$schema": "https://h/)";
+    for (int i = 0; i < 50000; ++i) {
+        longHttps += "x/";
+    }
+    tree.write("a/6-long-https.json", longHttps + R"(nothing-1.json", "schemaVersion": 1})");
+    ValidateOptions o;
+    o.paths = {tree.root() / "a"};
+    int code = -1;
+    const auto report = runJson(o, code);
+    CHECK(code == 1);
+    CHECK(report.at("summary").at("valid") == 2);
+    CHECK(report.at("summary").at("invalid") == 4);
+    for (const char* name : {"1-huge-major.json", "2-int-max-major.json"}) {
+        INFO(name);
+        const auto* f = fileNamed(report, name);
+        REQUIRE(f != nullptr);
+        CHECK(f->at("status") == "invalid");
+        CHECK(f->at("errors").at(0).at("pointer") == "/$schema");
+        CHECK(f->at("errors").at(0).at("message").get<std::string>().find(
+                  "is a newer major than this build reads") != std::string::npos);
+    }
+    const auto* unknown = fileNamed(report, "3-unknown-huge.json");
+    REQUIRE(unknown != nullptr);
+    CHECK(unknown->at("status") == "invalid"); // no such schema
+    const auto* minor = fileNamed(report, "4-huge-minor.json");
+    REQUIRE(minor != nullptr);
+    CHECK(minor->at("status") == "valid"); // newer than this build's minor: validated as it is, with a note
+    REQUIRE(minor->at("log").size() == 1);
+    CHECK(minor->at("log").at(0).get<std::string>().find("schemaVersion 4294967297 is newer") !=
+          std::string::npos);
+    const auto* good = fileNamed(report, "5-good.json");
+    REQUIRE(good != nullptr);
+    CHECK(good->at("status") == "valid");
+    const auto* longId = fileNamed(report, "6-long-https.json");
+    REQUIRE(longId != nullptr);
+    CHECK(longId->at("status") == "invalid"); // no schema nothing-1
+}

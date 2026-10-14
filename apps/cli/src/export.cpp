@@ -25,12 +25,10 @@
 #include <esses/project/mappings.hpp>
 #include <esses/project/project_file.hpp>
 
-#include <fast_float/fast_float.h>
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <charconv>
-#include <cmath>
 #include <map>
 #include <memory>
 #include <ostream>
@@ -181,18 +179,13 @@ const model::Range* findRange(const model::DataLayer& layer, const std::string& 
     return nullptr;
 }
 
-// Both GPS inputs of the GPS corrections' default settings are logged in `layer` (as MathsService decides).
-
-std::optional<Rate> parseHz(const std::string& text) {
-    double hz = 0.0;
-    const auto r = fast_float::from_chars(text.data(), text.data() + text.size(), hz);
-    if (r.ec != std::errc() || r.ptr != text.data() + text.size() || !(hz > 0.0) || hz > 1e6) {
-        return std::nullopt;
+// The --rate grid: exact (parseRate, D-008) and at most 1 MHz.
+Result<Rate> parseGridRate(std::string_view text) {
+    Result<Rate> rate = parseRate(text);
+    if (rate && Rate{1'000'000, 1} < *rate) {
+        return fail(ErrorCode::Invalid, "the grid is at most 1 MHz");
     }
-    if (std::trunc(hz) == hz) {
-        return Rate{static_cast<std::uint32_t>(hz), 1};
-    }
-    return Rate{static_cast<std::uint32_t>(std::llround(hz * 1000.0)), 1000}.normalised();
+    return rate;
 }
 
 } // namespace
@@ -209,6 +202,16 @@ int runExport(AppContext& ctx, const ExportOptions& o, std::ostream& out, std::o
     if (o.format != "csv" && o.format != formats::kLegacyCsvWriterId) {
         err << "esses-cli export: --format is csv or " << formats::kLegacyCsvWriterId << "\n";
         return 2;
+    }
+    std::optional<Rate> gridRate; // checked before the log is opened
+    if (!o.rate.empty()) {
+        const Result<Rate> rate = parseGridRate(o.rate);
+        if (!rate) {
+            err << "esses-cli export: --rate '" << o.rate << "': " << rate.error().message
+                << " (a number of Hz or num/den)\n";
+            return 2;
+        }
+        gridRate = *rate;
     }
     Result<const units::UnitRegistry*> unitsResult = ctx.units();
     if (!unitsResult || *unitsResult == nullptr) {
@@ -381,9 +384,8 @@ int runExport(AppContext& ctx, const ExportOptions& o, std::ostream& out, std::o
     // Evaluate the maths outputs (one task per node, in parallel; this thread waits).
     std::vector<std::pair<std::size_t, Future<m::ColumnHandle>>> pending;
     for (std::size_t i = 0; i < picks.size(); ++i) {
-        if (picks[i].maths) {
-            pending.emplace_back(
-                i, graph.require(*picks[i].maths, m::SampleRange::all(), Priority::Visible, {}));
+        if (const auto& node = picks[i].maths) {
+            pending.emplace_back(i, graph.require(*node, m::SampleRange::all(), Priority::Visible, {}));
         }
     }
     auto exported = std::make_shared<model::DataSource>(*source);
@@ -407,7 +409,9 @@ int runExport(AppContext& ctx, const ExportOptions& o, std::ostream& out, std::o
         const Result<m::ColumnHandle>& r = future.get();
         if (!r) {
             // The node's Error summary (the definition's, or its first failing input's), else the failure.
-            const m::MathStatus s = graph.status(*picks[i].maths);
+            // Every pending entry has a maths node (it was added above only when present).
+            const auto& node = picks[i].maths;
+            const m::MathStatus s = node ? graph.status(*node) : m::MathStatus{};
             err << "esses-cli export: '" << picks[i].name << "' cannot be evaluated: "
                 << (s.state == m::MathState::Error && !s.summary.empty() ? s.summary : describe(r.error()))
                 << "\n";
@@ -499,14 +503,7 @@ int runExport(AppContext& ctx, const ExportOptions& o, std::ostream& out, std::o
         view.start = range->start;
         view.end = range->end;
     }
-    if (!o.rate.empty()) {
-        const std::optional<Rate> rate = parseHz(o.rate);
-        if (!rate) {
-            err << "esses-cli export: --rate is a number of Hz, not '" << o.rate << "'\n";
-            return 2;
-        }
-        view.resampleRate = rate;
-    }
+    view.resampleRate = gridRate;
     formats::WriterOptions wopts;
     if (!csvUnits.empty()) {
         Result<model::OpaqueJson> j = model::OpaqueJson::parse(json{{"csv", {{"units", csvUnits}}}}.dump());

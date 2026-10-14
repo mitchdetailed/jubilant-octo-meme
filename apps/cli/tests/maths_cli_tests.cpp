@@ -220,6 +220,15 @@ TEST_CASE("maths cli: eval refuses bad expressions and options", "[unit][cli]") 
     CHECK(err2.str().find("no-such-log.ld") != std::string::npos);
     o.rate = "fast";
     CHECK(runEval(ctx, o, out, err) == 2);
+    // --rate is exact (parseRate): a zero denominator, a negative or a rate beyond 32 bits is a usage error
+    // with its reason, before any log is opened.
+    for (const char* bad : {"20.5/0", "-20", "4294967296", "1/4294967296", "inf"}) {
+        INFO(bad);
+        o.rate = bad;
+        std::ostringstream rateErr;
+        CHECK(runEval(ctx, o, out, rateErr) == 2);
+        CHECK(rateErr.str().starts_with(std::string("esses-cli eval: --rate '") + bad + "': "));
+    }
     o.rate = "auto";
     o.unit = "furlongs";
     CHECK(runEval(ctx, o, out, err) == 2);
@@ -348,6 +357,90 @@ TEST_CASE("maths cli: maths check finds cycles, synthesis and table errors throu
     CHECK(c.at("status") == "Ok");
     CHECK(codes(c) == std::set<std::string>{"I-UNRESOLVED"});
     CHECK(doc.at("summary").at("parseErrors") == 0);
+}
+
+// A module condition is a row of its own, counted whatever the module holds: before, a condition in error
+// was printed but left out of every summary count and of the exit status, so a module with only a built-in
+// item and a broken condition checked as 0 errors with exit status 0.
+TEST_CASE("maths cli: maths check counts a module condition in error whatever the module holds",
+          "[unit][cli]") {
+    const TempDir dir("condition");
+    const std::filesystem::path builtinOnly = writeTemp(dir, "a-builtin-only.maths.json", R"json({
+  "$schema": "urn:esses:maths-1", "schemaVersion": 1, "id": "builtin-only",
+  "condition": "'Driver' ==",
+  "items": [{"kind": "builtin", "module": "esses.corrected_speed_distance", "version": 1}]})json");
+    AppContext ctx = context();
+    MathsCheckOptions o;
+    o.modules = {builtinOnly};
+    o.json = true;
+    std::ostringstream out;
+    std::ostringstream err;
+    CHECK(runMathsCheck(ctx, o, out, err) == 1);
+    nlohmann::json doc = nlohmann::json::parse(out.str());
+    CHECK(doc.at("modules").at(0).at("condition").at("status") == "Error");
+    CHECK(doc.at("modules").at(0).at("items").at(0).at("status") == "Ok"); // the built-in item itself
+    const nlohmann::json& summary = doc.at("summary");
+    CHECK(summary.at("moduleErrors") == 1);
+    CHECK(summary.at("parseErrors") == 1);
+    CHECK(summary.at("error") == 0); // ok/warning/error/disabled stay item counts
+    CHECK(summary.at("items") == 1);
+    CHECK(summary.at("codes").at("E-SYNTAX") == 1);
+
+    std::ostringstream text;
+    o.json = false;
+    CHECK(runMathsCheck(ctx, o, text, err) == 1);
+    CHECK(text.str().find("  Error  (condition)\n      E-SYNTAX error") != std::string::npos);
+    CHECK(text.str().find("1 items: 1 ok, 0 warning, 0 error, 0 disabled; 1 parse errors; 1 module errors") !=
+          std::string::npos);
+
+    // Named items: the graph disables them with E-CONDITION; the condition row is the module's error, once.
+    const std::filesystem::path named = writeTemp(dir, "b-named.maths.json", R"json({
+  "$schema": "urn:esses:maths-1", "schemaVersion": 1, "id": "named",
+  "condition": "'Driver' ==",
+  "items": [{"kind": "expression", "name": "A", "expr": "1"}, {"kind": "expression", "name": "B", "expr": "2"}]})json");
+    o.modules = {named};
+    o.json = true;
+    std::ostringstream out2;
+    CHECK(runMathsCheck(ctx, o, out2, err) == 1);
+    doc = nlohmann::json::parse(out2.str());
+    CHECK(doc.at("modules").at(0).at("condition").at("status") == "Error");
+    CHECK(doc.at("modules").at(0).at("items").at(0).at("status") == "Disabled");
+    CHECK(doc.at("summary").at("moduleErrors") == 1);
+    CHECK(doc.at("summary").at("codes").at("E-CONDITION") == 2); // one per disabled item
+
+    // A disabled module's condition is not evaluated: listed, not an error.
+    const std::filesystem::path off = writeTemp(dir, "c-off.maths.json", R"json({
+  "$schema": "urn:esses:maths-1", "schemaVersion": 1, "id": "off", "enabled": false,
+  "condition": "'Driver' ==",
+  "items": [{"kind": "builtin", "module": "esses.corrected_speed_distance", "version": 1}]})json");
+    o.modules = {off};
+    std::ostringstream out3;
+    CHECK(runMathsCheck(ctx, o, out3, err) == 0);
+    doc = nlohmann::json::parse(out3.str());
+    CHECK(doc.at("modules").at(0).at("condition").at("status") == "Disabled");
+    CHECK(doc.at("summary").at("moduleErrors") == 0);
+    CHECK(doc.at("summary").at("parseErrors") == 0);
+
+    // With a log, a condition that type-checks but reads a channel is refused by the graph (03 section 4.3
+    // rule 8: an expression over the details): its E-CONDITION makes the condition row an error.
+    const std::filesystem::path channel = writeTemp(dir, "d-channel.maths.json", R"json({
+  "$schema": "urn:esses:maths-1", "schemaVersion": 1, "id": "reads-a-channel",
+  "condition": "'Speed' > 0",
+  "items": [{"kind": "expression", "name": "A", "expr": "1"}]})json");
+    o.modules = {channel};
+    o.log = repoRoot() / "fixtures" / "generic.csv" / "sparse-gps" / "input.csv";
+    o.noSidecar = true;
+    std::ostringstream out4;
+    std::ostringstream err4;
+    const int status = runMathsCheck(ctx, o, out4, err4);
+    INFO(err4.str());
+    CHECK(status == 1);
+    doc = nlohmann::json::parse(out4.str());
+    const nlohmann::json& cond = doc.at("modules").at(0).at("condition");
+    CHECK(cond.at("status") == "Error");
+    REQUIRE_FALSE(cond.at("diagnostics").empty());
+    CHECK(cond.at("diagnostics").back().at("code") == "E-CONDITION");
+    CHECK(doc.at("summary").at("moduleErrors") == 1);
 }
 
 TEST_CASE("maths cli: maths functions lists the registry", "[unit][cli]") {

@@ -12,8 +12,12 @@
 //                   scale_offset items and compile errors as the application finds them (D-188), against a
 //                   log's channels, details and built-in modules with --log, else without a source (names are
 //                   I-UNRESOLVED and an item reading one is checked, not compiled); per-item status Ok /
-//                   Warning / Error / Disabled and summary counts (AC-M2-01: tools/maths_corpus_check.py
-//                   aggregates them without names or expressions).
+//                   Warning / Error / Disabled, a module condition's status as a row of its own, and summary
+//                   counts (AC-M2-01: tools/maths_corpus_check.py aggregates them without names or
+//                   expressions). ok/warning/error/disabled count items; codes and parseErrors count the
+//                   condition rows too; moduleErrors counts modules that do not load, enabled modules whose
+//                   condition is in error and built-in modules that do not register. Exit 1 when an item is
+//                   in error or moduleErrors is not 0.
 //   maths functions the manifests of the function registry (03 section 10.1).
 #pragma once
 
@@ -42,7 +46,7 @@ struct EvalOptions {
     std::string expression;
     std::vector<std::filesystem::path> files;
     std::string layer = "Normal";
-    std::string rate = "auto";       // auto | <Hz> | <num>/<den>
+    std::string rate = "auto";       // auto | <Hz> | <num>/<den>, exact (parseRate: "20.5" is 41/2)
     std::string unit;                // the declared result unit; the values are reported in it
     std::string range;               // "Outings:Laps/3": report only the samples of that range
     std::vector<std::string> compat; // "unaryMinusAbovePower=1"

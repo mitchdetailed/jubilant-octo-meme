@@ -13,9 +13,11 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <charconv>
 #include <map>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -279,7 +281,16 @@ Result<SchemaRef> SchemaRegistry::schemaOf(const JsonDoc& doc) const {
     const std::size_t dash = key->rfind('-');
     SchemaRef ref;
     ref.id = key->substr(0, dash);
-    ref.version = std::stoi(key->substr(dash + 1));
+    // isSchemaKey admits at most six digits; parsed without an exception all the same (01 section 6 rule 1).
+    const std::string_view major = std::string_view(*key).substr(dash + 1);
+    const std::from_chars_result parsed =
+        std::from_chars(major.data(), major.data() + major.size(), ref.version);
+    if (parsed.ec != std::errc() || parsed.ptr != major.data() + major.size()) {
+        ErrorContext ctx;
+        ctx.detail = "/$schema";
+        return fail(ErrorCode::Invalid, "\"$schema\" has a major version out of range: " + uri,
+                    std::move(ctx));
+    }
     ref.schemaVersion = doc.schemaVersion();
     return ref;
 }

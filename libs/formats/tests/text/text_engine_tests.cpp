@@ -340,6 +340,34 @@ TEST_CASE("text engine: a profile with the blocks layout is refused for now", "[
     CHECK(probe.error().code == ErrorCode::Unsupported);
 }
 
+// The header's row numbers are public strings: one that is not a row number is an Invalid result from the
+// analysis and from toJson, never an exception (std::stoi threw, an Internal error or an escape from toJson).
+TEST_CASE("text engine: a header row that is not a number is Invalid, never an exception", "[unit]") {
+    std::vector<std::string> log;
+    auto p = TextProfile::parse(
+        R"({"$schema": "urn:esses:importer-profile-1", "schemaVersion": 1, "id": "rows", "name": "R",
+        "version": "1", "header": {"unitsRow": 1, "dataRow": 2}})",
+        log);
+    REQUIRE(p.ok());
+    REQUIRE(p->toJson().ok());
+    constexpr std::string_view kCsv = "Time,A\ns,V\n0,1\n1,2\n";
+    REQUIRE(TextEngine::makeImporter(*p)->probe(*memory(kCsv)).ok());
+    for (const char* bad : {"x", "1x", "-1", "99999999999999999999999"}) {
+        for (const bool units : {true, false}) {
+            INFO(bad << (units ? " as unitsRow" : " as dataRow"));
+            TextProfile q = *p;
+            (units ? q.header.unitsRow : q.header.dataRow) = bad;
+            const auto text = q.toJson();
+            REQUIRE_FALSE(text.ok());
+            CHECK(text.error().code == ErrorCode::Invalid);
+            const auto probe = TextEngine::makeImporter(q)->probe(*memory(kCsv));
+            REQUIRE_FALSE(probe.ok());
+            CHECK(probe.error().code == ErrorCode::Invalid);
+            CHECK(probe.error().message.find("is not a row number") != std::string::npos);
+        }
+    }
+}
+
 TEST_CASE("text engine: addProfile refuses colliding ids and foreign importer ids", "[unit]") {
     Env env;
     std::vector<std::string> log;

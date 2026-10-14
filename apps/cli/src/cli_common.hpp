@@ -3,10 +3,11 @@
 //
 // Small helpers shared by the esses-cli commands and esses-gen-fixtures: whole-file I/O through UTF-8 paths,
 // the canonical JSON text of 02 section 6.5 rule 1 (through esses_model's one canonical writer),
-// exception-free JSON parsing, and the reversible file-name encoding of channel names used under
-// expected.channels/.
+// exception-free JSON parsing, the reversible file-name encoding of channel names used under
+// expected.channels/, and exact rates from the command line.
 #pragma once
 
+#include <esses/base/rate.hpp>
 #include <esses/base/result.hpp>
 
 #include <nlohmann/json.hpp>
@@ -43,5 +44,12 @@ std::string percentDecode(std::string_view text);
 
 // "a,b,,c" -> {"a","b","c"}
 std::vector<std::string> splitList(std::string_view text, char separator = ',');
+
+// An exact rate from a command-line option (rates are rationals, D-008): "<number>" or "<number>/<number>",
+// each an unsigned decimal with an optional fraction and exponent ("20", "20.5", "1e3", "2.5E-1"), converted
+// exactly and reduced ("20.5" and "20.5/1" -> 41/2, "33.333" -> 33333/1000, "100/3" -> 100/3). Invalid, with
+// the reason, for a sign, a zero, anything else that is not such a number ("inf", "nan", "0x10", spaces), a
+// number with more than 19 significant digits, or a num or den that does not fit 32 bits once reduced.
+Result<Rate> parseRate(std::string_view text);
 
 } // namespace esses::cli

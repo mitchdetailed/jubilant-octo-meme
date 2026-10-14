@@ -120,7 +120,10 @@ TEST_CASE("schema registry: schemaOf reads the id, the major and the minor", "[u
     CHECK(*ref == SchemaRef{"project", 12, 0});
     for (const char* bad : {R"({"schemaVersion": 1})", R"({"$schema": 1})", R"([1])",
                             R"({"$schema": "http://json-schema.org/draft-07/schema#"})",
-                            R"({"$schema": "urn:esses:project"})", R"({"$schema": "urn:esses:project-0"})"}) {
+                            R"({"$schema": "urn:esses:project"})", R"({"$schema": "urn:esses:project-0"})",
+                            // a major beyond int is Invalid, never an exception
+                            R"({"$schema": "urn:esses:project-999999999999999999999999999999"})",
+                            R"({"$schema": "https://esses.example/s/project-2147483648.schema.json"})"}) {
         INFO(bad);
         const auto r = registry.schemaOf(doc(bad));
         REQUIRE_FALSE(r.ok());

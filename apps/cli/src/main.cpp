@@ -97,7 +97,8 @@ int run(const std::vector<std::string>& args) {
         ->required();
     evalCmd->add_option("files", evalFiles, "the logs")->required();
     evalCmd->add_option("--layer", eval.layer, "the layer (default Normal)");
-    evalCmd->add_option("--rate", eval.rate, "auto (the highest input rate), a number of Hz or num/den");
+    evalCmd->add_option("--rate", eval.rate,
+                        "auto (the highest input rate), a number of Hz or num/den, exact (20.5 = 41/2 Hz)");
     evalCmd->add_option("--unit", eval.unit, "the result unit the values are reported in");
     evalCmd->add_option("--range", eval.range, "report only the samples of a range, e.g. \"Outings:Laps/3\"");
     evalCmd->add_option("--compat", eval.compat, "unaryMinusAbovePower=1, alias:<spelling>=<function>");
@@ -121,7 +122,7 @@ int run(const std::vector<std::string>& args) {
     exportCmd->add_option("--range", exportOptions.range, "write one range, e.g. \"Outings:Laps/3\"");
     exportCmd->add_option("--format", exportOptions.format, "csv (default) or motec.csv");
     exportCmd->add_option("--rate", exportOptions.rate,
-                          "the CSV grid in Hz (default: the highest rate, <= 1 kHz)");
+                          "the CSV grid, Hz or num/den, at most 1 MHz (default: the highest rate, <= 1 kHz)");
     exportCmd->add_option("--units", exportUnits, "display units, e.g. \"Corr Speed=km/h,Oil Temp=deg C\"");
     exportCmd->add_option("--layer", exportOptions.layer, "the layer (default Normal)");
     exportCmd->add_option("-o,--output", exportOutput, "the CSV file")->required();

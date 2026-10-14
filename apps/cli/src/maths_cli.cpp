@@ -82,32 +82,6 @@ double shortestF32(double v) {
     return out;
 }
 
-std::optional<Rate> parseRateText(const std::string& text) {
-    if (text.empty() || text == "auto") {
-        return std::nullopt;
-    }
-    const std::size_t slash = text.find('/');
-    double num = 0.0;
-    double den = 1.0;
-    const auto parse = [](std::string_view s, double& out) {
-        const auto r = fast_float::from_chars(s.data(), s.data() + s.size(), out);
-        return r.ec == std::errc() && r.ptr == s.data() + s.size();
-    };
-    const std::string_view all(text);
-    if (slash == std::string::npos
-            ? !parse(all, num)
-            : (!parse(all.substr(0, slash), num) || !parse(all.substr(slash + 1), den))) {
-        return Rate{};
-    }
-    if (!(num > 0.0) || !(den > 0.0) || num > 4e9 || den > 4e9) {
-        return Rate{};
-    }
-    if (slash == std::string::npos && std::trunc(num) != num) {
-        return Rate{static_cast<std::uint32_t>(std::llround(num * 1000.0)), 1000}.normalised();
-    }
-    return Rate{static_cast<std::uint32_t>(num), static_cast<std::uint32_t>(den)}.normalised();
-}
-
 // Nominal rate of a channel (03 section 6.4 rule 2, as MathGraph reads it, D-185): the descriptor's, else for
 // a timestamped series one over its mean interval rounded to whole Hz (a period below 1 Hz).
 std::optional<Rate> nominalRate(const model::Channel& c) {
@@ -490,10 +464,11 @@ int runEval(AppContext& ctx, const EvalOptions& o, std::ostream& out, std::ostre
     }
     m::MathItem item;
     item.name = "eval";
-    const std::optional<Rate> rate = parseRateText(o.rate);
-    if (rate) {
-        if (!rate->valid()) {
-            err << "esses-cli eval: --rate is auto, a number of Hz or num/den\n";
+    if (!o.rate.empty() && o.rate != "auto") {
+        const Result<Rate> rate = parseRate(o.rate); // exact (D-008): "20.5/1" is 41/2 Hz
+        if (!rate) {
+            err << "esses-cli eval: --rate '" << o.rate << "': " << rate.error().message
+                << " (auto, a number of Hz or num/den)\n";
             return 2;
         }
         item.rate.automatic = false;
@@ -830,9 +805,16 @@ int runMathsCheck(AppContext& ctx, const MathsCheckOptions& o, std::ostream& out
         }
         for (const m::IBuiltinModule* module : builtins) {
             m::Diagnostics diags;
-            if (Result<std::vector<m::ChannelKey>> keys = graph.defineBuiltin(*module, {}, diags); !keys) {
+            // Its diagnostics belong to no item row: counted here, and a module that does not register is a
+            // module error (the reason on stderr).
+            Result<std::vector<m::ChannelKey>> keys = graph.defineBuiltin(*module, {}, diags);
+            for (const m::Diagnostic& d : diags) {
+                ++byCode[d.code];
+            }
+            if (!keys) {
                 err << "esses-cli maths check: built-in module " << module->id() << ": "
                     << describe(keys.error()) << "\n";
+                ++moduleErrors;
             }
         }
     }
@@ -850,17 +832,51 @@ int runMathsCheck(AppContext& ctx, const MathsCheckOptions& o, std::ostream& out
         }
         const m::MathModule& module = *l.module;
         mj["id"] = module.id;
-        if (module.condition) {
-            const SourceScope scope(source, o.layer, &module, m::FunctionRegistry::builtin(), units);
-            const ItemCheck cond = checkSource(*module.condition, scope, *compat);
-            mj["condition"] = json{{"status", cond.status}, {"diagnostics", diagnosticsJson(cond.diags)}};
-        }
         text << "module " << module.id << " (" << u8(l.file) << ")\n";
         // The module's nodes in item order (the graph makes one per item with a name, built-in items aside).
         std::vector<const m::MathNodeInfo*> mine;
         for (const m::MathNodeInfo& n : nodes) {
             if (n.moduleId == l.graphId && n.origin == m::MathModule::Origin::Global) {
                 mine.push_back(&n);
+            }
+        }
+        if (module.condition) {
+            // The condition is a row of its own, counted like an item (codes, parse errors) and, in error,
+            // as a module error: a module with no named item has no node that could carry it.
+            const SourceScope scope(source, o.layer, &module, m::FunctionRegistry::builtin(), units);
+            ItemCheck cond = checkSource(*module.condition, scope, *compat);
+            if (!m::hasError(cond.diags)) {
+                // The application's verdict (03 section 4.3 rule 8): a condition the graph cannot fold over
+                // the details disables the module's items with E-CONDITION, which the type check above may
+                // pass (with --log, a condition that reads a channel).
+                for (const m::MathNodeInfo* n : mine) {
+                    for (const m::Diagnostic& d : n->status.diags) {
+                        if (d.code == "E-CONDITION" && d.level == m::Diagnostic::Error) {
+                            cond.diags.push_back(d);
+                        }
+                    }
+                    if (m::hasError(cond.diags)) {
+                        cond.status = "Error";
+                        break;
+                    }
+                }
+            }
+            if (!module.enabled) {
+                cond.status = "Disabled"; // a disabled module's condition is not evaluated
+            }
+            for (const m::Diagnostic& d : cond.diags) {
+                ++byCode[d.code];
+            }
+            if (cond.parseError && module.enabled) {
+                ++parseErrors;
+            }
+            if (cond.status == "Error") {
+                ++moduleErrors;
+            }
+            mj["condition"] = json{{"status", cond.status}, {"diagnostics", diagnosticsJson(cond.diags)}};
+            text << "  " << cond.status << "  (condition)\n";
+            for (const m::Diagnostic& d : cond.diags) {
+                text << "      " << diagnosticText(d) << "\n";
             }
         }
         std::size_t next = 0;
@@ -921,7 +937,7 @@ int runMathsCheck(AppContext& ctx, const MathsCheckOptions& o, std::ostream& out
     } else {
         out << text.str() << items << " items: " << byStatus["Ok"] << " ok, " << byStatus["Warning"]
             << " warning, " << byStatus["Error"] << " error, " << byStatus["Disabled"] << " disabled; "
-            << parseErrors << " parse errors\n";
+            << parseErrors << " parse errors; " << moduleErrors << " module errors\n";
     }
     return (moduleErrors > 0 || byStatus["Error"] > 0) ? 1 : 0;
 }

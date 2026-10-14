@@ -10,8 +10,11 @@
 #include <nlohmann/json-schema.hpp>
 
 #include <algorithm>
+#include <charconv>
+#include <cstdint>
+#include <limits>
 #include <ostream>
-#include <regex>
+#include <string_view>
 #include <system_error>
 
 namespace esses::cli {
@@ -43,16 +46,57 @@ Result<std::unique_ptr<nlohmann::json_schema::json_validator>> makeValidator(con
 SchemaStore::SchemaStore(std::filesystem::path dir) : dir_(std::move(dir)) {}
 SchemaStore::~SchemaStore() = default;
 
-std::optional<std::string> SchemaStore::schemaName(std::string_view uri) {
-    static const std::regex kUrn("^(?:urn:esses:|esses:)([a-z][a-z0-9-]*-[1-9][0-9]*)$");
-    static const std::regex kHttps(
-        R"(^https://[^/\s]+(?:/[^/\s]+)*/([a-z][a-z0-9-]*-[1-9][0-9]*)(?:\.schema)?\.json$)");
-    std::match_results<std::string_view::const_iterator> m;
-    if (std::regex_match(uri.begin(), uri.end(), m, kUrn) ||
-        std::regex_match(uri.begin(), uri.end(), m, kHttps)) {
-        return m[1].str();
+namespace {
+
+// "<name>-<major>": [a-z][a-z0-9-]* '-' [1-9][0-9]* (the major has no '-', so it follows the last one).
+bool isSchemaKey(std::string_view key) {
+    const std::size_t dash = key.rfind('-');
+    if (dash == std::string_view::npos || dash == 0 || dash + 1 == key.size()) {
+        return false;
     }
-    return std::nullopt;
+    const auto lower = [](char c) { return c >= 'a' && c <= 'z'; };
+    const auto digit = [](char c) { return c >= '0' && c <= '9'; };
+    const std::string_view name = key.substr(0, dash);
+    const std::string_view major = key.substr(dash + 1);
+    return lower(name.front()) &&
+           std::all_of(name.begin(), name.end(), [&](char c) { return lower(c) || digit(c) || c == '-'; }) &&
+           major.front() != '0' && std::all_of(major.begin(), major.end(), digit);
+}
+
+} // namespace
+
+// Matched by hand, not with std::regex: its recursive matcher overflowed the stack on a long "$schema" (an
+// https form of 100 KB ended the whole process). The language is unchanged:
+//   ^(?:urn:esses:|esses:)(KEY)$  and  ^https://[^/\s]+(?:/[^/\s]+)*/(KEY)(?:\.schema)?\.json$
+std::optional<std::string> SchemaStore::schemaName(std::string_view uri) {
+    std::string_view key;
+    if (uri.starts_with("urn:esses:")) {
+        key = uri.substr(10);
+    } else if (uri.starts_with("esses:")) {
+        key = uri.substr(6);
+    } else if (uri.starts_with("https://")) {
+        const std::string_view rest = uri.substr(8);
+        const std::size_t last = rest.rfind('/');
+        if (last == std::string_view::npos || rest.front() == '/' ||
+            rest.find("//") != std::string_view::npos ||
+            rest.find_first_of(" \t\n\v\f\r") != std::string_view::npos) {
+            return std::nullopt; // no path, an empty host or segment, or whitespace
+        }
+        key = rest.substr(last + 1);
+        if (!key.ends_with(".json")) {
+            return std::nullopt;
+        }
+        key.remove_suffix(5);
+        if (key.ends_with(".schema")) {
+            key.remove_suffix(7);
+        }
+    } else {
+        return std::nullopt;
+    }
+    if (!isSchemaKey(key)) {
+        return std::nullopt;
+    }
+    return std::string(key);
 }
 
 bool SchemaStore::isMetaSchema(std::string_view uri) {
@@ -137,6 +181,32 @@ struct FileOutcome {
     std::vector<std::string> log; // migration steps and notes (02 section 6.6 rule 5)
 };
 
+// The newest major below `major` that `dir` has a schema <name>-<major>.schema.json for, 0 when none. The
+// directory is listed once, so a huge major costs one listing, not a file probe per number below it.
+int newestMajorBelow(const std::filesystem::path& dir, const std::string& name, int major) {
+    constexpr std::string_view kSuffix = ".schema.json";
+    const std::string prefix = name + "-";
+    int newest = 0;
+    std::error_code ec;
+    for (std::filesystem::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
+        const std::string file = u8(it->path().filename());
+        if (file.size() <= prefix.size() + kSuffix.size() || !file.starts_with(prefix) ||
+            !file.ends_with(kSuffix)) {
+            continue;
+        }
+        const std::string_view number =
+            std::string_view(file).substr(prefix.size(), file.size() - prefix.size() - kSuffix.size());
+        int n = 0;
+        const std::from_chars_result r = std::from_chars(number.data(), number.data() + number.size(), n);
+        std::error_code fileEc;
+        if (r.ec == std::errc() && r.ptr == number.data() + number.size() && number.front() != '0' &&
+            n >= 1 && n < major && n > newest && it->is_regular_file(fileEc)) {
+            newest = n;
+        }
+    }
+    return newest;
+}
+
 // Steps 1-2 of 02 section 6.6 rule 2 on an Esses document: a major newer than the schemas of `dir` is
 // refused, an older minor is migrated to the newest one the registered steps reach. Returns the errors
 // (empty: go on validating `doc`, which may have been replaced by its migrated form).
@@ -150,25 +220,41 @@ std::vector<SchemaError> prepareForValidation(json& doc, const std::filesystem::
     }
     const std::size_t dash = key->rfind('-');
     const std::string name = key->substr(0, dash);
-    const int major = std::stoi(key->substr(dash + 1));
+    // The major is all digits (schemaName's pattern) but need not fit an int; one that does not is newer than
+    // any this build reads. Never an exception: one document's "$schema" must not stop the batch.
+    const std::string_view digits = std::string_view(*key).substr(dash + 1);
+    int major = 0;
+    const std::from_chars_result parsed =
+        std::from_chars(digits.data(), digits.data() + digits.size(), major);
+    if (parsed.ec == std::errc::result_out_of_range) {
+        major = std::numeric_limits<int>::max();
+    } else if (parsed.ec != std::errc() || parsed.ptr != digits.data() + digits.size() || major < 1) {
+        return {{"/$schema", *key + " does not end in a major version number"}};
+    }
     std::error_code ec;
     if (!std::filesystem::is_regular_file(dir / p8(*key + ".schema.json"), ec)) {
-        for (int older = major - 1; older >= 1; --older) {
+        if (const int older = newestMajorBelow(dir, name, major); older > 0) {
             const std::string known = name + "-" + std::to_string(older);
-            if (std::filesystem::is_regular_file(dir / p8(known + ".schema.json"), ec)) {
-                return {{"/$schema", *key + " is a newer major than this build reads (" + known +
-                                         "); the file is not opened (02 section 6.6 rule 2)"}};
-            }
+            return {{"/$schema", *key + " is a newer major than this build reads (" + known +
+                                     "); the file is not opened (02 section 6.6 rule 2)"}};
         }
         return {}; // reported as an unknown schema by the validator
     }
     const project::Migrations& migrations = project::Migrations::instance();
     const int latest = migrations.latest(*key);
-    const int version = doc.contains("schemaVersion") && doc["schemaVersion"].is_number_integer()
-                            ? doc["schemaVersion"].get<int>()
-                            : 1;
+    int version = 1;
+    std::string versionText = "1";
+    if (const auto v = doc.find("schemaVersion"); v != doc.end() && v->is_number_integer()) {
+        // Read without narrowing: a schemaVersion beyond int is newer than any, never wrapped round.
+        constexpr int kMax = std::numeric_limits<int>::max();
+        constexpr int kMin = std::numeric_limits<int>::min();
+        version = v->is_number_unsigned()
+                      ? static_cast<int>(std::min<std::uint64_t>(v->get<std::uint64_t>(), kMax))
+                      : static_cast<int>(std::clamp<std::int64_t>(v->get<std::int64_t>(), kMin, kMax));
+        versionText = v->dump();
+    }
     if (version > latest) {
-        r.log.push_back(*key + " schemaVersion " + std::to_string(version) + " is newer than this build's " +
+        r.log.push_back(*key + " schemaVersion " + versionText + " is newer than this build's " +
                         std::to_string(latest) + "; validated as it is");
         return {};
     }

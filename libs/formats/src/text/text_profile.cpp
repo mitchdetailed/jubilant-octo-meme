@@ -13,8 +13,11 @@
 #include <esses/formats/text_profile.hpp>
 
 #include <algorithm>
+#include <charconv>
+#include <optional>
 #include <set>
 #include <string>
+#include <system_error>
 #include <utility>
 
 namespace esses::formats {
@@ -82,6 +85,17 @@ std::string_view encodingName(TextProfile::Encoding e) {
         break;
     }
     return "cp1252";
+}
+
+// A header row number held as text ("3"): the number the document stores, nullopt for anything else (the
+// header's fields are public strings; never an exception).
+std::optional<int> rowNumber(const std::string& text) {
+    int n = 0;
+    const std::from_chars_result r = std::from_chars(text.data(), text.data() + text.size(), n);
+    if (r.ec != std::errc() || r.ptr != text.data() + text.size() || n < 0) {
+        return std::nullopt;
+    }
+    return n;
 }
 
 bool oneOf(std::string_view v, std::initializer_list<std::string_view> values) {
@@ -596,13 +610,17 @@ Result<std::string> TextProfile::toJson() const {
         h["unitsRow"] = nullptr;
     } else if (header.unitsRow == "@auto") {
         h["unitsRow"] = "@auto";
+    } else if (const std::optional<int> u = rowNumber(header.unitsRow)) {
+        h["unitsRow"] = *u;
     } else {
-        h["unitsRow"] = std::stoi(header.unitsRow);
+        return fail(ErrorCode::Invalid, "header.unitsRow '" + header.unitsRow + "' is not a row number");
     }
     if (header.dataRow == "auto" || header.dataRow.empty()) {
         h["dataRow"] = "auto";
+    } else if (const std::optional<int> d = rowNumber(header.dataRow)) {
+        h["dataRow"] = *d;
     } else {
-        h["dataRow"] = std::stoi(header.dataRow);
+        return fail(ErrorCode::Invalid, "header.dataRow '" + header.dataRow + "' is not a row number");
     }
     h["unitInName"] = header.unitInName.empty() ? json(nullptr) : json(header.unitInName);
     h["ignoreEmptyNames"] = header.ignoreEmptyNames;

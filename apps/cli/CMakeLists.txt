@@ -116,7 +116,13 @@ if(ESSES_BUILD_TESTS)
                    "-DEXPR='SPEED'[m/s] * 2" "-DARGS=--range Outings:Laps/1" -DRATE_NUM=1000 -DRATE_DEN=1
                    -DUNIT=m/s -DDTYPE=F32 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/eval-json-speed"
                    -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/eval_golden.cmake")
-  set_tests_properties(cli.eval.golden_gear cli.eval.json_speed_lap PROPERTIES
+  # --rate is exact (D-008): "20.5/1" evaluates at 41/2 Hz, not 20 Hz.
+  add_test(NAME cli.eval.json_rate_exact
+           COMMAND "${CMAKE_COMMAND}" "-DCLI=${_cli}" "-DINPUT=${_acc_input}" "-DMODE=json"
+                   "-DEXPR='SPEED'[m/s] * 2" "-DARGS=--range Outings:Laps/1 --rate 20.5/1" -DRATE_NUM=41
+                   -DRATE_DEN=2 -DUNIT=m/s -DDTYPE=F32 "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/eval-json-rate"
+                   -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/eval_golden.cmake")
+  set_tests_properties(cli.eval.golden_gear cli.eval.json_speed_lap cli.eval.json_rate_exact PROPERTIES
                        FIXTURES_REQUIRED esses_fixture_inputs LABELS "cli;fixtures" TIMEOUT 300)
   # export (07 section 5.1, project-aware CSV with maths) over the generated synthetic-acc-dialect input with the
   # project of tests/data/export-project: mappings at open, the project's maths (a selection-dependent stat over
