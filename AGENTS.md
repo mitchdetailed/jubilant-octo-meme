@@ -36,11 +36,11 @@ These apply to every change, human or AI, and are checked in review and in CI.
 5. **Research material.** `docs/design/background/` (local only) holds the research notes and design-panel
    proposals. Read the relevant summary (`research/features_compact.md`, `research/concepts.md`) before
    implementing a behaviour, but never copy its wording or any quoted help text into a committed file.
-6. **Vendor marks** (`TRADEMARK.md`, D-003, D-125). The vendor's and product's names never appear in
+6. **Vendor marks** (00_OVERVIEW §8, D-003, D-125; `TRADEMARK.md` is withheld until a working model, D-192). The vendor's and product's names never appear in
    identifiers, file names, UI strings, string literals or JSON values, except for the five allow-listed
    nominative classes in `tools/vendor_marks_allowlist.txt` (importer ids `motec.ld`/`motec.csv`, dialog format
    labels, the CSV writer's format-name constant, the `x-i2`/`xI2` round-trip bag, and prose in `CLEANROOM.md`,
-   `NOTICES.md`, `TRADEMARK.md`, `docs/` and fixture READMEs). Code that handles a vendor format uses neutral
+   `NOTICES.md`, `docs/` and fixture READMEs). Code that handles a vendor format uses neutral
    names (`Cfg*`, `Legacy*`). `python -I tools/check_vendor_marks.py` must report 0 findings.
 7. **The design is the contract.** Use the names in `ARCHITECTURE_OUTLINE.md` §1 and §4 verbatim; a new public
    name is added to the outline first. A departure from the design is recorded (an ADR in

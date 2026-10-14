@@ -25,3 +25,6 @@ fixtures/motec.ld/synthetic-*/input.ldx
 tests/maths/user_modules/
 tests/maths/oracle/
 *.private.json
+
+# Texts withheld from the published repository until there is a working model (D-192); restore before release
+docs/unpublished/

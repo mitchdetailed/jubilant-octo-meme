@@ -9,7 +9,7 @@ that relates to MoTeC i2 or its file formats (D-004, D-128; 08_REPO_AND_BUILD.md
 2. i2 behaviour comes only from: the help pages as displayed by the shipped help viewer, shipped XML or
    configuration files, SDK samples, public sources, and black-box observation on the user's licensed install.
 3. No MoTeC code, art, icons, help text, sample files, templates, schemes or trademarks are committed or
-   shipped. Vendor marks appear only nominatively (`TRADEMARK.md`).
+   shipped. Vendor marks appear only nominatively (the trademark policy in `docs/design/00_OVERVIEW.md` section 8).
 4. AI-provenance rule (from `CONTRIBUTING.md`): never paste i2 help text, i2 shipped files, vendor XML or GPL
    source into a prompt that generates committed code, documentation, keymap `doc` strings or tooltips;
    describe behaviour in your own words first.

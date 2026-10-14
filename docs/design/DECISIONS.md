@@ -51,7 +51,7 @@ Each ADR has: Title · Context · Options considered (with the research facts th
 | D-035 | MVP scope and milestones | parity-first's MVP minus i2 file importers, index DB and GL (all v1.0); Lap/Details editors, Time Report and sections stay in MVP; ~30 weeks to 0.1, re-estimated ≈ 42 with contingency (D-045) | **yes** (scope cut; answered 2026-10-10) |
 | D-036 | Profiles | Circuit profile only in MVP; range kinds for Run/Stage exist in the model from M0; Drag/Rally rules and editors v1.0 | no |
 
-Addendum A (after the open questions) adds D-037–D-191: decisions proposed by the section writers of documents 00–08, by the 2026-10-10 review (A.1–A.8) and by the final cross-document revision (A.9), plus implementation decisions taken once M0 started (A.10: the user's instructions, and the reconciliation with spike S-1 and the converter port specification) the departures of M0 as built from the design (A.11), those of M1 as built (A.12, proposed) and those of M2 (A.13, proposed), with their own index. Where an addendum entry amends an ADR above, the ADR carries a one-line "Amended by" note.
+Addendum A (after the open questions) adds D-037–D-192: decisions proposed by the section writers of documents 00–08, by the 2026-10-10 review (A.1–A.8) and by the final cross-document revision (A.9), plus implementation decisions taken once M0 started (A.10: the user's instructions, and the reconciliation with spike S-1 and the converter port specification) the departures of M0 as built from the design (A.11), those of M1 as built (A.12, proposed) and those of M2 (A.13, proposed), with their own index. Where an addendum entry amends an ADR above, the ADR carries a one-line "Amended by" note.
 
 ---
 
@@ -820,6 +820,7 @@ Rewritten on 2026-10-10 after the review. The list is deduplicated across this d
 | D-189 | Seven keymap rows of milestone M2 move to M3; the workbook rows are built (amends 06 §14.1's milestone column, D-178 (e)) | no | M2 review |
 | D-190 | The rest of the M2 review: recoverable saves, bounded and guarded text reads, coalesced sidecar writes, cancellable opens, the Maths Editor's partial save (amends D-167, D-172, D-177 (a), D-187; 02 §4 sidecar rule 4, §6.8; 05 §7.1) | no | M2 review, AC-M2-06, AC-M2-11, AC-M2-13 |
 | D-191 | The 0.1 evaluator streams a plan in pieces and seals a node's chunks on idle workers (refines D-139; 03 §6.0; AC-M2-10; supersedes the proposal of D-183) | no | AC-M2-10 |
+| D-192 | Public README is a work-in-progress notice; TRADEMARK.md withheld until a working model (amends D-004; AC-M0-10) | no (user request 2026-10-13) | Maintainer |
 
 ### A.1 Review amendments
 
@@ -1968,3 +1969,9 @@ about 3 ms now). The public `Kernel`, `BlockCtx`, `ExtentMode` and `Plan` are un
 summary, cache insertion: about 3.5 ns per sample, 45 % of the set) and the first touch of the chunks' memory; the
 next levers are in `esses_store` and the elementwise interpreter's non-vectorised operators.
 **User must confirm:** no (it supersedes the proposal of D-183, which the maintainer withdraws or confirms).
+
+#### D-192 Public README is a work-in-progress notice; TRADEMARK.md withheld until a working model (amends D-004; AC-M0-10)
+**Context.** The maintainer asked on 2026-10-13 to keep the project description and the trademark notice out of the public view until there is a working model, with only a work-in-progress notice in their place.
+**Decision.** The root `README.md` says only that the project is a work in progress. `TRADEMARK.md` is removed from the repository. Their full texts are kept locally in `docs/unpublished/` (git-ignored) and are restored before the first public release. Other documents point to the trademark policy in `00_OVERVIEW.md` section 8 instead. The vendor-mark rules themselves are unchanged and still enforced by `tools/check_vendor_marks.py`.
+**Consequences.** The repository history still contains the earlier README and TRADEMARK.md, and the design documents describe the project in full; hiding those as well needs a history rewrite and a decision on `docs/` before the repository is made public.
+**User must confirm:** no (requested by the user, 2026-10-13).

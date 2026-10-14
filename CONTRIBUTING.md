@@ -43,7 +43,7 @@ On Windows `tools\dev\build-core.cmd` sets up the MSVC environment and runs all 
   `plotcore`, the CLI) never include a Qt header or link a Qt module (`cmake/qt-free-check.cmake`). Strings
   there are UTF-8 `std::string`.
 - **No exceptions across library boundaries:** fallible public functions return `esses::Result<T>`.
-- Names never contain vendor marks (`TRADEMARK.md`); code handling a vendor format uses neutral names
+- Names never contain vendor marks (the trademark policy in `docs/design/00_OVERVIEW.md` section 8); code handling a vendor format uses neutral names
   (`Cfg*`, `Legacy*`).
 - Every source file starts with the SPDX header:
 <!-- REUSE-IgnoreStart -->
