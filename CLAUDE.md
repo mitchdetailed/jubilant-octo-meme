@@ -19,8 +19,9 @@ Instructions for Claude Code in the Esses repository (D-128, D-151). The full gu
   values outside the allow-list (`tools/vendor_marks_allowlist.txt`); use neutral names (`Cfg*`, `Legacy*`).
 - **Never let a lower layer depend upward or let Qt below layer 4** (`AGENTS.md` section 3).
 - **Never take expectations from the code under test** (fixtures, goldens, lap tables; D-041), never edit
-  `tools/ld_ref_decode.py` to agree with the reader, and never render or commit pixel goldens locally (they come
-  from the ubuntu `qt-app` CI artefact, D-127).
+  `tools/ld_ref_decode.py` to agree with the reader, and never treat a locally rendered pixel golden as
+  authoritative: it may be committed only as provisional (`"generatedOn": "windows"`, report mode) until the
+  ubuntu `qt-app` CI artefact replaces it (D-127 as amended by D-203 (ae)).
 - **Never commit, push, reset or switch branches** unless the maintainer asked for it in this session. Commits
   carry no `Signed-off-by:` while DCO is suspended (D-160); never sign off in the maintainer's name.
 

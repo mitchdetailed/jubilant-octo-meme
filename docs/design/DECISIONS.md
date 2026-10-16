@@ -2145,8 +2145,7 @@ components; only adding or removing one rebuilds the tabs. (ad) **The track fixt
 --all` skips it; recorded in `fixtures/README.md`. (ae) **D-127 (a) amended**: `time_distance` has 21 named cases
 in M3 (the cap of 12 was M1's), and pixel goldens rendered locally may be committed as provisional ("generatedOn":
 "windows", report mode) until the ubuntu artefact replaces them; the `DrawList` JSON goldens stay exact everywhere.
-The contributor guides (`CLAUDE.md`, `AGENTS.md`) still state the old rule; their wording is left to the
-maintainer. (af) **Deferred to M4 or later**: the group-heading behaviours of 04 §8.2 item 4 (drag a heading to
+The contributor guides (`CLAUDE.md`, `AGENTS.md`) state the amended rule. (af) **Deferred to M4 or later**: the group-heading behaviours of 04 §8.2 item 4 (drag a heading to
 reorder groups, double-click for Group Properties; no `GroupHeading` hit is registered yet); the Track Editor's
 speed-class column and section bounds in the Corr Dist unit (06 §13.5 item 4; `TrackSection` has no speed class);
 loading track maps on the pool (the file is small and cached after the first read); the legacy CSV dialect for a
