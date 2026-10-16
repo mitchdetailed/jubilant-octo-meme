@@ -202,6 +202,41 @@ TEST_CASE("taskpool: equal share keys coalesce into one shared Future", "[unit][
     CHECK(runs.load() == 2);
 }
 
+// A worker publishes a task's result (and runs its continuations) a moment before it drops the task's key. A
+// submit in that window, after the Future is ready, starts a task of its own instead of joining the finished
+// one (01 section 5.4 rule 1): the continuation below submits exactly there, deterministically. The window
+// was how MathGraph's Recalculate got a previous result back without evaluating (AC-M2-04, CI on ubuntu).
+TEST_CASE("taskpool: a share key submitted once the task's Future is ready starts a new task",
+          "[unit][taskpool]") {
+    TaskPool pool(1);
+    Gate registered;
+    Gate submitted;
+    std::atomic<int> runs{0};
+    const TaskKey key{"maths/src1/Normal/speed/2/all"};
+    auto f1 = pool.submit(Priority::Visible, key, CancelToken{}, [&](CancelToken) {
+        registered.wait(); // until the continuation is in place, so that it runs on this worker
+        return runs.fetch_add(1) + 1;
+    });
+    Future<int> f2;
+    bool joined = true;
+    bool readyThere = false;
+    f1.onReady([&](const Result<int>&) {
+        // On the worker: f1 is ready, its task not yet completed (the key is still registered).
+        readyThere = f1.ready();
+        f2 = pool.submit(Priority::Visible, key, CancelToken{},
+                         [&](CancelToken) { return runs.fetch_add(1) + 1; });
+        joined = f2.sharesStateWith(f1);
+        submitted.open();
+    });
+    registered.open();
+    submitted.wait();
+    CHECK(readyThere);
+    CHECK_FALSE(joined);
+    CHECK(f1.get().value() == 1);
+    CHECK(f2.get().value() == 2); // ran again: one worker, so after f1's task completed
+    CHECK(runs.load() == 2);
+}
+
 TEST_CASE("taskpool: a chunk key requested by ten components materialises once", "[unit][taskpool]") {
     TaskPool pool(1);
     Gate gate;

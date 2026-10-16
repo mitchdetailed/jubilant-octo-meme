@@ -12,6 +12,7 @@
 #include <nlohmann/json.hpp>
 
 #include <cmath>
+#include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <limits>
@@ -332,4 +333,21 @@ TEST_CASE("json interop: readFile", "[unit][json]") {
     REQUIRE(text.ok());
     CHECK(*text == "a\r\nb");
     CHECK(jsonio::readFile(dir.path() / "none.txt").error().code == ErrorCode::Io);
+}
+
+TEST_CASE("json interop: readFile of a directory is an Io error, never an exception", "[unit][json]") {
+    // A directory opens as a file on POSIX and its read fails (EISDIR); libstdc++ throws that from the
+    // stream buffer whatever the stream's exception mask. Windows refuses the open. Io either way.
+    test::TempDir dir("jsonreaddir");
+    const auto folder = dir.path() / "document.json";
+    std::filesystem::create_directories(folder);
+    Result<std::string> text = fail(ErrorCode::Internal, "not called");
+    REQUIRE_NOTHROW(text = jsonio::readFile(folder));
+    REQUIRE_FALSE(text.ok());
+    CHECK(text.error().code == ErrorCode::Io);
+    CHECK(text.error().context.path == folder);
+    Result<JsonDoc> doc = fail(ErrorCode::Internal, "not called");
+    REQUIRE_NOTHROW(doc = JsonDoc::load(folder));
+    REQUIRE_FALSE(doc.ok());
+    CHECK(doc.error().code == ErrorCode::Io);
 }

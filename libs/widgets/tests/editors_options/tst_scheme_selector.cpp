@@ -7,8 +7,9 @@
 // filled from the shipped scheme of its background with one line per filled item (rule 8); a choice switches
 // the session's scheme live (schemeChanged once, scheme.active in the settings, never on the undo stack),
 // turns "follow OS" off and shows in every selector; restoreActive brings back a user scheme; following the
-// OS does nothing while the OS reports no colour scheme (and picks the shipped dark scheme when it reports
-// dark, Qt 6.8+); Duplicate, Import and Export; the application palette of a scheme.
+// OS does nothing while the OS reports no colour scheme and picks the shipped light or dark scheme when it
+// reports one (a QStyleHints request, Qt 6.8+, is followed as the platform theme reports it); Duplicate,
+// Import and Export; the application palette of a scheme.
 
 #include "../../../qtmodel/tests/qtmodel_test_support.hpp"
 
@@ -177,11 +178,36 @@ private Q_SLOTS:
         } else {
             QCOMPARE(w.session->scheme(), w.session->shippedScheme(os == Qt::ColorScheme::Dark));
         }
-#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
-        QGuiApplication::styleHints()->setColorScheme(Qt::ColorScheme::Dark);
-        selector.applySystemScheme();
+        // The OS reports light, then dark (as colorSchemeChanged carries it to the shell): the shipped scheme
+        // of each, once; Unknown changes nothing. Driven with the reported scheme, so that it holds on every
+        // platform and Qt version (an offscreen platform reports no scheme and ignores requests).
+        selector.applySystemScheme(Qt::ColorScheme::Light);
+        QCOMPARE(w.session->scheme(), w.session->shippedScheme(false));
+        QSignalSpy changed(w.session.get(), &qt::ProjectSession::schemeChanged);
+        QVERIFY(selector.applySystemScheme(Qt::ColorScheme::Dark));
         QCOMPARE(w.session->scheme(), w.session->shippedScheme(true));
+        QCOMPARE(changed.count(), 1);
+        QVERIFY(!selector.applySystemScheme(Qt::ColorScheme::Dark)); // already the dark scheme
+        QVERIFY(!selector.applySystemScheme(Qt::ColorScheme::Unknown));
+        QCOMPARE(w.session->scheme(), w.session->shippedScheme(true));
+        QCOMPARE(changed.count(), 1);
+        QVERIFY(selector.applySystemScheme(Qt::ColorScheme::Light));
+        QCOMPARE(w.session->scheme(), w.session->shippedScheme(false));
+        // Not following: the OS scheme is ignored.
+        selector.setFollowSystem(false);
+        QVERIFY(!selector.applySystemScheme(Qt::ColorScheme::Dark));
+        QCOMPARE(w.session->scheme(), w.session->shippedScheme(false));
+        selector.setFollowSystem(true);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+        // A request through QStyleHints (Qt 6.8): the platform theme may apply it, after its theme-change
+        // event, or ignore it (offscreen); applySystemScheme() follows what QStyleHints then reports.
+        QGuiApplication::styleHints()->setColorScheme(Qt::ColorScheme::Dark);
+        QCoreApplication::processEvents();
+        const Qt::ColorScheme reported = QGuiApplication::styleHints()->colorScheme();
+        selector.applySystemScheme();
+        QCOMPARE(w.session->scheme(), w.session->shippedScheme(reported == Qt::ColorScheme::Dark));
         QGuiApplication::styleHints()->unsetColorScheme();
+        QCoreApplication::processEvents();
 #endif
     }
 

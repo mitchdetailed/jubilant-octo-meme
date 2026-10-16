@@ -122,7 +122,7 @@ public:
     void add(std::unique_ptr<IWriter> writer);
 
     // Best first; ties keep registration order; only confidences > 0. Reads the first 64 KiB and the sibling
-    // listing once. Io when the file cannot be read.
+    // listing once. Io when the file cannot be read or is not a regular file (a directory).
     Result<std::vector<std::pair<const IImporter*, SniffResult>>>
     sniff(const std::filesystem::path& path) const;
     std::vector<std::pair<const IImporter*, SniffResult>> sniff(const SniffInput& input) const;

@@ -53,7 +53,7 @@ if(TEST qtmodel.tst_undo_property)
   foreach(_seed 7 20260101)
     add_test(NAME qtmodel.tst_undo_property.seed_${_seed} COMMAND ${ESSES_PREFIX}_qtmodel_tst_undo_property)
     set_tests_properties(qtmodel.tst_undo_property.seed_${_seed} PROPERTIES
-                         ENVIRONMENT "QT_QPA_PLATFORM=offscreen;ESSES_TEST_SEED=${_seed}"
+                         ENVIRONMENT "${ESSES_QT_TEST_ENVIRONMENT};ESSES_TEST_SEED=${_seed}"
                          ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
                          LABELS "${_esses_undo_labels}" TIMEOUT 600)
   endforeach()

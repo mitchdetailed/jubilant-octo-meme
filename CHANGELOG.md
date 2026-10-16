@@ -136,6 +136,90 @@ All notable changes are recorded here, newest first. The project follows semanti
 
 ## Unreleased (M2)
 
+- Task-pool, test-output and source-loader fixes (pull request 2). A share-key `TaskPool::submit` no longer joins a
+  task whose `Future` is already ready: the worker drops the key a moment after it publishes the result, and a
+  submit in that moment got the old result without a run (MathGraph's Recalculate re-evaluation, and timed runs
+  of the maths bench that skipped evaluations); it now starts a task of its own (01 §5.4 rule 1). A requester
+  that registers just after a share task latched its cancellation gets a task of its own too, instead of a
+  Cancelled result. Qt tests run with `QT_FORCE_STDERR_LOGGING=1` (`ESSES_QT_TEST_ENVIRONMENT`), so their output
+  reaches ctest on Windows, where Qt Test otherwise writes to `OutputDebugString` when the process has no
+  console. `SourceLoader` emits `sourcePublished()` before the distance prefetch, so `channelReady()` never
+  precedes the source it belongs to (a trust edit made in reply was dropped); regression test
+  `qtmodel.tst_source_loader` `noChannelIsAnnouncedBeforeItsSource`, and `tst_source_loader` waits on conditions
+  instead of fixed times. Test: `base.taskpool: a share key submitted once the task's Future is ready starts a
+  new task`.
+
+- Reads are no longer refused while `AtomicFile` replaces the file (Windows). `readWholeFile` read through a
+  `std::ifstream`, which does not share delete access, and `AtomicFile` renamed its temporary into place
+  through its writing handle (write access, no sharing), closed a moment after the rename: a read in that moment
+  failed with a sharing violation (about one in ten reads while another thread replaced the file in a loop),
+  and an open stream made the rename itself fail. `readWholeFile` and the new `readFileHead(path, maxBytes,
+  what)` now open with `CreateFileW` sharing read, write and delete access and read with `ReadFile` (the POSIX
+  path and every error are unchanged). `AtomicFile` writes through a handle that shares read and delete access
+  and renames through a second handle with delete access only, so `MappedFile` (which never shares write
+  access) is not refused either; a rename refused with `ERROR_ACCESS_DENIED` or `ERROR_SHARING_VIOLATION`
+  (a few in a thousand while other threads open the target) is retried for up to 500 ms before the `MoveFileExW`
+  fallback. While the rename is under way the target's name can be missing (gaps of about 10 ms measured, and
+  renames of up to 200 ms on a loaded machine), so `readWholeFile`, `readFileHead` and `MappedFile::open` look
+  again for up to 500 ms when a file is not found or is being deleted; a sharing violation is still reported at
+  once. `ImporterRegistry::sniff(path)` reads its 64 KiB head through `readFileHead`, and `tst_source_loader`
+  reads the sidecar through `readWholeFile`. Regression tests, each holding the handle states of the moment
+  after the rename still and then replacing the file again and again, with no failed read or open allowed:
+  `base.read file: a document that AtomicFile replaces reads whole at every instant` (also an open reader that
+  does not keep a replacement out; 500 reads straight after a write, then at least 2000 reads against a writer
+  thread), `base.atomic file: a mapped reader opens the file at every instant of a replacement` (at least 2000
+  opens against a writer thread) and `formats.registry: sniff reads a log through the handles of an atomic
+  replacement` (200 sniffs straight after a write); the first fails against the previous reader and against the
+  previous writer, the second against the previous writer, the third against the previous sniff.
+
+- One whole-file reader for documents (pull request 2, the macOS `core` job). The four directory regression tests
+  of the previous entry failed on macOS: libc++ opens a directory as a stream and reads it as an empty file, with
+  no error and no exception (libstdc++ throws `std::ios_base::failure` with EISDIR, MSVC refuses the open), so
+  the readers returned empty text and the failure surfaced later as Format, or, in `saveWithBackup`, an empty
+  "previous version" was copied to `backup/` before the replacement failed. `esses_base` gains
+  `readWholeFile(path, what)` and `requireRegularFile(path, what)` (`read_file.hpp`): the file type is checked
+  with `std::filesystem::status` before anything is opened (a directory, device, FIFO or socket is Io "... is
+  not a regular file", a missing file Io "cannot open ..."), the file is read in binary mode through
+  `istream::read`, which turns a failed read into badbit instead of letting it escape, and no exception leaves
+  the call. The seven copies of the old read (`jsonio::readFile`, the settings schemas of the two built-in maths
+  modules, the sidecar, the unit table, the project session's document reads, `esses-cli`'s `readFile`) now
+  call it with their own names in the messages, and `saveWithBackup` refuses a target that exists but is not a
+  regular file before it creates `backup/`. The two other reads of document input that met the same platform
+  difference check the type too: `esses-cli`'s `sha256File` (fixture verification hashed a directory as an
+  empty file on macOS) and `ImporterRegistry::sniff(path)` (a directory read as an empty head on POSIX and was
+  offered to the importers by its extension; Io on Windows). Tests: `base.read file: ...` (regular, empty,
+  missing, directory, and a file that cannot be opened: held without sharing on Windows, without read
+  permission on POSIX) and a directory case in `formats.registry: sniff confidence bands and companions`; the
+  four regression tests are unchanged.
+
+- Fixes for the first CI run of the public repository (pull request 2). `bench.maths_bench.smoke` aborted on
+  Linux with "ChunkCache destroyed while Columns still use it": the readiness block of `esses-maths-bench` (and
+  its `--digest` mode) declared the `TaskPool` before the `ChunkCache`, so the cache was destroyed first, while a
+  worker could still hold the shared state of the task it had just run, and through it the result's `Column`
+  (a worker publishes a result, wakes the requester, then runs the continuations and completes the task). The
+  cache is now declared before the pool, which joins its workers before the cache goes; the other benchmarks,
+  the tests' runtimes and `AppRuntime` already had that order. Linux's scheduler tends to run the woken
+  requester at once and preempt the worker inside that window; Windows usually wakes it on another processor,
+  but the abort reproduces there with the benchmark pinned to one logical processor. The same pinned runs
+  showed a second race: a timed run's fresh graph could join the warm-up run's still-completing task of the
+  same key and skip an evaluation ("expected one evaluation per output"); each run now starts once the pool
+  has completed every task. Regression test `maths.math graph teardown: ...` holds a worker inside the window
+  and checks that the cache keeps the result's chunks until the pool has joined. A save over a directory
+  standing where a document belongs (`qtmodel.tst_project_recovery`) threw `std::ios_base::failure` on Linux:
+  libstdc++'s file buffer throws a failed read (POSIX opens a directory, the read fails with EISDIR) whatever
+  the stream's exception mask, and `istreambuf_iterator` lets it through. `jsonio::readFile` (the save, backup
+  and journal path) returns Io instead, as do the other whole-file readers (sidecar, unit table, the settings
+  schemas of the built-in maths modules, the project session's document reads, `esses-cli`); regression tests
+  in `base`, `project`, `model` and `units`. `SchemeSelector::applySystemScheme(Qt::ColorScheme)` applies the
+  scheme the OS reports, and the shell passes the one `QStyleHints::colorSchemeChanged` carries;
+  `widgets.tst_scheme_selector` drives light, dark and Unknown through it on every Qt version, and checks a
+  Qt 6.8 `QStyleHints::setColorScheme()` request against what the platform theme then reports (the old check
+  expected the request to take effect, which the offscreen platform of Qt 6.12 does not do; on Qt 6.7 it was
+  compiled out). clang-tidy 19 (the `lint` job): the 25 findings are fixed without NOLINT (unchecked
+  `std::optional` access in the maths graph, compiler and kernels and in the text importer, a `std::string`
+  parameter taken by value, two optional-to-value-to-optional conversions), and the run over every Qt-free
+  translation unit is clean.
+
 - Review fixes in `esses-cli` (AC-M2-01, AC-M2-08, AC-M2-14; D-008). `eval --rate` and `export --rate` are exact:
   each of `<Hz>`, `<num>` and `<den>` is an unsigned decimal with an optional fraction and exponent, converted
   exactly and reduced (`20.5/1` is 41/2 Hz, which was truncated to 20 Hz; `33.3333` is 333333/10000, which was

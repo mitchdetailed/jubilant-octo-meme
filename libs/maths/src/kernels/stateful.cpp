@@ -95,7 +95,7 @@ struct Gated {
             reset.emplace(in[2]);
         }
     }
-    double value(std::uint32_t i) const noexcept { return (*x)(i); }
+    double value(std::uint32_t i) const noexcept { return x ? (*x)(i) : kNaN; }
     bool gate(std::uint32_t i) const noexcept { return !cond || truthy((*cond)(i)); }
     // The gated valid value of sample i, or NaN.
     double gated(std::uint32_t i) const noexcept { return gate(i) ? value(i) : kNaN; }

@@ -119,9 +119,9 @@ struct ProjectFile {
 // `target` exists with other bytes, its content is first copied to <projectFolder>/backup/<target file name
 // without ".json">.<yyyymmdd-hhmmss UTC>.json (a "-2", "-3", ... suffix on a clash); then `bytes` is written
 // atomically to `target`, and only the newest `keep` backups of that file are kept. An error means `target`
-// was not written: Io on a failed read or write, and on a failed backup copy unless `backupError` is given,
-// in which case the document is written all the same and the backup's failure (or a failed pruning) is
-// reported there.
+// was not written: Io on a failed read or write, when `target` exists but is not a regular file (a directory:
+// nothing is backed up or written), and on a failed backup copy unless `backupError` is given, in which case
+// the document is written all the same and the backup's failure (or a failed pruning) is reported there.
 Result<void> saveWithBackup(const std::filesystem::path& projectFolder, const std::filesystem::path& target,
                             std::string_view bytes,
                             std::chrono::system_clock::time_point now = std::chrono::system_clock::now(),

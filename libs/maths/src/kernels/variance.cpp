@@ -91,8 +91,9 @@ public:
                    model::canonicalLayerName(reference_->ref.layer) == model::canonicalLayerName(ctx.layer);
         other_ = Grid{};
         status_ = ok();
-        if (mainHere_ && reference_ && !refHere_ &&
-            (channel_.empty() || !ctx.getChannel || !readOtherSource(ctx))) {
+        const MathRangeGeom* reference = reference_ ? &*reference_ : nullptr;
+        if (mainHere_ && reference != nullptr && !refHere_ &&
+            (channel_.empty() || !ctx.getChannel || !readOtherSource(ctx, *reference))) {
             ErrorContext c;
             c.detail = "E-REF-SOURCE";
             status_ = fail(ErrorCode::Unsupported,
@@ -114,13 +115,14 @@ public:
         here.t0 = ctx.t0;
         here.first = ctx.first;
         const Grid& ref = refHere_ ? here : other_;
-        const bool usable = mainHere_ && reference_.has_value() &&
+        const MathRangeGeom* reference = reference_ ? &*reference_ : nullptr;
+        const bool usable = mainHere_ && reference != nullptr &&
                             (!distance_ || (mainDist_ != nullptr && refDist_ != nullptr));
         for (std::uint32_t i = 0; i < out.n; ++i) {
             double v = kNaN;
             const Micros t = ctx.rate.timeAt(ctx.first + static_cast<SampleIdx>(i), ctx.t0);
             if (usable && t >= main_.start && t < main_.end && i < here.values.size()) {
-                const std::optional<Micros> tRef = referenceTime(t);
+                const std::optional<Micros> tRef = referenceTime(*reference, t);
                 if (tRef) {
                     v = here.values[i] - ref.at(*tRef);
                 }
@@ -130,8 +132,8 @@ public:
     }
 
 private:
-    std::optional<Micros> referenceTime(Micros t) const {
-        const MathRangeGeom& r = *reference_;
+    // The time in the reference lap `r` that corresponds to time t of the main lap, if there is one.
+    std::optional<Micros> referenceTime(const MathRangeGeom& r, Micros t) const {
         Micros tRef = 0;
         if (!distance_) {
             const Micros c = (t - main_.start) + main_.offsetUs;
@@ -151,9 +153,8 @@ private:
         return tRef;
     }
 
-    // False when the host cannot read the channel in the reference lap's source.
-    bool readOtherSource(const EvalContext& ctx) {
-        const MathRangeGeom& r = *reference_;
+    // False when the host cannot read the channel in the reference lap `r`'s source.
+    bool readOtherSource(const EvalContext& ctx, const MathRangeGeom& r) {
         const units::UnitId unit = unit_.value_or(units::kNoUnit);
         Result<MathInputGatherer> host =
             ctx.getChannel(ChannelKey::make(r.ref.src, r.ref.layer, channel_), unit, ctx.resultRate);

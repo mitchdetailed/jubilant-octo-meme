@@ -3,6 +3,7 @@
 #include "doc_io.hpp"
 
 #include <esses/base/atomic_file.hpp>
+#include <esses/base/read_file.hpp>
 #include <esses/maths/corrected_speed_distance.hpp>
 #include <esses/project/profile.hpp>
 #include <esses/project/project_file.hpp>
@@ -397,6 +398,12 @@ Result<void> saveWithBackup(const std::filesystem::path& projectFolder, const st
     std::optional<std::string> previous;
     std::error_code ec;
     if (fs::exists(target, ec)) {
+        // Only a regular file is read, backed up and replaced: a directory standing where the document
+        // belongs is Io before backup/ is created or anything is written (libc++ reads a directory as an
+        // empty file, which would otherwise be "backed up" before the replacement fails).
+        if (Result<void> regular = requireRegularFile(target); !regular) {
+            return regular;
+        }
         auto old = jsonio::readFile(target);
         if (!old) {
             return Failure{old.error()};

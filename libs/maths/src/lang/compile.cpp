@@ -462,8 +462,14 @@ private:
         return !id || intrinsicClass(*id) != KernelClass::Elementwise;
     }
 
-    // The reference node (ChannelRef, or the ChannelRef under a Convert) when `i` reads a channel.
-    std::optional<std::uint32_t> channelRef(std::uint32_t i) const {
+    // A channel read: the reference node (ChannelRef, or the ChannelRef under a Convert) and its scope entry.
+    struct ChannelRead {
+        std::uint32_t ref = 0;
+        const ScopeEntry* entry = nullptr;
+    };
+
+    // The channel read of `i` when it reads a channel.
+    std::optional<ChannelRead> channelRef(std::uint32_t i) const {
         const Node& n = node(i);
         std::uint32_t ref = i;
         if (n.kind == NodeKind::Convert && !n.kids.empty()) {
@@ -474,16 +480,17 @@ private:
             entry->what != ScopeEntry::Channel) {
             return std::nullopt;
         }
-        return ref;
+        return ChannelRead{ref, &*entry};
     }
 
-    Result<std::uint32_t> inputFor(std::uint32_t i, bool linear) {
-        const std::uint32_t ref = *channelRef(i);
-        const ScopeEntry& entry = *info_[ref].entry;
+    Result<std::uint32_t> inputFor(std::uint32_t i, const ChannelRead& read, bool linear) {
+        const std::uint32_t ref = read.ref;
+        const ScopeEntry& entry = *read.entry;
         const units::UnitId stored = entry.type.unit;
         units::UnitId unit = stored;
-        if (node(i).kind == NodeKind::Convert && node(i).unit) {
-            unit = *node(i).unit;
+        const Node& n = node(i);
+        if (n.kind == NodeKind::Convert && n.unit) {
+            unit = *n.unit;
         }
         units::Converter conv;
         if (unit != stored && units_.contains(unit) && units_.contains(stored)) {
@@ -517,8 +524,8 @@ private:
     // A per-sample value as a stage input: a plan input, a call's stage, or an elementwise stage.
     Result<Stage::Ref> series(std::uint32_t i, bool linear) {
         Stage::Ref ref;
-        if (channelRef(i)) {
-            Result<std::uint32_t> in = inputFor(i, linear);
+        if (const std::optional<ChannelRead> read = channelRef(i)) {
+            Result<std::uint32_t> in = inputFor(i, *read, linear);
             if (!in) {
                 return Failure{in.error()};
             }
@@ -662,8 +669,8 @@ private:
         if (n.type.kind == Kind::Invalid && !lang::perSample(n.type)) {
             return EwBuilder::imm(ew::kInvalid);
         }
-        if (channelRef(i)) {
-            Result<std::uint32_t> input = inputFor(i, linear);
+        if (const std::optional<ChannelRead> read = channelRef(i)) {
+            Result<std::uint32_t> input = inputFor(i, *read, linear);
             if (!input) {
                 return Failure{input.error()};
             }
@@ -715,7 +722,7 @@ private:
             return b.push(ins);
         }
         case NodeKind::Call: {
-            if (isStageCall(i)) {
+            if (!in.intrinsic || isStageCall(i)) { // a call without an intrinsic is a stage call too
                 Result<std::uint32_t> s = stageFor(i);
                 if (!s) {
                     return Failure{s.error()};

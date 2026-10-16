@@ -4,6 +4,8 @@
 
 #include "cli_common.hpp"
 
+#include <esses/base/read_file.hpp>
+
 #include <fstream>
 #include <vector>
 
@@ -144,6 +146,10 @@ std::string sha256Hex(std::string_view bytes) {
 }
 
 Result<std::string> sha256File(const std::filesystem::path& path) {
+    // A directory opens as a stream on POSIX and libc++ reads it as an empty file: check the type first.
+    if (Result<void> regular = requireRegularFile(path, u8(path)); !regular) {
+        return Failure{regular.error()};
+    }
     std::ifstream in(path, std::ios::binary);
     if (!in) {
         ErrorContext ctx;

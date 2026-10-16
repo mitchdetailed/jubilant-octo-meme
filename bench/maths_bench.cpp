@@ -272,6 +272,24 @@ maths::MathModule readinessModule() {
     return m;
 }
 
+// Waits until `pool` has completed every task, so that a timed run never shares the workers with the tail of
+// the previous one (a worker completes a task, and drops its key, a moment after the task's Future is ready).
+// An equal key submitted in that window starts a task of its own (TaskPool, 01 section 5.4 rule 1), so a
+// fresh graph over the same source evaluates every output anew either way.
+void waitIdle(const TaskPool& pool) {
+    for (;;) {
+        const TaskPool::Stats s = pool.stats();
+        std::size_t queued = 0;
+        for (const std::size_t q : s.queued) {
+            queued += q;
+        }
+        if (s.running == 0 && s.parked == 0 && queued == 0) {
+            return;
+        }
+        std::this_thread::yield();
+    }
+}
+
 struct Readiness {
     std::vector<double> readyMs;
     std::vector<double> defineMs;
@@ -286,6 +304,7 @@ Readiness measureReadiness(const std::shared_ptr<const model::DataSource>& src,
     Readiness out;
     const maths::MathModule module = readinessModule();
     for (int r = -1; r < runs; ++r) {
+        waitIdle(pool); // the previous run's tasks are complete: every output of this graph is evaluated anew
         maths::MathGraph graph(src, "Normal", units, {}, &pool, &cache);
         const auto t0 = std::chrono::steady_clock::now();
         static_cast<void>(graph.setModules(std::span<const maths::MathModule>(&module, 1), nullptr, nullptr));
@@ -328,6 +347,7 @@ void printNodeTimes(const std::shared_ptr<const model::DataSource>& src,
                     const std::shared_ptr<const units::UnitRegistry>& units, TaskPool& pool,
                     store::ChunkCache& cache) {
     const maths::MathModule module = readinessModule();
+    waitIdle(pool);
     maths::MathGraph graph(src, "Normal", units, {}, &pool, &cache);
     static_cast<void>(graph.setModules(std::span<const maths::MathModule>(&module, 1), nullptr, nullptr));
     for (const maths::ChannelKey& key : graph.outputs()) {
@@ -708,8 +728,8 @@ std::string digestOf(const analysis::UniformSignal& s) {
 // (makeDigestSource), through MathGraph (the sealed column) and through evaluateWhole (as esses-cli eval runs
 // it). Two builds that print the same lines compute the same results.
 int printDigests(const std::shared_ptr<const units::UnitRegistry>& units) {
+    store::ChunkCache cache(std::size_t{4} << 30); // before the pool, which joins first (see main())
     TaskPool pool;
-    store::ChunkCache cache(std::size_t{4} << 30);
     const std::shared_ptr<const model::DataSource> digestSrc = makeDigestSource(cache, *units);
     const std::shared_ptr<const model::DataSource> rw2 = makeRw2(cache, *units, 120'000'000);
     int failures = 0;
@@ -991,9 +1011,14 @@ int main(int argc, char** argv) {
     std::size_t workers = 0;
     bool readinessOk = true;
     {
+        // The cache is declared before the pool so that it is destroyed after it: ~TaskPool joins the workers
+        // first. A worker still holds the shared state of the task it just ran, and through it the result's
+        // Column, for a moment after the requester's Future is ready (it publishes, wakes the requester, then
+        // runs the continuations and completes the task); destroying the cache in that window trips its
+        // "destroyed while Columns still use it" assertion.
+        store::ChunkCache rwCache(std::size_t{4} << 30);
         TaskPool pool(poolWorkers > 0 ? poolWorkers : TaskPool::defaultWorkerCount());
         workers = pool.stats().workers;
-        store::ChunkCache rwCache(std::size_t{4} << 30);
         const Micros rwDuration = smoke ? 60'000'000 : 1'800'000'000; // 30 min (bench/workloads.md RW-2)
         const std::shared_ptr<const model::DataSource> rw2 = makeRw2(rwCache, *units, rwDuration);
         const Readiness ready = measureReadiness(rw2, units, pool, rwCache, runs);

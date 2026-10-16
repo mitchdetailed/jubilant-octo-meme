@@ -382,8 +382,10 @@ public:
     bool chunkIndependent() const override { return true; }
 
     store::Interp interp(LayerIx layer, ChannelIx channel) const override {
-        if (layer == 0 && channel < layout_->columns.size() && layout_->columns[channel].interp) {
-            return *layout_->columns[channel].interp;
+        if (layer == 0 && channel < layout_->columns.size()) {
+            if (const std::optional<store::Interp>& interp = layout_->columns[channel].interp) {
+                return *interp;
+            }
         }
         return IReader::interp(layer, channel);
     }
@@ -459,10 +461,11 @@ public:
     }
 
     const Dictionary::Entry* columnHint(LayerIx layer, ChannelIx channel) const override {
-        if (layer != 0 || channel >= layout_->columns.size() || !layout_->columns[channel].hint) {
+        if (layer != 0 || channel >= layout_->columns.size()) {
             return nullptr;
         }
-        return &*layout_->columns[channel].hint;
+        const std::optional<Dictionary::Entry>& hint = layout_->columns[channel].hint;
+        return hint ? &*hint : nullptr;
     }
     const Dictionary* dictionary() const override { return dictionary_.get(); }
 

@@ -126,8 +126,8 @@ MathStatus statusFromResult(const Version& version, const Result<ColumnHandle>& 
         d.code = detail && isDiagnosticCode(detail) ? *detail : std::string("E-EVAL");
         d.level = Diagnostic::Error;
         d.message = r.error().message;
-        if (r.error().context.span) {
-            d.span = *r.error().context.span;
+        if (const std::optional<TextSpan>& span = r.error().context.span) {
+            d.span = *span;
         }
         s.state = MathState::Error;
         s.summary = d.message;
@@ -150,7 +150,8 @@ MathStatus errorStatus(const Version& version, const Error& error, const Diagnos
     }
     if (!hasError(s.diags)) {
         Diagnostic d;
-        d.code = isDiagnosticCode(error.context.detail) ? *error.context.detail : std::string("E-EVAL");
+        const std::optional<std::string>& detail = error.context.detail;
+        d.code = detail && isDiagnosticCode(detail) ? *detail : std::string("E-EVAL");
         d.level = Diagnostic::Error;
         d.message = error.message;
         s.diags.push_back(std::move(d));
@@ -495,6 +496,29 @@ Result<std::vector<ChannelKey>> MathGraph::defineBuiltin(const IBuiltinModule& m
     return keys;
 }
 
+namespace {
+
+// The module document `m`, created empty when absent.
+MathModule& documentIn(std::optional<MathModule>& m) {
+    return m ? *m : m.emplace();
+}
+
+// The module document that holds item node `n`, or nullptr when it has none.
+MathModule* documentOf(MathGraph::Impl& impl, const MathNode& n) {
+    if (n.origin == MathModule::Origin::Local) {
+        return impl.local ? &*impl.local : nullptr;
+    }
+    if (n.origin == MathModule::Origin::Transient) {
+        return impl.transient ? &*impl.transient : nullptr;
+    }
+    if (n.origin == MathModule::Origin::Global && n.moduleSlot < impl.globals.size()) {
+        return &impl.globals[n.moduleSlot];
+    }
+    return nullptr;
+}
+
+} // namespace
+
 NodeId MathGraph::define(const MathModule& module, const MathItem& item, Diagnostics& diags) {
     if (item.name.empty()) {
         Diagnostic d;
@@ -510,16 +534,10 @@ NodeId MathGraph::define(const MathModule& module, const MathItem& item, Diagnos
     case MathModule::Origin::Builtin:
         return {};
     case MathModule::Origin::Local:
-        if (!impl_->local) {
-            impl_->local.emplace();
-        }
-        doc = &*impl_->local;
+        doc = &documentIn(impl_->local);
         break;
     case MathModule::Origin::Transient:
-        if (!impl_->transient) {
-            impl_->transient.emplace();
-        }
-        doc = &*impl_->transient;
+        doc = &documentIn(impl_->transient);
         break;
     case MathModule::Origin::Global: {
         const auto it = std::find_if(impl_->globals.begin(), impl_->globals.end(),
@@ -584,14 +602,7 @@ void MathGraph::remove(const NodeId& node) {
             impl_->builtins.erase(impl_->builtins.begin() + static_cast<std::ptrdiff_t>(n->builtinReg));
         }
     } else {
-        MathModule* doc = nullptr;
-        if (n->origin == MathModule::Origin::Local && impl_->local) {
-            doc = &*impl_->local;
-        } else if (n->origin == MathModule::Origin::Transient && impl_->transient) {
-            doc = &*impl_->transient;
-        } else if (n->origin == MathModule::Origin::Global && n->moduleSlot < impl_->globals.size()) {
-            doc = &impl_->globals[n->moduleSlot];
-        }
+        MathModule* doc = documentOf(*impl_, *n);
         if (doc == nullptr || n->itemIndex >= doc->items.size()) {
             return;
         }
@@ -609,14 +620,7 @@ void MathGraph::setEnabled(const NodeId& node, bool enabled) {
         static_cast<void>(setModuleEnabled(n->moduleId, enabled));
         return;
     }
-    MathModule* doc = nullptr;
-    if (n->origin == MathModule::Origin::Local && impl_->local) {
-        doc = &*impl_->local;
-    } else if (n->origin == MathModule::Origin::Transient && impl_->transient) {
-        doc = &*impl_->transient;
-    } else if (n->origin == MathModule::Origin::Global && n->moduleSlot < impl_->globals.size()) {
-        doc = &impl_->globals[n->moduleSlot];
-    }
+    MathModule* doc = documentOf(*impl_, *n);
     if (doc == nullptr || n->itemIndex >= doc->items.size() || doc->items[n->itemIndex].enabled == enabled) {
         return;
     }

@@ -40,7 +40,8 @@ namespace esses::jsonio {
 // levels (refused before parsing: the writer and every walker recurse over a parsed value).
 Result<nlohmann::json> parseJson(std::string_view text);
 
-// The bytes of a file. Io with context.path when it cannot be opened or read.
+// The bytes of a file: readWholeFile() (read_file.hpp). Io with context.path when it does not exist, is not a
+// regular file (a directory), or cannot be opened or read.
 Result<std::string> readFile(const std::filesystem::path& path);
 
 // ---- the canonical writer (02 section 6.5 rule 1)
