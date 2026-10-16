@@ -69,12 +69,12 @@ repeats = channels), `open.unit_not_applied` (Info), `open.sidecar_load_failed` 
 (`companion.*`, `sidecar.*`, `model.*`, `detail.*`) are copied under their codes.
 
 Deviations from 05 sections 1-2 (M0): `JsonDoc` is not in esses_base yet, so JSON members are
-`model::OpaqueJson`; `load()` returns `Future<OpenedSource>` and there is no `MappingHook`,
-`PendingResolution` or `resume` (M1); step 4 has no dictionary, unit-mapping profile or `ChannelResolver`
-mappings; `IReader` gains `interp`, `companion`, `formatHeader`, `setConversion` and `makeChunkProvider`,
-`ByteSource` gains `mtimeUnixUs`, `mappedFile` and `buffer`; `ImporterRegistry::writer` has a non-const
-overload because `IWriter::write` is non-const; timestamped channels and partial-range or resampled exports
-are Unsupported.
+`model::OpaqueJson`; `load()` returns `Future<OpenedSource>` (M2 adds the `MappingHook` overload and `resume`,
+see "Text importers"); in M0 step 4 had no dictionary, unit-mapping profile or mappings, and timestamped channels
+did not open (M2 opens them); `IReader` gains `interp`, `companion`, `formatHeader`, `setConversion` and
+`makeChunkProvider`, `ByteSource` gains `mtimeUnixUs`, `mappedFile` and `buffer`; `ImporterRegistry::writer` has
+a non-const overload because `IWriter::write` is non-const; the motec.ld writer's timestamped channels and
+partial-range or resampled exports are Unsupported.
 
 Tests: `esses_formats_tests` (byte sources, registry sniffing and opening, the importer mapping, probe_json
 goldens in `tests/data/probe/` validated against `schemas/probe-1.schema.json`, the writer's round trips and
@@ -130,3 +130,76 @@ Tests: `esses_formats_ld_tests` (round trips of every synthetic family, hostile 
 smoke test, the chunk provider through a `Column`, `.ldx`), the private `[oracle]` cases over the user's files
 in `fixtures/private/s1` (skipped when absent), `formats_ld.oracle_synthetic` (the synthetic families decoded
 by `tools/ld_ref_decode.py`) and `lint.check_ld_codes` (one code vocabulary with the oracle).
+
+## Text importers (M2; 05 §6–§8, D-029, D-167, D-168, D-190)
+
+The text importers live in `src/text/`, their tests in `tests/text/` (one Catch2 executable, `formats_text.<test>`).
+`docs/formats/text.md` is the as-built description (rules, dialect flags, every Import Log code, departures).
+
+| Header | Contents | Design |
+|---|---|---|
+| `text_profile.hpp` | `TextProfile` (importer-profile-1: `parse`, `load`, canonical `toJson`, `contentHash` = xxh3 of that text, `effectiveImporterId`) | 05 §7.2 |
+| `text_engine.hpp` | `TextEngine::makeImporter` (an `IImporter` over a profile and its dictionary), `loadProfiles` | 05 §7.1 |
+| `dictionary.hpp` | `Dictionary` (dictionary-1: `parse`, `load`, `toJson`, `match` by vendorId, then name, then nameRegex) | 05 §8.3 |
+| `unit_mapping_profile.hpp` | `UnitMappingProfile` (unitmap-1: canonical round trip, atomic `save`, `resolve` most specific first, `fileStem`) | 05 §8.2 |
+| `csv.hpp` | importer ids `motec.csv` and `text.profile:generic.csv`, writer ids `motec.csv` and `csv`, `kLegacyCsvFormatName` (vendor-mark allow-list class c), `makeLegacyCsvWriter`, `makeGenericCsvWriter` | 05 §6 |
+| `mapping.hpp` | `OpenState` (opaque), `UnresolvedRow`, `PendingResolution`, `MappingDecision`, `MappingHook` | 05 §2, §8.1 |
+| `registry.hpp` (M2) | `LoadResult`, `addProfile`, `load(…, MappingHook)`, `resume`; `OpenContext::mappings` and `unitMaps`; `open_code::kUnitMapLoadFailed` | 05 §2 |
+| `importer.hpp` (M2) | `IReader::columnHint`, `dictionary`, `makeTimesProvider`, `timeRange`, `attachColumns` (all defaulted) | 05 §2 step 4a, §7.1 |
+
+Sources: `text_scan` (encodings, lines, cells, fast_float numbers with either decimal point, the rational rate
+search, bounded and portable regular expressions), `text_analyse` (pass 1: preamble, header, columns, time, row
+sets and their chunk starts, enumeration labels, lap sources, hold carry-in, the `ProbeResult`), `text_decode`
+(pass 2: one chunk of one row set for any set of columns), `text_engine` (the importer, the reader, the slab
+decoder that shares one sweep between the columns of a source and seals siblings with `insertGroup` through
+`store::WeakColumn`), `text_profile`, `dictionary`, `unit_mapping_profile`, `csv_writers`; the pipeline's M2 part
+is in `registry.cpp`.
+
+Shipped data: `data/profiles-text/motec.csv.json` and `generic.csv.json`, `data/dictionaries/motec.csv.json` and
+`generic.csv.json`; the build embeds them (`generated/builtin_text_profiles.hpp`) and `withBuiltins` registers
+both profiles (after `motec.ld`) and both writers. Schemas `importer-profile-1`, `dictionary-1`, `unitmap-1`
+with examples. Fixtures (AC-M2-13): `fixtures/motec.csv/dialect-basic`, `fixtures/generic.csv/{semicolon-decimal-
+comma, sparse-gps, timestamped-tab}`, self-authored by `tools/gen_text_fixtures.py` (the oracle of their channel
+values). Fuzz targets `fuzz_csv_sniff`, `fuzz_text_profile` (`tests/fuzz/`); benchmark `bench/formats_bench`.
+
+Open pipeline in M2 (05 §2 as built, D-168): step 4a applies the reader's column hint (the profile's `columns`) and
+the importer's dictionary; 4b the importer's unit map (`ImportOptions::unitMap`, else `OpenContext::unitMaps`),
+then the unit registry; 4c `OpenContext::mappings` and the unit maps' analysis names (`model::applyMappings`).
+Unresolved = a vendor unit known to neither, or a quantity without a unit: with a `MappingHook` task A ends with a
+`PendingResolution`, `resume` runs task B with the `MappingDecision`; without one the channel opens unitless with
+`Unit unknown: "<unit>"` (`strictUnits`: NotFound). Timestamped channels open as `TimestampedSeries` (time
+columns shared between channels whose reader returns the same provider).
+
+Tests: `formats_text.*`: the scanner; the three documents (shipped files parse and validate, canonical round
+trips, errors with JSON pointers, matching order); the engine through the registry (legacy dialect, decimal comma,
+units in names, sparse and text columns, timestamped files with last-wins and dropped rows, epoch times, BOMs,
+UTF-16, cp1252, CR-only lines, quotes, trailing delimiters, duplicate and empty names, lap counter beacons, ragged
+rows, sniff bands, refused `blocks` layout, `addProfile` rules); the Mapping hand-off (AC-M2-11 at registry level);
+slabs (one sweep seals siblings, parallel decodes equal the sequential result, hold across slab boundaries, sparse
+chunk indexes); the CSV writers (legacy round trip, plain table with resampling and ranges); seeded mutations of
+the fixtures under both profiles (`[property]`); the private sample files named by `ESSES_PRIVATE_TEXT_SAMPLES`
+(`[oracle]`, skipped when unset).
+
+Deviations (D-167, D-168; details in `docs/formats/text.md`):
+
+- `LoadResult` is `variant<OpenedSource, PendingResolution>` (05 §2 has the bare `DataSource`), `resume` returns
+  `Future<OpenedSource>`; both take the M0 `OpenContext` where 05 §2 passes a `Progress`. `resume` works on a
+  copy of the state; the context it is given replaces task A's when it names a registry or a cache.
+- `MappingDecision::unitMap` is a typed `std::optional<UnitMappingProfile>` (05 writes `JsonDoc`);
+  `PendingResolution` adds `path` and `importerId`. `saveUnitMap` is the caller's to honour (the registry knows no
+  project directory).
+- `ImporterRegistry::addProfile` returns `Result<void>` (a colliding importer id, or an `importerId` other than the
+  built-in `motec.csv`, is refused) and takes the profile's `Dictionary`.
+- The rules of 05 §7 that differ (D-167): `@auto` names row at half numeric, decimal comma among separator tokens,
+  checked rate candidates, column classification from spread samples, the portable multi-line sniff search, the
+  `capture` direction, the slab decoder's in-flight table as the share key, `blocks` layout Unsupported.
+- D-190: both passes read a file mapping through `GuardedLines` (guarded 4 MiB windows; rows over 16 MiB cut) and
+  pass 2 checks `changedOnDisk()` before each chunk, so the page-fault guard covers text files too (D-167's
+  departure withdrawn); `text::analyse` takes the mapping. Cells are capped at what a row can use, a first line
+  over 1 MiB is Format; a ragged row is an invalid sample of a sparse column in both passes; a header-only CSV
+  opens with no samples; an odd UTF-16 byte is dropped; quoted line breaks are reported (`text.quoted_newline`),
+  not joined; nested-quantifier patterns are refused and dictionary patterns compiled once (`text::cachedRegex`);
+  the sniff sees the first 16 lines. `ImportOptions::cancel` (an addition to 05 §1.1) carries the open's token to
+  `IImporter::open`; `ImporterRegistry` sets it.
+- Dictionary bitfields are read and written but not expanded into Bool channels yet (05 §8.3; no shipped
+  dictionary has one).

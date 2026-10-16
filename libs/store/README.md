@@ -12,6 +12,8 @@ Layer 1, Qt-free. The chunked column store every channel lives in (01_ARCHITECTU
 - `IChunkProvider`, `Column`, `ChunkCache`, `ChunkHandle`: lazy materialisation with RAII pins, `tryPin` /
   `prefetch` for any thread, `require` for workers (Rule W: inline materialisation), one free path for chunk
   memory (cache lock, pin count zero). Budget tracking and a warning hook; no eviction before M5.
+  `ChunkCache::insertGroup` seals the sibling chunks of one sweep; `WeakColumn` (M2, D-167) names those siblings
+  without keeping them alive (the text importers' slab decoder).
 - `UniformSeries`, `TimestampedSeries`, `Resampler`, `ResampleView`: the four interpolation policies.
 - `InMemoryProvider`: in-memory columns for small derived data and tests.
 

@@ -13,11 +13,12 @@
 #pragma once
 
 #include <esses/base/cancel.hpp>
+#include <esses/base/json_doc.hpp>
 #include <esses/base/rate.hpp>
 #include <esses/base/result.hpp>
 #include <esses/base/time.hpp>
 #include <esses/model/layer.hpp>
-#include <esses/model/opaque_json.hpp>
+#include <esses/model/opaque_json.hpp> // compatibility: model::OpaqueJson names JsonDoc
 #include <esses/store/column.hpp>
 #include <esses/store/series.hpp>
 #include <esses/units/unit_registry.hpp>
@@ -73,8 +74,7 @@ struct CorrectedSpeedSettings {
     // values are converted to base units through `units` (a unit it lacks falls back to a fixed table of
     // speed units). Invalid with context.detail (a JSON pointer) on a value the settings schema rejects
     // (fastestWheel takes exactly two channels, alternateList at least one, names are not blank).
-    static Result<CorrectedSpeedSettings> fromJson(const model::OpaqueJson& settings,
-                                                   const units::UnitRegistry& units);
+    static Result<CorrectedSpeedSettings> fromJson(const JsonDoc& settings, const units::UnitRegistry& units);
 };
 
 // A whole-extent uniform signal in base units.

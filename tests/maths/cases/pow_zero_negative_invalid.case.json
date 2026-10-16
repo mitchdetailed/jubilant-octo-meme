@@ -1,0 +1,36 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "pow_zero_negative_invalid",
+  "expression": "0 ^ (0 - 'X')",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): power",
+    "note": "0 to a negative power is infinite: invalid (D-185)"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 800000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [0.25, 0.5, 1, 2, 4, 9, 16, 100]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [null, null, null, null, null, null, null, null],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

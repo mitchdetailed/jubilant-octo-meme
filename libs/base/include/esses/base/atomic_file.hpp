@@ -3,8 +3,11 @@
 //
 // AtomicFile (01 section 9 rule 5): every write of a persisted file is temp + flush + rename over the target,
 // so a reader (or a crash) never sees a half-written file.
-//   Windows: CreateFileW(CREATE_NEW) in the target's directory, WriteFile, FlushFileBuffers,
-//            MoveFileExW(MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH).
+//   Windows: CreateFileW(CREATE_NEW) in the target's directory, WriteFile, FlushFileBuffers, then a rename
+//            with POSIX semantics through a second handle that holds delete access only, so a reader that
+//            shares delete access (readWholeFile, MappedFile) is never refused with a sharing violation; a
+//            refused rename is retried for up to 500 ms, then MoveFileExW(MOVEFILE_REPLACE_EXISTING |
+//            MOVEFILE_WRITE_THROUGH) is tried.
 //   POSIX:   open(O_CREAT | O_EXCL), write, fsync, rename, fsync of the directory.
 // The temporary file is removed on every failure path.
 #pragma once

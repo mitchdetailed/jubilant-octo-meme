@@ -34,7 +34,7 @@ bool isKnownTopLevel(std::string_view key) noexcept {
     return std::find(std::begin(kKnownTopLevel), std::end(kKnownTopLevel), key) != std::end(kKnownTopLevel);
 }
 
-OpaqueJson opaqueOrViolate(const json& j, const std::string& pointer) {
+JsonDoc opaqueOrViolate(const json& j, const std::string& pointer) {
     auto o = jsonio::toDoc(j);
     if (!o) {
         violate(pointer, o.error().message);
@@ -205,7 +205,7 @@ VideoLink videoLinkFromJson(const json& j, const std::string& pointer) {
     return v;
 }
 
-OpaqueJson localMathsFromJson(const json& j, const std::string& pointer) {
+JsonDoc localMathsFromJson(const json& j, const std::string& pointer) {
     ObjectReader r(j, pointer);
     detail::checkSchemaId(j, "maths", 1, pointer);
     r.optional("$schema");

@@ -22,7 +22,7 @@ the document code and no JSON type appears in a public header.
 | `resolver.hpp` | `ResolutionStep`, `ResolutionTrace`, `MappingRow/Table`, `AliasCandidate/Row/Table`, `ChannelResolver`, `makeAliasDescriptor`, `applyMappings` |
 | `whole_outing.hpp` | `WholeOutingOptions`, `buildWholeOutingGroup`, `rebuildWholeOutingRanges` |
 | `markers_document.hpp` | `MarkersDocument` (`markers-1`) |
-| `opaque_json.hpp` | `OpaqueJson`, an alias of `esses_base`'s `JsonDoc` (M1) |
+| `opaque_json.hpp` | `OpaqueJson`, an alias of `esses_base`'s `JsonDoc` (M1); since M2 the model's own headers spell `JsonDoc` and keep including this header for the code that still spells the alias |
 | `notes.hpp` | `ModelNote` and its codes |
 
 ## Open pipeline order (05 section 2 steps 3 to 6)
@@ -77,3 +77,15 @@ A published source is `std::shared_ptr<const DataSource>`; an edit produces a ne
   the same microsecond as a beacon therefore sorts before the beacon.
 - Numeric details are not yet exposed as `Detail` constant channels (02 section 4.2 behaviour 3); that needs
   the maths engine's constant-series representation (M1/M2).
+
+## M2 contract (07 §5.1)
+
+Sources and tests are globbed since M2. `sidecar.hpp` adds the edit commands the M2 undo commands wrap:
+`SidecarDocument::setAnnotation`, `removeAnnotation`, `setLocalMaths`, `restoreLogged` (`src/sidecar_edits.cpp`,
+final; `tests/sidecar_edit_m2_tests.cpp`). `markerEdits` (offset, ignore, offsetDistance; restore is a command,
+D-065), `rangeOverrides` keyed `(groupPath, startMarker)`, `localMaths` and `annotations` were already read and
+written in M1; no `M2-STUB` is left in this library. The lap rebuild after a marker edit (AC-M2-05) needs the
+circuit rules, so its test lives in `esses_analysis` (`tests/marker_edit_rebuild_tests.cpp`); the sidecar's
+byte-identical round trip is part of `esses_project`'s AC-M2-07 test (`libs/model/tests/data/rich.sidecar.json`).
+`OpaqueJson` (M1) is spelled `JsonDoc` in the model's headers and sources since M2; the alias stays for its
+other users. Consumers: `esses_qtmodel` (`undo_commands.hpp`).

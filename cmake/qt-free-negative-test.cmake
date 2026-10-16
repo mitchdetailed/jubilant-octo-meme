@@ -53,9 +53,15 @@ elseif(CASE STREQUAL "required_qt_free")
   set(expect_text "must be declared QT_FREE")
   set(lib_args "LAYER 3 HEADER_ONLY SOURCES src/rate.cpp")
   set(probe_name plotcore)
+elseif(CASE STREQUAL "qt_module_qtmodel_widgets")
+  # M1: esses_qtmodel never links Qt Widgets (01 section 2.2 rule 4).
+  set(expect_text "must not link Qt6::Widgets")
+  set(extra_cmake "add_library(Qt6::Widgets INTERFACE IMPORTED)\n")
+  set(lib_args "LAYER 4 HEADER_ONLY SOURCES src/rate.cpp DEPS Qt6::Widgets")
+  set(probe_name qtmodel)
 elseif(CASE STREQUAL "qt_module_qtmodel_gui")
-  # M1: esses_qtmodel links Qt Core only (01 section 2.2 rule 4).
-  set(expect_text "must not link Qt6::Gui")
+  # M2 (D-161): esses_qtmodel may link Qt Gui for QUndoStack/QUndoCommand (headers checked by check_layering.py).
+  set(expect_fail FALSE)
   set(extra_cmake "add_library(Qt6::Gui INTERFACE IMPORTED)\n")
   set(lib_args "LAYER 4 HEADER_ONLY SOURCES src/rate.cpp DEPS Qt6::Gui")
   set(probe_name qtmodel)

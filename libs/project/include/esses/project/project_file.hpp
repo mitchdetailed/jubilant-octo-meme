@@ -16,6 +16,7 @@
 // names; a workbook's file is workbooks/<name>.workbook.json (02 section 6.1).
 #pragma once
 
+#include <esses/analysis/lap_stretch.hpp>
 #include <esses/base/json_doc.hpp>
 #include <esses/base/result.hpp>
 #include <esses/model/opaque_json.hpp> // compatibility: model::OpaqueJson names JsonDoc
@@ -70,6 +71,10 @@ struct BuiltinMathsEntry { // project.json builtinMaths.<moduleId>
 };
 
 struct ProjectFile {
+    // The newest project-1 minor this build reads and writes. 2 (M2): the Data-window filter keys of 02
+    // section 6.2 are fixed to "default" and the hash text; the 1 -> 2 migration rewrites bare hex keys.
+    static constexpr int kSchemaVersion = 2;
+
     std::string name;
     std::string profile = "circuit";
     JsonDoc options;           // options.* (02 section 6.2 key table)
@@ -79,8 +84,14 @@ struct ProjectFile {
     std::vector<std::string> workbooks;
     std::vector<RecentSource> recentSources;
     SelectionKeys lastSelection;
-    JsonDoc dataWindow; // filters, applyToAllSources (06 section 5.4)
-    JsonDoc unknown;    // unrecognised top-level members, preserved
+    // filters, applyToAllSources (06 section 5.4). From schemaVersion 2 the filter keys are "default" or the
+    // source's quick hash as model::hashText ("xxh3:<32 hex digits>"), the form of every other hash here.
+    JsonDoc dataWindow;
+    JsonDoc unknown; // unrecognised top-level members, preserved
+    // The minor written on save: kSchemaVersion, or the newer minor the document was read with (R-38: never
+    // downgraded). An older document is migrated on load (Migrations, 02 section 6.6) and marked dirty.
+    int schemaVersion = kSchemaVersion;
+    bool dirty = false; // set when load() migrated the document; the next explicit Save rewrites it
 
     static Result<ProjectFile> parse(std::string_view json, std::vector<std::string>& log);
     static Result<ProjectFile> load(const std::filesystem::path& path, std::vector<std::string>& log);
@@ -94,17 +105,26 @@ struct ProjectFile {
     // name.
     static ProjectFile makeDefault(std::string projectName, std::string profileId = "circuit");
 
+    // options.general.autosaveMinutes (02 section 6.2): the journal autosave interval, 0 = off; 2 when the
+    // option is absent or not an integer of 0 or more (the session's timer, 02 section 6.8 rule 1).
+    int autosaveMinutes() const;
+    // options.lapStretch {enabled, tolerancePct} as analysis::LapStretchSettings (tolerance as a fraction);
+    // the defaults (on, 5 %) for an absent or malformed member (D-016).
+    analysis::LapStretchSettings lapStretchSettings() const;
+
     friend bool operator==(const ProjectFile&, const ProjectFile&) = default;
 };
 
-// The explicit-Save write of one project document (02 sections 6.1 and 6.8 rule 2, D-070): `bytes` is written
-// atomically to `target`; when `target` existed with other bytes, its previous content is then copied to
-// <projectFolder>/backup/<target file name without ".json">.<yyyymmdd-hhmmss UTC>.json (a "-2", "-3", ...
-// suffix on a clash) and only the newest `keep` backups of that file are kept. Io on a failed write; a failed
-// backup copy is reported after the document itself was written.
+// The explicit-Save write of one project document (02 sections 6.1 and 6.8 rule 2, D-070, D-190): when
+// `target` exists with other bytes, its content is first copied to <projectFolder>/backup/<target file name
+// without ".json">.<yyyymmdd-hhmmss UTC>.json (a "-2", "-3", ... suffix on a clash); then `bytes` is written
+// atomically to `target`, and only the newest `keep` backups of that file are kept. An error means `target`
+// was not written: Io on a failed read or write, when `target` exists but is not a regular file (a directory:
+// nothing is backed up or written), and on a failed backup copy unless `backupError` is given, in which case
+// the document is written all the same and the backup's failure (or a failed pruning) is reported there.
 Result<void> saveWithBackup(const std::filesystem::path& projectFolder, const std::filesystem::path& target,
                             std::string_view bytes,
                             std::chrono::system_clock::time_point now = std::chrono::system_clock::now(),
-                            int keep = 5);
+                            int keep = 5, std::optional<Error>* backupError = nullptr);
 
 } // namespace esses::project

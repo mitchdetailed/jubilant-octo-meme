@@ -1,0 +1,78 @@
+{
+  "$schema": "urn:esses:importer-profile-1",
+  "schemaVersion": 1,
+  "columns": {
+    "Corr Dist": {
+      "dtype": "F64",
+      "name": "Corr Dist",
+      "quantity": "Distance"
+    }
+  },
+  "decimal": ".",
+  "delimiter": ",",
+  "duplicateNames": "suffix",
+  "encoding": "auto",
+  "header": {
+    "dataRow": 2,
+    "ignoreEmptyNames": true,
+    "namesRow": 0,
+    "skipBlank": true,
+    "unitInName": null,
+    "unitsRow": 1
+  },
+  "id": "motec.csv",
+  "importerId": "motec.csv",
+  "lapSource": {
+    "detailsKey": "Beacon Markers",
+    "fallback": {
+      "column": "Lap",
+      "kind": "lap_counter_edge",
+      "optional": true
+    },
+    "kind": "lap_table",
+    "optional": true
+  },
+  "layout": "table",
+  "name": "motec.csv export (quoted metadata, names and units rows)",
+  "preamble": {
+    "capture": {
+      "Comment": "Comment",
+      "Device": "Device Type",
+      "Driver": "Driver",
+      "Duration": "@duration",
+      "End Distance": "@endDist",
+      "End Time": "@endTime",
+      "Engine ID": "Engine Id",
+      "Log Date": "Log Date",
+      "Log Time": "Log Time",
+      "Origin Time": "@originTime",
+      "Range": "Export Range",
+      "Sample Rate": "@rate",
+      "Session": "Session",
+      "Start Distance": "@startDist",
+      "Start Time": "@startTime",
+      "Vehicle": "Vehicle Id",
+      "Vehicle Desc": "Vehicle Desc",
+      "Venue": "Venue",
+      "Workbook": "Export Workbook",
+      "Worksheet": "Export Worksheet"
+    },
+    "keyValueColumns": [[0, 1, 2], [4, 5, 6]],
+    "untilBlank": true
+  },
+  "quote": "\"",
+  "sentinels": ["", "NaN", "-###", "+###"],
+  "sniff": {
+    "confidence": 95,
+    "extensions": [".csv"],
+    "preambleRegex": "^\"Format\",\"MoTeC CSV File\""
+  },
+  "sparse": "hold",
+  "time": {
+    "column": "Time",
+    "rate": "fromDetail:@rate",
+    "unit": "s"
+  },
+  "trim": true,
+  "version": "1.0.0"
+}

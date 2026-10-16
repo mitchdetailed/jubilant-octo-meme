@@ -9,6 +9,7 @@
 #include "sha256.hpp"
 #include "validate.hpp"
 
+#include <esses/base/casefold.hpp>
 #include <esses/base/env.hpp>
 #include <esses/base/priority.hpp>
 #include <esses/formats/byte_source.hpp>
@@ -519,6 +520,50 @@ struct Target {
     std::optional<fs::path> input; // from a manifest
 };
 
+// fixture diff: explain every difference instead of listing the first few (05 section 9.2).
+struct Explain {
+    bool on = false;
+    std::string channel; // case-folded; "" = every channel
+};
+
+// The JSON Pointer paths where two JSON texts differ (nlohmann's JSON Patch from `expected` to `actual`), at
+// most `limit` of them: "<op> at '<path>': expected <value>, got <value>".
+std::vector<std::string> jsonDifferences(std::string_view expected, std::string_view actual,
+                                         std::size_t limit) {
+    std::vector<std::string> out;
+    const json e = json::parse(expected, nullptr, false);
+    const json a = json::parse(actual, nullptr, false);
+    if (e.is_discarded() || a.is_discarded()) {
+        return out;
+    }
+    const auto shortText = [](const json& v) {
+        std::string t = v.dump();
+        return t.size() > 120 ? t.substr(0, 117) + "..." : t;
+    };
+    const json patch = json::diff(e, a);
+    for (const json& op : patch) {
+        if (out.size() == limit) {
+            out.push_back("... and " + std::to_string(patch.size() - limit) + " more");
+            break;
+        }
+        const std::string path = op.value("path", std::string());
+        const std::string kind = op.value("op", std::string());
+        const json::json_pointer ptr(path);
+        std::string line = kind;
+        line += " at '";
+        line += path;
+        line += "'";
+        if (kind == "replace" || kind == "remove") {
+            line += ": expected " + (e.contains(ptr) ? shortText(e.at(ptr)) : std::string("<absent>"));
+        }
+        if (kind == "replace" || kind == "add") {
+            line += std::string(kind == "add" ? ": " : ", ") + "got " + shortText(op.value("value", json()));
+        }
+        out.push_back(std::move(line));
+    }
+    return out;
+}
+
 enum class Status : std::uint8_t { Pass, Fail, Skip };
 
 struct Outcome {
@@ -564,8 +609,9 @@ struct Comparison {
     std::uint64_t compared = 0;
     std::uint64_t readerInvalid = 0;
     std::uint64_t maxF32Ulps = 0;
+    std::uint64_t maxF64Ulps = 0;
     std::uint64_t mismatches = 0;
-    std::vector<std::string> problems;
+    std::vector<std::string> problems; // the first kProblemsPerChannel, in sample order
 };
 
 void addProblem(Comparison& c, std::string text) {
@@ -578,12 +624,10 @@ void addProblem(Comparison& c, std::string text) {
 Comparison compareChannel(const ExpectedChannel& e, const model::Channel& ch, const Tolerance& tol,
                           bool strict) {
     Comparison r;
+    // M2: timestamped channels (text importers) compare their I64 time column with the oracle's times.
     const auto* us = std::get_if<store::UniformSeries>(&ch.series);
-    if (us == nullptr) {
-        addProblem(r, "the reader's channel is timestamped; the oracle's is uniform");
-        return r;
-    }
-    const store::Column& col = us->values;
+    const auto* ts = std::get_if<store::TimestampedSeries>(&ch.series);
+    const store::Column& col = store::seriesValues(ch.series);
     const store::SampleIdx n = col.size();
     const std::uint64_t expectedCount = e.samples.empty() ? 0 : e.samples.back().index + 1;
     if (e.samples.empty()) {
@@ -610,16 +654,19 @@ Comparison compareChannel(const ExpectedChannel& e, const model::Channel& ch, co
         const auto first = static_cast<store::SampleIdx>(e.samples[k].index);
         const auto last = static_cast<store::SampleIdx>(e.samples[j - 1].index);
         auto h = col.require(first, last, Priority::Background, {});
-        if (!h) {
+        Result<store::ChunkHandle> th = ts != nullptr
+                                            ? ts->timesUs.require(first, last, Priority::Background, {})
+                                            : Result<store::ChunkHandle>(store::ChunkHandle{});
+        if (!h || !th) {
             addProblem(r, "decode of samples " + std::to_string(first) + ".." + std::to_string(last) +
-                              " failed: " + h.error().toString());
+                              " failed: " + (h ? th.error() : h.error()).toString());
             k = j;
             continue;
         }
         for (std::size_t q = k; q < j; ++q) {
             const ExpectedSample& s = e.samples[q];
             const auto i = static_cast<store::SampleIdx>(s.index);
-            const Micros t = us->timeAt(i);
+            const Micros t = us != nullptr ? us->timeAt(i) : th->int64At(i).value_or(-1);
             if (t != s.timeUs) {
                 addProblem(r, "sample " + std::to_string(i) + ": time " + std::to_string(t) + " us, oracle " +
                                   std::to_string(s.timeUs) + " us");
@@ -677,6 +724,7 @@ Comparison compareChannel(const ExpectedChannel& e, const model::Channel& ch, co
             }
             case store::Dtype::F64: {
                 const std::uint64_t d = ulpDistanceF64(v, s.value);
+                r.maxF64Ulps = std::max(r.maxF64Ulps, d);
                 if (d > tol.f64Ulps) {
                     addProblem(r, "sample " + std::to_string(i) + ": " + numberText(v) + ", oracle " +
                                       numberText(s.value) + " (" + std::to_string(d) + " F64 ulp)");
@@ -701,7 +749,8 @@ bool readerExcluded(const formats::ProbeResult& probe, std::string_view oracleNa
 }
 
 // Compares (or with update rewrites) one expectation file; "" when equal.
-void checkText(const fs::path& file, const std::string& actual, bool required, bool update, Outcome& o) {
+void checkText(const fs::path& file, const std::string& actual, bool required, bool update, Outcome& o,
+               const Explain& explain = {}) {
     auto expected = readFile(file);
     if (!expected) {
         if (update) {
@@ -729,10 +778,18 @@ void checkText(const fs::path& file, const std::string& actual, bool required, b
         }
         return;
     }
-    o.problems.push_back(u8(file.filename()) + " differs, " + firstDifference(*expected, actual));
+    const std::vector<std::string> paths =
+        explain.on ? jsonDifferences(*expected, actual, 25) : std::vector<std::string>{};
+    if (paths.empty()) {
+        o.problems.push_back(u8(file.filename()) + " differs, " + firstDifference(*expected, actual));
+    }
+    for (const std::string& d : paths) {
+        o.problems.push_back(u8(file.filename()) + ": " + d);
+    }
 }
 
-Outcome verifyOne(AppContext& ctx, SchemaStore* schemas, const Target& t, bool update) {
+Outcome verifyOne(AppContext& ctx, SchemaStore* schemas, const Target& t, bool update,
+                  const Explain& explain = {}) {
     Outcome o;
     o.dir = t.dir;
     o.id = u8(t.dir.filename());
@@ -843,7 +900,7 @@ Outcome verifyOne(AppContext& ctx, SchemaStore* schemas, const Target& t, bool u
         o.problems.push_back(probeText.error().toString());
         return o;
     }
-    checkText(t.dir / "expected.probe.json", *probeText, true, update, o);
+    checkText(t.dir / "expected.probe.json", *probeText, true, update, o, explain);
     if (!fx.contains("dialect") || fx["dialect"] != probed->probe.dialect) {
         if (update || !fx.contains("dialect")) {
             if (update) {
@@ -866,12 +923,12 @@ Outcome verifyOne(AppContext& ctx, SchemaStore* schemas, const Target& t, bool u
     }
     const model::DataSource& src = *opened->source;
     if (auto mt = markersText(src); mt) {
-        checkText(t.dir / "expected.markers.json", *mt, false, update, o);
+        checkText(t.dir / "expected.markers.json", *mt, false, update, o, explain);
     } else {
         o.problems.push_back(mt.error().toString());
     }
     if (auto lt = lapsText(src); lt) {
-        checkText(t.dir / "expected.laps.json", *lt, false, update, o);
+        checkText(t.dir / "expected.laps.json", *lt, false, update, o, explain);
     } else {
         o.problems.push_back(lt.error().toString());
     }
@@ -911,7 +968,25 @@ Outcome verifyOne(AppContext& ctx, SchemaStore* schemas, const Target& t, bool u
             matched[*at] = true;
             p = *at + 1;
             const model::Channel& ch = layer.channels[*at];
+            if (!explain.channel.empty() && caseFold(ch.desc.name) != explain.channel &&
+                caseFold(e.name) != explain.channel) {
+                continue;
+            }
             const Comparison c = compareChannel(e, ch, *tol, strict);
+            if (explain.on) {
+                // One line per channel: what was compared, how far apart, where it first differs.
+                std::string line = "channel '" + ch.desc.name + "' (oracle " + std::to_string(e.oracleIndex) +
+                                   " '" + e.name + "'): " + std::to_string(c.compared) + " samples, " +
+                                   std::to_string(c.mismatches) + " differ";
+                if (c.maxF32Ulps > 0 || c.maxF64Ulps > 0) {
+                    line += ", max " + std::to_string(std::max(c.maxF32Ulps, c.maxF64Ulps)) +
+                            (c.maxF64Ulps > c.maxF32Ulps ? " F64" : " F32") + " ulp";
+                }
+                if (!c.problems.empty()) {
+                    line += "; first: " + c.problems.front();
+                }
+                o.notes.push_back(std::move(line));
+            }
             ++o.channels;
             o.samples += c.compared;
             o.readerInvalid += c.readerInvalid;
@@ -926,7 +1001,7 @@ Outcome verifyOne(AppContext& ctx, SchemaStore* schemas, const Target& t, bool u
             ctx.cache().clear();
         }
         const json compared = fx.value("channelsCompared", json("all"));
-        if (compared.is_string() && compared.get<std::string>() == "all") {
+        if (compared.is_string() && compared.get<std::string>() == "all" && explain.channel.empty()) {
             for (std::size_t q = 0; q < layer.channels.size(); ++q) {
                 if (!matched[q]) {
                     o.problems.push_back("reader channel '" + layer.channels[q].desc.name +
@@ -1119,6 +1194,71 @@ int runFixtureVerify(AppContext& ctx, const FixtureVerifyOptions& o, std::ostrea
         out << " (" << channels << " channels, " << samples << " samples compared)\n";
     }
     return failed > 0 ? 1 : 0;
+}
+
+int runFixtureDiff(AppContext& ctx, const FixtureDiffOptions& o, std::ostream& out, std::ostream& err) {
+    std::vector<Target> targets;
+    for (const fs::path& root : o.dirs) {
+        if (!pathExists(root)) {
+            err << "esses-cli fixture diff: no such directory " << u8(root) << "\n";
+            return 2;
+        }
+        std::vector<fs::path> dirs;
+        findFixtures(root, dirs);
+        for (const fs::path& d : dirs) {
+            targets.push_back(Target{d, std::nullopt});
+        }
+    }
+    if (targets.empty()) {
+        err << "esses-cli fixture diff: no fixture.json found\n";
+        return 2;
+    }
+    if (!ctx.registry()) {
+        err << "esses-cli fixture diff: " << ctx.registry().error().toString() << "\n";
+        return 2;
+    }
+    std::optional<SchemaStore> schemas;
+    if (auto dir = ctx.schemaDir(); dir) {
+        schemas.emplace(*dir);
+    }
+    Explain explain;
+    explain.on = true;
+    explain.channel = caseFold(o.channel);
+    json fixtures = json::array();
+    std::size_t differing = 0;
+    for (const Target& t : targets) {
+        const Outcome r = verifyOne(ctx, schemas ? &*schemas : nullptr, t, false, explain);
+        const bool differs = r.status == Status::Fail;
+        differing += differs ? 1 : 0;
+        if (o.json) {
+            fixtures.push_back(json{{"id", r.id},
+                                    {"dir", u8(r.dir)},
+                                    {"status", std::string(statusText(r.status))},
+                                    {"channels", r.notes},
+                                    {"differences", r.problems}});
+            continue;
+        }
+        out << (r.status == Status::Skip ? "SKIP" : differs ? "DIFF" : "SAME") << "  " << r.id;
+        if (r.status == Status::Skip) {
+            out << "  (" << r.skipReason << ")";
+        }
+        out << "\n";
+        for (const std::string& n : r.notes) {
+            out << "    " << n << "\n";
+        }
+        for (const std::string& d : r.problems) {
+            out << "    - " << d << "\n";
+        }
+    }
+    if (o.json) {
+        if (auto text = canonicalText(json{{"fixtures", std::move(fixtures)}, {"differing", differing}});
+            text) {
+            out << *text;
+        }
+    } else {
+        out << "fixture diff: " << differing << " of " << targets.size() << " fixtures differ\n";
+    }
+    return differing > 0 ? 1 : 0;
 }
 
 } // namespace esses::cli

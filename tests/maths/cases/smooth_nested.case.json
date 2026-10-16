@@ -1,0 +1,36 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "smooth_nested",
+  "expression": "smooth(smooth('X', 3), 3)",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): smooth",
+    "note": "chained windows"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 1200000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [3, 1.5, 4.25, 1, 5.5, 9, 2.75, 6.5, 5.25, 3.5, 5, 8.75]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [2.58333333333, 2.47222222222, 2.91666666667, 3.66666666667, 4.83333333333, 5.66666666667, 5.55555555556, 5.33333333333, 4.83333333333, 5.13888888889, 5.73611111111, 6.3125],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "variance_dist_reference",
+  "expression": "variance_dist('X')",
+  "provenance": {
+    "kind": "release-notes",
+    "ref": "Maths Functions (Pro): variance_dist",
+    "note": "x on Main minus x on the reference at the same distance from the lap start (D-081)"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 2100000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]
+    },
+    "Corr Dist": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "m",
+      "values": [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 112.5, 125, 137.5, 150, 162.5, 175, 187.5, 200, 212.5, 225],
+      "dtype": "f64"
+    }
+  },
+  "ranges": {
+    "Outings": [
+      {
+        "startUs": 0,
+        "endUs": 2000000
+      }
+    ],
+    "Outings:Laps": [
+      {
+        "startUs": 0,
+        "endUs": 1000000
+      },
+      {
+        "startUs": 1000000,
+        "endUs": 2000000
+      }
+    ]
+  },
+  "selection": {
+    "main": "Outings:Laps/2",
+    "reference": "Outings:Laps/1"
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [null, null, null, null, null, null, null, null, null, null, 10, 10.75, 11.5, 12.25, 13, 13.75, 14.5, 15.25, null, null, null],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

@@ -166,6 +166,19 @@ void LayoutFile::setDockOption(const QString& id, const QString& option, const Q
     root_.insert(key("docks"), docks);
 }
 
+QByteArray LayoutFile::dialogGeometry(const QString& k) const {
+    return QByteArray::fromBase64(
+        object(object(root_, "dialogs"), k).value(key("geometry")).toString().toLatin1());
+}
+
+void LayoutFile::setDialogGeometry(const QString& k, const QByteArray& geometry) {
+    QJsonObject dialogs = object(root_, "dialogs");
+    QJsonObject d = dialogs.value(k).toObject(); // other members (a splitter, 06 section 3.4) are kept
+    d.insert(key("geometry"), QString::fromLatin1(geometry.toBase64()));
+    dialogs.insert(k, d);
+    root_.insert(key("dialogs"), dialogs);
+}
+
 void LayoutFile::setVersions(const QString& appVersion, const QString& qtVersion, const QString& dockBackend,
                              const QString& adsVersion) {
     root_.insert(key("appVersion"), appVersion);

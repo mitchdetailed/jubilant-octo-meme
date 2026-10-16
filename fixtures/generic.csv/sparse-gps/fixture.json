@@ -1,0 +1,29 @@
+{
+  "$schema": "urn:esses:fixture-1",
+  "schemaVersion": 1,
+  "channelsCompared": "all",
+  "dialect": "",
+  "format": "text.profile:generic.csv",
+  "input": {
+    "bytes": 72611,
+    "file": "input.csv",
+    "sha256": "5726103f374ee3794ab2582b8e99c021fe2adeb1a59663050c08be7ff4ac88d7"
+  },
+  "licence": "CC0-1.0",
+  "name": "sparse-gps",
+  "notes": "sparse timestamped columns with their own times; a lap counter",
+  "oracle": {
+    "kind": "generator",
+    "ref": "tools/gen_text_fixtures.py 1.0.0 (MIT)",
+    "tolerance": {
+      "F32": "1ulp",
+      "F64": "1ulp",
+      "I32": "exact",
+      "timesUs": "exact"
+    },
+    "validity": "strict"
+  },
+  "private": false,
+  "provenance": "synthetic",
+  "source": "synthetic: tools/gen_text_fixtures.py, a 100 Hz table with 10 Hz GPS columns left empty in between"
+}

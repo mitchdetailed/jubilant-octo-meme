@@ -1,0 +1,30 @@
+{
+  "bad-dps.json": {
+    "pointer": "/aliases/0/dps",
+    "why": "dps lies in 0..15"
+  },
+  "empty-name.json": {
+    "pointer": "/aliases/0/name",
+    "why": "an alias has a name"
+  },
+  "flag-not-boolean.json": {
+    "pointer": "/aliases/0/enabled/0",
+    "why": "enable flags are booleans"
+  },
+  "missing-aliases.json": {
+    "pointer": "",
+    "why": "the aliases array is required"
+  },
+  "no-candidates.json": {
+    "pointer": "/aliases/0/candidates",
+    "why": "an alias has at least one candidate"
+  },
+  "unknown-member.json": {
+    "pointer": "/aliases/0",
+    "why": "alias records are closed"
+  },
+  "wrong-schema-id.json": {
+    "pointer": "/$schema",
+    "why": "the $schema id names another schema"
+  }
+}

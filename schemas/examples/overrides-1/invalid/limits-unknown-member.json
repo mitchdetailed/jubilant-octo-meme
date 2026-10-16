@@ -1,0 +1,14 @@
+{
+  "$schema": "urn:esses:overrides-1",
+  "schemaVersion": 1,
+  "channels": {
+    "Speed": {
+      "warn": {
+        "above": {
+          "unit": "rpm",
+          "v": 0
+        }
+      }
+    }
+  }
+}

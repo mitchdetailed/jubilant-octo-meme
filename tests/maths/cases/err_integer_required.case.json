@@ -1,0 +1,30 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "err_integer_required",
+  "expression": "'X' & 3",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Operators (Pro)",
+    "note": "& | ~ need integer operands"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 400000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [1.5, 2, 3, 4]
+    }
+  },
+  "expected": {
+    "error": {
+      "code": "E-INTEGER-REQUIRED"
+    }
+  }
+}

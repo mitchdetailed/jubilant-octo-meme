@@ -20,6 +20,7 @@
 #include <esses/base/result.hpp>
 #include <esses/maths/diagnostics.hpp>
 #include <esses/maths/eval_context.hpp>
+#include <esses/maths/math_item.hpp>
 #include <esses/model/opaque_json.hpp>
 #include <esses/store/types.hpp>
 #include <esses/units/unit_registry.hpp>
@@ -30,12 +31,6 @@
 #include <vector>
 
 namespace esses::maths {
-
-struct DisplayDefaults {                 // 03 section 4.1
-    units::UnitId unit = units::kNoUnit; // kNoUnit: inherit (Corr Speed: the first input's display unit)
-    int dps = 2;
-    int colourIndex = 0;
-};
 
 // Evaluates one output over the whole layer extent (03 section 6.0). `upstream` holds the evaluated outputs
 // named in BuiltinOutput::upstream, in that order (Corr Dist reads Corr Speed), read back from their sealed
@@ -51,6 +46,12 @@ struct BuiltinOutput {
     // the absence of the others (03 section 7.2: exactly the logged columns the node reads).
     std::vector<std::string> inputs;
     WholeExtentFn evaluate;
+    // M2: logged channels that must all be present in the layer; when one is missing the output is Disabled
+    // with `missingSummary` instead of being evaluated (03 section 9.2: "Disabled (no GPS channels)", never
+    // an error). An output named like one of its `inputs` is self-maths: it shadows that channel and its
+    // descriptor reuses the shadowed channel's (03 section 8).
+    std::vector<std::string> required;
+    std::string missingSummary;
     units::QuantityId quantity = units::kUnitless;
     units::UnitId resultUnit = units::kNoUnit; // base-stored values (03 section 3.2 rule 11)
     DisplayDefaults display;
@@ -69,6 +70,10 @@ public:
     virtual model::OpaqueJson defaultSettings() const = 0;
     virtual Result<std::vector<BuiltinOutput>>
     expand(const model::OpaqueJson& settings, const units::UnitRegistry& units, Diagnostics& diags) const = 0;
+    // M2: whether a disabled `builtin` item of this module (sidecar localMaths or a global module) disables
+    // its outputs (true, the default) or only the optional steps the module's `enabled` flag gates
+    // (esses.gps_corrections: the zero-fix step runs whatever `enabled` says, 03 section 9.2).
+    virtual bool disabledItemDisablesOutputs() const { return true; }
 
 protected:
     IBuiltinModule() = default;

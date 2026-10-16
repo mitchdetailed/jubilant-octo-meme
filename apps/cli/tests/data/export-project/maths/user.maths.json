@@ -1,0 +1,41 @@
+{
+  "$schema": "urn:esses:maths-1",
+  "schemaVersion": 1,
+  "id": "user",
+  "items": [
+    {
+      "expr": "'SPEED'[km/h] * 2",
+      "kind": "expression",
+      "name": "Speed Twice",
+      "quantity": "Speed",
+      "rate": "auto",
+      "resultUnit": "km/h"
+    },
+    {
+      "expr": "stat_max('SPEED'[m/s])",
+      "kind": "expression",
+      "name": "Lap Max Speed",
+      "quantity": "Speed",
+      "rate": "auto",
+      "resultUnit": "m/s"
+    },
+    {
+      "expr": "'Gear' + 1",
+      "kind": "expression",
+      "name": "Gear Plus",
+      "rate": "auto"
+    },
+    {
+      "expr": "filter_lp('SPEED'[m/s], 5000)",
+      "kind": "expression",
+      "name": "Too Fast",
+      "rate": "auto"
+    },
+    {
+      "expr": "'Too Fast' + 1",
+      "kind": "expression",
+      "name": "Too Fast Plus",
+      "rate": "auto"
+    }
+  ]
+}

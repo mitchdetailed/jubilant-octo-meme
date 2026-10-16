@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:aliases-1",
+  "title": "Esses channel aliases (aliases-1)",
+  "description": "<Project>/channels/aliases.json (02 sections 4.6 and 6.3, D-013): names that resolve to the first usable of an ordered list of candidates, each with its own enable flag (\"enabled\" has one flag per candidate, all enabled when absent; the lengths are checked by the loader), with the alias's own colour index and decimals. Names compare case-insensitively and are unique (checked by the loader). Unknown top-level members are allowed and preserved; alias records are closed.",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "aliases"],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072). The urn:esses: form is written; the bare esses: form of earlier drafts and the later https form are accepted on load and normalised on save (02 section 6.6 rule 1).",
+      "type": "string",
+      "pattern": "^(urn:esses:aliases-1|esses:aliases-1|https://[^/\\s]+(/[^/\\s]+)*/aliases-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "aliases": {
+      "description": "Aliases in file order.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/alias"
+      }
+    },
+    "x-esses-legacy": {
+      "$ref": "#/definitions/legacyBag"
+    }
+  },
+  "definitions": {
+    "alias": {
+      "type": "object",
+      "required": ["name", "candidates"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidates": {
+          "description": "Channel or alias names, tried in order.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "enabled": {
+          "description": "One flag per candidate.",
+          "type": "array",
+          "items": {
+            "type": "boolean"
+          }
+        },
+        "colourIndex": {
+          "description": "Index into the scheme's channel palette.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "dps": {
+          "description": "Display decimals.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15
+        }
+      },
+      "additionalProperties": false
+    },
+    "legacyBag": {
+      "description": "Fields removed by a migration, kept verbatim (02 section 6.6 rule 3).",
+      "type": "object"
+    }
+  }
+}

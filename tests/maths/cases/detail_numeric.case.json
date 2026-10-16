@@ -1,0 +1,42 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "detail_numeric",
+  "expression": "'X' / 'Vehicle Wheelbase'[m]",
+  "provenance": {
+    "kind": "derived",
+    "ref": "03_MATHS_ENGINE.md 4.1",
+    "note": "a numeric detail of the source"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 400000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [1, 2, 3, 4]
+    }
+  },
+  "details": {
+    "Vehicle Wheelbase": {
+      "v": 2.5,
+      "unit": "m"
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [0.4, 0.8, 1.2, 1.6],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

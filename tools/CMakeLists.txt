@@ -49,12 +49,24 @@ set_tests_properties(fixtures.laps_golden PROPERTIES FIXTURES_REQUIRED esses_fix
 
 # Every JSON document of the corpus satisfies the schema it names (08 section 5; AC-M0-10). The private fixture
 # directory is checked when it exists (fixtures/private/s1 holds spike outputs that are not schema documents).
-add_test(NAME fixtures.validate_json COMMAND ${_cli} validate "${CMAKE_SOURCE_DIR}/fixtures/motec.ld")
+add_test(NAME fixtures.validate_json COMMAND ${_cli} validate "${CMAKE_SOURCE_DIR}/fixtures/motec.ld"
+                                              "${CMAKE_SOURCE_DIR}/fixtures/motec.csv"
+                                              "${CMAKE_SOURCE_DIR}/fixtures/generic.csv")
 set_tests_properties(fixtures.validate_json PROPERTIES LABELS "fixtures;lint" TIMEOUT 300)
 if(EXISTS "${CMAKE_SOURCE_DIR}/fixtures/private/motec.ld")
   add_test(NAME fixtures.validate_private_json
            COMMAND ${_cli} validate "${CMAKE_SOURCE_DIR}/fixtures/private/motec.ld")
   set_tests_properties(fixtures.validate_private_json PROPERTIES LABELS "fixtures;oracle" TIMEOUT 600)
+endif()
+
+# M2 (AC-M2-13): the self-authored text fixtures are what tools/gen_text_fixtures.py writes (inputs, expected
+# channels, fixture.json); fixtures.verify_public compares the readers with them.
+find_package(Python3 3.8 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+  add_test(NAME fixtures.text_generator_current
+           COMMAND "${Python3_EXECUTABLE}" -I "${CMAKE_CURRENT_SOURCE_DIR}/gen_text_fixtures.py"
+                   --root "${CMAKE_SOURCE_DIR}" --check)
+  set_tests_properties(fixtures.text_generator_current PROPERTIES LABELS "fixtures;lint" TIMEOUT 120)
 endif()
 
 # The generator is deterministic: the same family written twice is bit-identical.

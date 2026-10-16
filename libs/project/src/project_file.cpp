@@ -3,6 +3,7 @@
 #include "doc_io.hpp"
 
 #include <esses/base/atomic_file.hpp>
+#include <esses/base/read_file.hpp>
 #include <esses/maths/corrected_speed_distance.hpp>
 #include <esses/project/profile.hpp>
 #include <esses/project/project_file.hpp>
@@ -19,6 +20,8 @@
 namespace esses::project {
 
 namespace {
+
+constexpr detail::DocKind kKind{"project", ProjectFile::kSchemaVersion};
 
 using detail::json;
 using jsonio::asString;
@@ -89,7 +92,7 @@ SelectionKeys readSelection(const json& j, const std::string& pointer) {
 }
 
 json projectToJson(const ProjectFile& p) {
-    json root = detail::newDocument("project");
+    json root = detail::newDocument("project", std::max(p.schemaVersion, kKind.current));
     root["name"] = p.name;
     root["profile"] = p.profile;
     if (!p.options.compact().empty()) {
@@ -214,72 +217,78 @@ Result<void> pruneBackups(const std::filesystem::path& dir, const std::string& s
 } // namespace
 
 Result<ProjectFile> ProjectFile::parse(std::string_view json, std::vector<std::string>& log) {
-    return detail::parseDocument<ProjectFile>(json, [&](const detail::json& root) -> Result<ProjectFile> {
-        ObjectReader r(root, "");
-        detail::readSchemaHeader(r, "project", log);
-        ProjectFile p;
-        p.name = asString(r.required("name"), r.child("name"));
-        p.profile = detail::optString(r, "profile", "circuit");
-        if (const detail::json* o = r.optional("options")) {
-            p.options = detail::objectDoc(*o, r.child("options"));
-        }
-        if (const detail::json* u = r.optional("ui")) {
-            ObjectReader ur(*u, r.child("ui"));
-            p.layoutLocked = detail::optBool(ur, "layoutLocked", false);
-            ur.closed();
-        }
-        p.mathsOrder = detail::optStringArray(r, "mathsOrder");
-        if (const detail::json* b = r.optional("builtinMaths")) {
-            ObjectReader br(*b, r.child("builtinMaths"));
-            for (auto it = b->begin(); it != b->end(); ++it) {
-                const std::string ep = br.child(it.key());
-                if (!detail::isLowerId(it.key(), '_', 2)) {
-                    violate(ep,
+    return detail::readDocument<ProjectFile>(
+        json, kKind, log,
+        [&](const detail::json& root, const detail::DocVersion& version) -> Result<ProjectFile> {
+            ObjectReader r(root, "");
+            detail::markSchemaHeader(r);
+            ProjectFile p;
+            p.schemaVersion = version.write;
+            p.dirty = version.migrated;
+            p.name = asString(r.required("name"), r.child("name"));
+            p.profile = detail::optString(r, "profile", "circuit");
+            if (const detail::json* o = r.optional("options")) {
+                p.options = detail::objectDoc(*o, r.child("options"));
+            }
+            if (const detail::json* u = r.optional("ui")) {
+                ObjectReader ur(*u, r.child("ui"));
+                p.layoutLocked = detail::optBool(ur, "layoutLocked", false);
+                ur.closed();
+            }
+            p.mathsOrder = detail::optStringArray(r, "mathsOrder");
+            if (const detail::json* b = r.optional("builtinMaths")) {
+                ObjectReader br(*b, r.child("builtinMaths"));
+                for (auto it = b->begin(); it != b->end(); ++it) {
+                    const std::string ep = br.child(it.key());
+                    if (!detail::isLowerId(it.key(), '_', 2)) {
+                        violate(
+                            ep,
                             "a built-in module id is dotted snake_case (\"esses.corrected_speed_distance\")");
-                }
-                ObjectReader er(it.value(), ep);
-                BuiltinMathsEntry e;
-                if (const detail::json* v = er.optional("version")) {
-                    e.version = jsonio::asInt32(*v, er.child("version"));
-                    if (e.version < 1) {
-                        violate(er.child("version"), "a module version is at least 1");
                     }
+                    ObjectReader er(it.value(), ep);
+                    BuiltinMathsEntry e;
+                    if (const detail::json* v = er.optional("version")) {
+                        e.version = jsonio::asInt32(*v, er.child("version"));
+                        if (e.version < 1) {
+                            violate(er.child("version"), "a module version is at least 1");
+                        }
+                    }
+                    e.enabled = detail::optBool(er, "enabled", true);
+                    if (const detail::json* s = er.optional("settings")) {
+                        e.settings = detail::objectDoc(*s, er.child("settings"));
+                    }
+                    er.closed();
+                    p.builtinMaths.emplace(it.key(), std::move(e));
                 }
-                e.enabled = detail::optBool(er, "enabled", true);
-                if (const detail::json* s = er.optional("settings")) {
-                    e.settings = detail::objectDoc(*s, er.child("settings"));
+            }
+            p.workbooks = detail::optStringArray(r, "workbooks");
+            if (const detail::json* list = r.optional("recentSources")) {
+                const std::string lp = r.child("recentSources");
+                if (!list->is_array()) {
+                    violate(lp, "recentSources is an array");
                 }
-                er.closed();
-                p.builtinMaths.emplace(it.key(), std::move(e));
+                for (std::size_t i = 0; i < list->size(); ++i) {
+                    ObjectReader sr((*list)[i], jsonio::pointerIndex(lp, i));
+                    RecentSource s;
+                    s.path = asString(sr.required("path"), sr.child("path"));
+                    s.importer = detail::optString(sr, "importer");
+                    s.hash = sr.optional("hash") != nullptr ? readHash(*sr.optional("hash"), sr.child("hash"))
+                                                            : "";
+                    s.openedAt = detail::optString(sr, "openedAt");
+                    sr.closed();
+                    p.recentSources.push_back(std::move(s));
+                }
             }
-        }
-        p.workbooks = detail::optStringArray(r, "workbooks");
-        if (const detail::json* list = r.optional("recentSources")) {
-            const std::string lp = r.child("recentSources");
-            if (!list->is_array()) {
-                violate(lp, "recentSources is an array");
+            if (const detail::json* s = r.optional("lastSelection")) {
+                p.lastSelection = readSelection(*s, r.child("lastSelection"));
             }
-            for (std::size_t i = 0; i < list->size(); ++i) {
-                ObjectReader sr((*list)[i], jsonio::pointerIndex(lp, i));
-                RecentSource s;
-                s.path = asString(sr.required("path"), sr.child("path"));
-                s.importer = detail::optString(sr, "importer");
-                s.hash =
-                    sr.optional("hash") != nullptr ? readHash(*sr.optional("hash"), sr.child("hash")) : "";
-                s.openedAt = detail::optString(sr, "openedAt");
-                sr.closed();
-                p.recentSources.push_back(std::move(s));
+            if (const detail::json* d = r.optional("dataWindow")) {
+                p.dataWindow = detail::objectDoc(*d, r.child("dataWindow"));
             }
-        }
-        if (const detail::json* s = r.optional("lastSelection")) {
-            p.lastSelection = readSelection(*s, r.child("lastSelection"));
-        }
-        if (const detail::json* d = r.optional("dataWindow")) {
-            p.dataWindow = detail::objectDoc(*d, r.child("dataWindow"));
-        }
-        p.unknown = detail::unknownMembers(r);
-        return p;
-    });
+            p.unknown = detail::unknownMembers(r);
+            return p;
+        },
+        projectToJson);
 }
 
 Result<ProjectFile> ProjectFile::load(const std::filesystem::path& path, std::vector<std::string>& log) {
@@ -299,6 +308,47 @@ Result<void> ProjectFile::save(const std::filesystem::path& path) const {
         return Failure{std::move(e)};
     }
     return saveWithBackup(path.parent_path(), path, *text);
+}
+
+int ProjectFile::autosaveMinutes() const {
+    constexpr int kDefault = 2;
+    constexpr std::int64_t kMaxMinutes = std::int64_t{24} * 60;
+    if (!options.isObject()) {
+        return kDefault;
+    }
+    const json o = jsonio::fromDoc(options);
+    const auto general = o.find("general");
+    if (general == o.end() || !general->is_object()) {
+        return kDefault;
+    }
+    const auto minutes = general->find("autosaveMinutes");
+    if (minutes == general->end() || !minutes->is_number_integer() || minutes->get<std::int64_t>() < 0 ||
+        minutes->get<std::int64_t>() > kMaxMinutes) {
+        return kDefault;
+    }
+    return static_cast<int>(minutes->get<std::int64_t>());
+}
+
+analysis::LapStretchSettings ProjectFile::lapStretchSettings() const {
+    analysis::LapStretchSettings out;
+    if (!options.isObject()) {
+        return out;
+    }
+    const json o = jsonio::fromDoc(options);
+    const auto stretch = o.find("lapStretch");
+    if (stretch == o.end() || !stretch->is_object()) {
+        return out;
+    }
+    if (const auto enabled = stretch->find("enabled"); enabled != stretch->end() && enabled->is_boolean()) {
+        out.enabled = enabled->get<bool>();
+    }
+    if (const auto pct = stretch->find("tolerancePct"); pct != stretch->end() && pct->is_number()) {
+        const double value = pct->get<double>();
+        if (value >= 0.0 && value <= 100.0) {
+            out.tolerance = value / 100.0;
+        }
+    }
+    return out;
 }
 
 ProjectFile ProjectFile::makeDefault(std::string projectName, std::string profileId) {
@@ -342,11 +392,18 @@ ProjectFile ProjectFile::makeDefault(std::string projectName, std::string profil
 }
 
 Result<void> saveWithBackup(const std::filesystem::path& projectFolder, const std::filesystem::path& target,
-                            std::string_view bytes, std::chrono::system_clock::time_point now, int keep) {
+                            std::string_view bytes, std::chrono::system_clock::time_point now, int keep,
+                            std::optional<Error>* backupError) {
     namespace fs = std::filesystem;
     std::optional<std::string> previous;
     std::error_code ec;
     if (fs::exists(target, ec)) {
+        // Only a regular file is read, backed up and replaced: a directory standing where the document
+        // belongs is Io before backup/ is created or anything is written (libc++ reads a directory as an
+        // empty file, which would otherwise be "backed up" before the replacement fails).
+        if (Result<void> regular = requireRegularFile(target); !regular) {
+            return regular;
+        }
         auto old = jsonio::readFile(target);
         if (!old) {
             return Failure{old.error()};
@@ -355,37 +412,54 @@ Result<void> saveWithBackup(const std::filesystem::path& projectFolder, const st
             previous = std::move(old).value();
         }
     }
-    if (auto written = AtomicFile::write(target, bytes); !written) {
-        return written;
-    }
-    if (!previous) {
-        return ok();
-    }
-    const fs::path dir = projectFolder / "backup";
-    fs::create_directories(dir, ec);
-    if (ec) {
-        ErrorContext ctx;
-        ctx.path = dir;
-        return fail(ErrorCode::Io, "cannot create the backup folder: " + ec.message(), std::move(ctx));
-    }
     std::string stem = fromU8(target.filename().u8string());
     if (stem.ends_with(".json")) {
         stem.resize(stem.size() - 5);
     }
-    const std::string stamp = backupStamp(now);
-    const std::string base = stem + "." + stamp;
-    fs::path copy = dir / toU8(base + ".json");
-    for (int n = 2; fs::exists(copy, ec); ++n) {
-        std::string name = base;
-        name += '-';
-        name += std::to_string(n);
-        name += ".json";
-        copy = dir / toU8(name);
+    const fs::path dir = projectFolder / "backup";
+    // The previous version is copied to backup/ before the target is replaced (D-070, D-190): a crash in
+    // between leaves the old file and its copy, never the new file without the copy of the old one.
+    const auto backUp = [&]() -> Result<void> {
+        fs::create_directories(dir, ec);
+        if (ec || !fs::is_directory(dir, ec)) {
+            ErrorContext ctx;
+            ctx.path = dir;
+            return fail(ErrorCode::Io,
+                        "cannot create the backup folder: " +
+                            (ec ? ec.message() : std::string("not a folder")),
+                        std::move(ctx));
+        }
+        const std::string base = stem + "." + backupStamp(now);
+        fs::path copy = dir / toU8(base + ".json");
+        for (int n = 2; fs::exists(copy, ec); ++n) {
+            std::string name = base;
+            name += '-';
+            name += std::to_string(n);
+            name += ".json";
+            copy = dir / toU8(name);
+        }
+        return AtomicFile::write(copy, *previous);
+    };
+    bool backedUp = false;
+    if (previous) {
+        if (Result<void> b = backUp(); !b) {
+            if (backupError == nullptr) {
+                return b; // nothing written
+            }
+            *backupError = b.error();
+        } else {
+            backedUp = true;
+        }
     }
-    if (auto backedUp = AtomicFile::write(copy, *previous); !backedUp) {
-        return backedUp;
+    if (auto written = AtomicFile::write(target, bytes); !written) {
+        return written;
     }
-    return pruneBackups(dir, stem, keep);
+    if (backedUp) {
+        if (Result<void> pruned = pruneBackups(dir, stem, keep); !pruned && backupError != nullptr) {
+            *backupError = pruned.error();
+        }
+    }
+    return ok();
 }
 
 } // namespace esses::project

@@ -1,15 +1,21 @@
 // SPDX-FileCopyrightText: 2026 the Esses contributors
 // SPDX-License-Identifier: MIT
 //
-// ChannelsModel (06 section 7): the tree behind the Channels window (C). Level 1 = source (plus "Project"),
-// level 2 = category (Logged, Maths, Details, Alias, Mapped, Constants), level 3 = the importer's channel
-// groups (flat when none), level 4 = channels "name (unit)" (italic when Pending, red when Error). Sorted
-// with logical case-insensitive order. M1: plain substring filter (filterAccepts); the word-prefix search
-// semantics of 06 section 7 item 3 arrive in M2. Updates coalesced to <= 10 Hz. GUI thread only.
-// M1 details: categories without channels are omitted (M1 has Logged and Maths only; Details, Alias, Mapped
-// and Constants arrive with their documents); level 3 is flat (the M1 importers deliver no channel groups);
-// StatusRole carries model::ChannelStatus (Pending: italic, Error: red, styled by the view; Qt Core has no
-// QFont/QColor); sources follow the Data-window order.
+// ChannelsModel (06 section 7): the tree behind the Channels window (C). Level 1 = source (plus "Project" for
+// the source-independent constants), level 2 = category (Logged, Maths, Alias, Constants), level 3 = the
+// importer's channel groups (flat when none), level 4 = channels "name (unit)" (italic when Pending, red when
+// Error). Sorted with logical case-insensitive order. Updates coalesced to <= 10 Hz. GUI thread only.
+// Search (06 section 7 item 3, M2): filterAccepts implements the word-prefix semantics: the query and the
+// name are split into words on whitespace, '_', '-', '/', '(', ')', '[' and ']'; every query word must be a
+// case-insensitive prefix of a distinct name word, in order ("W S FL" finds "Wheel Speed FL", "temp (ecu)"
+// finds "Water Temp (ECU)"); loose (Options > General "loose name match", ProjectSession::looseChannelSearch)
+// makes each word a substring match. The Channel Editor's filter uses the same function (06 section 13.1 item
+// 2). Details: categories without channels are omitted; Maths lists the enabled chain heads (a Disabled
+// output, e.g. an item of a disabled module, is not a channel); Alias lists the project's aliases
+// that resolve in the source (through the logged channels or a maths output); Details and Mapped arrive with
+// their editors; level 3 is flat (no importer delivers channel groups yet); StatusRole carries
+// model::ChannelStatus (Pending: italic, Error: red, styled by the view; Qt Core has no QFont/QColor);
+// sources follow the Data-window order.
 #pragma once
 
 #include <QAbstractItemModel>
@@ -41,8 +47,11 @@ public:
     int columnCount(const QModelIndex& parent = QModelIndex()) const override;
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
 
-    // M1 filter: every whitespace-separated word must be a case-insensitive substring of the name.
-    static bool filterAccepts(const QString& channelName, const QString& query);
+    // The words of a channel name or a search query (06 section 7 item 3).
+    static QStringList searchWords(const QString& text);
+    // The word-prefix search: every query word a case-insensitive prefix (loose: substring) of a distinct
+    // name word, in order; an empty query accepts everything.
+    static bool filterAccepts(const QString& channelName, const QString& query, bool loose = false);
     // MIME "application/x-esses-channels": {"channels": [...], "newPanel": bool}.
     static QByteArray channelsMime(const QStringList& channels, bool newPanel);
 

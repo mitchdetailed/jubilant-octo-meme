@@ -1,0 +1,5 @@
+{
+  "$schema": "urn:esses:builtin-esses.gps_corrections-1",
+  "schemaVersion": 1,
+  "latitude": "GPS Latitude"
+}

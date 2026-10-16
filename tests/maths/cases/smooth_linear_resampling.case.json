@@ -1,0 +1,40 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "smooth_linear_resampling",
+  "expression": "smooth('G', 3)",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): smooth",
+    "note": "smooth resamples its argument Linear whatever its interpolation (6.4 rule 6)"
+  },
+  "rate": {
+    "num": 10,
+    "den": 1
+  },
+  "compat": {},
+  "precision": "single",
+  "durationUs": 1200000,
+  "inputs": {
+    "G": {
+      "rate": {
+        "num": 5,
+        "den": 1
+      },
+      "unit": "",
+      "values": [1, 2, 4, 8, 16, 32],
+      "interp": "previous"
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [1.25, 1.5, 2.16666666667, 3, 4.33333333333, 6, 8.66666666667, 12, 17.3333333333, 24, 28, 32],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

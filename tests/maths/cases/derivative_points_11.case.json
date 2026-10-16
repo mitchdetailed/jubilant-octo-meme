@@ -1,0 +1,36 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "derivative_points_11",
+  "expression": "derivative('X', 11)",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): derivative",
+    "note": "least-squares slope over the window; n of 0 or 1 is 2"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 1200000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [3, 1.5, 4.25, 1, 5.5, 9, 2.75, 6.5, 5.25, 3.5, 5, 8.75]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [11.0714285714, 5.53571428571, 5.89285714286, 4.83333333333, 3.07575757576, 2.65909090909, 3.97727272727, 3.09090909091, 3.5, 0.446428571429, 0.267857142857, 6.78571428571],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

@@ -4,8 +4,8 @@
 // The round-trip rule of 02 section 6.5 rule 3 for every esses_project document kind, over the shipped
 // documents and every schema example: save(load(f)) == f for the shipped (canonical, current-version)
 // documents; save(load(save(load(f)))) == save(load(f)) and a schema-valid output for every valid example;
-// the loaders reject what the schemas reject, except members the M1 types keep opaque (options, dataWindow,
-// print; validated against the schema by SchemaRegistry from M2).
+// the loaders reject what the schemas reject (the members the M1 types keep opaque, options, dataWindow and
+// print, through SchemaRegistry since M2).
 #include "test_support.hpp"
 
 #include <esses/base/paths.hpp>
@@ -124,19 +124,23 @@ TEST_CASE("round trip: every valid schema example loads, saves idempotently and 
 }
 
 TEST_CASE("round trip: the loaders reject the invalid schema examples", "[unit]") {
-    // Rejected by the schema only: members M1 keeps as opaque JSON.
+    // M2: the members M1 keeps as opaque JSON (options, dataWindow, print) are checked by SchemaRegistry on
+    // load, so every invalid example is refused, those three with the schema's JSON pointer.
     const std::set<std::string> opaque{"project-1/bad-filter-kind.json", "project-1/bad-time-format.json",
                                        "scheme-1/print-unknown-member.json"};
     std::size_t checked = 0;
     for (const char* schemaId : {"workbook-1", "project-1", "scheme-1", "keymap-1", "profile-1"}) {
+        const auto expect = nlohmann::json::parse(
+            pt::readAll(pt::repoRoot() / "schemas/examples" / schemaId / "expect.json"));
         for (const auto& path : pt::jsonFiles(pt::repoRoot() / "schemas/examples" / schemaId / "invalid")) {
             const std::string key = std::string(schemaId) + "/" + path.filename().string();
             INFO(key);
             const auto r = kind(schemaId).rewrite(pt::readAll(path));
+            REQUIRE_FALSE(r.ok());
             if (opaque.count(key) != 0) {
-                CHECK(r.ok());
-            } else {
-                CHECK_FALSE(r.ok());
+                CHECK(r.error().code == ErrorCode::Invalid);
+                CHECK(r.error().context.detail ==
+                      expect.at(path.filename().string()).at("pointer").get<std::string>());
             }
             ++checked;
         }

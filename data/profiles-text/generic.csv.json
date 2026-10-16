@@ -1,0 +1,42 @@
+{
+  "$schema": "urn:esses:importer-profile-1",
+  "schemaVersion": 1,
+  "columns": {},
+  "decimal": "auto",
+  "delimiter": "auto",
+  "duplicateNames": "suffix",
+  "encoding": "auto",
+  "header": {
+    "dataRow": "auto",
+    "ignoreEmptyNames": true,
+    "namesRow": 0,
+    "skipBlank": true,
+    "unitInName": "[\\(\\[]([^\\)\\]]*)[\\)\\]]\\s*(\\*OBD)?$",
+    "unitsRow": "@auto"
+  },
+  "id": "generic.csv",
+  "lapSource": {
+    "column": "@auto:^(lap|lap number|lap count|lapno)$",
+    "kind": "lap_counter_edge",
+    "optional": true
+  },
+  "layout": "table",
+  "name": "Delimited text (auto-detect)",
+  "preamble": {
+    "untilRegex": "@auto"
+  },
+  "quote": "\"",
+  "sentinels": ["", "NaN", "nan", "#N/A", "N/A", "-###", "+###", "none", "null"],
+  "sniff": {
+    "confidence": 30,
+    "extensions": [".csv", ".txt", ".tsv", ".asc", ".log"]
+  },
+  "sparse": "timestamped",
+  "time": {
+    "column": "@auto",
+    "rate": "infer",
+    "unit": "@auto"
+  },
+  "trim": true,
+  "version": "1.0.0"
+}

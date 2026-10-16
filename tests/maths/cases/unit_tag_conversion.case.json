@@ -1,0 +1,42 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "unit_tag_conversion",
+  "expression": "'S'[km/h]",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Expressions (Pro)",
+    "note": "[unit] converts the base-unit value before calculation (2.4 rule 5)"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 400000,
+  "inputs": {
+    "S": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "m/s",
+      "values": [0, 10, 20, 27.5]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [0, 36, 72, 99],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    },
+    "diagnostics": [
+      {
+        "code": "W-UNIT-MISSING",
+        "count": 0
+      }
+    ]
+  }
+}

@@ -4,7 +4,8 @@
 # esses_project (layer 2, Qt-free; 01 section 2.1, 02 section 6). M1 (07 section 4.1): ProjectFile,
 # WorkbookFile, ComponentSpec, Scheme, Keymap and Profile read/write paths plus the shipped documents
 # (data/workbooks/circuit-default.workbook.json, data/schemes/{light,dark}.scheme.json, data/keymaps/default.json,
-# data/profiles/circuit.profile.json, data/rules/*.rule.json). SchemaRegistry and Migrations arrive in M2.
+# data/profiles/circuit.profile.json, data/rules/*.rule.json). M2: the channel documents, SchemaRegistry,
+# Migrations and Journal (src/persistence/).
 # Links esses_base, esses_units, esses_model, esses_analysis and esses_maths (same-layer edges, D-122);
 # nlohmann-json and json-schema-validator are private (no JSON library type in a public header).
 #
@@ -25,6 +26,9 @@ esses_add_library(project LAYER 2 QT_FREE
   PRIVATE_DEPS
     esses::nlohmann_json
     esses::json_schema_validator)
+# SchemaRegistry::findSchemasDir() falls back to the source tree's schemas/ (developer builds, tests), after
+# <dataDir>/schemas and <exe dir>/data/schemas.
+target_compile_definitions(${ESSES_PREFIX}_project PRIVATE "ESSES_PROJECT_SOURCE_DIR=\"${CMAKE_SOURCE_DIR}\"")
 
 file(GLOB_RECURSE _esses_project_tests CONFIGURE_DEPENDS
      "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.hpp")

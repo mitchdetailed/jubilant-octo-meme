@@ -1,0 +1,34 @@
+{
+  "bad-interp.json": {
+    "pointer": "/channels/Gear/interp",
+    "why": "interpolation is one of the four policies"
+  },
+  "dps-out-of-range.json": {
+    "pointer": "/channels/Engine RPM/dps",
+    "why": "dps lies in 0..15"
+  },
+  "empty-channel-name.json": {
+    "pointer": "/channels",
+    "why": "a channel name is not empty (reported at the map)"
+  },
+  "limits-unknown-member.json": {
+    "pointer": "/channels/Speed/warn",
+    "why": "limits are closed"
+  },
+  "missing-channels.json": {
+    "pointer": "",
+    "why": "the channels map is required"
+  },
+  "scale-without-unit.json": {
+    "pointer": "/channels/Speed/scaleMax",
+    "why": "a value carries its unit"
+  },
+  "unit-with-space.json": {
+    "pointer": "/channels/Speed/displayUnit",
+    "why": "unit symbols carry no surrounding white space"
+  },
+  "wrong-schema-id.json": {
+    "pointer": "/$schema",
+    "why": "the $schema id names another schema"
+  }
+}

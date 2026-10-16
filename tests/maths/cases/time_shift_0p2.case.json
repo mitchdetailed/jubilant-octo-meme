@@ -1,0 +1,36 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "time_shift_0p2",
+  "expression": "time_shift('X', 0.2)",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): time_shift",
+    "note": "positive t delays; round(t * rate) half away from zero (time_shift.sign)"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 1200000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [3, 1.5, 4.25, 1, 5.5, 9, 2.75, 6.5, 5.25, 3.5, 5, 8.75]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [null, null, 3, 1.5, 4.25, 1, 5.5, 9, 2.75, 6.5, 5.25, 3.5],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

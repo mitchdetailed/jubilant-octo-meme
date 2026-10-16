@@ -1,0 +1,10 @@
+{
+  "$schema": "urn:esses:aliases-1",
+  "schemaVersion": 1,
+  "aliases": [
+    {
+      "candidates": [],
+      "name": "Speed"
+    }
+  ]
+}

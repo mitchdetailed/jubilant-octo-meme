@@ -1,0 +1,13 @@
+{
+  "$schema": "urn:esses:overrides-1",
+  "schemaVersion": 1,
+  "channels": {
+    "Speed": {
+      "colourIndex": 1
+    }
+  },
+  "futureMember": [1, 2],
+  "x-esses-legacy": {
+    "old": 1
+  }
+}

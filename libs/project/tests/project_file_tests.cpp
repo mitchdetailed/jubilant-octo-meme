@@ -10,7 +10,10 @@
 #include <nlohmann/json.hpp>
 
 #include <chrono>
+#include <filesystem>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using namespace esses;
@@ -66,11 +69,17 @@ TEST_CASE("project file: a minimal file fills the defaults and writes the full f
     CHECK(p->profile == "circuit");
     CHECK(p->options.isNull());
     CHECK(p->builtinMaths.empty());
+    // The example is a version-1 document: migrated on load (D-162) and so dirty, written as version 2.
+    CHECK(p->dirty);
+    CHECK(p->schemaVersion == ProjectFile::kSchemaVersion);
     const std::string once = p->toJson();
     CHECK(pt::schemaErrors(once, "project-1").empty());
     const auto again = ProjectFile::parse(once, log);
     REQUIRE(again.ok());
-    CHECK(*again == *p);
+    CHECK_FALSE(again->dirty);
+    ProjectFile migrated = *p;
+    migrated.dirty = false;
+    CHECK(*again == migrated);
     CHECK(again->toJson() == once);
     CHECK(once.find("\"options\"") == std::string::npos); // absent stays absent
 }
@@ -176,6 +185,47 @@ TEST_CASE("project file: save writes atomically and keeps the last five backups 
     CHECK(pt::jsonFiles(dir.path() / "backup").size() == 6);
 }
 
+// D-190: the previous version is copied to backup/ before the target is replaced, so a failed backup either
+// leaves the target as it was (the caller asked for no report) or is reported beside a written target.
+TEST_CASE("project file: saveWithBackup backs up before it writes", "[unit]") {
+    pt::TempDir dir("project-backup-first");
+    const auto target = dir.path() / "project.json";
+    pt::writeAll(target, "{\"v\": 1}\n");
+    pt::writeAll(dir.path() / "backup", "a file where the backup folder belongs");
+    const auto now = std::chrono::sys_days{std::chrono::year{2026} / 10 / 13} + std::chrono::hours{9};
+    const auto refused = saveWithBackup(dir.path(), target, std::string("{\"v\": 2}\n"), now);
+    REQUIRE_FALSE(refused.ok());
+    CHECK(refused.error().code == ErrorCode::Io);
+    CHECK(pt::readAll(target) == "{\"v\": 1}\n"); // not written: an error means the target is untouched
+
+    std::optional<Error> backupError;
+    REQUIRE(saveWithBackup(dir.path(), target, std::string("{\"v\": 2}\n"), now, 5, &backupError).ok());
+    CHECK(pt::readAll(target) == "{\"v\": 2}\n"); // written, the backup's failure reported beside it
+    REQUIRE(backupError.has_value());
+    CHECK(backupError->code == ErrorCode::Io);
+
+    std::filesystem::remove(dir.path() / "backup");
+    backupError.reset();
+    REQUIRE(saveWithBackup(dir.path(), target, std::string("{\"v\": 3}\n"), now, 5, &backupError).ok());
+    CHECK_FALSE(backupError.has_value());
+    CHECK(pt::readAll(dir.path() / "backup" / "project.20261013-090000.json") == "{\"v\": 2}\n");
+}
+
+// A directory standing where the document belongs (the project recovery test's failed save): Io, never an
+// exception (libstdc++ throws from reading a directory, which POSIX lets a stream open), and nothing written.
+TEST_CASE("project file: saveWithBackup over a directory is an Io error", "[unit]") {
+    pt::TempDir dir("project-save-over-dir");
+    const auto target = dir.path() / "channels" / "mappings.json";
+    std::filesystem::create_directories(target);
+    const auto now = std::chrono::sys_days{std::chrono::year{2026} / 10 / 14} + std::chrono::hours{9};
+    Result<void> saved = fail(ErrorCode::Internal, "not called");
+    REQUIRE_NOTHROW(saved = saveWithBackup(dir.path(), target, std::string("{}\n"), now));
+    REQUIRE_FALSE(saved.ok());
+    CHECK(saved.error().code == ErrorCode::Io);
+    CHECK(std::filesystem::is_directory(target));
+    CHECK_FALSE(std::filesystem::exists(dir.path() / "backup"));
+}
+
 TEST_CASE("project file: load reports Io and Format with the path", "[unit]") {
     pt::TempDir dir("project-load");
     std::vector<std::string> log;
@@ -187,4 +237,25 @@ TEST_CASE("project file: load reports Io and Format with the path", "[unit]") {
     REQUIRE_FALSE(broken.ok());
     CHECK(broken.error().code == ErrorCode::Format);
     CHECK(broken.error().context.path == dir.path() / "project.json");
+}
+
+TEST_CASE("project file: the autosave interval and the lap-stretch settings come from the options",
+          "[unit]") {
+    ProjectFile p = ProjectFile::makeDefault("P");
+    CHECK(p.autosaveMinutes() == 2);
+    CHECK(p.lapStretchSettings() == analysis::LapStretchSettings{true, 0.05});
+    const auto with = [](std::string_view options) {
+        ProjectFile q;
+        q.options = *JsonDoc::parse(options);
+        return q;
+    };
+    CHECK(with(R"({"general": {"autosaveMinutes": 0}})").autosaveMinutes() == 0); // off
+    CHECK(with(R"({"general": {"autosaveMinutes": 5}})").autosaveMinutes() == 5);
+    CHECK(with(R"({"general": {"autosaveMinutes": -1}})").autosaveMinutes() == 2);
+    CHECK(with(R"({"general": {"autosaveMinutes": "2"}})").autosaveMinutes() == 2);
+    CHECK(ProjectFile{}.autosaveMinutes() == 2);
+    const auto off = with(R"({"lapStretch": {"enabled": false, "tolerancePct": 2.5}})").lapStretchSettings();
+    CHECK_FALSE(off.enabled);
+    CHECK(off.tolerance == 0.025);
+    CHECK(with(R"({"lapStretch": {"tolerancePct": -3}})").lapStretchSettings().tolerance == 0.05);
 }

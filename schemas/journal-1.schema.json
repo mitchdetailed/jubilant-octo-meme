@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:journal-1",
+  "title": "Esses write-ahead journal entry (journal-1)",
+  "description": "One <Project>/.journal/<seq>.json file of the write-ahead autosave (02 section 6.8, D-019, D-070): the full canonical document of every project file that was dirty at the autosave, with the hash of the on-disk file the edit started from (null for a new file) and the hash of the document's canonical bytes. seq is monotonic in the folder; replay takes the newest entry per path ordered by seq, then at. Unknown top-level members are allowed and preserved; entries are closed.",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "seq", "at", "session", "entries"],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072). The urn:esses: form is written; the bare esses: form of earlier drafts and the later https form are accepted on load and normalised on save (02 section 6.6 rule 1).",
+      "type": "string",
+      "pattern": "^(urn:esses:journal-1|esses:journal-1|https://[^/\\s]+(/[^/\\s]+)*/journal-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "at": {
+      "description": "When the entry was written.",
+      "$ref": "#/definitions/isoDateTime"
+    },
+    "session": {
+      "description": "The writing session.",
+      "$ref": "#/definitions/uuid"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/entry"
+      }
+    },
+    "x-esses-legacy": {
+      "$ref": "#/definitions/legacyBag"
+    }
+  },
+  "definitions": {
+    "entry": {
+      "type": "object",
+      "required": ["path", "baseHash", "hash", "document"],
+      "properties": {
+        "path": {
+          "description": "Project-relative path with '/' separators, inside the project folder (no '.' or '..' segment, no ':' or '\\\\').",
+          "type": "string",
+          "pattern": "^([^/\\\\:.][^/\\\\:]*|\\.[^/\\\\:.][^/\\\\:]*|\\.\\.[^/\\\\:]+)(/([^/\\\\:.][^/\\\\:]*|\\.[^/\\\\:.][^/\\\\:]*|\\.\\.[^/\\\\:]+))*$"
+        },
+        "baseHash": {
+          "description": "xxh3-128 of the on-disk bytes the edit started from; null for a new file.",
+          "type": ["string", "null"],
+          "pattern": "^xxh3:[0-9a-f]{32}$"
+        },
+        "hash": {
+          "description": "xxh3-128 of the document's canonical bytes.",
+          "$ref": "#/definitions/hash128"
+        },
+        "document": {
+          "description": "The full document (validated by its own schema on recovery).",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "hash128": {
+      "description": "xxh3-128 as \"xxh3:\" + 32 lower-case hex digits, high word first (Hash128::hex()).",
+      "type": "string",
+      "pattern": "^xxh3:[0-9a-f]{32}$"
+    },
+    "uuid": {
+      "description": "Canonical lower-case 8-4-4-4-12 UUID (Uuid::str()).",
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "isoDateTime": {
+      "description": "ISO 8601 date-time with seconds and a UTC offset (or Z).",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "legacyBag": {
+      "description": "Fields removed by a migration, kept verbatim (02 section 6.6 rule 3).",
+      "type": "object"
+    }
+  }
+}

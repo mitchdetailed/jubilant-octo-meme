@@ -1,0 +1,50 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "table2d_invalid_axis_sample",
+  "expression": "'P'[m]",
+  "item": {
+    "kind": "table2d",
+    "axis": {
+      "unit": "m",
+      "breakpoints": [0, 10, 20]
+    },
+    "values": {
+      "unit": "",
+      "data": [0, 1, 4]
+    },
+    "interpolation": "linear",
+    "outOfRange": "clamp"
+  },
+  "provenance": {
+    "kind": "derived",
+    "ref": "03_MATHS_ENGINE.md 4.4",
+    "note": "an invalid axis sample gives an invalid output"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 600000,
+  "inputs": {
+    "P": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "m",
+      "values": [0, 5, 10, 15, 20, 25],
+      "valid": [1, 0, 1, 1, 0, 1]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [0, null, 1, 2.5, null, 4],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

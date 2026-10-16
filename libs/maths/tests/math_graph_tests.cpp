@@ -508,12 +508,30 @@ TEST_CASE("math graph: invalid output sets are rejected and change nothing", "[u
         CHECK(g.outputs().size() == 3);
         CHECK(g.version(*g.find("Fake Speed")) == v0);
     }
-    // Another module may not define an output that already exists (shadowing rules arrive in M2).
+    // Another module defining outputs of the same names shadows them (03 section 4.3, M2): one chain per name
+    // in registration order, whose head is the later module's output; the earlier outputs keep their
+    // versions.
     FakeModule second("test.second", "Fake Speed");
     Diagnostics d;
-    Result<std::vector<ChannelKey>> clash = g.defineBuiltin(second, {}, d);
-    REQUIRE_FALSE(clash);
-    CHECK(d.back().code == "E-DUPLICATE-OUTPUT");
+    Result<std::vector<ChannelKey>> shadow = g.defineBuiltin(second, {}, d);
+    REQUIRE(shadow);
+    CHECK(g.outputs().size() == 3);
+    CHECK(g.nodes().size() == 6);
+    const std::vector<MathNodeInfo> infos = g.nodes();
+    CHECK(infos[0].moduleId == "test.fake");
+    CHECK_FALSE(infos[0].head);
+    CHECK(infos[0].id.chainIndex == 0);
+    CHECK(infos[0].status.version == v0);
+    CHECK(infos[3].moduleId == "test.second");
+    CHECK(infos[3].head);
+    CHECK(infos[3].id.chainIndex == 1);
+    CHECK(g.version(*g.find("Fake Speed")) == infos[3].status.version);
+    CHECK(g.descriptor(*g.find("Fake Speed"))->id ==
+          model::channelIdMathsModule(src->id, "Normal", "Fake Speed", "test.second"));
+    Result<ColumnHandle> head = await(g, *g.find("Fake Dist"));
+    REQUIRE(head);
+    CHECK(second.distEvals->load() == 1);
+    CHECK(module.distEvals->load() == 0);
 
     MathGraph noUnits(src, "Normal", nullptr, {}, &rt.pool, &rt.cache);
     CHECK(noUnits.defineBuiltin(module, {}, d).error().code == ErrorCode::Invalid);

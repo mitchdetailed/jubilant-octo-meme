@@ -1,0 +1,46 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "bit_decode_one_bit",
+  "expression": "bit_decode('A', 2)",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): bit_decode",
+    "note": "(x >> bit) & 1 (bit_decode.arity)"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 800000,
+  "inputs": {
+    "A": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [12, 10, 255, 6, 0, 7, 1023, 5],
+      "dtype": "i32"
+    },
+    "B": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [10, 6, 15, 3, 9, 7, 512, 2],
+      "dtype": "i32"
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [1, 0, 1, 1, 0, 1, 1, 1],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

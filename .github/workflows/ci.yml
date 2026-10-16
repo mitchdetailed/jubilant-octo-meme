@@ -75,6 +75,15 @@ jobs:
           "$bin/esses-gen-fixtures" --inputs-only --out build/fixture-inputs/motec.ld --fixtures fixtures/motec.ld \
             --manifest build/fixture-inputs/manifest.json
           "$bin/esses-cli" fixture verify fixtures/ --manifest build/fixture-inputs/manifest.json
+      # ctest above already ran the maths case corpus; this step repeats it visibly (AC-M2-02): the committed
+      # expectations are what the independent reference tools/maths_ref.py generates (D-041), then every case file
+      # of tests/maths/cases runs through compile and evaluateWhole (the Catch2 tag [cases] prints the counts).
+      - name: Maths case corpus (AC-M2-02)
+        shell: bash
+        run: |
+          py=python3; if [ "$RUNNER_OS" = Windows ]; then py=python; fi
+          "$py" -I tools/maths_ref.py --check tests/maths/cases
+          build/${{ matrix.preset }}/bin/esses_maths_tests "[cases]"
       # A DrawList golden mismatch writes <case>@<dpr>x.actual.json next to the test binary (libs/plotcore/README.md).
       - name: Upload DrawList golden diffs
         if: failure()
@@ -191,7 +200,9 @@ jobs:
 
   lint:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    # 45, not 20: the clang-tidy build of the Qt-free targets (ci-linux-lint, every translation unit through
+    # clang-tidy) was cancelled at step 228 of 233 on a slow hosted runner; it grows with every library.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
@@ -233,7 +244,7 @@ jobs:
       - name: Forbidden paths (section 1)
         shell: bash
         run: |
-          bad=$(git ls-files | grep -E '^(research|help_text|conv_samples)/|\.(chm|i2wkb|i2wsp|mcs|mfs|mt2)$' | grep -v '^fixtures/private/' || true)
+          bad=$(git ls-files | grep -E '^(research|help_text|conv_samples|tests/maths/user_modules|tests/maths/oracle)/|\.(chm|i2wkb|i2wsp|mcs|mfs|mt2)$|\.private\.json$' | grep -v '^fixtures/private/' || true)
           if [ -n "$bad" ]; then echo "Forbidden paths are tracked:"; echo "$bad"; exit 1; fi
       - name: Configure with clang-tidy on the Qt-free targets
         run: cmake --preset ci-linux-lint -DCLANG_TIDY_EXE="$CLANG_TIDY"
@@ -246,9 +257,15 @@ jobs:
         run: ctest --preset ci-linux-lint
       - name: REUSE / SPDX
         run: pipx run reuse lint
-      - name: Schema validation of data/, schemas/ and fixtures/ (08 section 5, AC-M0-10)
+      - name: Schema validation of data/, fixtures/, tests/maths/ and schemas/ (08 section 5, AC-M0-10, AC-M2-08)
         shell: bash
-        run: ./build/ci-linux-lint/bin/esses-cli validate data fixtures schemas/*.schema.json
+        run: ./build/ci-linux-lint/bin/esses-cli validate --all --root .
+      # AC-M2-01: the user's maths corpus is private (tests/maths/user_modules, git-ignored); without it the check
+      # reports "skipped". With a private checkout it prints the counts that docs/milestones/M2.md records.
+      - name: Maths corpus counts (AC-M2-01, private, skipped without the corpus)
+        run: >-
+          python3 -I tools/maths_corpus_check.py --cli build/ci-linux-lint/bin/esses-cli
+          --corpus tests/maths/user_modules --compat-doc docs/maths-compat.md --if-present
       - name: Import Log codes documented (AC-M0-12)
         run: python3 -I tools/check_importlog_codes.py --self-test && python3 -I tools/check_importlog_codes.py --root .
 
@@ -316,7 +333,7 @@ jobs:
 
   fuzz-smoke:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25 # build with ASan + UBSan + coverage, generate the seeds, 2 x 60 s
+    timeout-minutes: 30 # build with ASan + UBSan + coverage, generate the seeds, 5 targets x 60 s
     steps:
       - uses: actions/checkout@v4
       - uses: lukka/get-cmake@latest
@@ -329,13 +346,13 @@ jobs:
       - name: Run each fuzz target for 60 s (AC-M0-06)
         shell: bash
         run: |
-          for name in fuzz_ld_header fuzz_ldx; do
+          for name in fuzz_ld_header fuzz_ldx fuzz_maths_parser fuzz_csv_sniff fuzz_text_profile; do
             t=build/linux-clang-fuzz/bin/$name; corpus=build/fuzz-corpus/$name; mkdir -p "$corpus"
             dict=(); [ -f "$t.dict" ] && dict=("-dict=$t.dict")
             "$t" -max_total_time=60 -max_len=65536 -rss_limit_mb=2048 "${dict[@]}" "$corpus" "build/fuzz-seeds/$name"
           done
 
-  # The same targets with MSVC's libFuzzer and ASan (preset win-msvc-fuzz: the libraries and the two targets only).
+  # The same targets with MSVC's libFuzzer and ASan (preset win-msvc-fuzz: the libraries and the fuzz targets only).
   fuzz-smoke-windows:
     runs-on: windows-2022
     timeout-minutes: 30
@@ -354,7 +371,7 @@ jobs:
         run: |
           build/win-msvc-core-rel/bin/esses-gen-fixtures --inputs-only --out build/fuzz-inputs
           python -I tools/fuzz_seeds.py --inputs build/fuzz-inputs --out build/fuzz-seeds --max-bytes 65536
-          for name in fuzz_ld_header fuzz_ldx; do
+          for name in fuzz_ld_header fuzz_ldx fuzz_maths_parser fuzz_csv_sniff fuzz_text_profile; do
             t=build/win-msvc-fuzz/bin/$name.exe; corpus=build/fuzz-corpus/$name; mkdir -p "$corpus"
             dict=(); [ -f "build/win-msvc-fuzz/bin/$name.dict" ] && dict=("-dict=build/win-msvc-fuzz/bin/$name.dict")
             "$t" -max_total_time=60 -max_len=65536 -rss_limit_mb=4096 "${dict[@]}" "$corpus" "build/fuzz-seeds/$name"

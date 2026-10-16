@@ -1,0 +1,29 @@
+{
+  "$schema": "urn:esses:mathfn-manifest-1",
+  "schemaVersion": 1,
+  "name": "mylib.rolling_rms",
+  "description": "root mean square over a window of n points",
+  "args": [
+    {
+      "name": "x",
+      "kind": "Series",
+      "dim": "any",
+      "optional": false
+    },
+    {
+      "name": "n",
+      "kind": "Scalar",
+      "dim": "dimensionless",
+      "optional": true
+    }
+  ],
+  "arities": [1, 2],
+  "returns": {
+    "kind": "Series",
+    "unitRule": "same_as:x"
+  },
+  "class": "External",
+  "blockCapable": false,
+  "telemetry": false,
+  "provenance": "plugin:example"
+}

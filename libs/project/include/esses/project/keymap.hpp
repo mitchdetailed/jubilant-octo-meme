@@ -65,6 +65,9 @@ struct Keymap {
     std::vector<KeyBinding> bindings;
     std::vector<KeyUnbind> unbind;
     JsonDoc unknown; // unrecognised top-level members, preserved
+    // The minor written on save: the newest this build writes, or the newer minor the document was read with
+    // (R-38: never downgraded).
+    int schemaVersion = 1;
 
     // Invalid (context.detail = JSON pointer) on a malformed row: a command that is not <area>.<verb_noun>
     // snake_case, an unknown context, status or milestone, an empty key, args that are not an array, or a

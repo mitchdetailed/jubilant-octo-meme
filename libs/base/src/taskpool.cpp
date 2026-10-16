@@ -352,19 +352,33 @@ std::shared_ptr<detail::SharedStateBase> TaskPool::submitNode(const std::shared_
             Impl::KeyEntry& entry = impl_->keys[node->key.text];
             // A task whose token has already fired (the task observed that all its requesters cancelled, or
             // cancelAll) will only resolve Cancelled: a new requester gets a task of its own instead. Until
-            // the task observes it, a new requester still joins and keeps it alive (AllRequesters). The old
-            // task stays in `live` until it completes, and completeLocked() leaves the key's new task alone.
-            if (entry.active && entry.active->cancel->fired()) {
-                entry.active.reset();
+            // the task observes it, a new requester still joins and keeps it alive (AllRequesters). A task
+            // whose Future is ready has finished for its requesters, although its worker drops the key only a
+            // moment later (runNode: execute publishes, then completeLocked): a submit in that window gets a
+            // task of its own too (01 section 5.4 rule 1 joins a queued or running task), or a caller that
+            // saw the Future ready and asks again (MathGraph::invalidate, Recalculate) would get the old
+            // result without a run. The old task stays in `live` until it completes, and completeLocked()
+            // leaves the key's new task alone.
+            std::shared_ptr<detail::TaskNode> existing = entry.active;
+            if (existing &&
+                (existing->cancel->fired() || existing->state == nullptr || existing->state->ready())) {
+                existing.reset();
             }
-            if (entry.active) {
-                const std::shared_ptr<detail::TaskNode> existing = entry.active;
-                if (existing->resultType != node->resultType) {
-                    typeMismatch = true;
-                    node->stage.store(detail::TaskStage::Done, std::memory_order_release);
-                    toResolve.emplace_back(node, Error{ErrorCode::Internal, "task key type mismatch", {}});
-                } else {
-                    existing->cancel->addRequester(std::move(requester));
+            if (existing && existing->resultType != node->resultType) {
+                typeMismatch = true;
+                node->stage.store(detail::TaskStage::Done, std::memory_order_release);
+                toResolve.emplace_back(node, Error{ErrorCode::Internal, "task key type mismatch", {}});
+            } else {
+                if (existing) {
+                    existing->cancel->addRequester(requester);
+                    // The task may have latched its cancellation between the check above and this
+                    // registration (it saw every earlier requester cancelled, under the token's own mutex):
+                    // it resolves Cancelled, so this requester gets a task of its own after all.
+                    if (existing->cancel->fired()) {
+                        existing.reset();
+                    }
+                }
+                if (existing) {
                     if (node->priority < existing->priority &&
                         existing->stage.load(std::memory_order_relaxed) == detail::TaskStage::Queued) {
                         impl_->unqueueLocked(*existing);
@@ -374,12 +388,12 @@ std::shared_ptr<detail::SharedStateBase> TaskPool::submitNode(const std::shared_
                     result = existing->state;
                     node->stage.store(detail::TaskStage::Done,
                                       std::memory_order_release); // discarded duplicate
+                } else {
+                    entry.active = node;
+                    node->cancel->addRequester(std::move(requester));
+                    impl_->live.emplace(node.get(), node);
+                    impl_->enqueueLocked(node);
                 }
-            } else {
-                entry.active = node;
-                node->cancel->addRequester(std::move(requester));
-                impl_->live.emplace(node.get(), node);
-                impl_->enqueueLocked(node);
             }
         } else { // Kind::Replace
             Impl::KeyEntry& entry = impl_->keys[node->key.text];

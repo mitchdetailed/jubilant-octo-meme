@@ -1,0 +1,114 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:mathfn-manifest-1",
+  "title": "Esses maths function manifest (mathfn-manifest-1)",
+  "description": "The manifest of one maths function (03 section 10.1, D-024): the shape FunctionRegistry holds for every intrinsic of 03 section 5 and for external functions (the v1.0 C ABI esses_mathfn_v1, v1.1 Lua), so the editor, the type checker and esses-cli maths functions treat both alike. Name (canonical lower case; dotted for an external function, keeping the reference tool's ProgId.name spelling), description, the arguments with their kind, dimension and whether they may be left out, the accepted arities, the result kind and unit rule (03 section 3.2 rule 9), the kernel class, whether it evaluates block by block, whether it runs on telemetry, and where it comes from. M2 ships the shape and no external implementation (07 section 5.1). Closed.",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "name", "args", "arities", "returns", "class", "provenance"],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072). The urn:esses: form is written; the bare esses: form of earlier drafts and the later https form are accepted on load (02 section 6.6 rule 1).",
+      "type": "string",
+      "pattern": "^(urn:esses:mathfn-manifest-1|esses:mathfn-manifest-1|https://[^/\\s]+(/[^/\\s]+)*/mathfn-manifest-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "name": {
+      "description": "Canonical lower-case name; an external function is dotted (\"mylib.rolling_rms\").",
+      "type": "string",
+      "pattern": "^[a-z_][a-z0-9_]*(\\.[a-z_][a-z0-9_]*)*$"
+    },
+    "description": {
+      "type": "string"
+    },
+    "args": {
+      "description": "The parameters in call order.",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/argSpec"
+      }
+    },
+    "arities": {
+      "description": "Accepted argument counts (E-ARITY lists them).",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      }
+    },
+    "returns": {
+      "type": "object",
+      "required": ["kind", "unitRule"],
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/argKind"
+        },
+        "unitRule": {
+          "description": "03 section 3.2 rule 9: same_as:<arg>, unitless, angle, sqrt:<arg>, per_time:<arg>, times_time:<arg>, times_length:<arg>, pow:<arg>,<arg or n>, unify:<args>, declared[:<unit>].",
+          "type": "string",
+          "pattern": "^(unitless|angle|declared(:\\S+)?|(same_as|sqrt|per_time|times_time|times_length):[a-z_][a-z0-9_]*|pow:[a-z_][a-z0-9_]*,([a-z_][a-z0-9_]*|[0-9]+)|unify:[a-z_][a-z0-9_]*(,[a-z_][a-z0-9_]*)+)$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "class": {
+      "description": "Kernel class (03 section 6.1); External for a function the host calls through IMathFunction.",
+      "enum": ["Elementwise", "Windowed", "IIR", "Stateful", "Range", "Variance", "Table", "External"]
+    },
+    "blockCapable": {
+      "description": "Evaluates block by block (chunk-independent, halo 0); otherwise once over the math window.",
+      "type": "boolean"
+    },
+    "telemetry": {
+      "description": "Runs on telemetry (v1.1).",
+      "type": "boolean"
+    },
+    "provenance": {
+      "description": "\"intrinsic\", a plugin id, or \"lua:<file>\".",
+      "type": "string",
+      "minLength": 1
+    },
+    "x-esses-legacy": {
+      "$ref": "#/definitions/legacyBag"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "argKind": {
+      "description": "What an argument or a result is (03 section 10.1 ArgSpec::Kind).",
+      "enum": ["Scalar", "Series", "Text", "RangeRef", "Keyword"]
+    },
+    "argSpec": {
+      "type": "object",
+      "required": ["name", "kind"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "$ref": "#/definitions/argKind"
+        },
+        "dim": {
+          "description": "\"any\", or the dimension the argument must have (\"time\", \"frequency\", \"length\", \"dimensionless\", ...).",
+          "type": "string",
+          "minLength": 1
+        },
+        "optional": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "legacyBag": {
+      "description": "Fields removed by a migration, kept verbatim (02 section 6.6 rule 3).",
+      "type": "object"
+    }
+  }
+}

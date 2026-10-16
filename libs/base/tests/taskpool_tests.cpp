@@ -28,6 +28,10 @@ using namespace std::chrono_literals;
 
 namespace {
 
+// Tasks reach a Gate (and other test locals) by reference, so each test declares them before its TaskPool:
+// the pool is destroyed first and joins its workers while they can still touch the Gate (ASan
+// stack-use-after-scope on CI otherwise). open() notifies under the lock, so a waiter that returns and lets
+// the Gate go out of scope never races the opener's notify.
 class Gate {
 public:
     void wait() {
@@ -35,10 +39,8 @@ public:
         cv_.wait(lock, [this] { return open_; });
     }
     void open() {
-        {
-            std::lock_guard lock(mutex_);
-            open_ = true;
-        }
+        std::lock_guard lock(mutex_);
+        open_ = true;
         cv_.notify_all();
     }
 
@@ -71,11 +73,11 @@ std::size_t totalQueued(const TaskPool::Stats& s) {
 } // namespace
 
 TEST_CASE("taskpool: 10000 tasks across three priorities complete", "[unit][taskpool]") {
-    TaskPool pool(4);
     constexpr int kTasks = 10'000;
     std::atomic<int> executed{0};
     std::vector<Future<int>> futures;
     futures.reserve(kTasks);
+    TaskPool pool(4);
     for (int i = 0; i < kTasks; ++i) {
         const auto priority = static_cast<Priority>(i % 3);
         futures.push_back(pool.submit(priority, TaskKey{}, CancelToken{}, [i, &executed](CancelToken) {
@@ -108,12 +110,12 @@ TEST_CASE(
     constexpr int kWorkers = 1;
     constexpr int kBackground = 1'000;
     constexpr int kInteractive = 10;
-    TaskPool pool(kWorkers);
     Gate gate;
     std::atomic<int> sequence{0};
     std::vector<int> backgroundStart(kBackground, -1);
     std::vector<int> interactiveStart(kInteractive, -1);
     std::vector<Future<int>> futures;
+    TaskPool pool(kWorkers);
     // The first kWorkers Background tasks start at once and hold their workers until the gate opens, so the
     // remaining ones are still queued when the Interactive tasks arrive.
     for (int b = 0; b < kBackground; ++b) {
@@ -147,8 +149,8 @@ TEST_CASE(
 }
 
 TEST_CASE("taskpool: FIFO within a band", "[unit][taskpool]") {
-    TaskPool pool(1);
     Gate gate;
+    TaskPool pool(1);
     auto blockers = blockWorkers(pool, gate, 1);
     std::mutex m;
     std::vector<int> order;
@@ -172,10 +174,10 @@ TEST_CASE("taskpool: FIFO within a band", "[unit][taskpool]") {
 }
 
 TEST_CASE("taskpool: equal share keys coalesce into one shared Future", "[unit][taskpool]") {
-    TaskPool pool(2);
     Gate gate;
     std::atomic<int> runs{0};
     const TaskKey key{"maths/src1/Normal/speed/1/all"};
+    TaskPool pool(2);
     auto f1 = pool.submit(Priority::Background, key, CancelToken{}, [&](CancelToken) {
         runs.fetch_add(1);
         gate.wait();
@@ -202,9 +204,44 @@ TEST_CASE("taskpool: equal share keys coalesce into one shared Future", "[unit][
     CHECK(runs.load() == 2);
 }
 
-TEST_CASE("taskpool: a chunk key requested by ten components materialises once", "[unit][taskpool]") {
+// A worker publishes a task's result (and runs its continuations) a moment before it drops the task's key. A
+// submit in that window, after the Future is ready, starts a task of its own instead of joining the finished
+// one (01 section 5.4 rule 1): the continuation below submits exactly there, deterministically. The window
+// was how MathGraph's Recalculate got a previous result back without evaluating (AC-M2-04, CI on ubuntu).
+TEST_CASE("taskpool: a share key submitted once the task's Future is ready starts a new task",
+          "[unit][taskpool]") {
+    Gate registered;
+    Gate submitted;
+    std::atomic<int> runs{0};
+    const TaskKey key{"maths/src1/Normal/speed/2/all"};
     TaskPool pool(1);
+    auto f1 = pool.submit(Priority::Visible, key, CancelToken{}, [&](CancelToken) {
+        registered.wait(); // until the continuation is in place, so that it runs on this worker
+        return runs.fetch_add(1) + 1;
+    });
+    Future<int> f2;
+    bool joined = true;
+    bool readyThere = false;
+    f1.onReady([&](const Result<int>&) {
+        // On the worker: f1 is ready, its task not yet completed (the key is still registered).
+        readyThere = f1.ready();
+        f2 = pool.submit(Priority::Visible, key, CancelToken{},
+                         [&](CancelToken) { return runs.fetch_add(1) + 1; });
+        joined = f2.sharesStateWith(f1);
+        submitted.open();
+    });
+    registered.open();
+    submitted.wait();
+    CHECK(readyThere);
+    CHECK_FALSE(joined);
+    CHECK(f1.get().value() == 1);
+    CHECK(f2.get().value() == 2); // ran again: one worker, so after f1's task completed
+    CHECK(runs.load() == 2);
+}
+
+TEST_CASE("taskpool: a chunk key requested by ten components materialises once", "[unit][taskpool]") {
     Gate gate;
+    TaskPool pool(1);
     auto blockers = blockWorkers(pool, gate, 1);
     std::atomic<int> runs{0};
     std::vector<Future<int>> futures;
@@ -224,8 +261,8 @@ TEST_CASE("taskpool: a chunk key requested by ten components materialises once",
 }
 
 TEST_CASE("taskpool: coalescing and raise move a queued task to a higher band", "[unit][taskpool]") {
-    TaskPool pool(1);
     Gate gate;
+    TaskPool pool(1);
     auto blockers = blockWorkers(pool, gate, 1);
     std::mutex m;
     std::vector<std::string> order;
@@ -253,8 +290,8 @@ TEST_CASE("taskpool: coalescing and raise move a queued task to a higher band", 
 
 TEST_CASE("taskpool: queuedTasks lists the runnable tasks of a key prefix with their bands",
           "[unit][taskpool]") {
-    TaskPool pool(1);
     Gate gate;
+    TaskPool pool(1);
     auto blockers = blockWorkers(pool, gate, 1);
     const auto noop = [](CancelToken) { return 0; };
     auto a = pool.submit(Priority::Background, TaskKey{"maths/s1/a"}, CancelToken{}, noop);
@@ -284,10 +321,10 @@ TEST_CASE("taskpool: queuedTasks lists the runnable tasks of a key prefix with t
 }
 
 TEST_CASE("taskpool: replace keys keep one running and one pending task", "[unit][taskpool]") {
-    TaskPool pool(2);
     Gate gate;
     std::atomic<int> started{0};
     const TaskKey key{"trace/ws1/comp1"};
+    TaskPool pool(2);
     auto a = pool.submit(Priority::Visible, key, CancelToken{}, [&](CancelToken) {
         started.fetch_add(1);
         gate.wait();
@@ -307,8 +344,8 @@ TEST_CASE("taskpool: replace keys keep one running and one pending task", "[unit
 }
 
 TEST_CASE("taskpool: a trace key submitted twice while nothing runs executes once", "[unit][taskpool]") {
-    TaskPool pool(1);
     Gate gate;
+    TaskPool pool(1);
     auto blockers = blockWorkers(pool, gate, 1);
     std::atomic<int> runs{0};
     auto x = pool.submit(Priority::Visible, TaskKey{"trace/ws/c"}, CancelToken{}, [&](CancelToken) {
@@ -329,11 +366,11 @@ TEST_CASE("taskpool: CancelToken is observed within one chunk", "[unit][taskpool
     // The task checks its token at every chunk boundary. "Observed within one chunk" means: once cancel() has
     // returned, at most one further chunk begins (the one whose checkpoint raced with cancel()), and the next
     // checkpoint stops the task.
-    TaskPool pool(2);
     CancelSource source;
     std::atomic<int> chunksDone{0};
     std::atomic<bool> cancelReturned{false};
     std::atomic<int> chunksBegunAfterCancel{0};
+    TaskPool pool(2);
     auto f = pool.submit(Priority::Visible, TaskKey{}, source.token(), [&](CancelToken token) -> Result<int> {
         for (int chunk = 0; chunk < 1'000'000; ++chunk) {
             if (token.checkpoint()) {
@@ -357,8 +394,8 @@ TEST_CASE("taskpool: CancelToken is observed within one chunk", "[unit][taskpool
 }
 
 TEST_CASE("taskpool: a task cancelled while queued never runs", "[unit][taskpool]") {
-    TaskPool pool(1);
     Gate gate;
+    TaskPool pool(1);
     auto blockers = blockWorkers(pool, gate, 1);
     CancelSource source;
     std::atomic<bool> ran{false};
@@ -373,7 +410,6 @@ TEST_CASE("taskpool: a task cancelled while queued never runs", "[unit][taskpool
 }
 
 TEST_CASE("taskpool: share-key cancellation is collective", "[unit][taskpool]") {
-    TaskPool pool(2);
     CancelSource s1;
     CancelSource s2;
     std::atomic<bool> started{false};
@@ -387,6 +423,7 @@ TEST_CASE("taskpool: share-key cancellation is collective", "[unit][taskpool]") 
         }
         return 1;
     };
+    TaskPool pool(2);
     auto f1 = pool.submit(Priority::Visible, TaskKey{"maths/s/Normal/x/1/all"}, s1.token(), loop);
     auto f2 = pool.submit(Priority::Visible, TaskKey{"maths/s/Normal/x/1/all"}, s2.token(), loop);
     REQUIRE(f2.sharesStateWith(f1));
@@ -400,7 +437,6 @@ TEST_CASE("taskpool: share-key cancellation is collective", "[unit][taskpool]") 
 
 TEST_CASE("taskpool: a new requester never joins a share task whose cancellation already fired",
           "[unit][taskpool]") {
-    TaskPool pool(2);
     CancelSource s1;
     Gate leave;
     std::atomic<bool> started{false};
@@ -418,6 +454,7 @@ TEST_CASE("taskpool: a new requester never joins a share task whose cancellation
         }
         return 7;
     };
+    TaskPool pool(2);
     auto f1 = pool.submit(Priority::Visible, TaskKey{"maths/s/Normal/y/1/all"}, s1.token(), task);
     REQUIRE(waitFor([&] { return started.load(); }));
     s1.cancel(); // the only requester gives up; the task observes it and is about to resolve Cancelled
@@ -432,9 +469,9 @@ TEST_CASE("taskpool: a new requester never joins a share task whose cancellation
 
 TEST_CASE("taskpool: chunk keys ignore requester cancellation and stop through cancelAll",
           "[unit][taskpool]") {
-    TaskPool pool(2);
     CancelSource requester;
     std::atomic<bool> started{false};
+    TaskPool pool(2);
     auto f = pool.submit(Priority::Visible, TaskKey{"chunk/src1/Normal/3/0"}, requester.token(),
                          [&](CancelToken token) -> Result<int> {
                              started = true;
@@ -458,8 +495,8 @@ TEST_CASE("taskpool: chunk keys ignore requester cancellation and stop through c
 }
 
 TEST_CASE("taskpool: cancelAll with a prefix cancels queued tasks and leaves the rest", "[unit][taskpool]") {
-    TaskPool pool(1);
     Gate gate;
+    TaskPool pool(1);
     auto blockers = blockWorkers(pool, gate, 1);
     auto a = pool.submit(Priority::Visible, TaskKey{"distidx/a/Normal/1"}, CancelToken{},
                          [](CancelToken) { return 1; });
@@ -491,8 +528,8 @@ TEST_CASE("taskpool: exceptions never escape a worker", "[unit][taskpool]") {
 
 TEST_CASE("taskpool: a key reused with a different result type resolves to Internal", "[unit][taskpool]") {
     test::RecordingAssertHandler recorder;
-    TaskPool pool(1);
     Gate gate;
+    TaskPool pool(1);
     auto a = pool.submit(Priority::Visible, TaskKey{"maths/k"}, CancelToken{}, [&](CancelToken) {
         gate.wait();
         return 1;
@@ -533,8 +570,8 @@ TEST_CASE("taskpool: Rule W - a worker waiting on a queued task runs it inline",
 }
 
 TEST_CASE("taskpool: tryRunInline runs a queued task on the caller", "[unit][taskpool]") {
-    TaskPool pool(1);
     Gate gate;
+    TaskPool pool(1);
     auto blockers = blockWorkers(pool, gate, 1);
     std::thread::id ranOn;
     auto f = pool.submit(Priority::Background, TaskKey{"summary/src1"}, CancelToken{}, [&](CancelToken) {
@@ -613,8 +650,8 @@ TEST_CASE("future: ready futures, tryGet, onReady, take and void results", "[uni
     REQUIRE(taken.ok());
     CHECK(*taken.value() == 9);
 
-    TaskPool pool(2);
     Gate gate;
+    TaskPool pool(2);
     auto pending = pool.submit(Priority::Visible, TaskKey{}, CancelToken{}, [&](CancelToken) {
         gate.wait();
         return 3;
@@ -639,8 +676,8 @@ TEST_CASE("future: ready futures, tryGet, onReady, take and void results", "[uni
 
 TEST_CASE("taskpool: blocking on a NoBlock thread asserts in debug builds", "[unit][taskpool]") {
     test::RecordingAssertHandler recorder;
-    TaskPool pool(1);
     Gate gate;
+    TaskPool pool(1);
     auto f = pool.submit(Priority::Visible, TaskKey{}, CancelToken{}, [&](CancelToken) {
         gate.wait();
         return 1;

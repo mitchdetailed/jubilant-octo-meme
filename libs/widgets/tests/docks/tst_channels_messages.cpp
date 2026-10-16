@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: 2026 the Esses contributors
 // SPDX-License-Identifier: MIT
 //
-// ChannelsWindow (06 section 7, M1 plain filter) and MessagesWindow (06 section 11), offscreen: the filter
-// keeps the source/category rows of a match and highlights the first match, ENTER / CTRL+ENTER / double-click
-// request the channel for the focused component, DOWN moves into the list, the drag payload
-// (application/x-esses-channels) and its parser; the Messages severity buttons with counts, the text filter,
-// Copy/Save As text, action rows (ENTER and double-click run the command), Clear.
+// ChannelsWindow (06 section 7; the M2 search itself is tst_channels_search) and MessagesWindow (06 section
+// 11), offscreen: the filter keeps the source/category rows of a match and highlights the first match, ENTER
+// / CTRL+ENTER / double-click request the channel for the focused component, DOWN moves into the list, the
+// drag payload (application/x-esses-channels) and its parser; the Messages severity buttons with counts, the
+// text filter, Copy/Save As text, action rows (ENTER and double-click run the command), Clear.
 
 #include "../../../qtmodel/tests/qtmodel_test_support.hpp"
 
@@ -98,7 +98,7 @@ private Q_SLOTS:
                  {"Throttle", "Wheel Speed FL", "Wheel Speed FR", "Corr Speed", "Corr Dist"}) {
                 QVERIFY2(all.contains(QString::fromLatin1(name)), name);
             }
-            // Plain M1 filter: every word is a case-insensitive substring of the name.
+            // Word prefixes (06 section 7 item 3): "wheel" and "fl" start two name words, in order.
             QTest::keyClicks(&win.search(), QStringLiteral("wheel fl"));
             QCOMPARE(win.visibleChannels(), QStringList{QStringLiteral("Wheel Speed FL")});
             QCOMPARE(win.filterModel().rowCount(), 1); // the source row stays

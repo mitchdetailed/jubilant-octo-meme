@@ -1,0 +1,36 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "ln_positive",
+  "expression": "ln('X')",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): ln",
+    "note": "natural logarithm"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 800000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [0.25, 0.5, 1, 2, 4, 9, 16, 100]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [-1.38629436112, -0.69314718056, 0, 0.69314718056, 1.38629436112, 2.19722457734, 2.77258872224, 4.60517018599],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

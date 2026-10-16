@@ -12,7 +12,7 @@
       "pattern": "^(urn:esses:project-1|esses:project-1|https://[^/\\s]+(/[^/\\s]+)*/project-1(\\.schema)?\\.json)$"
     },
     "schemaVersion": {
-      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "description": "Minor version within major 1 (02 section 6.6 rule 1). This build writes 2; version 1 is migrated on load (Data-window filter keys, D-162).",
       "type": "integer",
       "minimum": 1
     },
@@ -229,11 +229,14 @@
       "additionalProperties": false
     },
     "dataWindow": {
-      "description": "Data-window filters per source (SourceId hex or default) and the apply-to-all flag (06 section 5.4).",
+      "description": "Data-window filters per source and the apply-to-all flag (06 section 5.4). From schemaVersion 2 a filter key is \"default\" or the source's quick hash as \"xxh3:<32 lower-case hex digits>\" (D-162); the 1 -> 2 migration rewrites a key of 32 bare hex digits and moves any other key to x-esses-legacy.dataWindowFilters.",
       "type": "object",
       "properties": {
         "filters": {
           "type": "object",
+          "propertyNames": {
+            "pattern": "^(default|xxh3:[0-9a-f]{32})$"
+          },
           "additionalProperties": {
             "$ref": "#/definitions/filterSpec"
           }

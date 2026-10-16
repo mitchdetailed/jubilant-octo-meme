@@ -1,0 +1,42 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "constant_with_unit",
+  "expression": "'X' * 'Wheelbase'[mm]",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Constants (Pro)",
+    "note": "a constant requested in another unit of its quantity"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 400000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [1, 2, 3, 4]
+    }
+  },
+  "constants": {
+    "Wheelbase": {
+      "v": 2.7,
+      "unit": "m"
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [2700, 5400, 8100, 10800],
+    "tolerance": {
+      "abs": 0.001,
+      "rel": 1e-06
+    }
+  }
+}

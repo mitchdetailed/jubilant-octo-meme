@@ -1,0 +1,6 @@
+{
+  "$schema": "urn:esses:unitmap-1",
+  "schemaVersion": 1,
+  "importer": "text.profile:generic.csv",
+  "rules": []
+}

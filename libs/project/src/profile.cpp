@@ -4,6 +4,7 @@
 
 #include <esses/project/profile.hpp>
 
+#include <algorithm>
 #include <set>
 #include <string>
 #include <utility>
@@ -11,6 +12,8 @@
 namespace esses::project {
 
 namespace {
+
+constexpr detail::DocKind kKind{"profile", 1};
 
 using detail::json;
 using jsonio::asString;
@@ -57,7 +60,7 @@ ProfileDetail readDetail(const json& j, const std::string& pointer) {
 }
 
 json profileToJson(const Profile& p) {
-    json root = detail::newDocument("profile");
+    json root = detail::newDocument("profile", std::max(p.schemaVersion, kKind.current));
     root["id"] = p.id;
     root["name"] = p.name;
     root["rangeKinds"] = p.rangeKinds;
@@ -140,63 +143,67 @@ const ProfileDetail* Profile::findDetail(std::string_view detailId) const noexce
 }
 
 Result<Profile> Profile::parse(std::string_view json, std::vector<std::string>& log) {
-    return detail::parseDocument<Profile>(json, [&](const detail::json& root) -> Result<Profile> {
-        ObjectReader r(root, "");
-        detail::readSchemaHeader(r, "profile", log);
-        Profile p;
-        p.id = asString(r.required("id"), r.child("id"));
-        if (!detail::isLowerId(p.id, '-', 1, 1)) {
-            violate(r.child("id"), "a profile id is lower case (\"circuit\"), found '" + p.id + "'");
-        }
-        p.name = asString(r.required("name"), r.child("name"));
-        p.rangeKinds = detail::optStringArray(r, "rangeKinds");
-        p.primaryRanges = detail::optString(r, "primaryRanges", "Outings:Laps");
-        p.primaryMarkers = detail::optString(r, "primaryMarkers", "Beacons");
-        p.rules = detail::optStringArray(r, "rules");
-        for (std::size_t i = 0; i < p.rules.size(); ++i) {
-            if (!detail::isLowerId(p.rules[i], '-', 2)) {
-                violate(jsonio::pointerIndex(r.child("rules"), i),
-                        "a rule id is dotted lower case (\"circuit.beacon-pair\"), found '" + p.rules[i] +
-                            "'");
+    return detail::readDocument<Profile>(
+        json, kKind, log,
+        [&](const detail::json& root, const detail::DocVersion& version) -> Result<Profile> {
+            ObjectReader r(root, "");
+            detail::markSchemaHeader(r);
+            Profile p;
+            p.schemaVersion = version.write;
+            p.id = asString(r.required("id"), r.child("id"));
+            if (!detail::isLowerId(p.id, '-', 1, 1)) {
+                violate(r.child("id"), "a profile id is lower case (\"circuit\"), found '" + p.id + "'");
             }
-        }
-        if (const detail::json* views = r.optional("dataViews")) {
-            const std::string vp = r.child("dataViews");
-            if (!views->is_array()) {
-                violate(vp, "dataViews is an array");
-            }
-            int defaults = 0;
-            for (std::size_t i = 0; i < views->size(); ++i) {
-                p.dataViews.push_back(readView((*views)[i], jsonio::pointerIndex(vp, i)));
-                defaults += p.dataViews.back().isDefault ? 1 : 0;
-            }
-            if (defaults > 1) {
-                violate(vp, "at most one data view is the default");
-            }
-        }
-        p.reportHeadings = detail::optStringArray(r, "reportHeadings");
-        p.defaultMaths = detail::optStringArray(r, "defaultMaths");
-        p.defaultWorkbook = detail::optString(r, "defaultWorkbook");
-        if (const detail::json* detailsJson = r.optional("details")) {
-            const std::string dp = r.child("details");
-            if (!detailsJson->is_array()) {
-                violate(dp, "details is an array");
-            }
-            std::set<std::string, std::less<>> ids;
-            for (std::size_t i = 0; i < detailsJson->size(); ++i) {
-                ProfileDetail d = readDetail((*detailsJson)[i], jsonio::pointerIndex(dp, i));
-                if (!ids.insert(d.id).second) {
-                    violate(jsonio::pointerIndex(dp, i), "detail '" + d.id + "' is listed twice");
+            p.name = asString(r.required("name"), r.child("name"));
+            p.rangeKinds = detail::optStringArray(r, "rangeKinds");
+            p.primaryRanges = detail::optString(r, "primaryRanges", "Outings:Laps");
+            p.primaryMarkers = detail::optString(r, "primaryMarkers", "Beacons");
+            p.rules = detail::optStringArray(r, "rules");
+            for (std::size_t i = 0; i < p.rules.size(); ++i) {
+                if (!detail::isLowerId(p.rules[i], '-', 2)) {
+                    violate(jsonio::pointerIndex(r.child("rules"), i),
+                            "a rule id is dotted lower case (\"circuit.beacon-pair\"), found '" + p.rules[i] +
+                                "'");
                 }
-                p.details.push_back(std::move(d));
             }
-        }
-        if (const detail::json* t = r.optional("terms")) {
-            p.terms = detail::objectDoc(*t, r.child("terms"));
-        }
-        p.unknown = detail::unknownMembers(r);
-        return p;
-    });
+            if (const detail::json* views = r.optional("dataViews")) {
+                const std::string vp = r.child("dataViews");
+                if (!views->is_array()) {
+                    violate(vp, "dataViews is an array");
+                }
+                int defaults = 0;
+                for (std::size_t i = 0; i < views->size(); ++i) {
+                    p.dataViews.push_back(readView((*views)[i], jsonio::pointerIndex(vp, i)));
+                    defaults += p.dataViews.back().isDefault ? 1 : 0;
+                }
+                if (defaults > 1) {
+                    violate(vp, "at most one data view is the default");
+                }
+            }
+            p.reportHeadings = detail::optStringArray(r, "reportHeadings");
+            p.defaultMaths = detail::optStringArray(r, "defaultMaths");
+            p.defaultWorkbook = detail::optString(r, "defaultWorkbook");
+            if (const detail::json* detailsJson = r.optional("details")) {
+                const std::string dp = r.child("details");
+                if (!detailsJson->is_array()) {
+                    violate(dp, "details is an array");
+                }
+                std::set<std::string, std::less<>> ids;
+                for (std::size_t i = 0; i < detailsJson->size(); ++i) {
+                    ProfileDetail d = readDetail((*detailsJson)[i], jsonio::pointerIndex(dp, i));
+                    if (!ids.insert(d.id).second) {
+                        violate(jsonio::pointerIndex(dp, i), "detail '" + d.id + "' is listed twice");
+                    }
+                    p.details.push_back(std::move(d));
+                }
+            }
+            if (const detail::json* t = r.optional("terms")) {
+                p.terms = detail::objectDoc(*t, r.child("terms"));
+            }
+            p.unknown = detail::unknownMembers(r);
+            return p;
+        },
+        profileToJson);
 }
 
 Result<Profile> Profile::load(const std::filesystem::path& path, std::vector<std::string>& log) {

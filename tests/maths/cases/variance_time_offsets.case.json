@@ -1,0 +1,64 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "variance_time_offsets",
+  "expression": "variance_time('X')",
+  "provenance": {
+    "kind": "release-notes",
+    "ref": "Maths Functions (Pro): variance_time",
+    "note": "alignment offsets of both laps (04 section 3.1 mapping)"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 2100000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30]
+    }
+  },
+  "ranges": {
+    "Outings": [
+      {
+        "startUs": 0,
+        "endUs": 2000000
+      }
+    ],
+    "Outings:Laps": [
+      {
+        "startUs": 0,
+        "endUs": 1000000
+      },
+      {
+        "startUs": 1000000,
+        "endUs": 2000000
+      }
+    ]
+  },
+  "selection": {
+    "main": {
+      "range": "Outings:Laps/2",
+      "offsetUs": 200000
+    },
+    "reference": {
+      "range": "Outings:Laps/1",
+      "offsetUs": 50000
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [null, null, null, null, null, null, null, null, null, null, 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5, 15.5, 16.5, null, null],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

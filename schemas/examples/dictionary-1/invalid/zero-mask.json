@@ -1,0 +1,19 @@
+{
+  "$schema": "urn:esses:dictionary-1",
+  "schemaVersion": 1,
+  "importer": "text.profile:logger-semicolon",
+  "version": "1.0.0",
+  "bitfields": [
+    {
+      "match": {
+        "name": "G"
+      },
+      "bits": [
+        {
+          "mask": "0x0000",
+          "name": "B"
+        }
+      ]
+    }
+  ]
+}

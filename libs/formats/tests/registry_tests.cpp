@@ -7,9 +7,20 @@
 #include "formats_test_support.hpp"
 #include "synthetic_families.hpp"
 
+#include <esses/base/atomic_file.hpp>
 #include <esses/base/taskpool.hpp>
 
 #include <catch2/catch_test_macros.hpp>
+
+#if defined(ESSES_OS_WINDOWS)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 using namespace esses;
 using namespace esses::formats;
@@ -59,10 +70,14 @@ TEST_CASE("registry: built-ins, lookup and the catalogue", "[unit][registry]") {
     const auto reg = ImporterRegistry::withBuiltins();
     REQUIRE(reg->find("motec.ld") != nullptr);
     CHECK(reg->find("motec.ld")->version() == kLdImporterVersion);
-    CHECK(reg->find("motec.csv") == nullptr);
+    // M2 (D-044): the shipped text profiles and the two CSV writers follow motec.ld.
+    CHECK(reg->find("motec.csv") != nullptr);
+    CHECK(reg->find("text.profile:generic.csv") != nullptr);
     REQUIRE(reg->writer("motec.ld") != nullptr);
-    CHECK(reg->importers().size() == 1);
-    CHECK(reg->writers().size() == 1);
+    CHECK(reg->writer("motec.csv") != nullptr);
+    CHECK(reg->writer("csv") != nullptr);
+    CHECK(reg->importers().size() == 3);
+    CHECK(reg->writers().size() == 3);
     const auto cat = nlohmann::json::parse(reg->catalogue().compact());
     CHECK(cat["importers"][0]["id"] == "motec.ld");
     CHECK(cat["importers"][0]["extensions"] == nlohmann::json::array({".ld"}));
@@ -121,12 +136,23 @@ TEST_CASE("registry: sniff confidence bands and companions", "[unit][registry]")
 
     // Extension only: 25; neither: no candidate. A file shorter than 4 bytes is not an error.
     writeText(dir.path() / "notes.ld", "this is text, not a log");
+    writeText(dir.path() / "notes.dat", "this is text, not a log");
     writeText(dir.path() / "notes.txt", "this is text, not a log");
     writeText(dir.path() / "tiny.ld", "@");
     CHECK(reg->sniff(dir.path() / "notes.ld")->front().second.confidence == 25);
-    CHECK(reg->sniff(dir.path() / "notes.txt")->empty());
+    CHECK(reg->sniff(dir.path() / "notes.dat")->empty());
+    // M2: the generic delimited-text profile claims .txt by its extension (05 section 7.3, at most 30).
+    REQUIRE(reg->sniff(dir.path() / "notes.txt")->size() == 1);
+    CHECK(reg->sniff(dir.path() / "notes.txt")->front().first->id() == "text.profile:generic.csv");
+    CHECK(reg->sniff(dir.path() / "notes.txt")->front().second.confidence == 30);
     CHECK(reg->sniff(dir.path() / "tiny.ld")->front().second.confidence == 25);
     CHECK(reg->sniff(dir.path() / "missing.ld").error().code == ErrorCode::Io);
+    // A directory named like a log is Io on every OS (POSIX opens it as a stream and reads an empty head).
+    fs::create_directories(dir.path() / "folder.ld");
+    const auto folder = reg->sniff(dir.path() / "folder.ld");
+    REQUIRE_FALSE(folder.ok());
+    CHECK(folder.error().code == ErrorCode::Io);
+    CHECK(folder.error().context.path == dir.path() / "folder.ld");
 
     // Only the 64 KiB head is visible: SniffInput built by hand.
     SniffInput in;
@@ -134,6 +160,54 @@ TEST_CASE("registry: sniff confidence bands and companions", "[unit][registry]")
     in.head = std::span<const std::byte>(good).first(0x6E2);
     in.size = good.size();
     CHECK(reg->sniff(in).front().second.confidence == 95); // the first record lies beyond the head here
+}
+
+// Regression (Windows): sniff(path) read the head through a std::ifstream, which shares no delete access, so
+// it was refused while the handle that renamed a replacement into place was still open, and an open stream
+// made the replacement fail. It reads through readFileHead now, which shares delete access (the read-file
+// tests run readFileHead's open against a writer thread).
+TEST_CASE("registry: sniff reads a log through the handles of an atomic replacement", "[unit][registry]") {
+    ld::test::TempDir dir("sniff-replaced");
+    const auto reg = ImporterRegistry::withBuiltins();
+    const std::vector<std::byte> good = smallLd();
+    const fs::path log = dir.path() / "run.ld";
+    REQUIRE(AtomicFile::write(log, good).ok());
+
+#if defined(ESSES_OS_WINDOWS)
+    // Held by a writer's handle (write and delete access) or by the renaming handle (delete access only),
+    // both sharing everything: the head is read all the same (a std::ifstream is refused by both).
+    for (const DWORD access : {DWORD{GENERIC_WRITE | DELETE}, DWORD{DELETE}}) {
+        const HANDLE holder =
+            CreateFileW(log.c_str(), access, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        REQUIRE(holder != INVALID_HANDLE_VALUE);
+        const auto held = reg->sniff(log);
+        CloseHandle(holder);
+        REQUIRE(held.ok());
+        REQUIRE_FALSE(held->empty());
+        CHECK(held->front().second.confidence == 95);
+    }
+#endif
+
+    // Replaced and sniffed at once, again and again.
+    int writeFailures = 0;
+    int sniffFailures = 0;
+    int wrongResults = 0;
+    for (int i = 0; i < 200; ++i) {
+        if (!AtomicFile::write(log, good).ok()) {
+            ++writeFailures;
+            continue;
+        }
+        const auto r = reg->sniff(log);
+        if (!r.ok()) {
+            ++sniffFailures;
+        } else if (r->empty() || r->front().second.confidence != 95) {
+            ++wrongResults;
+        }
+    }
+    CHECK(writeFailures == 0);
+    CHECK(sniffFailures == 0);
+    CHECK(wrongResults == 0);
 }
 
 TEST_CASE("registry: ranking is best first, ties keep registration order", "[unit][registry]") {
@@ -176,8 +250,11 @@ TEST_CASE("registry: open entry points and their errors", "[unit][registry]") {
     CHECK(mem->source->id == opened->source->id);
 
     CHECK(reg->open(dir.path() / "missing.ld", {}, context()).error().code == ErrorCode::Io);
+    writeText(dir.path() / "notes.dat", "plain text");
+    CHECK(reg->open(dir.path() / "notes.dat", {}, context()).error().code == ErrorCode::NotFound);
+    // M2: a .txt file goes to the generic text profile, which finds no table in it.
     writeText(dir.path() / "notes.txt", "plain text");
-    CHECK(reg->open(dir.path() / "notes.txt", {}, context()).error().code == ErrorCode::NotFound);
+    CHECK(reg->open(dir.path() / "notes.txt", {}, context()).error().code == ErrorCode::Format);
     ImportOptions unknown;
     unknown.importerId = "test.none";
     CHECK(reg->open(path, unknown, context()).error().code == ErrorCode::NotFound);

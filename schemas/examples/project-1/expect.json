@@ -1,4 +1,8 @@
 {
+  "bad-filter-key.json": {
+    "pointer": "/dataWindow/filters",
+    "why": "from version 2 filter keys are default or the xxh3: hash text (reported at the map)"
+  },
   "bad-filter-kind.json": {
     "pointer": "/dataWindow/filters",
     "why": "filter kinds are D-017's list (reported at the map)"

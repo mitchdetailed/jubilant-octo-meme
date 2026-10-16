@@ -1,0 +1,10 @@
+{
+  "latitude": "GPS Latitude",
+  "longitude": "GPS Longitude",
+  "speed": "GPS Speed",
+  "additionalChannels": ["GPS Heading", "GPS Altitude"],
+  "statusChannel": {"name": "GPS Sats Used", "validWhen": ">= 4"},
+  "duplicateRemoval": {"enabled": true},
+  "timeShift": {"percentOfUpdatePeriod": 80},
+  "outputs": "shadow"
+}

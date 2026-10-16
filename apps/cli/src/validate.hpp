@@ -1,11 +1,16 @@
 // SPDX-FileCopyrightText: 2026 the Esses contributors
 // SPDX-License-Identifier: MIT
 //
-// esses-cli validate (05 section 9.2, 08 section 5): checks JSON documents against the schema their "$schema"
-// member names (urn:esses:<name>-<major>, the bare esses: form or the https form, D-072), with the vendored
-// json-schema-validator. A document whose "$schema" is the draft-07 meta-schema is itself a schema and must
-// load as one. Directories are walked recursively for *.json; there a file without "$schema" is skipped,
-// while a file named explicitly must have one.
+// esses-cli validate (05 section 9.2, 08 section 5, 02 section 6.6 rule 5): checks JSON documents against the
+// schema their "$schema" member names (urn:esses:<name>-<major>, the bare esses: form or the https form,
+// D-072), with the vendored json-schema-validator, after steps 1-2 of the loader without writing anything: a
+// major newer than this build's schemas is refused, and an older minor is migrated through esses_project's
+// Migrations first (each step is reported). Errors are reported with their JSON pointer. A document whose
+// "$schema" is the draft-07 meta-schema is itself a schema and must load as one. Directories are walked
+// recursively for *.json; there a file without "$schema" is skipped, while a file named explicitly must have
+// one. --all validates data/, fixtures/, tests/maths/ and the schemas/*.schema.json files under --root (08
+// section 5) and leaves out the git-ignored private checkouts (fixtures/private, tests/maths/user_modules,
+// tests/maths/oracle).
 #pragma once
 
 #include "app_context.hpp"
@@ -63,8 +68,16 @@ struct ValidateOptions {
     std::vector<std::filesystem::path> paths;
     std::optional<std::filesystem::path> schemaFile; // --schema: validate every file against this one
     bool json = false;
-    bool verbose = false; // list valid files too
+    bool verbose = false;       // list valid files too
+    bool all = false;           // --all: data/, fixtures/, tests/maths/, schemas/*.schema.json
+    std::filesystem::path root; // --root (default: the current directory)
+    std::vector<std::filesystem::path> exclude; // --exclude: directories left out of a walk
 };
+
+// What --all validates under `root` (the directories that exist, then the schema files) and the private
+// checkouts it leaves out.
+std::vector<std::filesystem::path> allValidatePaths(const std::filesystem::path& root);
+std::vector<std::filesystem::path> allValidateExclusions(const std::filesystem::path& root);
 
 int runValidate(AppContext& ctx, const ValidateOptions& options, std::ostream& out, std::ostream& err);
 

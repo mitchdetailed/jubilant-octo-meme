@@ -38,7 +38,7 @@ Result<RuleDocument> RuleDocument::parse(std::string_view json) {
     if (!parsed) {
         return Failure{parsed.error()};
     }
-    auto opaque = model::OpaqueJson::parse(json);
+    auto opaque = JsonDoc::parse(json);
     if (!opaque) {
         return Failure{opaque.error()};
     }

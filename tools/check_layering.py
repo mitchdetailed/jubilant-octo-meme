@@ -13,10 +13,13 @@ Reads <build-dir>/esses_targets.json (written at configure time by cmake/esses_t
   3. the Qt-free set (01 section 2.3: base, units, store, model, formats, analysis, maths, project, plotcore and
      the CLI) is declared Qt-free whenever its targets exist;
   4. a library or executable links only the Qt modules of its layer (01 section 2.2 rule 4): esses_qtmodel Qt
-     Core; esses_qtrender and esses-render Qt Gui; esses_widgets and esses Qt Widgets (plus Svg, PrintSupport,
-     OpenGL); every other non-test target none; Qt Concurrent and Qt Sql nowhere (D-031);
+     Core and Qt Gui (D-161); esses_qtrender and esses-render Qt Gui; esses_widgets and esses Qt Widgets (plus
+     Svg, PrintSupport, OpenGL); every other non-test target none; Qt Concurrent and Qt Sql nowhere (D-031);
   5. only esses_widgets and the esses application link the docking library (esses::qtads, the LGPL Qt Advanced
-     Docking System as a shared library, D-026, D-153); tests may link what their library links.
+     Docking System as a shared library, D-026, D-153); tests may link what their library links;
+  6. esses_qtmodel uses Qt Gui for the undo framework only (D-161): its sources and headers include no Qt Gui
+     header except QUndoStack and QUndoCommand. The Qt Gui headers are the files of the directories the configure
+     step records as qtGuiHeaderDirs (Qt6::Gui's include directory); the check is skipped without them.
 
 Standard library only. `python -I tools/check_layering.py --build-dir build/<preset>`; `--self-test` runs the
 negative and positive cases (01 section 11 item 3). Exit status: 0 clean, 1 findings, 2 usage error.
@@ -37,7 +40,7 @@ REQUIRED_QT_FREE = ("base", "units", "store", "model", "formats", "analysis", "m
 _WIDGET_MODULES = frozenset({"Core", "Gui", "Widgets", "Svg", "SvgWidgets", "PrintSupport", "OpenGL",
                              "OpenGLWidgets"})
 QT_MODULES_ALLOWED = {
-    "qtmodel": frozenset({"Core"}),
+    "qtmodel": frozenset({"Core", "Gui"}),  # Gui: QUndoStack/QUndoCommand only (D-161, rule 6)
     "qtrender": frozenset({"Core", "Gui"}),
     "render": frozenset({"Core", "Gui"}),
     "widgets": _WIDGET_MODULES,
@@ -45,6 +48,10 @@ QT_MODULES_ALLOWED = {
 }
 QT_MODULES_NEVER = frozenset({"Concurrent", "Sql"})
 DOCKING_LIBRARY_USERS = frozenset({"widgets", "app"})
+# Rule 6 (D-161): the only Qt Gui headers a library may include, per library; libraries not listed are not
+# checked here (rule 4 covers which modules they link).
+QT_GUI_HEADERS_ALLOWED = {"qtmodel": frozenset({"QUndoStack", "QUndoCommand", "qundostack.h"})}
+QT_INCLUDE_RE = re.compile(r'^\s*#\s*include\s*[<"]((QtGui)/)?([A-Za-z0-9_.]+)[>"]')
 
 
 def is_docking_library(dep: str, namespace: str) -> bool:
@@ -165,6 +172,47 @@ def check(build_dir: pathlib.Path) -> list[str]:
             if is_docking_library(d, namespace):
                 findings.append(f"{n} links {d}; only esses_widgets and the esses application link the docking "
                                 f"library (D-026)")
+
+    # 6. Qt Gui headers of the libraries that may use part of Qt Gui only (D-161)
+    gui_headers: set[str] = set()
+    for d in manifest.get("qtGuiHeaderDirs", []):
+        gdir = pathlib.Path(d)
+        if gdir.is_dir():
+            gui_headers.update(f.name for f in gdir.iterdir() if f.is_file())
+    if gui_headers:
+        sources_of: dict[str, list[pathlib.Path]] = {}
+        if cc_path.exists():
+            for entry in json.loads(cc_path.read_text(encoding="utf-8")):
+                out = entry.get("output") or entry.get("command", "")
+                m = TARGET_DIR_RE.search(out)
+                if m:
+                    src = pathlib.Path(entry["file"])
+                    if not src.is_absolute():
+                        src = pathlib.Path(entry.get("directory", ".")) / src
+                    sources_of.setdefault(m.group(1), []).append(src)
+        for name, allowed_gui in QT_GUI_HEADERS_ALLOWED.items():
+            t = libs.get(name)
+            if t is None:
+                continue
+            files = list(sources_of.get(t["name"], []))
+            root = pathlib.Path(t["sourceDir"])
+            for sub in ("include", "src"):
+                if (root / sub).exists():
+                    files += [h for h in sorted((root / sub).rglob("*")) if h.suffix.lower() in HEADER_EXT]
+            for path in sorted(set(files)):
+                try:
+                    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+                except OSError:
+                    continue
+                for lineno, line in enumerate(lines, 1):
+                    m = QT_INCLUDE_RE.match(line)
+                    if not m:
+                        continue
+                    header = m.group(3)
+                    is_gui = m.group(2) is not None or header == "QtGui" or header in gui_headers
+                    if is_gui and header not in allowed_gui:
+                        findings.append(f"{path}:{lineno}: {t['name']} includes Qt Gui header <{m.group(1) or ''}"
+                                        f"{header}>; D-161 allows only " + ", ".join(sorted(allowed_gui)))
     return findings
 
 
@@ -219,14 +267,14 @@ def self_test() -> int:
         (root / "libs/a/include/esses/a/a.hpp").write_text("#include <esses/low/low.hpp>\n", encoding="utf-8")
         ok = ok and check(build) == []
 
-        # Negative: the Qt rules. qtmodel links Qt6::Gui, a Qt-free library links Qt6::Core, plotcore is not
+        # Negative: the Qt rules. qtmodel links Qt6::Widgets, a Qt-free library links Qt6::Core, plotcore is not
         # declared Qt-free, and a test links Qt6::Concurrent.
         def qt_lib(name: str, layer: int, deps: list[str], qt_free: bool = False) -> dict:
             return dict(lib(name, layer, deps), qtFree=qt_free)
 
         base_targets = list(manifest["targets"])
         manifest["targets"] = base_targets + [
-            qt_lib("qtmodel", 4, ["esses::low", "Qt6::Core", "Qt6::Gui"]),
+            qt_lib("qtmodel", 4, ["esses::low", "Qt6::Core", "Qt6::Widgets"]),
             qt_lib("plotcore", 3, ["esses::low"]),
             qt_lib("b2", 2, ["Qt6::Core"], qt_free=True),
             {"name": "esses_qtmodel_tst_x", "kind": "test", "layer": None, "sourceDir": str(root / "libs" / "a"),
@@ -234,7 +282,7 @@ def self_test() -> int:
         (build / "esses_targets.json").write_text(json.dumps(manifest), encoding="utf-8")
         findings = sorted(check(build))
         expected_qt = sorted([
-            "esses_qtmodel links Qt6::Gui; its layer allows only Core (01 section 2.2 rule 4)",
+            "esses_qtmodel links Qt6::Widgets; its layer allows only Core, Gui (01 section 2.2 rule 4)",
             "esses_plotcore must be declared QT_FREE (01 section 2.3)",
             "esses_b2 links Qt6::Core; its layer allows a Qt-free target (01 section 2.2 rule 4)",
             "esses_qtmodel_tst_x links Qt6::Concurrent, which no target may use (D-031)"])
@@ -245,7 +293,7 @@ def self_test() -> int:
         widgets = qt_lib("widgets", 5, ["Qt6::Widgets", "Qt6::Gui", "Qt6::Svg"])
         widgets["privateDeps"] = ["esses::qtads"]
         manifest["targets"] = base_targets + [
-            qt_lib("qtmodel", 4, ["esses::low", "Qt6::Core"]),
+            qt_lib("qtmodel", 4, ["esses::low", "Qt6::Core", "Qt6::Gui"]),
             qt_lib("qtrender", 4, ["Qt6::Gui"]),
             widgets,
             {"name": "esses_widgets_tst_dock_host", "kind": "test", "layer": None,
@@ -268,6 +316,31 @@ def self_test() -> int:
             "esses_plot_bench links ads::qtadvanceddocking-qt6; only esses_widgets and the esses application link "
             "the docking library (D-026)"])
         ok = ok and findings == expected_ads
+
+        # Rule 6 (D-161): esses_qtmodel includes the undo framework (allowed) and QImage (refused); without the
+        # recorded Qt Gui header directories the rule is skipped.
+        gui_dir = root / "qt" / "include" / "QtGui"
+        gui_dir.mkdir(parents=True)
+        for header in ("QImage", "qimage.h", "QUndoStack", "QUndoCommand", "qundostack.h", "QtGui"):
+            (gui_dir / header).write_text("", encoding="utf-8")
+        qtmodel_dir = root / "libs" / "qtmodel"
+        (qtmodel_dir / "include" / "esses" / "qtmodel").mkdir(parents=True)
+        (qtmodel_dir / "src").mkdir(parents=True)
+        (qtmodel_dir / "include" / "esses" / "qtmodel" / "undo.hpp").write_text(
+            "#include <QUndoCommand>\n#include <QtGui/QUndoStack>\n#include <QObject>\n", encoding="utf-8")
+        (qtmodel_dir / "src" / "image.hpp").write_text("#include <QString>\n#include <QImage>\n",
+                                                       encoding="utf-8")
+        qtmodel = qt_lib("qtmodel", 4, ["Qt6::Core", "Qt6::Gui"])
+        qtmodel["sourceDir"] = str(qtmodel_dir)
+        manifest["targets"] = base_targets + [qtmodel]
+        manifest["qtGuiHeaderDirs"] = [str(gui_dir)]
+        (build / "esses_targets.json").write_text(json.dumps(manifest), encoding="utf-8")
+        findings = check(build)
+        expected_gui = "image.hpp:2: esses_qtmodel includes Qt Gui header <QImage>"
+        ok = ok and len(findings) == 1 and expected_gui in findings[0]
+        manifest["qtGuiHeaderDirs"] = []
+        (build / "esses_targets.json").write_text(json.dumps(manifest), encoding="utf-8")
+        ok = ok and check(build) == []
     print("check_layering self-test: " + ("passed" if ok else "FAILED"))
     return 0 if ok else 1
 

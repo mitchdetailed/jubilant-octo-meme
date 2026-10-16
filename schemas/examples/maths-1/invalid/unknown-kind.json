@@ -1,0 +1,11 @@
+{
+  "$schema": "urn:esses:maths-1",
+  "schemaVersion": 1,
+  "id": "user",
+  "items": [
+    {
+      "kind": "lua",
+      "name": "A"
+    }
+  ]
+}

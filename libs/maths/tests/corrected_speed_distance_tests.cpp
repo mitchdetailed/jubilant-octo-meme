@@ -22,7 +22,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
-#include <random>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -165,9 +165,8 @@ TEST_CASE("corrected speed module: loading the schema", "[unit][csd]") {
     CHECK(missing.error().code == ErrorCode::Io);
     CHECK(module.settingsSchema().isNull());
     // Another schema under the expected file name is refused.
-    const std::filesystem::path dir = std::filesystem::temp_directory_path() /
-                                      ("esses-maths-schema-test-" + std::to_string(std::random_device{}()));
-    std::filesystem::create_directories(dir);
+    auto tmp = std::make_unique<test::TempDir>("schema");
+    const std::filesystem::path dir = tmp->path();
     {
         std::ofstream out(dir / std::string(CorrectedSpeedDistanceModule::kSettingsSchemaFile),
                           std::ios::binary);
@@ -182,8 +181,7 @@ TEST_CASE("corrected speed module: loading the schema", "[unit][csd]") {
         out << "{ not json";
     }
     CHECK(module.loadSchema(dir).error().code == ErrorCode::Format);
-    std::error_code ec;
-    std::filesystem::remove_all(dir, ec);
+    tmp.reset();
     CHECK(module.settingsSchema().isNull());
 
     // The schemas directory: the data directory when it has the file, else beside the executable or the

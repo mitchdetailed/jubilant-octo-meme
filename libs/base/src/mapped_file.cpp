@@ -5,6 +5,7 @@
 #include <esses/base/utf8.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <limits>
 #include <string>
 
@@ -63,6 +64,29 @@ void quickHashDecode(void* ctx) {
 
 std::string win32Error(const char* what, DWORD code) {
     return std::string(what) + " (Win32 error " + std::to_string(code) + ")";
+}
+
+// How long a file that is not found, or is being deleted (ERROR_ACCESS_DENIED), is looked for again: while a
+// rename over the file is under way its name can be missing for a moment (read_file.hpp). A sharing violation
+// (an in-place writer) is reported at once.
+constexpr auto kMissingRetryFor = std::chrono::milliseconds(500);
+
+HANDLE openForMapping(const std::filesystem::path& path) {
+    const auto deadline = std::chrono::steady_clock::now() + kMissingRetryFor;
+    for (;;) {
+        const HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE,
+                                        nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (file != INVALID_HANDLE_VALUE) {
+            return file;
+        }
+        const DWORD code = GetLastError();
+        if ((code != ERROR_FILE_NOT_FOUND && code != ERROR_PATH_NOT_FOUND && code != ERROR_ACCESS_DENIED) ||
+            std::chrono::steady_clock::now() >= deadline) {
+            SetLastError(code);
+            return INVALID_HANDLE_VALUE;
+        }
+        Sleep(1);
+    }
 }
 
 std::int64_t fileTimeToUnixUs(const FILETIME& ft) noexcept {
@@ -195,8 +219,7 @@ Result<MappedFile> MappedFile::open(const std::filesystem::path& path) {
     MappedFile mf;
     mf.path_ = path;
 #if defined(ESSES_OS_WINDOWS)
-    HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr,
-                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    HANDLE file = openForMapping(path);
     if (file == INVALID_HANDLE_VALUE) {
         return fail(ErrorCode::Io, win32Error("cannot open file", GetLastError()), contextFor(path));
     }

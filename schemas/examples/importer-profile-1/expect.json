@@ -1,0 +1,22 @@
+{
+  "missing-version.json": {
+    "pointer": "",
+    "why": "a profile has a content version"
+  },
+  "bad-delimiter.json": {
+    "pointer": "/delimiter",
+    "why": "delimiters are , ; tab | space or auto"
+  },
+  "bad-lap-kind.json": {
+    "pointer": "/lapSource/kind",
+    "why": "lap sources are none, lap_counter_edge, beacon_event or lap_table"
+  },
+  "nested-unknown-member.json": {
+    "pointer": "/header",
+    "why": "nested objects are closed"
+  },
+  "wrong-schema-id.json": {
+    "pointer": "/$schema",
+    "why": "the $schema id names another schema"
+  }
+}

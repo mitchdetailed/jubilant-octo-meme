@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 the Esses contributors
 // SPDX-License-Identifier: MIT
 //
-// esses-cli fixture add | verify (05 section 9.1-9.2, 08 section 6.7; AC-M0-01..03).
+// esses-cli fixture add | verify | diff (05 section 9.1-9.2, 08 section 6.7; AC-M0-01..03).
 //
 // fixture add <file> --format <id> --oracle ref-decode|<dir> --out <dir>
 //   Writes the fixture directory: input.<ext> and its companions (input.ldx), fixture.json (fixture-1),
@@ -65,9 +65,20 @@ struct FixtureVerifyOptions {
     bool verbose = false;
 };
 
+// fixture diff <dir>... [--channel <name>] (05 section 9.2): verify's checks explained in full: per channel
+// the samples compared, how many differ, the largest ulp distance and the first differing sample; the JSON
+// Pointer paths where expected.probe.json, expected.markers.json and expected.laps.json differ (missing
+// markers and laps included). Exit 1 when a fixture differs.
+struct FixtureDiffOptions {
+    std::vector<std::filesystem::path> dirs;
+    std::string channel; // only this channel (reader or oracle name, case-insensitive)
+    bool json = false;
+};
+
 int runFixtureAdd(AppContext& ctx, const FixtureAddOptions& options, std::ostream& out, std::ostream& err);
 int runFixtureVerify(AppContext& ctx, const FixtureVerifyOptions& options, std::ostream& out,
                      std::ostream& err);
+int runFixtureDiff(AppContext& ctx, const FixtureDiffOptions& options, std::ostream& out, std::ostream& err);
 
 // The default Python interpreter for ref-decode: <prefix>_PYTHON, else python (Windows) / python3.
 std::string defaultPython();

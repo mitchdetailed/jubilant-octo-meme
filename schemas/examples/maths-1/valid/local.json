@@ -1,0 +1,26 @@
+{
+  "$schema": "urn:esses:maths-1",
+  "schemaVersion": 1,
+  "constants": [],
+  "enabled": true,
+  "enumerations": [],
+  "futureMember": true,
+  "id": "local",
+  "items": [
+    {
+      "display": {
+        "dps": 1,
+        "unit": "bar"
+      },
+      "enabled": true,
+      "kind": "scale_offset",
+      "name": "Brake Pres F",
+      "offset": {
+        "unit": "bar",
+        "v": 0
+      },
+      "scale": 1.02
+    }
+  ],
+  "precision": "single"
+}

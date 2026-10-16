@@ -1,0 +1,67 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "range_is_track_sections_default_corners",
+  "expression": "range_is(\"Outings:Laps:Track Sections:Default:Corners\")",
+  "provenance": {
+    "kind": "help",
+    "ref": "Maths Functions (Pro): range_is",
+    "note": "the help's path, against the per-category child group (02 section 4.5)"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 1200000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [3, 1.5, 4.25, 1, 5.5, 9, 2.75, 6.5, 5.25, 3.5, 5, 8.75]
+    }
+  },
+  "ranges": {
+    "Outings": [
+      {
+        "startUs": 0,
+        "endUs": 1200000
+      }
+    ],
+    "Outings:Laps": [
+      {
+        "startUs": 0,
+        "endUs": 1200000
+      }
+    ],
+    "Outings:Laps:Track Sections": [],
+    "Outings:Laps:Track Sections:Default": [
+      {
+        "startUs": 0,
+        "endUs": 1200000
+      }
+    ],
+    "Outings:Laps:Track Sections:Default:Corners": [
+      {
+        "startUs": 200000,
+        "endUs": 400000
+      },
+      {
+        "startUs": 700000,
+        "endUs": 900000
+      }
+    ]
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

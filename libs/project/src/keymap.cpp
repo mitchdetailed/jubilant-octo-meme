@@ -14,6 +14,8 @@ namespace esses::project {
 
 namespace {
 
+constexpr detail::DocKind kKind{"keymap", 1};
+
 using detail::json;
 using jsonio::asString;
 using jsonio::ObjectReader;
@@ -104,7 +106,7 @@ json bindingToJson(const KeyBinding& b) {
 }
 
 json keymapToJson(const Keymap& k) {
-    json root = detail::newDocument("keymap");
+    json root = detail::newDocument("keymap", std::max(k.schemaVersion, kKind.current));
     root["name"] = k.name;
     root["inherits"] = k.inherits ? json(*k.inherits) : json(nullptr);
     json rows = json::array();
@@ -192,42 +194,46 @@ std::string normaliseKeySequence(std::string_view keys) {
 }
 
 Result<Keymap> Keymap::parse(std::string_view json, std::vector<std::string>& log) {
-    return detail::parseDocument<Keymap>(json, [&](const detail::json& root) -> Result<Keymap> {
-        ObjectReader r(root, "");
-        detail::readSchemaHeader(r, "keymap", log);
-        Keymap k;
-        k.name = asString(r.required("name"), r.child("name"));
-        if (const detail::json* inh = r.optional("inherits")) {
-            k.inherits = asString(*inh, r.child("inherits"));
-        }
-        const detail::json& rows = r.required("bindings");
-        const std::string rp = r.child("bindings");
-        if (!rows.is_array()) {
-            violate(rp, "bindings is an array");
-        }
-        for (std::size_t i = 0; i < rows.size(); ++i) {
-            k.bindings.push_back(readBinding(rows[i], jsonio::pointerIndex(rp, i)));
-        }
-        if (const detail::json* un = r.optional("unbind")) {
-            const std::string up = r.child("unbind");
-            if (!un->is_array()) {
-                violate(up, "unbind is an array");
+    return detail::readDocument<Keymap>(
+        json, kKind, log,
+        [&](const detail::json& root, const detail::DocVersion& version) -> Result<Keymap> {
+            ObjectReader r(root, "");
+            detail::markSchemaHeader(r);
+            Keymap k;
+            k.schemaVersion = version.write;
+            k.name = asString(r.required("name"), r.child("name"));
+            if (const detail::json* inh = r.optional("inherits")) {
+                k.inherits = asString(*inh, r.child("inherits"));
             }
-            for (std::size_t i = 0; i < un->size(); ++i) {
-                ObjectReader ur((*un)[i], jsonio::pointerIndex(up, i));
-                KeyUnbind u;
-                u.command = readCommand(ur.required("command"), ur.child("command"));
-                u.context = readContext(ur.required("context"), ur.child("context"));
-                ur.closed();
-                k.unbind.push_back(std::move(u));
+            const detail::json& rows = r.required("bindings");
+            const std::string rp = r.child("bindings");
+            if (!rows.is_array()) {
+                violate(rp, "bindings is an array");
             }
-        }
-        k.unknown = detail::unknownMembers(r);
-        for (const std::string& c : k.conflicts()) {
-            log.push_back(c);
-        }
-        return k;
-    });
+            for (std::size_t i = 0; i < rows.size(); ++i) {
+                k.bindings.push_back(readBinding(rows[i], jsonio::pointerIndex(rp, i)));
+            }
+            if (const detail::json* un = r.optional("unbind")) {
+                const std::string up = r.child("unbind");
+                if (!un->is_array()) {
+                    violate(up, "unbind is an array");
+                }
+                for (std::size_t i = 0; i < un->size(); ++i) {
+                    ObjectReader ur((*un)[i], jsonio::pointerIndex(up, i));
+                    KeyUnbind u;
+                    u.command = readCommand(ur.required("command"), ur.child("command"));
+                    u.context = readContext(ur.required("context"), ur.child("context"));
+                    ur.closed();
+                    k.unbind.push_back(std::move(u));
+                }
+            }
+            k.unknown = detail::unknownMembers(r);
+            for (const std::string& c : k.conflicts()) {
+                log.push_back(c);
+            }
+            return k;
+        },
+        keymapToJson);
 }
 
 Result<Keymap> Keymap::load(const std::filesystem::path& path, std::vector<std::string>& log) {

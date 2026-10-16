@@ -1,0 +1,44 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "hypot_pair",
+  "expression": "hypot('X', 'Y')",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): hypot",
+    "note": "sqrt(x^2 + y^2)"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 800000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [3, 5, 8, -6, 0, 1.5, 7, 20]
+    },
+    "Y": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [4, 12, 15, 8, 0, 2, -24, 21]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [5, 13, 17, 10, 0, 2.5, 25, 29],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

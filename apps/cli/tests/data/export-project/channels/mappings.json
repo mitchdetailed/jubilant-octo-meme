@@ -1,0 +1,10 @@
+{
+  "$schema": "urn:esses:mappings-1",
+  "schemaVersion": 1,
+  "mappings": [
+    {
+      "from": "GEAR",
+      "to": "Gear"
+    }
+  ]
+}

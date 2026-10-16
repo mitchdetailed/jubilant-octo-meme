@@ -913,7 +913,7 @@ Complete `project-1` key set (every other key is an unknown member, preserved):
 | `workbooks` | workbook names in display order | 06 §2 |
 | `recentSources[]` | `{path, importer, hash, openedAt}` | 06 §18 |
 | `lastSelection` | `{main, overlay0?, overlays[], overlaysHidden, singleColourMain}` of `RangeKey` | 06 §5.5 |
-| `dataWindow.filters` | map `SourceId` hex or `default` → filter; `kind ∈ all \| selected \| fastest \| fastest3 \| withinOnePercent \| lapNumbers` (D-017's list), `laps` string (`"3"`, `"3-7"`, `"3,5,9"`) for `lapNumbers` | 06 §5.4 |
+| `dataWindow.filters` | map `default` or the source's quick hash as `xxh3:<32 hex digits>` (`model::hashText`; minor 2, D-162) → filter; `kind ∈ all \| selected \| fastest \| fastest3 \| withinOnePercent \| lapNumbers` (D-017's list), `laps` string (`"3"`, `"3-7"`, `"3,5,9"`) for `lapNumbers` | 06 §5.4 |
 | `dataWindow.applyToAllSources` | bool | 06 §5.4 |
 
 `RangeKey { source: {path, hash}, layer, groupPath, startMarker, name }` is the persisted form of `RangeRef` (D-014 identity `(groupPath, startMarker)`); restore resolves by `(hash, layer, groupPath, startMarker)`, then by `(path, layer, groupPath, name)` (06 §5.5).
@@ -1065,6 +1065,7 @@ Perspectives and `active.workbook` are keyed by `WorkbookFile::id` (D-019), neve
 3. On open, a non-empty `.journal/` offers recovery: the newest entry per `path` is applied in memory (checking `baseHash` against the on-disk file to detect edits made by another instance) and the project is marked dirty; "discard" deletes the journal.
 4. `seq` is monotonic per session; files from a different `session` id are also replayed (ordered by `seq`, then `at`).
 5. Maths modules additionally save atomically when the Maths Editor closes (i2 behaviour); schemes save on OK.
+6. As built (D-187): each file is its session's complete unsaved state, so a session deletes its older files once a new one is written and replay takes each session's newest file (sessions merged newest entry per `path`); Save first journals everything it is about to write and then deletes only its own session's files, so a journal whose recovery was put off (Later) stays for the next open while this session keeps autosaving beside it; Recover adopts the replayed files (the session journals the recovered documents as its own, then deletes them); a file a case-only rename writes again is never retired.
 
 ### 6.9 Remaining documents
 

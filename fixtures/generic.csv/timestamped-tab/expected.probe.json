@@ -1,0 +1,134 @@
+{
+  "$schema": "urn:esses:probe-1",
+  "schemaVersion": 1,
+  "companions": [],
+  "details": [],
+  "dialect": "tab,timestamped",
+  "enumTables": [],
+  "importerId": "text.profile:generic.csv",
+  "importerVersion": "1.0.0",
+  "layers": [
+    {
+      "channels": [
+        {
+          "dps": 3,
+          "dtype": "F32",
+          "flags": 0,
+          "index": 0,
+          "kind": "Real",
+          "loggedName": "Battery",
+          "sampleCount": 600,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "timestamped": true
+          },
+          "vendorDtype": "text",
+          "vendorUnit": "V"
+        },
+        {
+          "dps": 2,
+          "dtype": "F32",
+          "flags": 0,
+          "index": 1,
+          "kind": "Real",
+          "loggedName": "Coolant",
+          "sampleCount": 600,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "timestamped": true
+          },
+          "vendorDtype": "text",
+          "vendorUnit": "deg C"
+        }
+      ],
+      "durationUs": 13782000,
+      "markers": [],
+      "name": "Normal",
+      "utc": {
+        "unixUs": 1791800000018000
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "code": "text.auto_decimal",
+      "ctx": {
+        "detail": "."
+      },
+      "level": "Info",
+      "message": "decimal separator detected"
+    },
+    {
+      "code": "text.auto_delimiter",
+      "ctx": {
+        "detail": "tab"
+      },
+      "level": "Info",
+      "message": "delimiter detected"
+    },
+    {
+      "code": "text.auto_preamble",
+      "ctx": {
+        "detail": "0"
+      },
+      "level": "Info",
+      "message": "preamble detected"
+    },
+    {
+      "code": "text.auto_time_column",
+      "ctx": {
+        "detail": "Timestamp"
+      },
+      "level": "Info",
+      "message": "time column detected"
+    },
+    {
+      "code": "text.auto_time_unit",
+      "ctx": {
+        "detail": "epoch_ms"
+      },
+      "level": "Info",
+      "message": "time unit detected"
+    },
+    {
+      "code": "text.auto_units_row",
+      "ctx": {
+        "detail": "yes"
+      },
+      "level": "Info",
+      "message": "units row found"
+    },
+    {
+      "code": "text.lap_source_absent",
+      "ctx": {
+        "detail": "lap_counter_edge"
+      },
+      "level": "Info",
+      "message": "the profile's lap source is not in this file"
+    },
+    {
+      "code": "text.time_duplicate",
+      "ctx": {
+        "detail": "1"
+      },
+      "level": "Info",
+      "message": "rows with the time of the previous row replace it (last wins)"
+    },
+    {
+      "code": "text.time_not_monotonic",
+      "ctx": {
+        "detail": "1"
+      },
+      "level": "Warning",
+      "message": "rows whose time goes backwards are dropped"
+    },
+    {
+      "code": "text.timestamped",
+      "ctx": {},
+      "level": "Info",
+      "message": "the time column is not uniform; the channels are timestamped"
+    }
+  ]
+}

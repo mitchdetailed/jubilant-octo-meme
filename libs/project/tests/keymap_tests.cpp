@@ -156,7 +156,9 @@ TEST_CASE("keymap: the shipped default holds every row of the 06 section 14.4 ta
     CHECK(keysOf("view.channel_status", "global").empty());
 }
 
-TEST_CASE("keymap: hotkey batch 1 is implemented in M1, every other row is planned or reserved", "[unit]") {
+TEST_CASE("keymap: hotkey batch 1 is implemented in M1, M2 rows as they land, every other row is planned or "
+          "reserved",
+          "[unit]") {
     const Keymap k = shipped();
     const std::set<std::string> batch1Areas{"view", "data", "zoom", "pan", "cursor", "datum"};
     std::set<std::string> implemented;
@@ -165,10 +167,14 @@ TEST_CASE("keymap: hotkey batch 1 is implemented in M1, every other row is plann
         CHECK_FALSE(b.doc.empty());
         switch (b.status) {
         case KeymapStatus::Implemented:
-            implemented.insert(b.command);
-            CHECK(b.milestone == "M1");
-            CHECK(batch1Areas.count(b.command.substr(0, b.command.find('.'))) == 1);
-            CHECK_FALSE(b.keys.empty()); // AC-M1-06 sends the key
+            // The closed milestone (M1) or the one in progress (M2), whose rows turn implemented as they land
+            // (tools/check_keymap_coverage.py); a menu-only M2 row may have no key (06 section 14.3).
+            CHECK((b.milestone == "M1" || b.milestone == "M2"));
+            if (b.milestone == "M1") {
+                implemented.insert(b.command);
+                CHECK(batch1Areas.count(b.command.substr(0, b.command.find('.'))) == 1);
+                CHECK_FALSE(b.keys.empty()); // AC-M1-06 sends the key
+            }
             break;
         case KeymapStatus::Planned:
             CHECK(b.milestone !=
@@ -264,7 +270,9 @@ TEST_CASE("keymap: a user file inherits, replaces, unbinds and appends", "[unit]
     CHECK(toggle[0]->milestone == "M1"); // status, milestone and doc stay the base row's
     CHECK_FALSE(toggle[0]->doc.empty());
     CHECK(merged.rowsFor("cursor.insert_marker")[0]->keys == std::vector<std::string>{"Shift+F7"});
-    CHECK(merged.rowsFor("cursor.insert_marker")[0]->status == KeymapStatus::Planned);
+    // The status stays the base row's (implemented since the shell's M2 wiring).
+    CHECK(merged.rowsFor("cursor.insert_marker")[0]->status ==
+          base.rowsFor("cursor.insert_marker")[0]->status);
     REQUIRE(merged.rowsFor("my.plugin_action").size() == 1);
     CHECK(merged.bindings.back().command == "my.plugin_action");
     CHECK(merged.bindings.size() == base.bindings.size() - 1 + 1);

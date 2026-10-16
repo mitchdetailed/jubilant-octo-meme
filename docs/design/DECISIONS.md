@@ -51,7 +51,7 @@ Each ADR has: Title · Context · Options considered (with the research facts th
 | D-035 | MVP scope and milestones | parity-first's MVP minus i2 file importers, index DB and GL (all v1.0); Lap/Details editors, Time Report and sections stay in MVP; ~30 weeks to 0.1, re-estimated ≈ 42 with contingency (D-045) | **yes** (scope cut; answered 2026-10-10) |
 | D-036 | Profiles | Circuit profile only in MVP; range kinds for Run/Stage exist in the model from M0; Drag/Rally rules and editors v1.0 | no |
 
-Addendum A (after the open questions) adds D-037–D-160: decisions proposed by the section writers of documents 00–08, by the 2026-10-10 review (A.1–A.8) and by the final cross-document revision (A.9), plus implementation decisions taken once M0 started (A.10: the user's instructions, and the reconciliation with spike S-1 and the converter port specification) the departures of M0 as built from the design (A.11) and those of M1 as built (A.12, proposed), with their own index. Where an addendum entry amends an ADR above, the ADR carries a one-line "Amended by" note.
+Addendum A (after the open questions) adds D-037–D-192: decisions proposed by the section writers of documents 00–08, by the 2026-10-10 review (A.1–A.8) and by the final cross-document revision (A.9), plus implementation decisions taken once M0 started (A.10: the user's instructions, and the reconciliation with spike S-1 and the converter port specification) the departures of M0 as built from the design (A.11), those of M1 as built (A.12, proposed) and those of M2 (A.13, proposed), with their own index. Where an addendum entry amends an ADR above, the ADR carries a one-line "Amended by" note.
 
 ---
 
@@ -169,6 +169,7 @@ No custom software rasteriser: golden images come from `RasterBackend` run offsc
 **Consequences.** `esses-cli info/channels/laps/eval/convert/validate/fixture/bench` run without Qt; `esses-render worksheet.json x.ld -o out.png` is a small Qt Gui tool. The plot geometry is unit-testable against brute-force references without a window. The "bridge" is one `Dispatcher::post` (D-031), not an adapter per model object.
 
 **Amended by (A.9, proposed):** D-122 (`esses_project` links `esses_maths` as a same-layer edge and hosts every i2 configuration importer under `libs/project/src/cfgimport/`).
+**Amended by (A.13, proposed):** D-161 (`esses_qtmodel` also links Qt Gui, for `QUndoStack`/`QUndoCommand` only).
 
 **User must confirm:** no.
 
@@ -305,6 +306,8 @@ No custom software rasteriser: golden images come from `RasterBackend` run offsc
 
 **Amended by (A.9, proposed):** D-134 (`DistanceChain`) and D-140 (`DistanceIndex` key).
 **Amended by (A.12, proposed):** D-154 (the default `alternateList` ends with `Speed`) and D-157 (`timeAt` exact between the 0.25 m steps).
+**Amended by (A.13, proposed):** D-171 (`esses.gps_corrections` in M2: zero-fix step only, shadowing outputs first in their chains, Disabled without both channels).
+**Amended by (A.13, proposed):** D-173 (`esses.gps_corrections` registered for a layer that logs both GPS inputs) and D-174 (0.1 track length = the source's `Venue Length` until track maps; factors published as `Range::stretch`; the stretch toggle is view state).
 
 **User must confirm:** no (tolerance default is an open question).
 
@@ -352,6 +355,10 @@ No custom software rasteriser: golden images come from `RasterBackend` run offsc
 
 **Consequences.** Projects are git-diffable; a crash at the 2-minute mark cannot corrupt a project; a workbook shared with a teammate carries no personal dock state; i2 workbook import (v1.0) is a mapping onto the same vocabulary.
 
+**Amended by (A.13, proposed):** D-162 (`project-1` minor 2: Data-window filter keys and the 1 -> 2 migration) and D-163 (load pipeline: typed reader before the schema; newer minors kept on save or refused, R-38).
+**Amended by (A.13, proposed):** D-178 (the recovery prompt before the session restore; leaving a project saves, asks or writes the view state; the scheme choice and the toolbar selector are user settings).
+**Amended by (A.13, proposed):** D-177 (the Maths Editor's auto-save on close is the project's save, after a module edit only).
+
 **User must confirm:** no.
 
 ---
@@ -364,6 +371,8 @@ No custom software rasteriser: golden images come from `RasterBackend` run offsc
 
 **Consequences.** Users paste i2 expressions unchanged; the only divergence risk is `^`/unary minus and it is switchable.
 
+**Amended by (A.13, proposed):** D-165 (diagnostic codes beyond 03 §2.5, the nesting limit 256).
+
 **User must confirm:** **yes** — verify `-2^2` on the user's i2 install if possible (D-005 (3), D-038 (c)); permitted since the user's yes to Q-03 (3) on 2026-10-10 and scheduled for M2. Until observed the default stands, recorded "chosen, not observed".
 
 ---
@@ -375,6 +384,8 @@ No custom software rasteriser: golden images come from `RasterBackend` run offsc
 **Decision.** `Type { Kind {Scalar, Series, LapScalar, Bool, Text, RangeRef, Invalid}; UnitId unit; Dimension dim; std::optional<Rate> rate; bool integer; }`. The checker infers bottom-up (`m/s × s → m`; relational/boolean yield `Bool` 0/1 series; `choose` unifies branches; text only in `==`/`!=`; bitwise require integer). **Dimension or unit mismatches are warnings** shown live under the editor and in Channel Status; they never block evaluation (i2 only syntax-checks, and users' existing maths rely on "numbers are numbers once annotated"). The declared result unit is stamped on the output; display unit is separate. `LapScalar` values (ungated `stat_*`, numeric details per range) lower to a `Previous`-interpolated series over the ranges. Plugin functions declare unit rules in their manifest so they participate in inference.
 
 **Consequences.** No rejected i2 expressions; a strict mode (errors) is a later option behind a project flag.
+
+**Amended by (A.13, proposed):** D-164 (bare literals take the dimension they meet; an undeclared result unit is not checked).
 
 **User must confirm:** no.
 
@@ -389,6 +400,8 @@ No custom software rasteriser: golden images come from `RasterBackend` run offsc
 **Consequences.** Chunk-granular reuse, L1-resident blocks, correct zero-phase filters, and the Channel Status window has a precise state for every item.
 
 **Amended by (A.9, proposed):** D-139 (0.1 whole-node staging) and D-140 (node versions hash only what a node reads).
+
+**Amended by (A.13, proposed):** D-170 (`Kernel::status` for failures known only at evaluation; `integrate_dist` reads Corr Dist as a plan input) and D-171 (built-in outputs first and transient maths last in a chain, disabled elements skipped, conditions as constant expressions over details, alias fall-through on definition errors, the descriptor unit as stored).
 
 **User must confirm:** no.
 
@@ -413,6 +426,8 @@ No custom software rasteriser: golden images come from `RasterBackend` run offsc
 **Decision.** Maths **modules** (= i2 maths files) are JSON (`{id, enabled, condition?, constants[], enumerations[], items[]}`, item kinds `expression | filter | scale_offset | table2d | table3d | builtin | plugin | regression`). Built-in items (`esses.corrected_speed_distance`, `esses.gps_corrections`, `esses.damper_velocity`) have schema'd settings pages (no `Params` strings). External functions implement one interface `IMathFunction { manifest(); evaluate(EvalContext&, args) }`; the **C ABI** `esses_mathfn_v1` (mirrors `IMtcMathFunction`: args, `create_result` pre-sized to the result rate and extent, `mathStartUs/mathEndUs`, `BLOCK_CAPABLE` flag) arrives at v1.0 with the importer ABI (D-028); **Lua** user functions arrive at v1.1 behind the same interface (D-030). Dotted names (`mylib.rolling_rms`) keep i2's `ProgId.name` spelling so imported maths resolve. Multi-channel plugins (`IMtcMathPlugin`) are modelled as modules producing N channels (post-v1.0). The i2 maths XML importer (v1.0) maps `MathExpression/MathFilter/MathTable2D/MathConstant/MathEnumeration` 1:1 and translates known `Params` into module settings, flagging the rest.
 
 **Consequences.** Nothing scripted or compiled is needed for the MVP; the manifest schema is written in M2 so editors can autocomplete plugin functions later.
+
+**Amended by (A.13, proposed):** D-171 (a `builtin` item overrides the registered module's settings for its source; `enabled` may gate optional steps only, as for `esses.gps_corrections`).
 
 **User must confirm:** no.
 
@@ -487,6 +502,8 @@ No custom software rasteriser: golden images come from `RasterBackend` run offsc
 
 **Amended by (A.10):** D-142 (the `.ld` reader and the `.ld` part of the fixture writer are ported from the user's converter in M0, ahead of the harvest; the `.ldx` code is new) and D-144 (until the user confirms the converter's licence and lineage, nothing is ported verbatim: the reader and writer are new code written from the converter's port specification and the public notes).
 
+**Amended by (A.13, proposed):** D-179 (the Mapping panel's queue, Save and unit-map rows) and D-168 (unit-map rules before the registry, "unresolved" = an unknown unit or a quantity without a unit, the hand-off through `resume`, timestamped channels and the reader hooks of step 4).
+
 **User must confirm:** no (converter licence/provenance is an open question, Q-15; since D-144 it also gates any verbatim reuse of the converter's `.ld` code in M0).
 
 ---
@@ -498,6 +515,8 @@ No custom software rasteriser: golden images come from `RasterBackend` run offsc
 **Decision.** Own **light** two-pass text engine (pass 1: line index + preamble/header/units detection against the profile; pass 2: per-column decode of 65,536-row slabs into chunks) using `fast_float` for number conversion, no SIMD, no DCF in the MVP (added only on a measured complaint, D-011). Header-only CSV libraries are not used because preambles, per-channel blocks (Pi), sparse cells and ragged rows are outside their model. Profiles are JSON (`schemas/importer-profile-1`): `sniff {preambleRegex, extensions, confidence}`, `encoding`, `delimiter`, `decimal`, `quote`, `preamble {lines, capture → details}`, `header {namesRow, unitsRow, unitInName}`, `time {column, unit}`, `sentinels`, `sparse: timestamped | hold`, `duplicateNames`, `columns {vendor → {name, quantity, dtype, interp}}`, `lapSource {column, kind: lap_counter_edge | beacon_event | lap_table}` (ecosystem-first graft). Shipped in MVP: `motec.csv` (details from the preamble, lap times to markers), `generic.csv`. v1.0: Pi, EFI, RacePak ASCII, VBO, TrackAddict, RaceChrono, RaceBox, MSL, RaceCapture, Haltech/Link/MaxxECU/Syvecs exports (each = profile + fixture).
 
 **Consequences.** Adding a CSV dialect is a data PR with one fixture; the engine is ~1,500 lines; the chunk provider path means a later DCF cache needs no importer change.
+
+**Amended by (A.13, proposed):** D-167 (the text engine's rules as built: `@auto` names row, decimal comma, checked rate candidates, column sampling, portable multi-line sniff, `capture` direction, the slab decoder with `WeakColumn`, `blocks` deferred) and D-168 (step 4 and the Mapping-panel hand-off as built; shipped profiles registered by `withBuiltins`).
 
 **User must confirm:** no.
 
@@ -537,6 +556,10 @@ No custom software rasteriser: golden images come from `RasterBackend` run offsc
 
 **Consequences.** Modeless property dialogs (D-027) are safe to use freely; the CLI needs no undo.
 
+**Amended by (A.13, proposed):** D-161 (`QUndoStack` is a Qt Gui class in Qt 6: `esses_qtmodel` links Qt Gui for the undo framework only).
+**Amended by (A.13, proposed):** D-172 (whole-document commands; undone options edits keep the view state; the F9 domain stays view state over 02 §7; workbook-list and Mapping-panel edits; dirty state, save and autosave rules).
+**Amended by (A.13, proposed):** D-178 (Edit > Undo/Redo are the registry commands `edit.undo`/`edit.redo`, not `QUndoStack::createUndoAction`; component edits from the canvas are `WorkbookCommand`s; text-editing chords in a text field are the field's own).
+
 **User must confirm:** no.
 
 ---
@@ -560,6 +583,8 @@ No custom software rasteriser: golden images come from `RasterBackend` run offsc
 **Amended by (A.9, proposed):** D-127 (Linux-only pixel goldens, Noto Sans test font, private game-generated fixtures, `fixture-1` in 05 §9.1, `expected.laps.json`).
 
 **Amended by (A.11):** D-148 (Catch2 3.7.1 amalgamated and the project's own test discovery, which fails the build on a test name that a Catch2 test spec cannot select exactly) and D-152 (`esses-cli fixture add` requires `--licence` for a public fixture and defaults `oracle.validity` to `finite-only` for the reference decoder).
+
+**Amended by (A.13, proposed):** D-170 (the maths case corpus `tests/maths/cases/`, schema `maths-case-1`, expected values from `tools/maths_ref.py`).
 
 **User must confirm:** **confirmed by the user on 2026-10-10:** no real file is public for now, every real file stays in the private submodule and the synthetic families stay public (Q-04, to be revisited before the first public release); i2 exports of the user's MoTeC-device logs may serve as private oracles (Q-03 (1), D-005).
 
@@ -764,6 +789,38 @@ Rewritten on 2026-10-10 after the review. The list is deduplicated across this d
 | D-158 | Marker order: at equal times `EOL` before `SOL` (amends 02 §4.3 behaviour 8) | no | M1 §3 review fix |
 | D-159 | Shipped data: `<exe dir>/data` first on every OS (amends 01 §9) | no | PR #1 CI (qt-app ubuntu) |
 | D-160 | DCO sign-off suspended while the maintainer is the only contributor (amends D-002, D-004) | no (user decision 2026-10-12) | PR #1 |
+| D-161 | `esses_qtmodel` links Qt Gui for the undo framework only (amends D-007, D-032; 01 §2.1–2.2, 06 §1) | no | M1 §6 item 9, M2 contracts |
+| D-162 | `project-1` minor 2: Data-window filter keys are the hash text; the first real migration (amends D-019; 02 §6.2) | no | M2 persistence, 07 §5.1 |
+| D-163 | Load pipeline of the project documents: typed reader before the schema, newer minors kept or refused (amends D-019; 02 §6.1, §6.6; closes R-38) | no | M2 persistence, M1 §6 item 7 |
+| D-164 | Maths dimension warnings: bare literals and undeclared result units (refines D-021; 03 §3.2 rules 4 and 10) | no | M2 language |
+| D-165 | Maths diagnostics beyond 03 §2.5, and the nesting limit (refines D-020; 03 §2.5, §14.3) | no | M2 language |
+| D-166 | `esses-cli eval` evaluates on the calling thread, over logged channels and details (amends 03 §13) | no | M2 language, AC-M2-14 |
+| D-167 | Text engine as built: rules that differ from 05 §7 (amends D-029; 05 §7.1–7.3) | no | M2 CSV import, AC-M2-13 |
+| D-168 | Open-pipeline step 4, the Mapping-panel hand-off and the shipped text profiles as built (amends D-028, D-029; 05 §2, §8) | no | M2 CSV import, AC-M2-11 |
+| D-169 | IIR filters designed in-tree, not through Iir1; the Chebyshev reading (amends D-124, 03 §1, §5.3; refines D-082) | no | M2 kernels |
+| D-170 | Maths kernels as built: failures known at evaluation, `integrate_dist`'s Corr Dist input, the case corpus (amends D-022, D-033; 03 §6.1, §14.1) | no | M2 kernels, AC-M2-02 |
+| D-171 | `MathGraph` as built: the ends of a shadowing chain, disabled elements, conditions, the descriptor unit and the M2 graph surface (refines D-022, D-024; amends 03 §4.2–4.3, §7.1, §8, §9.2) | no | M2 graph, AC-M2-03, AC-M2-04 |
+| D-172 | Undo, persistence and the journal in `esses_qtmodel` as built: whole-document commands, view state kept out of undone edits, workbook and Mapping-panel edits, dirty state, save and autosave rules (refines D-019, D-032, D-070; amends 02 §6.8, §7) | no | M2 qtmodel, AC-M2-06, AC-M2-09 |
+| D-173 | `MathsService` and Channel Status as built: GPS corrections where GPS is logged, local maths from the sidecar, the live check's scope, the rows and kinds of Channel Status (refines D-013, D-016, D-022; amends 03 §9.2, §11, 06 §10) | no | M2 qtmodel, AC-M2-12 |
+| D-174 | Lap stretching in 0.1: the track length is the source's `Venue Length` until track maps; factors published as `Range::stretch`; the toolbar toggle is view state (refines D-016, D-140) | no | M2 qtmodel |
+| D-175 | Channels-window search: the query is split like the names; loose is a substring per word, still in order (refines 06 §7 item 3) | no | M2 qtmodel |
+| D-176 | (number not used: reserved during the M2 work and never written) | — | — |
+| D-177 | The maths editors as built: auto-save on close through the project save, the apply and close rules, the item pages of 0.1, Channel Status and Channel Editor routing, the active-channel commands (refines D-013, D-019, D-021, D-027; amends 03 §11, 06 §10, §13.1, §13.2, §14.4) | no | M2 maths editors, AC-M2-12 |
+| D-178 | The shell's M2 wiring as built: Options, schemes, Edit-menu undo, text-field chords, the recovery prompt and leaving a project; keymap rows of the milestone in progress (refines D-019, D-032, D-161; amends 06 §2.1, §13.7, §14.2, §16, §18) | no | M2 options and shell, AC-M2-06 |
+| D-179 | The data editors and the Data/Channels dock work as built: the Mapping panel's queue, Save and unit-map rows, the Lap Editor's rows and beacon edits, typed details, the filter UI and the proof of AC-M2-05/-11 (refines D-028, D-014, D-015; 05 §8.1, 06 §5.4, §6, §7, §13.3, §13.4, §13.8) | no | M2 data editors, AC-M2-05, AC-M2-11 |
+| D-180 | The shell's wiring of the M2 editors as built: the Mapping panel's place, the Channel Status dock, modeless editors on first use, and the proofs of AC-M2-05/-11 in `tests/ui` (refines D-177, D-178, D-179; 06 §2.2, §3.2, §10, §13, §14.4) | no | M2 integration, AC-M2-05, AC-M2-11 |
+| D-181 | `esses-cli export` and `fixture diff` as built (refines D-090; 05 §9.2, 07 §5.1, §5.5) | no | M2 integration |
+| D-182 | Maths units found in the user's maths: `[ratio]` on a unitless channel, `l/100km` and `psi (sg)` (refines D-164, D-010; 03 §2.4 rule 5) | no | M2 integration, AC-M2-01 |
+| D-183 | AC-M2-10 on the 0.1 whole-node path: measured, not met; the two-frame gate moves to M5 (withdrawn 2026-10-13: superseded by D-191, AC-M2-10 met) | no (withdrawn) | M2 integration, AC-M2-10 |
+| D-184 | AC-M2-14 reads the fixture's own channel name (amends 07 §5.2 AC-M2-14) | **yes** (confirmed 2026-10-14) | M2 integration, AC-M2-14 |
+| D-185 | Maths engine corrections of the M2 review: result rate through statistics, integer and Bool dtypes, non-finite results, literal factors, table axis units, the power switch's hash, synthesised self references, filter windows, stepping constants, recursive `previous_sample`, the math window in the selection key, variance across sources, timestamped rates (refines D-021, D-022, D-164, D-170, D-171; amends 03 §3.2, §4.4, §5.2, §5.4, §5.6, §6.4–6.6, §7.2, §7.6, §8) | no | M2 review, AC-M2-02 |
+| D-186 | `scale_offset` is computed in the unit of its offset (amends 03 §4.4) | **yes** (confirmed 2026-10-14) | M2 review |
+| D-187 | The journal as a per-session snapshot: write-ahead save, autosave beside a deferred recovery, Recover adopts, case-only renames (amends D-172 (h)–(i); 02 §6.8) | no | M2 review, AC-M2-06 |
+| D-188 | `esses-cli maths check` reports MathGraph's nodes (refines D-166; 03 §13, AC-M2-01) | no | M2 review, AC-M2-01 |
+| D-189 | Seven keymap rows of milestone M2 move to M3; the workbook rows are built (amends 06 §14.1's milestone column, D-178 (e)) | no | M2 review |
+| D-190 | The rest of the M2 review: recoverable saves, bounded and guarded text reads, coalesced sidecar writes, cancellable opens, the Maths Editor's partial save (amends D-167, D-172, D-177 (a), D-187; 02 §4 sidecar rule 4, §6.8; 05 §7.1) | no | M2 review, AC-M2-06, AC-M2-11, AC-M2-13 |
+| D-191 | The 0.1 evaluator streams a plan in pieces and seals a node's chunks on idle workers (refines D-139; 03 §6.0; AC-M2-10; supersedes the proposal of D-183) | no | AC-M2-10 |
+| D-192 | Public README is a work-in-progress notice; TRADEMARK.md withheld until a working model (amends D-004; AC-M0-10) | no (user request 2026-10-13) | Maintainer |
 
 ### A.1 Review amendments
 
@@ -1003,6 +1060,7 @@ Rewritten on 2026-10-10 after the review. The list is deduplicated across this d
 #### D-082 Remaining maths compatibility readings
 **Context.** Several function semantics are ambiguous in the help text. D-020 requires each to be listed with a test.
 **Decision.** As listed in 03 and `docs/maths-compat.md`, each with a case file: `edge_delay` rise/fall with `time_valid ≡ edge_delay(rise)`; positive `time_shift` delays; `pulse_width` is the width of the most recently completed high pulse; `bit_decode(x, bit)` and `(x, lowBit, count)`; `integrate_dist` shares `integrate`'s arities; `derivative(x, y[, n])` is the with-respect-to form; tables clamp out of range; IIR passes are primed with the first/last valid sample; window edges truncate and exclude invalid samples; rounding is half away from zero; text comparison is exact and case-sensitive; downsampling is point sampling; scientific-notation literals are decimal (seconds) in window arguments.
+*Refined by D-169 (M2, proposed): the IIR readings (RC form, Chebyshev ripple, `fc`, normalisation, band order, priming).*
 **User must confirm:** no.
 
 #### D-083 `esses.gps_corrections` registered disabled
@@ -1228,6 +1286,7 @@ These entries record choices the documents adopted during the final cross-docume
 #### D-124 Build and CI refinements (amends D-034)
 **Decision.** Iir1 and json-schema-validator are compiled from vendored sources as static libraries; only pocketfft is header-only. Windows uses the `x64-windows-static-md` triplet and one `bin/` output directory. The vcpkg `files` binary cache is persisted with `actions/cache` (not `x-gha`). Required checks are `core` ×3, `qt-app` on Windows and Linux, `sanitize`, `fuzz-smoke` and `lint`; macOS `qt-app` runs nightly. DMG and AppImage are built best-effort at 0.1 with runner smoke tests (a macOS VM is permitted only on Apple hardware); the Windows installer, portable zip and CLI tarballs are release-blocking. AC-M4-04 adds a Windows VM with an old VC++ redistributable. A nightly Linux TSan build with an instrumented Qt covers `QtTextMetrics` (04 §5.4).
 *Amended by D-147 and D-150 (M0 as built): there is no vcpkg triplet or vcpkg binary cache, because every library dependency is vendored and built in the tree; the `qt-app` job, and with it the `qt-app` required checks, starts in M1.*
+*Amended by D-169 (M2, proposed): Iir1 is not vendored; the IIR filters are designed in-tree.*
 **User must confirm:** no (the Linux/macOS release status is Q-12).
 
 #### D-125 Vendor-mark allow-list classes and identifier linting (amends D-003, D-103; touches D-019, D-035)
@@ -1297,6 +1356,7 @@ These entries record choices the documents adopted during the final cross-docume
 #### D-139 0.1 maths staging (amends D-022)
 **Decision (proposed, 03 §6.0).** Through 0.1, one task evaluates each maths node over the whole layer extent (key `…/all`) and seals it into ordinary chunks; parallelism is across nodes only. The chunk-parallel evaluator (register bytecode, cumulative halos, `Ordered` checkpoints, per-chunk tasks, the chunk-order determinism test) comes at v1.0. AC-M2-10's "multi-core evaluation" is met by parallelism across nodes; 07 §5 and §8 deliverables state this staging (`OPEN_QUESTIONS.md` F-10, applied).
 **User must confirm:** no (listed in `OPEN_QUESTIONS.md` as design confirmation F-10, now applied).
+**Refined by (A.13):** D-191 (the node's task streams the plan in pieces with the same values, and the node's later chunks are sealed by idle workers; still one task per node and parallelism across nodes).
 
 #### D-140 Node versions and the `DistanceIndex` key (amends D-016, D-022)
 **Decision (proposed, 03 §7.2).** A maths node's version hashes exactly the logged columns, range-group versions, details and constants it reads, never `DataSource::version`. `RangeGroupTree` keeps a version per group path (`Outings:Laps` separate from each `Track Sections` group). `DistanceIndex` is keyed by `(Corr Dist column version, lap start/end marker ids and times, stretch settings)`. So an annotation invalidates no maths, and track-section rebuilds never invalidate `Corr Dist`.
@@ -1432,3 +1492,486 @@ These entries record where M1, as built and reviewed on the developer machine on
 **Decision.** By the user's instruction on 2026-10-12 ("drop dco for now"), the requirement is suspended. The `dco` CI job stays in `.github/workflows/ci.yml` but runs only when the repository variable `ESSES_REQUIRE_DCO` is `true`. CONTRIBUTING.md, GOVERNANCE.md, AGENTS.md, CLAUDE.md and the pull request template say so. Before outside contributions are accepted, the maintainer sets the variable and the requirement applies again; no CLA either way.
 **Consequences.** Commits made so far carry no sign-off and need no history rewrite. Re-enabling is one repository setting. The no-relicensing policy and the MIT licence are unchanged.
 **User must confirm:** no (decided by the user, 2026-10-12).
+
+### A.13 M2 (proposed, 2026-10-12)
+
+These entries record where M2, as built, departs from what a design document or an acceptance criterion says (`docs/milestones/M2.md`). Each states the ADRs it amends; those ADRs carry an "Amended by" line.
+
+#### D-161 `esses_qtmodel` links Qt Gui for the undo framework only (amends D-007, D-032; 01 §2.1–2.2, 06 §1)
+**Context.** D-032 puts one `QUndoStack` on `ProjectSession` in `esses_qtmodel` and rejects a second, toolkit-free undo abstraction; D-007 and 01 §2.1/§2.2 rule 4 limit `esses_qtmodel` to Qt Core, on the premise that the undo framework is part of it. In Qt 6 `QUndoStack`, `QUndoCommand` and `QUndoGroup` belong to the Qt Gui module (they left Qt Widgets in Qt 6.0), so the M1 configure checks (`cmake/qt-free-check.cmake`, `tools/check_layering.py`) refuse them there, and M1 left the placement open (`docs/milestones/M1.md` §6 item 9). Options: (a) link Qt Gui in `esses_qtmodel` and restrict what may be used from it; (b) a Qt-free undo stack in `esses_project` behind a thin wrapper for the GUI; (c) move the stack and every command into `esses_widgets`.
+**Decision.** (a), the smallest change that keeps D-032 as written. `esses_qtmodel` links `Qt6::Gui` and may include from Qt Gui only `<QUndoStack>` and `<QUndoCommand>` (also spelled `<QtGui/...>`); every other Qt Gui header (`QImage`, `QColor`, `QFont`, `QGuiApplication`, `QAction`, ...) stays forbidden there, and Qt Widgets, OpenGL, Svg and PrintSupport remain forbidden as before. `cmake/qt-free-check.cmake` allows the link; `tools/check_layering.py` rule 6 enforces the header list against the Qt Gui header directory the configure step records (`esses_targets.json` `qtGuiHeaderDirs`), with a self-test; the configure negative test that refused Qt Gui now refuses Qt Widgets (`lint.configure_check.qt_module_qtmodel_widgets`) and a positive case accepts Qt Gui (`qt_module_qtmodel_gui`). The undo commands (`libs/qtmodel/include/esses/qtmodel/undo_commands.hpp`) and their Qt Tests stay in `esses_qtmodel` and run under `QCoreApplication`: the undo framework needs no GUI application. The Edit-menu actions (`QUndoStack::createUndoAction`, which returns a `QAction`) are created in `esses_widgets`.
+**Consequences.** D-032 holds unchanged: one `QUndoStack` per `ProjectSession`, commands wrapping the Qt-free documents, no second abstraction. Option (b) would have reopened D-032 and re-implemented merging, macros and the clean state; option (c) would have moved document logic into the widget layer and turned the AC-M2-09 property test into a widgets test. `esses_qtmodel`'s link closure now contains Qt Gui, which every executable that links it (`esses-render`, `esses`, the Qt tests) already had; the Qt-free libraries and `esses-cli` are unaffected. 01 §2.1, the outline's §1.1 table, 06 §1 and `AGENTS.md` §3 read "Qt Core, plus Qt Gui's undo framework (D-161)".
+**User must confirm:** no.
+
+#### D-162 `project-1` minor 2: Data-window filter keys are the hash text; the first real migration (amends D-019; 02 §6.2)
+**Context.** 07 §5.1 asks for `SchemaRegistry` and `Migrations` "with one real migration". 02 §6.2's key table gives the Data-window filter keys as "`SourceId` hex or `default`", while its example and the M1 `project-1` example key them `xxh3:9f3c…`, the form every other hash of `project-1` (`recentSources[].hash`, `lastSelection.*.source.hash`) and `sidecar-1` (`source.hash`) uses; `project-1` minor 1 left the key form open. M2 is the first build that writes the filters (the Data-window filters moved from M1 to M2, D-044).
+**Decision.** `project-1` minor 2 fixes the keys to `"default"` or the source's quick hash as `"xxh3:<32 lower-case hex digits>"` (`model::hashText`), enforced by the schema's `propertyNames`. The registered step `project-1` 1 -> 2 rewrites a key of 32 bare hex digits (either case) to that form, keeps an already prefixed twin when both exist, and moves every other key, with its filter, to `x-esses-legacy.dataWindowFilters` (02 §6.6 rule 3: nothing is deleted). `ProjectFile::kSchemaVersion` is 2; a minor-1 `project.json` loads migrated and dirty, and its first explicit Save keeps the minor-1 bytes in `backup/` (D-070).
+**Consequences.** The whole migration path (migrate -> parse -> validate -> dirty -> backup) runs on a shipped document kind from M2, and `esses-cli validate` migrates minor-1 files before validating them. Whoever persists the Data-window filters writes `hashText` keys. 02 §6.2's key table reads "`default` or `xxh3:<32 hex>`".
+**User must confirm:** no.
+
+#### D-163 Load pipeline of the project documents: typed reader before the schema, newer minors kept or refused (amends D-019; 02 §6.1, §6.6; closes R-38)
+**Context.** 02 §6.1 writes `Document<T>::load` as "validate -> migrate -> parse" and §6.6 rule 2 as "migrate -> validate -> parse". The M1 typed readers are lenient where the form does not matter (§6.6 rule 4: a missing `$schema`; a workbook without `id` or `name` gets one; an explicit `null` reads as absent) and strict on closed records, with the pointer of the offending member; the schemas require those members, so validating the raw input first would refuse what the readers accept and report other pointers. The members M1 keeps verbatim (`options`, `dataWindow`, `print`, unknown members) were checked by nothing on load. R-38 (M1 review): a document of a newer minor was written back as `schemaVersion` 1, and a member a newer minor adds to a closed record failed as `Invalid`.
+**Decision.** (a) Every `esses_project` loader runs: JSON syntax -> header (another schema `Invalid`, another major `Unsupported`, absent header read as `<name>-1` and logged) -> the registered `Migrations` up to the kind's current minor -> the typed reader -> `SchemaRegistry` validation of the document as it will be written (the typed result serialised), `Invalid` with the schema's pointer. This checks the verbatim members against the schema and keeps the readers' leniencies; without a schemas directory the typed reader is the only check. (b) A newer minor is read as it is and its `schemaVersion` is kept on save, never downgraded; when the reader or the schema refuses it, the error is `Unsupported` with the original pointer ("written by a newer build ... left untouched"), so such a file is neither opened in part nor overwritten with a loss. (c) `esses-cli validate` runs the same header and migration steps without writing (02 §6.6 rule 5): a newer major fails at `/$schema`, the migration log is printed, every error carries its pointer.
+**Consequences.** The invalid schema examples of the verbatim members fail on load with the schema's pointer; the pointers of typed members stay the readers'. Every document type carries `schemaVersion`. The sidecar (`esses_model`, below `esses_project`) keeps its own reader with the newer-minor rule it has had since M0.
+**User must confirm:** no.
+
+#### D-164 Maths dimension warnings: bare literals and undeclared result units (refines D-021; 03 §3.2 rules 4 and 10)
+**Context.** 03 §3.2 rule 4 raises `W-DIM-MISMATCH` when the dimensions of the operands of `+ -` differ and both are known. A numeric literal is dimensionless, so `'Speed'[km/h] > 100`, `'Brake Temp'[deg C] - 5` or `max('Speed'[m/s], 0)`, the everyday form of pasted i2 maths where "numbers are numbers once annotated" (D-021), would each carry a warning. Rule 10 compares the item's `resultUnit` with the inferred dimension; `MathItem`'s defaults (unit `""`, quantity Unitless) cannot be told apart from an explicit unitless declaration, so every item and every `esses-cli eval` expression without a declared unit would carry `W-RESULT-DIM`.
+**Decision.** (a) A bare numeric literal, and an expression of literals only, has no unit: it takes the dimension of the operand it meets in `+ -`, the relational and equality operators, `min`, `max`, `hypot`, `atan2` and the branches of `choose`, and raises no `W-DIM-MISMATCH` or `W-UNIT-SCALE` against it; in `* /` it leaves the other operand's dimension and unit unchanged. A constant, a detail or a reference keeps its unit and is checked as before. (b) The declared result unit is checked (`W-RESULT-DIM`, `I-RESULT-SCALE`) only when the item sets its unit or its quantity; `esses-cli eval` declares one only with `--unit`. Both readings are the `docs/maths-compat.md` rows `lang.literal-dimension` and `lang.result-unit`.
+**Consequences.** Literal arithmetic does not erode AC-M2-01's share of Ok items; a mismatch between two annotated references, constants or details is still a warning. An item that leaves its unit and quantity at the defaults for a dimensioned expression gets no `W-RESULT-DIM`; its output is stored as the numbers, as before. Strict mode (D-021) is unchanged.
+**Amended by (A.13):** D-185 (d) (a literal factor other than ±1 in `* /` makes the scale unknown: no `I-RESULT-SCALE` through a conversion by hand).
+**User must confirm:** no.
+
+#### D-165 Maths diagnostics beyond 03 §2.5, and the nesting limit (refines D-020; 03 §2.5, §14.3)
+**Context.** 03 §2.5 lists the syntax codes to reproduce (`E-QUOTE-MISSING` ... `E-UNIT-UNKNOWN`) but none for other malformed input (an unexpected token, an empty expression, a stray character, an unclosed comment, a malformed number, an empty name) or for a call that cannot be evaluated, and nothing bounds the nesting the parser must accept, while the fuzz target of 03 §14.3 requires no crash and bounded memory.
+**Decision.** Error codes added (ours): `E-SYNTAX` (any other unexpected token, saying what was expected), `E-EXPR-EMPTY`, `E-UNEXPECTED-CHAR` (outside quotes anything but the ASCII tokens, with a fix for typographic quotes and for `=`), `E-COMMENT-UNCLOSED`, `E-NUMBER-FORMAT` (`2x`, `1e`, out of range), `E-NAME-EMPTY` (`''`), `E-EXPR-TOO-DEEP` (a tree deeper than 256 levels or a parser recursion beyond 256), and `E-KERNEL-UNAVAILABLE` from `compile()` for a call that has no kernel. The parser recovers after every error (`Engine RPM` continues as `'Engine RPM'`, `'X' km/h` as `'X'[km/h]`, skipping to `)` or `,` otherwise), so one pass reports every independent error, in source order. The list is in `libs/maths/README.md` and `libs/maths/src/lang/codes.hpp`.
+**Consequences.** The Maths Editor and Channel Status show a precise code for every input. Hostile input cannot exhaust the stack: the type checker is iterative and `print` and `compile` recurse at most 256 levels. An expression nested deeper than 256 levels, which no known maths does, must be split into items.
+**User must confirm:** no.
+
+#### D-166 `esses-cli eval` evaluates on the calling thread, over logged channels and details (amends 03 §13)
+**Context.** 03 §13 has `eval` evaluate "on the TaskPool with synchronous wait". In M2 the language and the 0.1 whole-node evaluation (`evaluateWhole`, D-139) exist before `MathGraph::define`, the shadowing chains and `MathsScheduler`; on the whole-node path one evaluation is one task in any case.
+**Decision.** `eval` resolves names through the CLI's scope over the opened source (channels by name, then by logged name; numeric and text details), compiles, and calls `evaluateWhole` on the calling thread (the CLI may block, 03 §7.4) at the plan's rate, else the layer's highest logged rate. Maths outputs (other items, the built-in `Corr Speed`/`Corr Dist`) are not resolvable in `eval` until it evaluates through `MathGraph`.
+**Consequences.** The CLI runs the same plan and evaluation code as the application; its timing (`--timing`) is one core's. `eval` gains maths outputs and the TaskPool when `MathGraph::define` lands.
+**User must confirm:** no.
+
+#### D-167 Text engine as built: rules that differ from 05 §7 (amends D-029; 05 §7.1–7.3)
+**Context.** The M2 text engine (`libs/formats/src/text/`, `docs/formats/text.md`) implements 05 §7. Writing it against the self-authored fixtures, the fuzz targets and the 300 MB benchmark showed rules of 05 §7 that cannot hold as written: the `@auto` names row needs a following line "≥ 80 % numeric", which a table with one text column in three never has; `decimal: auto` counts every numeric token, so whole-number columns hide a decimal comma; the rate search takes the smallest denominator within 0.1 %, which is 41/2 for 20.48 Hz; classifying columns from "the first 256 values" makes a column that is zero at standstill an integer column; `std::regex` has no portable multi-line flag (MSVC's `^` matches at every line start, libstdc++'s and libc++'s only at the start) and recurses per character on some libraries; 05 §7.2 writes `capture` as detail id → regex while its own legacy example maps file key → detail id; and the slab share key of §7.1 needs a way to name sibling columns for `ChunkCache::insertGroup` without keeping them alive.
+**Decision.** (a) `@auto` names row: the next data line must be at least half numeric. (b) `decimal: auto` is `,` when, among the tokens that carry a separator, at least 90 % carry one `,` (whole numbers say nothing). (c) Rate inference checks each candidate of 05 §7.1 (smallest denominator first) against the sampled rows with the 0.6/rate rule and takes the first that fits. (d) Columns are classified from the first 256 rows and every 1,000th row; whole numbers give `Integer` (F32, F64 above 2^24), else `Real` (F64 above 7 significant digits); more than half non-numeric gives `Enum`. (e) The sniff regex sees the first 4 KiB with `^` anchoring at every line start on every library (a search, then for a pattern starting with `^` one attempt pinned to each later line start); every other profile regex sees one line or one name; subjects are cut to 4 KiB and a regex error counts as no match. (f) `capture` maps file key → detail id or `@input` when `keyValueColumns` is set, and detail id or `@input` → regex otherwise. (g) One slab decoder per source sweeps a chunk of a row set for every column: the requester's chunk goes to its builder, siblings whose threads already wait for the same sweep get theirs handed over, the rest are sealed with `insertGroup` through the new non-owning `store::WeakColumn`; the share key `slab/<sourceId>/<k>` is that decoder's in-flight table, not a TaskPool key; sparse columns, whose chunks do not align with the dense slabs, decode per column. (h) The `blocks` layout (D-102) is parsed and validated but opening such a file is Unsupported until the Pi profile (v1.0). (i) Text files are read through the mapping without the `.ld` reader's page-fault guard (the decode owns objects with destructors, which the guard's longjmp cannot unwind).
+**Consequences.** Tables with text columns and decimal-comma files with integer columns open with the generic profile; 20.48 Hz exports read uniform without the details; results are the same on MSVC, libstdc++ and libc++, and pass 1 stays linear in the file (fuzz targets, 60 s each, clean). A file truncated in place while open may fault on POSIX; writers that replace files atomically are safe. `esses_store` gains `WeakColumn` (additive). The Pi profile and its fixture land with the `blocks` reader.
+**Amended by (A.13):** D-190 (g): text files are read through the page-fault guard after all (windowed guarded copies in both passes); (f) and (i)-(k) add the ragged sparse cell, the quoted line break, the odd UTF-16 byte and the regular-expression limits.
+**User must confirm:** no.
+
+#### D-168 Open-pipeline step 4, the Mapping-panel hand-off and the shipped text profiles as built (amends D-028, D-029; 05 §2, §8)
+**Context.** 05 §2 step 4 lists the dictionary (4a), the unit map (4b) and the resolver's Mappings (4c) and ends task A when "a unit or name" is unresolved; 05 §8.2 calls a profile complete "when every channel has a quantity and unit". Read literally, every text file without a units row (most generic CSVs) would stop at the Mapping panel for every column. The open pipeline of M0 also refused timestamped channels, had no way to apply the text profile's column overrides, and the registry had no data directory to find the shipped profiles in.
+**Decision.** (a) Step 4a applies the reader's column hint (the text profile's `columns`: name, quantity, unit, interpolation, kind, dtype) and then the importer's dictionary entry (`IReader::columnHint`, `IReader::dictionary`; `ImportOptions::applyDictionary`). (b) Step 4b tries the importer's unit map first (`ImportOptions::unitMap`, else `OpenContext::unitMaps[<file stem>]`, most specific rule first), then the unit registry; a rule's `analysisName` becomes a load-time Mapping. (c) Step 4c applies `OpenContext::mappings` and those analysis names with `model::applyMappings`. (d) A channel is **unresolved** when its vendor unit is known to neither, or when a hint or the dictionary names a quantity without a unit; a channel with neither unit nor quantity opens unitless and does not stop the open. With a `MappingHook`, task A ends with a `PendingResolution` (rows with up to five decoded values); `resume` runs task B on a copy of the state with the `MappingDecision` (its unit map, its mappings; what stays unresolved opens unitless; `saveUnitMap` is the caller's to honour, the registry knows no project). Task keys `open/<path>/<size>/<mtime>/a` and `/b`. (e) Timestamped channels open as `TimestampedSeries`, the time column from `IReader::makeTimesProvider` (channels that share a provider share one I64 Column) with `IReader::timeRange`, else from `readTimestamps`; `IReader::attachColumns` gives a reader its Columns for `insertGroup`. (f) `ImporterRegistry::withBuiltins` registers the shipped `motec.csv` and `generic.csv` profiles with their dictionaries (build-time embedded copies of `data/profiles-text/` and `data/dictionaries/`) and the `motec.csv` and `csv` writers; `addProfile` refuses an id collision and any `importerId` but the built-in `motec.csv`, so `SourceLoader::registerTextProfiles` adds the user's profiles only. (g) fixture-1 gains the oracle kind `generator` (the values a fixture generator printed into a self-authored text input, `tools/gen_text_fixtures.py`). (h) The first-paint budget of the 300 MB CSV (07 §12) is measured by the Qt-free `bench/formats_bench` up to "every chunk of 8 channels resident" (the formats share); the graph's build and raster of the eight traces is measured by `open_bench`.
+**Consequences.** AC-M2-11's blocking rule holds for files that state units the registry does not know; unit-less generic CSVs open at once and are mapped later. The registry's M2 members are implemented (`addProfile`, `load(…, MappingHook)`, `resume`); `OpenContext` gains `mappings` and `unitMaps`, `IReader` five defaulted hooks, `open_code` `open.unitmap_load_failed`. The registry tests that asserted "no text importer" in M0 now assert the M2 set.
+**User must confirm:** no.
+
+#### D-169 IIR filters designed in-tree, not through Iir1; the Chebyshev reading (amends D-124, 03 §1, §5.3; refines D-082)
+**Context.** 03 §1 lists Iir1 (MIT, vendored) as a dependency of `esses_maths` and 03 §5.3 builds the Chebyshev filters "via Iir1"; D-124 compiles it from vendored sources. Iir1 is not vendored (`third_party/README.md`), and adding a dependency needs the maintainer's approval for the download (`AGENTS.md` §2). 03 also leaves open what the ripple percentage measures, where `fc` lies for a Chebyshev filter, how the gain is normalised and what the order of a band filter counts.
+**Decision.** (a) The IIR kernels (`libs/maths/src/kernels/iir.cpp`) design and run every filter in-tree: a filter is a list of passes, each a cascade of second-order sections in transposed direct form II with F64 state, run forward or backward over the whole extent (03 §6.0). The first-order RC sections are the classic discretisation (low pass `y += a (x - y)`, `a = dt / (RC + dt)`; high pass `y = b (y' + x - x')`, `b = RC / (RC + dt)`; `RC = 1 / (2 pi fc)`). The Chebyshev type I filters come from the normalised analogue prototype (poles from the textbook formulas; ripple 0 gives the Butterworth poles) through the bilinear transform with pre-warped edges; band pass and band stop use the prototype of the given order (twice its poles), centred on `sqrt(f_lo f_hi)` of the pre-warped edges with their difference as width. (b) Readings (`docs/maths-compat.md` `iir.rc-form`, `iir.cheby-design`, `iir.priming`, `iir.nyquist`): ripple r % makes the pass-band gain ripple between 1 and 1 + r/100; `fc` is the edge of the ripple band (Butterworth: the -3 dB point); every section is normalised to unit gain at DC (low pass, band stop), at half the rate (high pass) or at the centre (band pass), so a constant passes a low pass unchanged; a pass is primed section by section with the steady state of its first valid input sample (backward: its last), holds its state through invalid samples and re-primes after a gap of more than 1 s; a cutoff at or above half the result rate is `E-ARG-VALUE` at evaluation (D-170). (c) `tools/maths_ref.py` checks the design independently: the whole transfer function multiplied out and run as one direct-form-I recursion, closed forms (the Butterworth biquad, -3 dB at `fc`, the ripple peak, unit gains); the case corpus compares the two on every order, ripple and band.
+**Consequences.** `esses_maths` gains no third-party dependency; 03 §1's Iir1 entry and D-124's "compiled Iir1" no longer apply (the CMake comment of `libs/maths` says so). Results will not be bit-identical to i2's filters; the readings are "chosen, not observed" until compared on the maintainer's install (D-038). An Iir1 port, if the maintainer wants one later, replaces the design behind the same kernel and is checked by the same cases.
+**User must confirm:** no.
+
+#### D-170 Maths kernels as built: failures known at evaluation, `integrate_dist`'s Corr Dist input, the case corpus (amends D-022, D-033; 03 §6.1, §14.1)
+**Context.** 03 §6.1's `Kernel::run` cannot fail, yet some failures are known only when a node is evaluated: a filter cutoff at or above half the result rate (the rate is the item's or the highest input rate), and a range path, which 03 §2.4 rule 3 validates against the source's `RangeGroupTree` at evaluation (`E-RANGE-UNKNOWN`, listing the available paths). `integrate_dist` reads the source's `Corr Dist` (03 §5.4), which is not one of its arguments, so a node version that hashes only its plan's inputs would not follow it. 03 §14.1 puts the case files in `tests/maths/*.case.json` with expected `values` plus `valid` flags, no layer extent, no way to state a table item or an expected failure, and has the expected arrays of windowed, stateful, IIR and resampling cases generated by a brute-force evaluator under `tests/maths/reference/`.
+**Decision.** (a) `Kernel` gains `virtual Result<void> status() const` (default success): `evaluateWhole` checks it after `reset()` and after `run()` and ends the evaluation with that error, its diagnostic code in `context.detail` (`E-ARG-VALUE`, `E-RANGE-UNKNOWN`), which the host turns into the node's Error status. `analysis::RangeTables` gains `contains(path)` and `paths()` for that check and its message; paths match exactly. (b) `compile()` appends the scope's `Corr Dist` (its chain head, base metres, gathered `Linear`, F64) as the last input of an `integrate_dist` stage, so the node version and the plan's inputs include it; without it the item is `E-NO-DISTANCE` at compile time. (c) The case corpus is `tests/maths/cases/<id>.case.json`, schema `maths-case-1` (written in M2): `durationUs` (the layer extent), an optional `item` (a `table2d` whose axis expression is the case's expression), `constants`, `details`, `ranges` (with their parent groups), `selection` (Main and reference with offsets and stretch), and `expected` with the result `rate`, `values` with `null` at invalid samples and a `tolerance`, or an `error` code, plus diagnostic counts. Every expected value comes from `tools/maths_ref.py`, an independent per-sample reference in Python written from 03 §5 and `docs/maths-compat.md` (it replaces `tests/maths/reference/`; `--check` confirms the committed files, `--self-test` checks the reference); the Catch2 test `maths cases: every tests/maths/cases/*.case.json passes` runs each file through `Parser`, `compile` and `evaluateWhole`. (d) `mathfn-manifest-1` (written in M2) is the shape of one `FunctionManifest`; the intrinsic manifests take their arguments and arities from the language's signature table and validate against it.
+**Consequences.** Channel Status shows the precise code of an evaluation-time failure; `Corr Dist` edits re-version `integrate_dist` nodes; AC-M2-02 is one ctest entry over the corpus (238 cases at M2) with the readings of `docs/maths-compat.md` named by case id. A case file is regenerated, never edited by hand: changing a reading changes `tools/maths_ref.py`, the files it writes and the compat row together.
+**User must confirm:** no.
+
+#### D-171 `MathGraph` as built: the ends of a shadowing chain, disabled elements, conditions, the descriptor unit and the M2 graph surface (refines D-022, D-024; amends 03 §4.2–4.3, §7.1, §8, §9.2)
+**Context.** 03 §4.3 orders a name's chain "logged → local self-maths → global self-maths (module order) → consumers" but places neither the built-in outputs (`esses.gps_corrections` shadows the GPS latitude and longitude, 03 §9.2) nor the transient module (filters made from a channel label, 03 §4.2), and says nothing about a disabled element. The module `condition` is "an expression over details, Bool scalar" without saying how it is evaluated or what a condition that cannot be evaluated does. Alias fall-through (03 §3.3 step 2) skips "a candidate whose chain head has status Error", but names resolve when the graph is built and most Error states are known only after an evaluation. 03 §7.1's surface has one `ChannelKey` per name, so Channel Status cannot list shadowed elements or ignored duplicates, and has no Recalculate (`MathsService::invalidate`, 07 §5.1) and no setter for the project's mappings, aliases or compat switches. 03 §8 gives a maths output `unit = resultUnit`, while `compile()` stores the values in the base unit of the result unit (03 §6.1). 03 §9 has no way for a source to override a built-in module's project settings or to show "Disabled (no GPS channels)".
+**Decision.** (a) Chain order: logged N → built-in outputs named N (registration order) → local items → global items (project order; the first enabled item of a name per module, later ones `W-DUP-IGNORED`, status Warning, never evaluated) → transient items: the GPS cleaning applies before any user maths, a quick filter on top of everything. (b) A disabled element (item or module disabled, condition false, a built-in output without its required inputs) stays in its chain with status Disabled and is skipped: consumers read the last enabled element, a self-maths element the enabled one before it, else the logged channel. (c) The condition is type-checked against the source's details and the module's own constants and must fold to a constant; one that does not parse or fold counts as false, with `E-CONDITION` on the module's items. (d) Alias fall-through skips a maths candidate whose definition has an error (syntax, type, compile, cycle); errors found only by an evaluation do not move an alias. (e) A maths output's descriptor carries the unit its values are stored in: the base unit of the declared result unit, else the expression's inferred unit; self-maths items (filter, scale_offset, an expression without a declared unit that reads its own name, a built-in output named like an input) keep the shadowed channel's descriptor (unit, quantity, DPS, colour) as 03 §8 says. (f) A `builtin` item of the local maths (else of an enabled global module) overrides the registered module's settings for its source; a disabled one disables the module's outputs unless `IBuiltinModule::disabledItemDisablesOutputs()` is false (`esses.gps_corrections`: `enabled` gates the v1.0 steps only). `BuiltinOutput` gains `required` and `missingSummary`; prefixed GPS outputs are stored in the Angle base unit. (g) Surface: `MathGraph` adds `nodes()` (`MathNodeInfo` with the `MathInput` of every referenced name and its `ResolutionTrace`), `status(NodeId)`, `setResolverTables`, `setCompat`, `setDistanceIndexes`, `invalidate(moduleId)` and `evaluationCount()`; `NodeId::kIgnored` marks an ignored duplicate; `define`, `remove` and `setEnabled` act on the graph's copy of the module; `ColumnHandle` adds `selectionKey`; `MathsScheduler::submit` keys a task `<prefix>/all` (`/c<n>` on the v1.0 chunk path). New codes: `E-CONDITION`, `E-GPS-SETTINGS`, `E-GPS-NO-CHANNELS`; `E-EXPR-TOO-DEEP` also for maths items that read each other more than 256 levels deep. (h) Node versions also hash the node's identity (origin, module, name), its result rate and a definition error's text; tasks of one version and selection share their sealed result, so a require that races a completion never evaluates twice.
+**Consequences.** Disabling an item restores what it shadowed; the Channel Status window and the Maths Editor get one row per item with its resolution; Recalculate re-evaluates without re-versioning. A Warning-only definition shows its diagnostics while Pending. Readings (a)–(d) are chosen, not observed (D-005 (3) permits the observation; not run yet), and are listed in `CLEANROOM.md`.
+**User must confirm:** no.
+
+#### D-172 Undo, persistence and the journal in `esses_qtmodel` as built: whole-document commands, view state kept out of undone edits, workbook and Mapping-panel edits, dirty state, save and autosave rules (refines D-019, D-032, D-070; amends 02 §6.8, §7)
+**Context.** D-032 and 02 §7 list the undoable edits but not how a command restores a document, and 02 §7 lists `linkTo`/`domain` among the undoable workbook edits while D-032 and 06 §1 rule 4 make the domain view state. A `SetProjectOptionsCommand` that restored the whole `project.json` would also rewind what lives there but is not an edit: the last selection, the Data-window filters, the MRU and the lap-stretch toggle (view state, 02 §7). 06 §5.2 makes the Data window's trust toggle an undoable `SetRangeTrustCommand`, but `DataSelectionModel` does not know the `SourceLoader`. 05 §8.1 makes the Mapping panel's decisions undoable project edits without saying which documents they touch. 02 §6.8 says the journal holds "every dirty project file" without defining dirty, and says nothing about files the project stops naming (a renamed or removed workbook, module or unit map), about a document that could not be read, or about autosave while the recovery prompt is open. The track-map document (sections) arrives in M3 and the scheme editor at v1.0 (06 §13.9).
+**Decision.** (a) Every command holds the document before and after by value (`DocumentCommand<Doc>`, `SidecarCommand`); replays are exact by construction (AC-M2-09's property test checks 30 randomised sequences against an independent replay). (b) `ProjectSession::setProjectFile` keeps the session's `lastSelection`, `recentSources`, `dataWindow`, `options.lapStretch.enabled` and the members other documents own (`workbooks`, `mathsOrder`): undoing an options edit never rewinds view state. (c) The F9 domain toggle stays view state (D-032 wins over 02 §7); a worksheet's persisted `linkTo` and default `domain` change only through workbook edits. (d) The workbook list is a document of its own (`WorkbookSet`: documents and file names) with add, remove (never the last), rename (the file follows the name; the layout follows the workbook id, D-019) and move commands; worksheet add/remove/rename/move and component paste/delete are `WorkbookCommand`s, a paste giving fresh component ids. (e) `connectSourceLoader` turns `DataSelectionModel::setTrusted` into a `SidecarCommand` on the session's stack when the selection has a session. (f) `applyMappingDecision` pushes one macro, "Resolve mapping": the decision's analysis names as project Mappings rows and, with Save, the unit map of the importer (`SetUnitMapCommand`); then task B runs. (g) A document is dirty for the journal when its canonical text differs from the text read from its file; project.json counts its view state, so the journal keeps the selection (06 §5.5). `isDirty()` is true after any edit and false again at the stack's clean index, except after a recovery or a migration, which only a save clears. (h) Save writes only documents whose text changed (D-070 backup of the previous file), retires the files of workbooks, modules and unit maps the project no longer names to `backup/` and deletes them, never writes over a document that existed but could not be read, and clears the journal only when every write succeeded. (i) Autosave appends nothing when the dirty set equals the last entry, and nothing while a recovery decision is outstanding (`JournalRecovery::Later` keeps the journal untouched); the prompt is either a hook (`setRecoveryPrompt`) asked on open or the `recoveryAvailable()` signal. (j) Track-map section edits and scheme edits get their commands with their documents (M3, v1.0).
+**Consequences.** Undo/redo never disturbs selection, filters or the stretch toggle; a crash loses at most one autosave interval of edits and selection; an unreadable file is preserved for the user to repair; a project folder holds no stale workbook or module files after a save. The view state in `project.json` makes a selection change "dirty" for the journal but not for the Save prompt.
+**Amended by (A.13):** D-187 ((h) Save journals first and clears only its own session's files, a case-only rename is never retired; (i) autosave continues beside a deferred recovery, Recover adopts the replayed journal); D-190 ((a)-(b), (d): applied entries are not replayed, ordered and atomic clears, session-tagged file names, project.json only after every other document, the backup copy first, one replay per open).
+**User must confirm:** no.
+
+#### D-173 `MathsService` and Channel Status as built: GPS corrections where GPS is logged, local maths from the sidecar, the live check's scope, the rows and kinds of Channel Status (refines D-013, D-016, D-022; amends 03 §9.2, §11, 06 §10)
+**Context.** 07 §5.1 registers `esses.gps_corrections` with its zero-fix step always on; registered for every layer, a source without GPS shows two Disabled outputs ("GPS Latitude", "GPS Longitude") in the Values window, the Channels tree and Channel Status. 03 §4.2 keeps local maths in the sidecar's `localMaths`, while the M2 contract gave `MathsService::setLocalModule` as the way in. 03 §11 item 2 checks the Maths Editor's text "against the Scope of the current Main source", but `MathGraph` exposes no scope for text that is not an item. 06 §10 lists the kinds Expression, Filter, Alias, Mapping, Built-in and Constant and the "(missing)" display of missing workbook references without a kind for them. A completion that applies its finished upstream nodes too can announce one output twice.
+**Decision.** (a) `esses.gps_corrections` is registered for a layer that logs both inputs of its default settings (by name or logged name); its outputs then shadow the logged ones as 03 §9.2 says. (b) A source's local maths is its sidecar's `localMaths` of each layer, re-read on every new snapshot (so `SetLocalMathsCommand` takes effect through the sidecar commit); `setLocalModule` overrides it for every layer until cleared. (c) The live check (`MathsService::check`, `LiveDiagnostics` with the 150 ms debounce) resolves, in 03 §3.3 order, the Main source's enabled maths outputs, its logged channels through the project's mappings and aliases (`model::ChannelResolver`), its details and the enabled global modules' constants; without a Main source it is the data-less scope (`I-UNRESOLVED`). (d) Channel Status rows: every maths item and built-in output (shadowed elements and ignored duplicates included), the constants of the enabled global modules (Source "Project"), every alias per open source (resolved through the logged channels or, failing that, a maths candidate), every mapping per source that logs its name (an unused mapping is one "Project" row, "Not used") and every channel a workbook component references that resolves nowhere (kind "Reference", "(missing)"); item kinds also show "Scale & Offset", "2D Table", "3D Table", "Plugin" and "Regression". Status texts follow 03 §7.3; refreshes are coalesced to 10 Hz and emit `dataChanged` when the rows stay. (e) `channelReady` fires once per (output, version), whichever completion applied it; `require()` announces Pending → Evaluating. (f) `connectMathsSelection` feeds the selection (a `MathSelection` keyed over Main, reference and overlays) and the Main/reference distance indexes to every graph; `connectProjectSession` feeds the modules, compat switches, mappings, aliases and corrected-speed settings.
+**Consequences.** Sources without GPS look as in M1; local maths edits are undoable sidecar edits; the editor's live line matches what the graph will report for logged channels, details and constants (a maths item's own scope adds its module's constants and self-maths, which the check does not model). Readings (a) and (d) are ours, not observed.
+**User must confirm:** no.
+
+#### D-174 Lap stretching in 0.1: the track length is the source's `Venue Length` until track maps; factors published as `Range::stretch`; the toolbar toggle is view state (refines D-016, D-140)
+**Context.** D-016 stretches each lap "to the track length" within a tolerance; the track length is the track map's (concepts research), and track maps arrive in M3. `Range::stretch` is "derived by LapStretch, never persisted", and the distance chains, the domain mappers and the maths selection already multiply by it, while `DistanceIndexKey` includes the stretch so a change would rebuild every index. 02 §7 makes the stretch tolerance an undoable options edit but does not place the toolbar toggle.
+**Decision.** (a) The track length of a source is an explicit value (`LapStretchService::setTrackLength`, the track map's from M3) else its `Venue Length` detail (from the file's venue block, in metres); without one nothing is stretched. (b) `LapStretchService` computes each lap's factor from its unstretched `DistanceIndex` (`analysis::LapStretch::row`) and publishes the factors as `Range::stretch` through `SourceLoader::setRangeStretch` (a new snapshot, group versions unchanged, so nothing that reads the ranges is invalidated); a lap whose index is pending keeps its factor until it arrives. (c) `DistanceService` copies a published index with the new scalar when only the stretch of its key changed (D-140: a shared index never changes), so a factor change rebuilds nothing. (d) The toolbar toggle (`data.lap_stretch_toggle`) is view state: written to `options.lapStretch.enabled` without the undo stack (like the filters); the tolerance stays an undoable options edit.
+**Consequences.** Laps line up in distance mode from M2 for logs that carry a venue length; M3's track maps replace the source of the length without other changes.
+**User must confirm:** no.
+
+#### D-175 Channels-window search: the query is split like the names; loose is a substring per word, still in order (refines 06 §7 item 3)
+**Context.** 06 §7 item 3 splits the query on whitespace only, yet its example `temp (ecu)` must find `Water Temp (ECU)`, whose words are split on brackets; "loose name match" switches "each word to a substring match" without saying whether order and distinctness still hold.
+**Decision.** The query is split on the same separators as the names (whitespace, `_`, `-`, `/`, `(`, `)`, `[`, `]`); each query word must match a distinct name word after the previous match (a greedy left-to-right match); loose matching replaces the prefix test by a substring test and keeps the order. The option is `options.general.looseChannelSearch` (`ProjectSession::looseChannelSearch`).
+**Consequences.** `W S FL`, `temp (ecu)`, `pres front` behave as 06 describes; `speed wheel` does not find `Wheel Speed FL`. The Channel Editor's filter and the Maths Editor's auto-complete (v1.0) use the same function.
+**User must confirm:** no.
+
+#### D-176 (number not used)
+The number was reserved while the M2 work was split between parallel tasks and no entry was written under it; it
+stays unused so that the later numbers keep their references.
+
+#### D-177 The maths editors as built: auto-save on close through the project save, the apply and close rules, the item pages of 0.1, Channel Status and Channel Editor routing, the active-channel commands (refines D-013, D-019, D-021, D-027; amends 03 §11, 06 §10, §13.1, §13.2, §14.4)
+**Context.** D-019 saves the maths modules "on editor close", 03 §11 item 9 writes the module file there, and 06 §13.2 item 6 adds "and on every Apply"; `ProjectSession` saves the project's documents together (backups, the journal cleared, the clean index of the undo stack) and keeps the module order in `project.json`, so a module file alone cannot be written consistently. 03 §11 item 3 refuses to close "while the edited item has an Error" without saying whether an item stored with an error (pasted, imported, or broken by a renamed channel) traps the dialog, nor whether Add creates an item before it is valid. 03 §11 item 8 and 06 §13.2 item 3 list item pages and fields (2D table grid, built-in settings, enumeration, Logged/Telemetry, the full list "in a popover") that 07 §5.6 lets slip or that need documents not built yet. An item has one status per open source, Recalculate is per module in `MathsService`, and transient maths has no document to edit. 06 §10's double-click opens "the Maths Editor at the item, the Alias editor or the Mapping panel" without saying how a dock reaches them; 06 §13.1 lists "every channel of every open source" without the maths outputs whose units (Corr Dist) item 5 makes editable there. 06 §14.4's active-channel rows act on "the focused component's active channel", which a component may leave unset, and CTRL+SHIFT+Z takes "the displayed value at the cursor" (03 §4.2) without saying what a second zero does.
+**Decision.** (a) Auto-save on close: when the dialog pushed a global-module edit since it was opened and a project is open, closing it calls `ProjectSession::save()` (atomic writes, D-070 backups, journal cleared); nothing is saved after an Apply (the journal covers it), and closing without a module edit saves nothing. Local maths is in the sidecar at every commit; transient maths is never saved. (b) Apply, leaving the item (another row, module, `openAt`, a structural edit) and closing apply a page with unapplied changes when it has no Error; with an Error, the apply, the switch and the close (button, window close and ESC) are refused with the diagnostic in a bar that offers Revert. Only unapplied changes block: an item stored with an error can be shown and left. A new item or constant exists only once applied (Add opens a dirty page; Revert drops it). Warnings and Info never block. (c) Item pages of 0.1: Expression (name, quantity, result and display units, rate Auto or Hz, DPS, colour index, interpolation, comment, the expression), Constant (name, value, unit, comment), Filter (channel, points or seconds) and Scale & Offset (channel, scale, offset with its unit); 2D/3D tables, built-in, plugin and regression items are listed and preserved but not edited; the enumeration name and the Logged/Telemetry flags are kept as stored; the full diagnostics list is a list under the line, not a popover. The status column shows the Main source's status (the source of a local module for its items); Recalculate invalidates the current module (`MathsService::invalidate`). The Transient node lists the filters of channel labels read-only. The Filter and Scale & Offset pages check the channel they read (`'Name'`: E-UNKNOWN-CHANNEL with data, I-UNRESOLVED without). (d) Channel Status: double-click or ENTER emits `openItemRequested` and invokes `tools.maths_editor [module, item]`, `tools.aliases [alias]` or `tools.mappings [logged name]` when registered and enabled (the mapping's logged name is the first quoted name of its "Resolved to"); built-in outputs and missing references open nothing; the filter box is the Channels-window word-prefix search on the channel name or a substring of the other text columns; "Errors only" keeps the rows with `ErrorRole`. (e) Channel Editor: the rows are the channels of every open source plus the maths outputs that are not self-maths of a logged channel (Category "Maths"); without an override the Unit cell is the stored unit; a display unit of another family than a file's channel is not applied to that file's row; at edit time a conflicting unit is refused with the file names (the at-open removal of 06 §13.1 item 6 is the open pipeline's, not the editor's). The Aliases and Mappings editors are public classes (`AliasesDialog`, `MappingsDialog`). (f) Active channel: `ActiveChannelCommands` registers the nine M2 `channel.*` rows and acts through a `Host` the shell supplies; the active channel defaults to the first visible trace; next/previous skip hidden traces; hide moves the square to the next visible trace and remove to the neighbouring visible one, dropping an emptied group; CTRL+SHIFT+F replaces the transient Filter of the channel (one per channel) and keeps the transient module itself, since `MathsService` only takes whole modules; CTRL+SHIFT+O and CTRL+SHIFT+Z replace or adjust the channel's `scale_offset` item of the local maths instead of stacking a second one (which W-DUP-IGNORED would ignore); zero at cursor uses the value as displayed (`ValuesModel`, rounded to the channel's decimals) in the trace's display unit, offset applied as a delta, so a second zero subtracts what is displayed now. (g) `ChannelEditor` keeps its header in `include/esses/widgets/editors_data/` and is implemented in `src/editors_maths/`.
+**Consequences.** A maths edit reaches disk with the rest of the project's edits when the editor closes (the same as Ctrl+S then); the editor can always be closed after Revert; an empty "New Expression" never lands in a module. The table, built-in and enumeration pages, auto-complete and Insert Function remain v1.0 (or M3 for the table grid, 07 §5.6). Channel Status and the editors meet through commands, so the dock works before and after the shell wires the editors. Zeroing twice converges on the displayed zero; a filter from a channel label can be changed without accumulating filters. Readings (b) for stored errors and (f) are ours, not observed.
+**Amended by (A.13):** D-190 (c) (the save on close writes the modules and their order only, through `ProjectSession::saveMathsModules`).
+**User must confirm:** no.
+
+#### D-178 The shell's M2 wiring as built: Options, schemes, Edit-menu undo, text-field chords, the recovery prompt and leaving a project; keymap rows of the milestone in progress (refines D-019, D-032, D-161; amends 06 §2.1, §13.7, §14.2, §16, §18)
+**Context.** 06 §13.7 persists every option in `project.json` "unless marked *user*", but "Show scheme selector on toolbar" is neither in 02 §6.2's key table nor marked, and "Follow OS light/dark" is *user* without saying what ends it (06 §16: "unless the user chose a scheme explicitly"). The lap-stretch tolerance (D-016, `options.lapStretch.tolerancePct`) is an undoable option (D-174) with no editor in 0.1 (the Corrected Speed dialog, 06 §13.6, is later). The Fonts and Keys tabs may slip (07 §5.6), and Keys "Import" does not say when an imported keymap applies, as the binder is built at start-up. D-161 creates the Edit-menu actions with `QUndoStack::createUndoAction`, while 06 §1 rule 5 makes every action a registry command with no shortcut of its own. 06 §13.2 item 6 makes CTRL+Z inside a text field text undo, but the router of 06 §14.2 (M1) sends CTRL chords to the binder first, also in other windows. 06 §18 Exit saves or asks for a dirty project only, yet the last selection and the Data-window filters are view state in `project.json` that marks nothing dirty (D-172 (g)), so a plain exit would lose what AC-M2-06 restores; it does not cover leaving a project for another. Step 3 asks Recover / Discard before steps 5-6 without saying how the start-up continues meanwhile or which selection is restored after a recovery. `check_keymap_coverage.py` refused an implemented row whose milestone is after the current (closed) one, so an M2 command with a handler could not get its `KEYMAP_TEST` row before M2 closes.
+**Decision.** (a) Options (`OptionsDialog`, window-modal, geometry in `layout.json` `dialogs.optionsDialog`): Apply and OK write the project options the user changed, and only those (an absent member stays absent), as one `SetProjectOptionsCommand` "Change options", never the view state; an invalid field refuses Apply and OK with the reason. The Analysis tab also edits `lapStretch.tolerancePct`. User settings: `language` (English only), `ui.schemeSelectorOnToolbar` and `scheme.followOs`, both off by default. Fonts and Keys are built read-only in M2; Keys imports a `keymap-1` file into `<config>/keymap.json` after checking it against the shipped keymap for conflicts (it applies at the next start), exports the effective keymap and reveals the configuration folder. (b) Schemes (`SchemeSelector`): the shipped light and dark schemes, then the user's `<config>/schemes/*.scheme.json` by name (a file that does not load or repeats a listed name is left out with a Messages row); an explicit choice turns "follow OS" off; following the OS applies the shipped scheme of `QStyleHints::colorScheme()` when the OS reports one; Duplicate writes "<name> copy" to the user folder and selects it. The application palette is mapped from the active scheme (06 §16 rule 6) at start-up and on every change. (c) Undo: Edit > Undo/Redo and the toolbar buttons are the registry commands `edit.undo`/`edit.redo` (`registerEditCommands`) shown through `CommandActions`, their tool tips naming the edit; `createUndoAction` is not used. A component edit from the canvas is a `WorkbookCommand`; after every document change (undo, redo, recovery) the shell re-syncs the workbook selector, the worksheet tabs and the shown worksheet. The platform's text-editing chords (undo, redo, cut, copy, paste, select all) in an editable text field go to the field first, wherever it is. (d) Recovery and leaving: the prompt is a window-modal `RecoveryDialog` (Recover / Discard / Later; closing it is Later) opened once `openProject` has returned, never a nested event loop; `SessionRestore` (the `-l` logs, which `esses` now hands to `openProject` with `-w`, else the previous data, then the selection) starts after the answer, so a recovered `lastSelection` is the one restored. Leaving a project with edits (exit, or opening another project) saves it when `options.general.saveOnExit` is on (the default) and asks Save / Discard / Cancel otherwise or when the save failed; Discard also deletes the journal. Leaving with view-state changes only writes them without a question, unless a journal was put off with Later (it stays for the next open). The window title marks a dirty project with "*". (e) A keymap row may be `implemented` while its milestone is the one in progress (the one after `CURRENT_MILESTONE`); later milestones still fail; a menu-only row is tested by triggering its `QAction` (`tests/ui/keymap/tst_keymap.cpp`).
+**Consequences.** Undo never disturbs the selection, the filters, the stretch toggle or the scheme; a text field keeps its own undo; a normal exit keeps the selection and filters AC-M2-06 restores, a kill keeps them in the journal; the scheme choice is per user, as 06 §16 says. M2 rows (`edit.undo`, `edit.redo`, `tools.options`, `data.lap_stretch_toggle`, `view.messages_window`, `view.reset_docks` so far) turn implemented with their tests as they land, and when M2 closes `CURRENT_MILESTONE` becomes M2 and every M2 row must be implemented. Readings (a) and (b) are ours, not observed.
+**User must confirm:** no.
+
+#### D-179 The data editors and the Data/Channels dock work as built: the Mapping panel's queue, Save and unit-map rows, the Lap Editor's rows and beacon edits, typed details, the filter UI and the proof of AC-M2-05/-11 (refines D-028, D-014, D-015; 05 §8.1, 06 §5.4, §6, §7, §13.3, §13.4, §13.8)
+**Context.** 06 §13.8 and 05 §8.1 describe the Mapping panel's actions without saying what Save does to the pending
+open, whether the "Apply to future files" column limits what is saved, where an analysis name is stored, or how
+several pending opens share the panel; 06 §13.3 lists the Lap Editor's functions but not how ignored beacons sit in
+the table, how a per-beacon offset applies to a user beacon (marker edits apply to the logged markers only, 02 §4.3)
+or what "pending" means while no worker resolves `offsetDistance` (02 §4.3 behaviour 7a); 06 §13.4 does not say
+which details are rows or how a typed number keeps its digits; 07 §5.2 proves AC-M2-05 and AC-M2-11 in
+`tests/ui/lap_editor` and `tests/ui/mapping_panel`, which drive the shell, whose M2 wiring lands separately.
+**Decision.** (a) The Mapping panel follows `SourceLoader::mappingRequired()` itself and queues further pending
+opens behind the one it shows. Proposals come from the project's unit map of the importer, then the units table,
+then the inferred quantity; units are offered as the canonical symbols of the row's quantity (compat units left
+out). Resolve applies every row to the open and writes only the rows ticked "Apply to future files" into
+`channels/unitmaps/<importerStem>.json`, as one "Resolve mapping" step; analysis names become project Mappings
+(D-013), never unit-map `analysisName` members, so one mapping serves every importer. Save puts the complete rows
+into the unit map (an undoable document edit written by the project's save and the journal) and leaves the open
+pending: only Resolve or Open Anyway completes it (06 §13.8 item 4); AC-M2-11's "resolved or saved" reads as
+"resolved, the answer optionally saved". Open Anyway applies the complete rows and opens the rest unitless. 05
+§8.1's Status column is kept beside 06 §13.8's columns; Load and Save As (05 §8.1) are not built in 0.1. (b) The
+Lap Editor lists the laps of the profile's primary group and, as greyed rows of class "Ignored", the ignored
+beacons of its marker group (IGRDBCN, or a beacon with an ignore edit), in session-time order; absolute inserts are
+in session time. A per-beacon time offset applies to the start beacon of the highlighted lap: a marker edit for a
+logged or companion beacon, a move for a user beacon. The beacon offset by distance is entered and stored in
+metres (`dMUnit` "m"), not in the Corr Dist display unit, and stays "pending" while no resolver exists (the laps do
+not move; `docs/milestones/M2.md` open issues). Trust edits go through `DataSelectionModel::setTrusted`, the Data
+window's command. The editor carries the lap-stretch check box (the toolbar's view state) and the stretch report.
+SHIFT+F7 is `registerInsertBeaconCommand` (`cursor.insert_marker`) and the toolbar action follows the service
+through `connectLapStretchToggle`; the shell registers both. (c) The Details editor's rows are the profile's
+details, then every other id of the open sources except the derived ones; a number is typed `<value> [unit]` (the
+profile's unit by default, a unit of the same quantity, the typed decimals kept as its display decimals); a Venue
+edit emits `venueRenamed` and the prompt of 06 §13.4 item 3 waits for track maps (M3). (d) The Data window's
+context menu offers the filters with the current kind checked and a non-modal lap-number editor; rows kept only by
+a slot and filtered source rows carry a filter icon. (e) AC-M2-05 (the editor half) and AC-M2-11 are proved by
+`widgets.tst_lap_editor` and `widgets.tst_mapping_panel` over the real loader, session and undo stack; the
+`tests/ui` walkthroughs follow with the shell's wiring.
+**Consequences.** A decision taken for one file can be kept for that file only; repeated imports stop at the panel
+only for what the unit map lacks; unit maps never rename channels. The beacon offset by distance is recorded and
+undoable but has no effect until its resolver lands.
+**User must confirm:** no.
+
+#### D-180 The shell's wiring of the M2 editors as built: the Mapping panel's place, the Channel Status dock, modeless editors on first use, and the proofs of AC-M2-05/-11 in `tests/ui` (refines D-177, D-178, D-179; 06 §2.2, §3.2, §10, §13, §14.4)
+**Context.** D-177 and D-179 built the editors without the shell, leaving `setMappingHandOff` off (unknown units
+opened unitless), the editors' `tools.*` rows, `cursor.insert_marker` and the nine `channel.*` rows `planned`, and
+AC-M2-05/-11 proved below the shell. 06 §13.8 puts the Mapping panel "above the worksheet area" without saying how it
+shares the central widget; 06 §3.2 lists `channelstatus` (Bottom, Closed) beside Messages; 06 §14.4 makes
+`view.channel_status` an alias of `tools.channel_status`; 06 §2.2 files the active-channel rows under Component, while
+`ActiveChannelCommands` registered them under a top-level "Channel" menu. Adding a closed dock moved the start-up
+keyboard focus into the Data window, and exposed a slot of `WorksheetCanvas` that `QApplication::focusChanged`
+could still reach while the canvas was being destroyed with the focus.
+**Decision.** (a) `MainWindow` owns a `MappingPanel` between the workbook/worksheet bar and the canvas, hidden until
+its `pendingChanged(true)` and hidden again on `false`, and turns the loader's Mapping-panel hand-off on. (b) The
+`channelstatus` dock (Bottom, Closed) holds a `ChannelStatusWindow` over a `ChannelStatusModel` of the window;
+`tools.channel_status` (CTRL+U, an optional channel argument selects its row) and `view.channel_status` both show,
+focus and refresh it. (c) The Maths Editor (CTRL+M, `[module, item]` opens it at the item; its Main source follows
+the selection), the Channel Editor (CTRL+E, `[channel]`), its Aliases (`[alias]`) and Mappings (`[logged name]`)
+editors, the Details editor (CTRL+D) and the Lap Editor (menu only; with the lap-stretch service) are modeless
+dialogs created on first use, shown, raised and activated by their command, their geometry kept in `layout.json`
+`dialogs.<key>` when they close; editor messages go to Messages (origin Maths), refusals and hints to the status bar.
+(d) `registerInsertBeaconCommand` (SHIFT+F7 over the workspace cursor) and `ActiveChannelCommands` (its `Host`: the
+canvas's focused component, else the last one; the active worksheet; the Maths Editor; the Channel Status dock)
+are registered; the active-channel rows sit in "Component/Active Channel". (e) The window gives the canvas the
+focus at the end of its construction, and `~WorksheetCanvas` disconnects from `QApplication::focusChanged` first.
+(f) The 19 rows (`tools.maths_editor`, `tools.channel_status`, `view.channel_status`, `tools.channel_editor`,
+`tools.aliases`, `tools.mappings`, `tools.details`, `tools.lap_editor`, `data.filter_all_sources`,
+`cursor.insert_marker`, `channel.*`) are `implemented` with their `KEYMAP_TEST` rows (D-178 (e)). (g) AC-M2-05 and
+AC-M2-11 are proved in the shell by `ui.tst_lap_editor` (60-lap outing: Tools > Lap Editor, SHIFT+F7 in the graph,
+CTRL+Z/CTRL+Y, a beacon time offset and Restore Logged Laps) and `ui.tst_mapping_panel` (a CSV beside an `.ld`,
+Resolve, CTRL+Z/CTRL+Y, CTRL+S writing the unit map, a silent next open, Save then Open Anyway), as 07 §5.2 names
+them; the widget-level suites of D-179 stay.
+**Consequences.** Unknown units now stop at the panel in the application, as AC-M2-11 requires; every M2 editor of
+06 §13 except the Track Editor (M3) and the Units List is reachable from its menu and key. A user who never opens
+an editor pays nothing for it. The remaining `planned` M2 rows are the project/file rows (`file.*`, the workbook
+selectors) and `tools.units_list` (`docs/milestones/M2.md` open issues).
+**User must confirm:** no.
+
+#### D-181 `esses-cli export` and `fixture diff` as built (refines D-090; 05 §9.2, 07 §5.1, §5.5)
+**Context.** 07 §5.1 asks for `export` "project-aware CSV with maths" and `fixture diff`; 05 §9.2 has `export
+<file> --format csv|motec.csv|motec.ld` as an alias of `convert` (not built) and `fixture diff <dir> [--channel x]`
+explaining mismatches; the M2 demo exports `"Corr Dist,Lap Delta"` of `Outings:Laps/3` from a project. Neither
+says which of two channels with one name is exported, which units are written, or how a selection-dependent maths
+channel (`stat_*` without reset) gets its math window outside the GUI.
+**Decision.** (a) `esses-cli export [<project>] <log> -o <file> [--channels a,b] [--range <group>/<n>] [--format
+csv|motec.csv] [--rate <Hz>] [--units "<channel>=<unit>,..."] [--layer] [--importer] [--options] [--no-sidecar]
+[--json]`. With a project folder (or its `project.json`): its mappings and unit maps apply at open, its maths
+modules in `mathsOrder`, the sidecar's local maths, `builtinMaths` of the corrected speed and distance (settings and
+enable flag), the GPS corrections where both GPS inputs are logged, its aliases and `options.maths.compat` (the
+registration order of `MathsService`, D-171/D-173); without one, the built-in modules with their defaults. (b) A
+requested name is the maths output when the graph has one (the head of its chain, what every consumer reads),
+else the logged channel by name, then by logged name; an unknown name is exit status 1. Without `--channels`: the
+logged channels no maths output shadows, then every maths output that is neither in error nor disabled. (c) Units:
+a maths item's display unit, else its declared result unit; then the project's `overrides.json` display units; then
+`--units`; else the stored base unit. (d) `--range` writes that range (time from 0 at its start) and is the Main
+range of the maths selection (`MathSelection`, its key a hash of the group path and bounds). (e) The maths are
+evaluated on a `TaskPool` of the process and the calling thread waits (03 §7.4). `motec.ld` output stays with
+`convert` (M1 not built; v1.0 UI). (f) `fixture diff <dir>... [--channel <name>] [--json]` runs `fixture verify`'s
+checks and explains every fixture: per channel the samples compared, how many differ, the largest F32/F64 ulp
+distance and the first differing sample with both values; for `expected.probe.json`, `expected.markers.json` and
+`expected.laps.json` the JSON Pointer of each difference (JSON Patch from expected to actual, 25 at most), which
+covers missing markers and laps; exit 1 when a fixture differs.
+**Consequences.** The demo's export runs with `'Corr Dist'` and any maths channel of the project (`Lap Delta` exists
+only as a user's item: there is no built-in of that name in 0.1). Exported maths values are those the graph would
+draw for that Main range. Tests: `cli.export.project` (relations checked by `apps/cli/tests/export_check.py`, not
+from the code under test) and `cli.fixture_diff.explains`.
+**User must confirm:** no.
+
+#### D-182 Maths units found in the user's maths: `[ratio]` on a unitless channel, `l/100km` and `psi (sg)` (refines D-164, D-010; 03 §2.4 rule 5)
+**Context.** The AC-M2-01 corpus (the user's i2-written maths, counts in `docs/milestones/M2.md`) had 512 items with
+`W-UNIT-FAMILY` because generated table maths tags every unitless channel `[ratio]`, and two items with
+`E-UNIT-UNKNOWN` on two units missing from `data/units.json` (a fuel consumption and a sealed-gauge pressure). 03 §2.4 rule 5 passes a unit of another family through
+unconverted with a warning, "a unitless channel with a dimensioned unit too"; Ratio is dimensionless, and its base
+`ratio` has the factor one, so nothing is converted either way. Fuel consumption (volume per distance) is the
+reciprocal of Fuel Economy, so it cannot be a unit of that quantity.
+**Decision.** (a) A unitless channel read in the base unit of a dimensionless quantity (`[ratio]`, `[rad]`,
+`[lambda]`) is read as stored, typed in that unit, without `W-UNIT-FAMILY`; any other unit (`[%]`, `[deg]`) keeps
+the warning. (b) `data/units.json` gains the quantity Fuel Consumption (dimension L², base `m3/m`, unit `l/100km`
+with the aliases `L/100km`, `l/100 km`, `L/100 km`; 1 l/100km = 1e-8 m³/m) and the aliases `psi (sg)` and `psisg` of
+`psi g` (sealed gauge: read against a sealed reference near one standard atmosphere, a gauge reading). Recorded as
+`lang.unit-family` and `lang.unit-lookup` in `docs/maths-compat.md`.
+**Consequences.** The corpus checks with 0 errors (100 % Ok or warnings only). Both readings are chosen, not
+observed: an i2 observation that `[%]` on a unitless channel scales, or that `psi (sg)` is absolute, changes them.
+**User must confirm:** no.
+
+#### D-183 AC-M2-10 on the 0.1 whole-node path: measured, not met; the two-frame gate moves to M5 (proposed; amends 07 §5.2 AC-M2-10, §12; D-042, D-139)
+**Context.** AC-M2-10 asks the 20 maths channels of `bench/workloads.md` on RW-2 to be ready within two frames (33.3
+ms) on the reference machine, "multi-core evaluation met by parallelism across nodes on the 0.1 whole-node path
+(D-139)". Measured on the reference machine (16 logical processors, 15 workers, Release, idle): median 112.9 ms of
+7 (107.0 to 117.5). The 20 nodes take 385 ms of work when required one at a time; the slowest alone (`derivative(
+smooth('Damper Pos FL', 5))` over 1.8 M samples at 1 kHz) takes 61 ms, so no scheduling of whole nodes can reach
+33 ms; across 15 workers the set runs 3.4 times faster than serially, bound by memory traffic (each 1 kHz node
+gathers its inputs into F64 buffers, evaluates F64 stages and seals F32 chunks plus a summary pyramid).
+**Decision (proposed).** AC-M2-10 at M2 records the measurement (`bench.maths_bench`, `maths.rw2_20_ready`, with the
+core count) instead of gating it, like `filter_lp` order -2; the two-frame gate, unchanged, applies from M5 with
+the chunk-parallel evaluator (03 §6.1, §8.1 of 07), which also brings F32 buffers between stages. The 0.1 levers in
+the order of their effect stay open issues of M2: the windowed kernels' per-sample cost (about 10 ns per sample for
+`smooth`), the gather and seal copies, sealing a node's chunks on idle workers.
+**Consequences.** 0.1 shows a maths-heavy worksheet Pending for about a tenth of a second after a change instead of
+two frames; every other M2 budget holds. If the maintainer keeps the gate at M2, M2 stays open until the evaluator
+work lands (estimated 2-3 days for the kernels and copies, without the chunk-parallel path).
+**Also amends 07 §1.5 (proposed, part of the same confirmation).** 07 §1.5 lets a budget row move one milestone
+only when the reference machine, not the code, is the cause; here the cause is the 0.1 whole-node evaluator. On
+confirmation the AC-M2-10 row of 07 §12 moves to M5 although the code is the cause, and until M5
+`maths.rw2_20_ready` is recorded without a limit (`bench/maths_bench.cpp` gives the row no limit then, so the
+self-hosted gate passes on it). Until the maintainer answers, the row keeps its 33.3 ms limit and the self-hosted
+bench job fails on it (Option B: M2 stays open for the evaluator work, and even then the slowest single node must
+drop below 33 ms). Measured again after the M2 review fixes: see `docs/milestones/M2.md` §1.
+**Status.** Withdrawn on 2026-10-13: D-191 met AC-M2-10 on the reference machine (about 28 ms against 33.3 ms), so the gate stays at M2 and the 07 §1.5 amendment proposed here does not apply.
+**User must confirm:** no (withdrawn).
+**Superseded in effect by (A.13):** D-191: the evaluator meets the 33.3 ms limit on this machine (`maths.rw2_20_ready` 28-29 ms, D-191's evidence), so recording the row until M5 and the 07 §1.5 amendment are no longer needed; proposed: withdraw this decision and keep the gate at M2.
+
+#### D-184 AC-M2-14 reads the fixture's own channel name (amends 07 §5.2 AC-M2-14)
+**Context.** AC-M2-14 evaluates `'Ground Speed' * 2` over `synthetic-acc-dialect`, which logs its road speed as
+`SPEED` (D-154); `esses-cli eval` reads a log without a project, so no mapping, alias or dictionary renames it, and
+the sim-exporter dialect has no shipped dictionary.
+**Decision.** The criterion's command is `esses-cli eval "'SPEED' * 2" fixtures/motec.ld/synthetic-acc-dialect/
+input.ld --json` (the ctest `cli.eval.json_speed_lap` reads `'SPEED'[m/s] * 2` over lap 1); with a project,
+`'Ground Speed'` resolves through the project's mapping or alias, as in `esses-cli export`.
+**Consequences.** The criterion measures what it was written for (rate, unit, values, the elementwise budget). In
+the application a workbook that names `Ground Speed` shows it "(missing)" for this dialect until the project maps or
+aliases `SPEED` (Corr Speed finds it through its alternate list, D-154); a shipped dictionary for the sim-exporter
+dialect stays an open issue of M2. The command as 07 §5.2 writes it fails (`E-UNKNOWN-CHANNEL 'Ground Speed'`, exit
+1): this entry changes an acceptance criterion, so it needs the maintainer's answer. The alternative that keeps
+the criterion as written is a registry-level dictionary for importers without one (M2 open issue 7: `SPEED` ->
+`Ground Speed` for the sim-exporter dialect).
+**User must confirm:** yes (it changes an acceptance criterion). **Confirmed by the user on 2026-10-14.**
+
+#### D-185 Maths engine corrections of the M2 review (refines D-021, D-022, D-164, D-170, D-171; amends 03 §3.2, §4.4, §5.2, §5.4, §5.6, §6.4–6.6, §7.2, §7.6, §8)
+**Context.** The M2 review probed the engine through `esses-cli` and project exports and found results that 03 does
+not allow or does not settle: an ungated `stat_*` (a `Scalar`) dropped the rate of its Series argument, so the plan
+fell back to the layer's highest rate and gathered a 10 Hz channel upsampled to 100 Hz (other statistics, ten times
+the work); an integer or Bool expression with a declared non-base unit was converted to base and then truncated
+into an I32 column (`choose(c, 50, 0)` declared `%` read 0 %); an integer result beyond ±2^31 saturated silently;
++-inf from `0^-1`, `exp(1000)`, `x / 1e-320` or the F32 cast was stored as a valid sample; a literal factor
+(`'Speed'[km/h] / 3.6` declared m/s) raised an `I-RESULT-SCALE` that told the user to declare the wrong unit; a table
+axis was never checked against the axis unit; flipping `unaryMinusAbovePower` re-versioned every expression though
+03 §2.3 affects only those with a sign and `^`; the synthesised `'N'` of filter and scale_offset items raised
+`W-UNIT-MISSING` on every dimensioned channel (in text the user never wrote); a Filter item of 0 points was an error
+though 03 §5.2 makes it a window of 2; a LapScalar result interpolated linearly between laps; `'P' =
+previous_sample('P') + 1` without a logged `P` was `E-UNKNOWN-CHANNEL` where 03 §5.4 says `E-CYCLE`; a marker edit
+that moved the math window's lap left ungated statistics on the old window with status OK; variance against a
+reference lap in another source was all-invalid with status OK; a sparse timestamped channel got a non-round auto
+rate, and a layer of timestamped channels only had no rate at all.
+**Decision.** (a) Result rate: an explicit rate, else the highest rate among the plan's Series inputs, a channel
+read only by a statistic included (03 §6.4 rule 2 as written); the layer's highest rate only for a plan without
+Series inputs (rule 3). (b) Output dtype (03 §6.5): I32 for Bool results, enumerations and integer results that
+provably fit (constants within the range; integer channels stored in at most 32 bits; those through `+ -`, the
+unary operators, `& |`, `choose`, `min`, `max`, `abs`, `remainder`, the integer roundings, `bit_*` of a known width
+under 32 and the order-preserving stateful functions); every other integer result is F64 (exact to 2^53) and keeps
+the Integer sample kind; an integer or Bool result converted from a declared non-base unit is real (F32, or F64 by
+the precision rules). (c) Every non-finite value is invalid: the overflowing operations (`/`, `^`, `power`, `exp`,
+`exp10`, `sinh`, `cosh`, `tan`) give an invalid sample in evaluation and in constant folding alike, and
+`evaluateWhole` clears any non-finite result after rounding to the output dtype (03 §5.1, §6.6). (d) A numeric
+literal factor other than ±1 in `* /` beside an operand of known non-trivial dimension leaves the dimension and the
+unit label and makes the scale unknown: users convert units by hand, so no scale is inferred through a literal and
+`I-RESULT-SCALE` is not raised; `W-RESULT-DIM` still checks the dimension (refines D-164 and 03 §3.2 rules 5 and 10).
+(e) A table2d axis expression is checked against the axis unit like a declared result unit (`W-RESULT-DIM`,
+`I-RESULT-SCALE` with an axis wording); its numbers are still compared with the breakpoints as they are. (f) The
+power switch is not hashed into definitions or compile signatures: the parse cache is keyed by the switches and
+the canonical text of the parsed AST (in both) differs exactly for the expressions with a sign and `^`, so only
+those re-version (03 §2.3 as written); function aliases stay hashed. (g) A synthesised filter or scale_offset
+reference reads `'N'[u]` in the unit it is read in (an identity conversion; bare for a unitless channel), so no
+`W-UNIT-MISSING` points into synthesised text. (h) A Filter item follows `smooth()`'s window rules: 0 and 1 points
+and 0 s are a window of 2; a negative or non-finite window is `E-ARG-VALUE` (03 §5.2 as written). (i) A LapScalar or
+Scalar result whose item leaves the interpolation at its default is Previous-interpolated (D-021, 03 §3.2 rule 3).
+(j) A reference to an item's own name inside `previous_sample` with no logged or earlier chain element is `E-CYCLE`
+(03 §5.4 as written); any other self reference without an earlier element stays `E-UNKNOWN-CHANNEL`. (k) The
+selection key of a SelectionDependent node also hashes the math window resolved against the current snapshot (03
+§7.6), and a new snapshot re-keys a node whose column was evaluated over another window (Pending, re-evaluated). (l)
+Variance against a reference lap in another source that the host cannot read fails with the new code
+`E-REF-SOURCE` (status Error) instead of an all-invalid output with status OK; `gap.variance-source` in
+`docs/maths-compat.md`. (m) The nominal rate of a timestamped channel without an importer rate is one over its mean
+interval rounded to whole Hz (a period below 1 Hz): 03 §6.4 rule 2 names the median, which needs the samples, and
+the rebuild runs on the owning thread, which never reads them (01 §5.3); the layer's highest rate counts every
+channel through the same helper. `esses-cli eval` uses the same rules.
+**Consequences.** Statistics of slow channels are computed over the samples as logged; integer results never
+saturate; plots never receive an infinity; the usual hand conversions are hint-free; a compat flip recomputes only
+what it changes; Channel Status no longer shows a warning on every Filter and Scale & Offset item; per-lap constants
+step; a moved lap re-evaluates the statistics over it. Every change has a regression test (`maths.math graph
+review: ...`, `maths.checker: a literal factor ...`, the corpus cases `pow_zero_negative_invalid`,
+`exp_overflow_invalid`, `f32_overflow_invalid`). Reading (m) is ours; an importer that knows the nominal rate gives
+it in the descriptor.
+**User must confirm:** no.
+
+#### D-186 `scale_offset` is computed in the unit of its offset (amends 03 §4.4)
+**Context.** 03 §4.4 synthesises a Scale & Offset item as `'N' * scale + offset_base` in the stored base unit, the
+offset converted into it as a delta. For linear units that equals scaling in any unit; for an affine unit it does
+not: a temperature stored in K and scaled by 1.02 reads 80 °C as 360.21 K = 87.06 °C, where a user who works in °C
+(and the reference product, which has no base-unit storage) expects 81.6 °C.
+**Decision.** The item computes `y = x * scale + offset` in the unit of its offset when that unit is of the input's
+display family (the unit the Maths Editor and CTRL+SHIFT+Z write: the channel's display unit), and in the stored
+unit otherwise (an offset without a unit, or in the stored unit itself); the offset is then used as written, and the
+result is converted to the base unit for storage (`MathItem::resultUnit` of the synthesised plan names the unit it
+is computed in). For linear units the result is the same as 03 §4.4's form; for affine units it is the scale the
+user reads.
+**Consequences.** A °C or °F channel scales as displayed; zeroing at the cursor (scale 1) is unchanged; an offset
+given in K on a °C display applies in K. `maths.math graph items: scale_offset computes in the offset's unit ...` and
+`maths.math graph review: scale_offset scales a temperature in the offset's unit`. Chosen, not observed.
+**User must confirm:** yes (it changes the computation 03 §4.4 specifies). **Confirmed by the user on 2026-10-14.**
+
+#### D-187 The journal as a per-session snapshot: write-ahead save, autosave beside a deferred recovery, Recover adopts, case-only renames (amends D-172 (h)–(i); 02 §6.8)
+**Context.** The review reproduced four ways to lose data with D-172's journal: (1) a workbook renamed only in letter
+case is written to the same file on a case-insensitive file system (Windows, default macOS), and the retire step
+then backed up and deleted that file, leaving `project.json` naming a workbook without a file; (2) replay took the
+newest entry per path across every journal file, but each autosave appends only the documents dirty at that moment,
+so an edit journalled once and then undone came back after a crash; (3) "Later" on the recovery prompt suspended
+autosave for the rest of the session and the next Save (or the save on exit, or closing the Maths Editor) deleted the
+deferred journal; (4) a save that failed part-way left the older journal, whose entries replayed over the files that
+save had written.
+**Decision.** (a) Every journal file is its session's complete unsaved state; `Journal::append` deletes the files it
+wrote before, and replay takes each session's newest file (a damaged entry there falls back to the same path in the
+session's next older file), merging sessions newest entry per path by seq and time and logging a path two sessions
+changed. (b) `ProjectSession::save()` first appends the snapshot of everything it is about to write, then writes,
+and on success deletes only its own session's files; a journal whose recovery was put off stays. (c) Autosave keeps
+journalling this session's own edits while a recovery is deferred (Later), beside the other session's files; a
+dirty set back to the disk's contents deletes the session's files. (d) Recover adopts the replayed journal: the
+session journals the recovered documents as its own and then deletes the replayed files, so they are never replayed
+over a later edit. (e) Discard on the prompt deletes the other sessions' files; leaving a project without saving
+(`discardSessionJournal`) deletes only this session's. (f) The retire step of Save never retires a file that is the
+same file as one the save names (`std::filesystem::equivalent`): a case-only rename keeps its file. `Journal` gains
+`JournalSessions {All, Own, Others}` for `pending`, `replay` and `clear`; journal-1 is unchanged.
+**Consequences.** D-172's consequence holds again: a crash loses at most one autosave interval, deferred or not, and
+a failed save loses nothing; journal folders hold one file per session instead of one per autosave. Two sessions
+that changed the same document independently replay the newer one (the replay log says so). Tests:
+`project.journal: ...` (per-session newest file, clear by session) and `qtmodel.tst_project_recovery`
+(`caseOnlyRenameKeepsTheWorkbook`, `undoneEditIsNotReplayed`, `laterSurvivesEditsSavesAndCrashes`,
+`failedSaveLeavesItsContentRecoverable`).
+**Amended by (A.13):** D-190 (a) (an entry the disk already holds is not replayed and no conflict; a journal holding nothing else is deleted at open without a prompt).
+**User must confirm:** no.
+
+#### D-188 `esses-cli maths check` reports MathGraph's nodes (refines D-166; 03 §13, AC-M2-01)
+**Context.** `maths check`, the tool behind AC-M2-01, parsed and type-checked each item against its own scope: it
+could not report cycles between items, the graph's synthesis and compile errors (`E-ARG-VALUE` of a filter window,
+`E-TABLE-AXIS`, `E-RATE-ZERO`, `E-NO-DISTANCE`), and it resolved a logged channel before a module item of the same
+name, the inverse of the shadowing chain, so AC-M2-01's counts measured another resolver than the application's.
+**Decision.** `maths check` loads every module given into one `MathGraph` in the order given (the project order)
+and reports each item's node: its status (Disabled, Error, else Ok or Warning by its diagnostics) and the
+definition's diagnostics. With `--log` the graph has the log's source and the built-in modules the application
+registers (corrected speed and distance; GPS corrections where both inputs are logged); without it the graph has no
+source: references are `I-UNRESOLVED`, an item that reads one is checked but not compiled, a module condition over
+details holds, and nothing is evaluated. A module id given twice is renamed inside the graph only. Parse errors are
+counted on the text the user wrote (expressions and table axes).
+**Consequences.** AC-M2-01's private corpus re-checks with the application's resolver (counts in
+`docs/milestones/M2.md`); cross-module constant ambiguity (`W-CONST-AMBIGUOUS`) and cross-module outputs now show.
+`cli.maths cli: maths check finds cycles, synthesis and table errors through MathGraph`.
+**User must confirm:** no.
+
+#### D-189 Seven keymap rows of milestone M2 move to M3; the workbook rows are built (amends 06 §14.1's milestone column, D-178 (e))
+**Context.** D-178 (e) makes `tools/check_keymap_coverage.py` require every row of the closing milestone to be
+implemented with a `KEYMAP_TEST`. Nineteen M2 rows were planned at review: `view.workbook_n` (ten keys),
+`view.prev_workbook`, `view.next_workbook`, `file.open_log`, `file.close_all`, `file.save_project`,
+`file.new_project`, `file.open_project`, `file.close_project` and `tools.units_list`. The file rows need a project
+or a file-dialog stub in the keymap fixture; `file.new_project`, `file.close_project`, `file.close_all` and the Units
+List have no handler.
+**Decision.** The workbook rows are implemented (`MainWindow::selectWorkbook`, wrapping at the ends) with their
+`KEYMAP_TEST`s. The seven others move to milestone M3 in `data/keymaps/default.json` (status planned): CTRL+O and
+CTRL+S keep working through their commands' default keys, and M3's keymap fixture adds a project and a dialog stub.
+**Consequences.** `check_keymap_coverage.py --milestone M2` reports 0 findings; M3 inherits seven rows (recorded in
+`docs/milestones/M2.md` §5 and §7).
+**User must confirm:** no.
+
+#### D-190 The rest of the M2 review: recoverable saves, bounded and guarded text reads, coalesced sidecar writes, cancellable opens, the Maths Editor's partial save (amends D-167, D-172, D-177 (a), D-187; 02 §4 sidecar rule 4, §6.8; 05 §7.1)
+**Context.** The M2 review's last fourteen findings, checked against the code after D-185 to D-189. The journal: D-187 already journals a save ahead of its writes, but a failed or killed save still left entries whose document was on disk, which replay reported as conflicts against the older `baseHash`; `Journal::clear` deleted files one by one in directory order, so an interrupted clear could leave an older snapshot behind a newer one; two sessions that read the same highest seq wrote the same `<seq>.json`, the later rename replacing the other session's file; Save wrote `project.json` even after an earlier document failed (02 §6.8 rule 2 writes it last so that it never names a file that was not written); `saveWithBackup` replaced a file before copying the old one to `backup/` (D-070), and reported a failed copy as a failed save of a document that was in fact on disk. The Maths Editor's save on close (D-177 (a)) was the project's save: it committed every other pending edit, cleaned the undo stack and deleted the journal. The text engine: a line or a row of any length was split into a cell per delimiter (a 10 MB line of commas took 482 MB); a sparse timestamped column counted the ragged rows before its first empty cell in pass 1 but not in pass 2, so the probe's sample count, the decoded samples and the chunk boundaries disagreed (a repeated time at sample 65,536); both passes read the file mapping without the page-fault guard (D-167), so a CSV truncated in place killed the process on Linux; a header-only CSV failed under `@auto`; a UTF-16 file of odd length gained a row; a quoted field holding a line break split its row silently; dictionary `nameRegex` patterns were compiled for every channel and entry, and a nested quantifier in a user's profile can hang libstdc++ and libc++. The application: every sidecar edit wrote the sidecar synchronously on the GUI thread (02 §4 sidecar rule 4 coalesces over 500 ms); opens could not be cancelled, so an open started in one project published into the next and its Mapping-panel decision wrote into the next project's documents; autosave rebuilt every dirty entry every interval and the recovery prompt replayed the journal twice.
+**Decision.** (a) Journal (amends D-172, D-187): replay leaves out an entry whose file already holds its document (`JournalReplay::applied`, no conflict), counts skipped files and entries (`skipped`), and a journal with nothing else to replay is deleted at open without a prompt; files are named `<seq>-<session tag>.json` (the session id's first eight hex digits; the untagged names of older journals are still read); `clear(All)` renames `.journal` to `.journal-clearing-<tag>-<stamp>` and then deletes it (a leftover folder is read by nobody and removed by the next clear), and every clear deletes oldest first, so an interrupted clear leaves each session's newest file, and deletes only the files it listed when it began, so a file another session writes meanwhile stays; Save writes `project.json` only when every other document was written, and retires the files the project no longer names only when every write, `project.json`'s included, succeeded (until then `project.json` on disk still names them). (b) `saveWithBackup` copies the previous version to `backup/` first; an error means the target was not written, unless the caller takes the backup's failure separately (`backupError`): then the document is written, the failure reported, and `ProjectSession` keeps the new baseline and logs "saved without its backup copy". (c) `ProjectSession::saveMathsModules` (amends D-177 (a)): the Maths Editor's save on close writes the module files that differ from disk and the module order into `project.json` as it is on disk, retires removed modules' files, journals ahead as Save does and re-journals the other edits against the new files; the undo stack, the other documents and the journal stay, and only a session left with nothing unsaved becomes clean. (d) Autosave compares the dirty set by hash before it builds any entry, and writes an unchanged set again when the session's newest journal file is gone (`Journal::ownFileExists`; another instance's Discard deletes it); the open's replay is made once and reused by the prompt and Recover. The serialisation and the write stay on the GUI thread in 0.1: `save()` is synchronous and its write-ahead must land before its writes, so a background journal writer needs an asynchronous save first (a serial persistence queue, later). (e) Text bounds: a first non-blank line longer than the 1 MiB header window is Format ("line N exceeds the maximum line length"); a longer line later ends the head; a names row of more than 65,536 cells is Format; `splitCells` stops at the cells the caller can use (65,537 in the header search, the header's count plus two after it, in both passes). (f) Sparse timestamped columns: in both passes a missing cell (a ragged row) is an invalid sample, as 05 §7.1 pass 2 says, and an empty cell is no sample; the review's proposal (a missing cell as an empty one) would contradict 05 §7.1 and the ragged-row rule of the dense columns. (g) Guarded reads (withdraws D-167's "no page-fault guard for text files"): both passes read a file mapping through `GuardedLines`, which copies 4 MiB windows through `MappedFile::guarded()` (a line over 16 MiB is cut to its first 16 MiB in both passes); hold carry-ins read backwards through guarded 64 KiB windows; UTF-16 is transcoded from a guarded copy; `formatHeader()` copies through the guard; pass 2 checks `changedOnDisk()` before each chunk (Io, `text.source_changed`). A fault is Io: the chunk is sealed invalid (`open.read_error`), the open fails. The registry's sniff still reads the first 64 KiB in place. (h) A header-only CSV under `@auto` (the whole file in the head, its last line or names and units at the end, the names naming the time column, no line that looks like a data row of them) opens with no samples and `text.no_data_rows`. (i) A quoted field holding a line break is not joined (05 §7.1 step 2 as built: one line per row); a head line that ends inside an open quote logs `text.quoted_newline` (Warning, the first line and the count). (j) A UTF-16 file of odd length drops its last byte (`text.encoding`, Warning, "odd byte count"). (k) Regular expressions: profiles and dictionaries refuse a repeated group that repeats inside unless each of its alternatives holds a character that must occur exactly once ("(a+)+", "(\w+\s?)*"; not "(\.[a-z]+)*"), a syntactic check; dictionary patterns are compiled once per process (a bounded cache); the sniff regex sees at most the first 16 lines of its 4 KiB. (l) Cancellable opens: `ImportOptions::cancel` carries the open task's token to the importer (the text engine's pass 1 checks it); `SourceLoader::cancelOpens()` fires every open's token, drops its result and every open waiting for the Mapping panel (`open.cancelled`, `open.mapping_cancelled`); `closeAll()` and a project change (`connectProjectSession`) call it. (m) Sidecar writes (02 §4 sidecar rule 4): `commitSidecar` publishes at once and queues the document; 500 ms after the first queued edit a Background task writes the newest document of each source, a per-source generation under a mutex keeping an older write from landing after a newer one; closing a source and destroying the loader write a queued document on the GUI thread; a failed write is an Import Log row `sidecar.write_failed` (`commitSidecar` no longer returns Io).
+**Consequences.** A save that fails or is killed part-way recovers without false conflicts and never leaves an older snapshot that replays over newer files; sessions that pick the same seq keep their files; the backup copy exists before the file it preserves changes. Closing the Maths Editor no longer commits, cleans or deletes anything but the modules. Hostile text costs bounded memory (the cells a row can use, one 4 MiB window and one line of at most 16 MiB per decoding thread, 32 MiB of sample rows); sparse columns with ragged rows decode exactly what the probe announced; a CSV truncated under the mapping fails a chunk instead of the process on every OS. Tests: `project.journal: an entry the disk already holds ...`, `... two sessions that pick the same seq ...`, `... clearing the whole journal renames it away first`, `project.project file: saveWithBackup backs up before it writes`, `... a clear never deletes a file written after it listed the journal`, `... ownFileExists follows the session's newest file`, `qtmodel.tst_project_recovery` (`failedSaveLeavesItsContentRecoverable`, `savedJournalIsNotOffered`, `failedBackupStillSaves`, `promptReplayIsTheOneRecovered`, `saveMathsModulesLeavesOtherEdits`, `failedSaveRetiresNothing`, `autosaveRewritesADeletedJournal`), `widgets.tst_maths_editor` (`closeSavesOnlyTheModules`), `qtmodel.tst_source_loader` (`sidecarWritesAreCoalesced`, `closeAllCancelsOpensInFlight`), `qtmodel.tst_mapping_handoff` (`projectChangeCancelsOpens`), and `formats_text.*` (the hostile line and row, the ragged sparse column in one chunk and across chunks, the guarded windows against `LineCursor` and against the in-memory decode, a file changed on disk, the header-only file, the odd UTF-16 file, the quoted line break, the nested quantifiers and the 16-line sniff, a cancelled open).
+**User must confirm:** no.
+
+#### D-191 The 0.1 evaluator streams a plan in pieces and seals a node's chunks on idle workers (refines D-139; 03 §6.0; AC-M2-10)
+**Context.** AC-M2-10 was measured at 113-120 ms against 33.3 ms (D-183). A profile of the 20-channel RW-2 set
+(Release, 16 logical processors, 15 workers, timing per node and per stage) showed the time going to memory, not to
+arithmetic: every 1 kHz node gathered its inputs into zero-filled whole-extent F64 buffers (14.4 MB per buffer at
+1.8 M samples), wrote every stage into another, made four passes over the result to round it and one more to slice
+it into chunks, and freed them all again; with 15 workers the fresh pages of those buffers faulted in one at a time
+(one 14.4 MB buffer took about 10 ms to allocate), and the set moved about 3 GB through memory. On top, the kernels
+had per-sample overheads: the default two-point derivative about 15 ns per sample, smooth 5.5 ns, the RC filters
+5.5 ns per pass with their state in memory, the I32 rounding a library call per sample.
+**Decision.** Without changing any result:
+(a) `lang::PlanStream` evaluates a plan in pieces of 16,384 result samples. A stage that implements the internal
+`kern::Streamable` (smooth, derivative, the forward-only filters, integrate, running, flip_flop, edge_delay,
+time_valid, time_shift, pulse_width, previous_sample, range, table and the fused elementwise kernel) steps through
+the extent with its state carried from one step to the next and reads its inputs at absolute sample indices from
+sliding windows that keep one piece plus the context it needs on each side; a stage that needs its whole input
+first (zero-phase and backward filters, the statistics, Variance) runs once over the whole extent as before. Buffers
+are F64 with NaN at invalid samples and no bitmap. `Kernel::run` of a streamable kernel is one step over the view, so
+each kernel's arithmetic has one implementation; `evaluateWhole` is a stream pulled to the end.
+(b) `MathGraph` seals an expression node through `graph::StreamPlanProvider`: each chunk is pulled from a stream,
+rounded as the output dtype stores it and written, then sealed by the store while its samples are in the cache; the
+result never exists as a whole-extent buffer (`PlanProvider` keeps the built-in outputs). The provider is
+chunk-independent, so `Column::require` offers the node's later chunks to idle workers, one priority band below the
+node's so that they never run ahead of another node's task, while the node's task builds the chunks in order and
+takes back those still queued. When every stage restarts inside the extent (stateless stages, and smooth and the
+sliding derivative at their re-summation points: `kern::Streamable::restartPoint`) a worker evaluates its chunk with
+an evaluation of its own restarted there; otherwise one stream runs in order under a lock and only the rounding,
+writing and sealing spread.
+(c) The kernels keep their operations and their order for every sample: smooth's add-one-drop-one update and the
+two-point derivative run in loops without the validity tests where a step's input has no invalid sample (the
+derivative's abscissa terms are exact: mu = i - 0.5, du = +-0.5, suu = 0.5, so x / 0.5 is computed as x * 2); the RC
+passes keep their state in registers and several forward passes run interleaved per sample; a whole-extent filter
+run reads its input in its first pass instead of copying it; the elementwise kernel reads F64 inputs without a
+bitmap in place; the chunk write folds the rounding and the validity passes into the conversion (F32/F64: an invalid
+sample is written as NaN and the store's seal makes the bitmap, 02 §3.1 behaviour 2; I32: truncated without the
+library call).
+**Evidence.** Unchanged results: `esses-maths-bench --digest` (a fingerprint of every output of the readiness set and
+of 67 expressions over every kernel class with invalid runs, a re-prime gap and mixed rates, through MathGraph and
+through `evaluateWhole`: 174 lines) is identical for the build before this change and after it; the 256 case files
+and `maths_ref.py --check` pass; new tests compare the stream pulled in random pieces with the whole-extent
+evaluation through `Kernel::run` with bitmaps, `restartAt` with the continuous stream, the provider's chunks
+(samples, bitmaps, pyramids) with `PlanProvider`'s chunks of `evaluateWhole`, chunks built concurrently in any order,
+and MathGraph's columns with `evaluateWhole`, bit for bit. Timing (Release, 16 logical processors on 8 cores, 15
+workers): `maths.rw2_20_ready` medians of 28.3, 28.5 and 29.0 ms in three batches of 15 runs (26.9-32.0 ms over
+all 45; 25.3-26.6 ms in earlier batches on a quieter machine) against 124.4 and 127.0 ms for the build before
+the change in the same session; the set's serial cost (`--workers 1`) 175 ms, and the 20
+nodes required alone 79.7 ms in all (402 ms before), the slowest `filter_hp('Damper Pos FR', 1, 2)` at 13.1 ms;
+`maths.filter_lp_zero_phase_21600k` 225-234 ms instead of 398-411 ms.
+**Consequences.** AC-M2-10 is met on this machine; D-183 (recording the row until M5, with its 07 §1.5 amendment)
+is no longer needed, and the 33.3 ms limit of `maths.rw2_20_ready` stays. An evaluation holds a few hundred
+kilobytes per stage instead of whole-extent buffers (whole-extent stages excepted), and a single node required alone
+seals its chunks across idle workers (`derivative(smooth('Damper Pos FL', 5))` over 1.8 M samples: 64 ms before,
+about 3 ms now). The public `Kernel`, `BlockCtx`, `ExtentMode` and `Plan` are unchanged; `kern::Streamable` and
+`PlanStream` are internal and a first piece of the v1.0 chunk path (03 §6.1: restart points instead of
+`saveState`/`loadState` for the kernels that have them). The remaining cost (serial, per kernel:
+`docs/milestones/M2.md` open issue 5) is mostly the store's seal of the output chunks (NaN scan, pyramid levels,
+summary, cache insertion: about 3.5 ns per sample, 45 % of the set) and the first touch of the chunks' memory; the
+next levers are in `esses_store` and the elementwise interpreter's non-vectorised operators.
+**User must confirm:** no (it supersedes the proposal of D-183, which the maintainer withdraws or confirms).
+
+#### D-192 Public README is a work-in-progress notice; TRADEMARK.md withheld until a working model (amends D-004; AC-M0-10)
+**Context.** The maintainer asked on 2026-10-13 to keep the project description and the trademark notice out of the public view until there is a working model, with only a work-in-progress notice in their place.
+**Decision.** The root `README.md` says only that the project is a work in progress. `TRADEMARK.md` is removed from the repository. Their full texts are kept locally in `docs/unpublished/` (git-ignored) and are restored before the first public release. Other documents point to the trademark policy in `00_OVERVIEW.md` section 8 instead. The vendor-mark rules themselves are unchanged and still enforced by `tools/check_vendor_marks.py`.
+**Consequences.** The repository history still contains the earlier README and TRADEMARK.md, and the design documents describe the project in full; hiding those as well needs a history rewrite and a decision on `docs/` before the repository is made public.
+**User must confirm:** no (requested by the user, 2026-10-13).

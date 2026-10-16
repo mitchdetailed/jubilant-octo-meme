@@ -1,0 +1,44 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "integrate_gated",
+  "expression": "integrate('X', 'C')",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): integrate",
+    "note": "holds while the condition is false"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 1200000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [3, 1.5, 4.25, 1, 5.5, 9, 2.75, 6.5, 5.25, 3.5, 5, 8.75]
+    },
+    "C": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [1, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 1]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [0.3, 0.45, 0.45, 0.45, 1, 1.9, 2.175, 2.175, 2.7, 2.7, 3.2, 4.075],
+    "tolerance": {
+      "abs": 1e-09,
+      "rel": 1e-09
+    }
+  }
+}

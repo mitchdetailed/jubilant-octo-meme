@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:overrides-1",
+  "title": "Esses channel overrides (overrides-1)",
+  "description": "<Project>/channels/overrides.json (02 section 6.3, 06 section 13.1, D-010, D-013): per-channel display settings keyed by channel name as written (display unit, decimals, colour index, autoscale and manual scale, interpolation, warning and fault limits). Every number is a {v, unit} object whose unit is kept as written, so a canonical document round-trips byte-identically. Unknown top-level members and unknown members of an override are allowed and preserved; the limit and value records are closed. Channel names that differ only in case are allowed (lookups take the exact spelling first).",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "channels"],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072). The urn:esses: form is written; the bare esses: form of earlier drafts and the later https form are accepted on load and normalised on save (02 section 6.6 rule 1).",
+      "type": "string",
+      "pattern": "^(urn:esses:overrides-1|esses:overrides-1|https://[^/\\s]+(/[^/\\s]+)*/overrides-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "channels": {
+      "description": "Overrides keyed by channel name; unknown channels are kept untouched.",
+      "type": "object",
+      "propertyNames": {
+        "minLength": 1
+      },
+      "patternProperties": {
+        "^.+$": {
+          "$ref": "#/definitions/channelOverride"
+        }
+      },
+      "additionalProperties": false
+    },
+    "x-esses-legacy": {
+      "$ref": "#/definitions/legacyBag"
+    }
+  },
+  "definitions": {
+    "channelOverride": {
+      "description": "ChannelOverrides::Entry. Every member is optional; members not listed here are preserved.",
+      "type": "object",
+      "properties": {
+        "displayUnit": {
+          "$ref": "#/definitions/unitSymbolOrEmpty"
+        },
+        "dps": {
+          "description": "Display decimals.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15
+        },
+        "colourIndex": {
+          "description": "Index into the scheme's channel palette.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "autoScale": {
+          "type": "boolean"
+        },
+        "scaleMin": {
+          "$ref": "#/definitions/unitValue"
+        },
+        "scaleMax": {
+          "$ref": "#/definitions/unitValue"
+        },
+        "interp": {
+          "description": "Interpolation policy (02 section 3.3).",
+          "enum": ["Linear", "Closest", "Previous", "Next"]
+        },
+        "warn": {
+          "$ref": "#/definitions/limits"
+        },
+        "fault": {
+          "$ref": "#/definitions/limits"
+        }
+      }
+    },
+    "limits": {
+      "description": "Warning or fault limits: a lower and/or an upper bound.",
+      "type": "object",
+      "properties": {
+        "min": {
+          "$ref": "#/definitions/unitValue"
+        },
+        "max": {
+          "$ref": "#/definitions/unitValue"
+        }
+      },
+      "additionalProperties": false
+    },
+    "unitValue": {
+      "description": "A persisted number with its unit (D-010): {\"v\": number, \"unit\": symbol}, \"\" for a unitless value. The value is in the unit as written; readers convert, writers keep the written unit.",
+      "type": "object",
+      "required": ["v", "unit"],
+      "properties": {
+        "v": {
+          "type": "number"
+        },
+        "unit": {
+          "$ref": "#/definitions/unitSymbolOrEmpty"
+        }
+      },
+      "additionalProperties": false
+    },
+    "unitSymbolOrEmpty": {
+      "description": "A unit symbol or alias of the unit registry (units-1), or \"\" for the unitless unit; no leading or trailing white space.",
+      "type": "string",
+      "pattern": "^(\\S(.*\\S)?)?$"
+    },
+    "legacyBag": {
+      "description": "Fields removed by a migration, kept verbatim (02 section 6.6 rule 3).",
+      "type": "object"
+    }
+  }
+}

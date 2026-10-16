@@ -12,11 +12,14 @@
 
 #include <esses/base/assert.hpp>
 #include <esses/base/casefold.hpp>
+#include <esses/base/read_file.hpp>
+#include <esses/base/taskpool.hpp>
 #include <esses/base/thread_role.hpp>
 #include <esses/base/utf8.hpp>
 #include <esses/formats/registry.hpp>
 #include <esses/qtmodel/app_runtime.hpp>
 #include <esses/qtmodel/data_selection_model.hpp>
+#include <esses/qtmodel/dispatcher.hpp>
 #include <esses/qtmodel/distance_service.hpp>
 #include <esses/qtmodel/maths_service.hpp>
 #include <esses/qtmodel/messages_model.hpp>
@@ -24,7 +27,17 @@
 
 #include <QSignalSpy>
 #include <QTest>
+#include <algorithm>
 #include <atomic>
+#include <chrono>
+#include <cstddef>
+#include <future>
+#include <latch>
+#include <memory>
+#include <string>
+#include <thread>
+#include <utility>
+#include <vector>
 
 using namespace esses;
 using namespace esses::qt;
@@ -75,6 +88,57 @@ std::filesystem::path writeSynthetic(const std::string& dirName, store::ChunkCac
     const auto src = makeSource(o, cache);
     return writeLd(*src, scratchDir(dirName), "session");
 }
+
+// Every task of the runtime's pool has completed (their results may still wait in the Dispatcher).
+bool poolIdle(AppRuntime& rt) {
+    const TaskPool::Stats s = rt.pool().stats();
+    std::size_t queued = 0;
+    for (const std::size_t q : s.queued) {
+        queued += q;
+    }
+    return queued == 0 && s.parked == 0 && s.running == 0;
+}
+
+// Every task of the runtime's pool has completed and every result it posted has been delivered to this
+// thread: what the tests wait for instead of a fixed time, which a loaded machine can always outlast.
+bool quiet(AppRuntime& rt) {
+    return poolIdle(rt) && rt.dispatcher().pending() == 0;
+}
+
+// Holds every worker of `pool` until release(), so that a task submitted meanwhile cannot have finished when
+// its submitter looks at the Future.
+class WorkerHold {
+public:
+    explicit WorkerHold(TaskPool& pool) : state_(std::make_shared<State>(pool.stats().workers)) {
+        for (std::size_t i = 0; i < pool.stats().workers; ++i) {
+            pool.run(Priority::Interactive, TaskKey{}, CancelToken{}, [state = state_](const CancelToken&) {
+                state->started.count_down();
+                state->release.wait();
+            });
+        }
+        state_->started.wait();
+    }
+    ~WorkerHold() { release(); }
+    WorkerHold(const WorkerHold&) = delete;
+    WorkerHold& operator=(const WorkerHold&) = delete;
+    void release() {
+        if (!released_) {
+            released_ = true;
+            state_->promise.set_value();
+        }
+    }
+
+private:
+    struct State {
+        explicit State(std::size_t workers)
+            : started(static_cast<std::ptrdiff_t>(workers)), release(promise.get_future().share()) {}
+        std::latch started;
+        std::promise<void> promise;
+        std::shared_future<void> release;
+    };
+    std::shared_ptr<State> state_;
+    bool released_ = false;
+};
 
 std::filesystem::path accFixture() {
     const std::filesystem::path rel =
@@ -185,6 +249,55 @@ private Q_SLOTS:
         QCOMPARE(w.selection.source(id), w.loader.source(id));
     }
 
+    // No channelReady() of a new source before its sourcePublished(). MathsService::require applies an
+    // evaluation that has already finished at once and announces channelReady() on the spot; the loader's
+    // distance prefetch requires Corr Dist, so when a worker had finished Corr Speed and Corr Dist before the
+    // prefetch, both were announced inside the publication, and a listener (the trust edit of
+    // phase2SurvivesACommitWhileItRuns, on Windows CI) met a source the selection did not hold yet. The
+    // window is forced here: when the built-ins are registered, Corr Dist is required and this thread waits
+    // until the workers have evaluated it, so it is finished but not applied when the loader reaches the
+    // prefetch.
+    void noChannelIsAnnouncedBeforeItsSource() {
+        AppRuntime rt(runtimeOptions());
+        const std::filesystem::path ld = writeSynthetic("announce-order", rt.cache());
+        Workspace w(rt);
+        w.loader.setUseSidecars(false);
+        QSignalSpy published(&w.loader, &SourceLoader::sourcePublished);
+        const std::string corrDist = caseFold("Corr Dist");
+        bool forced = false;
+        QObject::connect(&w.maths, &MathsService::statusChanged, &w.maths, [&](const maths::ChannelKey& key) {
+            if (forced || key.nameCf != corrDist) {
+                return;
+            }
+            forced = true;
+            {
+                WorkerHold hold(rt.pool()); // so that this require cannot apply (and announce) at once itself
+                static_cast<void>(w.maths.require(key, Priority::Visible));
+            }
+            // This thread is not NoBlock here; the results wait in the Dispatcher.
+            const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(60);
+            while (!poolIdle(rt) && std::chrono::steady_clock::now() < until) {
+                std::this_thread::yield();
+            }
+        });
+        std::vector<std::pair<std::string, bool>> announced; // the channel, and whether its source was known
+        QObject::connect(&w.maths, &MathsService::channelReady, &w.maths, [&](const maths::ChannelKey& key) {
+            announced.emplace_back(key.nameCf,
+                                   published.count() == 1 && w.selection.source(key.src) != nullptr);
+        });
+        w.loader.open(ld);
+        QTRY_COMPARE_WITH_TIMEOUT(published.count(), 1, 30000);
+        QVERIFY(forced);
+        const auto known = [&announced](const std::string& name) {
+            return std::any_of(announced.begin(), announced.end(),
+                               [&](const auto& a) { return a.first == name; });
+        };
+        QTRY_VERIFY_WITH_TIMEOUT(known(corrDist) && known(caseFold("Corr Speed")), 30000);
+        for (const auto& [name, sourceKnown] : announced) {
+            QVERIFY2(sourceKnown, ("channelReady('" + name + "') before its source was published").c_str());
+        }
+    }
+
     void secondOpenOfTheSameFile() {
         AppRuntime rt(runtimeOptions());
         const std::filesystem::path ld = writeSynthetic("twice", rt.cache());
@@ -236,7 +349,8 @@ private Q_SLOTS:
             QVERIFY(replaced.count() >= 1);
             QVERIFY(!w.selection.resolve(lap1)->trusted);
             QVERIFY(!rangeAt(*w.loader.source(id), 1).trusted);
-            QVERIFY(std::filesystem::exists(model::SidecarDocument::pathFor(ld)));
+            // Written by a Background task within 500 ms (D-190).
+            QTRY_VERIFY_WITH_TIMEOUT(std::filesystem::exists(model::SidecarDocument::pathFor(ld)), 10000);
             QVERIFY(w.loader.commitSidecar(nullptr, {}).error().code == ErrorCode::NotFound);
             QSignalSpy closed(&w.loader, &SourceLoader::sourceClosed);
             w.loader.close(id);
@@ -250,6 +364,75 @@ private Q_SLOTS:
         again.loader.open(ld);
         QTRY_COMPARE_WITH_TIMEOUT(published.count(), 1, 30000);
         QVERIFY(!rangeAt(*again.loader.source(id), 1).trusted); // read back from the sidecar
+    }
+
+    // D-190 (02 section 4 sidecar rule 4): an edit never writes the sidecar on the GUI thread; the edits of
+    // 500 ms coalesce into one Background write of the newest document; a closing source writes its last
+    // edit at once.
+    void sidecarWritesAreCoalesced() {
+        AppRuntime rt(runtimeOptions());
+        const std::filesystem::path ld = writeSynthetic("sidecar-coalesce", rt.cache());
+        const std::filesystem::path sidecar = model::SidecarDocument::pathFor(ld);
+        Workspace w(rt);
+        QSignalSpy published(&w.loader, &SourceLoader::sourcePublished);
+        w.loader.open(ld);
+        QTRY_COMPARE_WITH_TIMEOUT(published.count(), 1, 30000);
+        const model::SourceId id =
+            published.first().at(0).value<std::shared_ptr<const model::DataSource>>()->id;
+        const model::RangeRef lap1 = rangeRef(*w.loader.source(id), 1);
+        w.selection.setTrusted(lap1, false);
+        QVERIFY(!std::filesystem::exists(sidecar)); // nothing written by the edit itself
+        w.selection.setTrusted(lap1, true);
+        w.selection.setTrusted(lap1, false);
+        QVERIFY(!std::filesystem::exists(sidecar));
+        // readWholeFile shares delete access on Windows: a std::ifstream (which does not) open at the instant
+        // of a Background write would make that write's rename fail ("sidecar.write_failed"), and is itself
+        // refused while the renaming handle is still open.
+        const auto fileText = [&sidecar] { return readWholeFile(sidecar).valueOr(std::string()); };
+        // The newest edit, awaited by content: the file can exist before the newest edit reaches it.
+        QTRY_COMPARE_WITH_TIMEOUT(fileText(), *w.loader.source(id)->sidecar.toJson(), 10000);
+        // The source closes before its next write is due: the edit is written on the way out.
+        w.selection.setTrusted(lap1, true);
+        const model::SidecarDocument last = w.loader.source(id)->sidecar;
+        w.loader.close(id);
+        if (last.empty()) {
+            QVERIFY(!std::filesystem::exists(sidecar)); // an empty document deletes the file (D-069)
+        } else {
+            QCOMPARE(fileText(), *last.toJson());
+        }
+        Workspace again(rt);
+        QSignalSpy reopened(&again.loader, &SourceLoader::sourcePublished);
+        again.loader.open(ld);
+        QTRY_COMPARE_WITH_TIMEOUT(reopened.count(), 1, 30000);
+        QVERIFY(rangeAt(*again.loader.source(id), 1).trusted); // the last edit, read back
+    }
+
+    // D-190: closeAll() cancels the opens in flight; a result that arrives afterwards is dropped.
+    void closeAllCancelsOpensInFlight() {
+        AppRuntime rt(runtimeOptions());
+        const std::filesystem::path ld = writeSynthetic("cancel-open", rt.cache());
+        Workspace w(rt);
+        w.loader.setUseSidecars(false);
+        QSignalSpy published(&w.loader, &SourceLoader::sourcePublished);
+        QSignalSpy failed(&w.loader, &SourceLoader::openFailed);
+        QSignalSpy logs(&w.loader, &SourceLoader::importLog);
+        w.loader.open(ld);
+        QCOMPARE(w.loader.pendingOpens(), 1);
+        // The result can only reach this thread through its event loop, which has not run yet.
+        w.loader.closeAll();
+        QCOMPARE(w.loader.pendingOpens(), 0);
+        QCOMPARE(logs.count(), 1);
+        QVERIFY(logs.first().at(1).value<std::vector<formats::ImportLogEntry>>().at(0).code ==
+                "open.cancelled");
+        // The cancelled open has finished on its worker and its result has reached this thread (to be
+        // dropped), however long it takes: after a fixed wait a slow open could still deliver afterwards.
+        QTRY_VERIFY_WITH_TIMEOUT(quiet(rt), 30000);
+        QCOMPARE(published.count(), 0);
+        QCOMPARE(failed.count(), 0);
+        QVERIFY(w.loader.sources().empty());
+        // The loader opens again afterwards.
+        w.loader.open(ld);
+        QTRY_COMPARE_WITH_TIMEOUT(published.count(), 1, 30000);
     }
 
     // AC-M1-12: the open pipeline, publication, maths and distance work on a NoBlock thread without a wait.

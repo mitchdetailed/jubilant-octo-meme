@@ -5,8 +5,10 @@ Layer 2, Qt-free (01 §2.1, 02 §6). The persisted project documents and the shi
 shipped `data/workbooks/circuit-default.workbook.json`, `data/schemes/light.scheme.json`,
 `data/schemes/dark.scheme.json`, `data/keymaps/default.json` (the full 06 §14.4 table; hotkey batch 1
 `implemented`/M1, every other row `planned` with its milestone or `reserved`) and
-`data/profiles/circuit.profile.json`. `SchemaRegistry`, `Migrations`, `Journal`, `ChannelOverrides`, `Aliases`,
-`Mappings`, `TrackMapFile` and the configuration importers arrive later (M2+).
+`data/profiles/circuit.profile.json`. M2 (07 §5.1): the channel documents `ChannelOverrides` (`overrides-1`),
+`Aliases` (`aliases-1`), `Mappings` (`mappings-1`), `SchemaRegistry`, `Migrations` with the first real migration
+(`project-1` 1 -> 2, D-162), the write-ahead `Journal` (`journal-1`), and the load pipeline every document kind
+shares (D-163; see "M2: persistence" below). `TrackMapFile` and the configuration importers arrive later.
 
 Namespace `esses::project`; public headers in `include/esses/project/` (umbrella `project.hpp`). Links
 `esses_base`, `esses_units`, `esses_model`, `esses_analysis`, `esses_maths` (same-layer edges, D-122);
@@ -20,11 +22,17 @@ data directory of `Paths::dataDir()` in a build tree), so new shipped documents 
 | `rgba.hpp` | `Rgba` (0xRRGGBBAA), `rgba()`, `red/green/blue/alpha`, `parseRgba`, `formatRgba` | 04 §5.1, 06 §16 |
 | `component_spec.hpp` | `Rect`, `Links`, `Caption`, `Legend`, `ComponentSpec` (`parse`, `toJson`), `isKnownComponentType`, `supportedComponentVersion` | 04 §7.3, 02 §6.4 |
 | `workbook_file.hpp` | `WorksheetDef`, `WorkbookFile` (`parse`, `load`, `toJson`, `save`, `worksheet`) | 02 §6.4, 06 §4 |
-| `project_file.hpp` | `SourceKey`, `RangeKey`, `SelectionKeys`, `RecentSource`, `BuiltinMathsEntry`, `ProjectFile`, `saveWithBackup` | 02 §6.2, 06 §5.5, D-070 |
+| `project_file.hpp` | `SourceKey`, `RangeKey`, `SelectionKeys`, `RecentSource`, `BuiltinMathsEntry`, `ProjectFile` (M2: `kSchemaVersion` 2, `dirty`, `autosaveMinutes`, `lapStretchSettings`), `saveWithBackup` | 02 §6.2, 06 §5.5, D-070 |
 | `scheme.hpp` | `FontSpec`, `OverlayStyle`, `kSchemeRoles`, `kSchemeFontRoles`, `Scheme` (`role`, `font`, `channelColour`, `overlayColour`, `fillMissingFrom`) | 06 §16, 02 §6.9 |
 | `keymap.hpp` | `KeymapStatus`, `kKeymapContexts`, `kKeymapMilestones`, `KeyBinding`, `KeyUnbind`, `Keymap` (`merged`, `conflicts`, `rowsFor`), `normaliseKeySequence` | 06 §14.3-14.4 |
 | `profile.hpp` | `DataView`, `ProfileDetail`, `Profile` (`defaultView`, `findDetail`, `circuitDefault`) | 02 §6.9, D-036 |
 | `shipped_data.hpp` | `kCircuitDefaultWorkbook`, `kLightScheme`, `kDarkScheme`, `kDefaultKeymap`, `kCircuitProfile`, `kRulesDir`, `shippedFile` | 02 §6.1 |
+| `channel_overrides.hpp` | `ChannelOverrides` (`overrides-1`; `Entry`, `find`, `set`, `clear`) | 02 §6.3, 06 §13.1 |
+| `aliases.hpp` | `Aliases` (`aliases-1` over `model::AliasTable`; `cycleThrough`) | 02 §4.6, §6.3 |
+| `mappings.hpp` | `Mappings` (`mappings-1`; `Row`, `toTable`) | 02 §4.6, §6.3 |
+| `schema_registry.hpp` | `SchemaRef`, `SchemaRegistry` (`instance`, `findSchemasDir`, `loadDirectory`, `ids`, `validate`, `schemaOf`) | 02 §6.1, §6.6 |
+| `migrations.hpp` | `Migrations` (`instance`, `add`, `upgrade`, `latest`) | 02 §6.6 |
+| `journal.hpp` | `JournalEntry` (`of`), `JournalFile` (`journal-1`), `JournalReplay`, `JournalRecovery`, `Journal` (`append`, `pending`, `ownFileExists`, `replay`, `clear`, `recover`) | 02 §6.8, D-070 |
 
 ## Reading and writing (02 §6.5-6.6)
 
@@ -32,10 +40,19 @@ data directory of `Paths::dataDir()` in a build tree), so new shipped documents 
   (`ComponentSpec`: `parse`/`toJson` of one compact object). Errors: `Format` (syntax, with `context.offset`),
   `Invalid` (with `context.detail` = the JSON pointer of the offending member), `Unsupported` for another major
   of the schema (`context.schemaId`), `Io`; `load` adds `context.path`.
-- `"$schema"` is checked in the `urn:esses:`, `esses:` and https forms and always written as `urn:esses:<id>`; a
-  missing `"$schema"`/`"schemaVersion"` is read as version 1 and logged (02 §6.6 rule 4); a newer minor is
-  logged and read (no migrations before M2). Unknown top-level members are preserved and re-emitted sorted;
-  typed sub-records are closed, as in the schemas.
+- The load pipeline (02 §6.6 rule 2, D-163; `src/doc_io.hpp` `readDocument`): JSON syntax; `"$schema"` in the
+  `urn:esses:`, `esses:` and https forms (another schema `Invalid`, another major `Unsupported`), always written
+  as `urn:esses:<id>`; a missing `"$schema"`/`"schemaVersion"` is read as version 1 and logged (rule 4); an
+  older minor runs the registered `Migrations` up to the kind's current minor (one log line per step; the
+  document is marked dirty where the type has the flag, `ProjectFile::dirty`); the typed reader; then
+  `SchemaRegistry::instance()` validates the document as it will be written (`Invalid` with the schema's JSON
+  pointer), which checks the members the typed readers keep verbatim (`options`, `dataWindow`, `print`, unknown
+  members) while their own leniencies stay accepted. Unknown top-level members are preserved and re-emitted
+  sorted; typed sub-records are closed, as in the schemas.
+- A newer minor (R-38): read as it is, its `schemaVersion` kept on save (never written back as an older minor);
+  when the typed reader or the schema refuses it (a member this build does not know in a closed record), the
+  error is `Unsupported` ("written by a newer build ... left untouched"), so it is never overwritten with a
+  loss.
 - `toJson()`/`save()` produce the canonical text of `esses_base`'s writer (`JsonDoc`, 02 §6.5 rule 1); `save`
   writes atomically (`AtomicFile`). `ProjectFile::save` and `saveWithBackup` keep the previous bytes in
   `<Project>/backup/<file>.<yyyymmdd-hhmmss>.json`, last 5 per file (D-070).
@@ -44,15 +61,19 @@ data directory of `Paths::dataDir()` in a build tree), so new shipped documents 
   present); scheme roles/fonts/palettes when not empty, `strikeOut` only when true; keymap rows write `args`,
   `milestone`, `doc` when set and `status` when not implemented or a milestone is set (every shipped row, no user
   row); profile `default` only when true, `outingDetail`/`unit` when not empty, `dps`/`default` when set.
-- Round trip (02 §6.5 rule 3, `tests/round_trip_tests.cpp`): the shipped documents are byte-identical after
-  load and save; every valid schema example saves idempotently to a schema-valid document; the loaders reject
-  the invalid examples except those of members M1 keeps opaque (`options`, `dataWindow`, `print`).
+- Round trip (02 §6.5 rule 3, `tests/round_trip_tests.cpp`, AC-M2-07 in `tests/roundtrip_m2_tests.cpp`): the
+  shipped documents are byte-identical after load and save; every valid schema example saves idempotently to a
+  schema-valid document; the loaders reject every invalid example (those of the opaque members with the
+  schema's pointer).
 - Ids: a workbook without `id` gets `uuidFromHash(hash128({"workbook", fileName}))`, a worksheet
   `uuidFromHash(hash128({"worksheet", workbookId, index}))`, a component
   `uuidFromHash(hash128({"component", worksheetId, index}))`; each sets `dirty` and logs.
 
-Schemas (`schemas/`, D-072): `workbook-1`, `project-1`, `scheme-1`, `keymap-1`, `profile-1`, with valid and
-invalid examples under `schemas/examples/<id>/` (`tools/check_schemas.py`, `tests/schema_examples_tests.cpp`).
+Schemas (`schemas/`, D-072): `workbook-1`, `project-1` (minor 2 since M2), `scheme-1`, `keymap-1`, `profile-1`,
+and from M2 `overrides-1`, `aliases-1`, `mappings-1`, `journal-1` and `maths-1` (03 §4.1; the module type and its
+reader are `esses_maths`' `MathModuleIo`), with valid and invalid examples under `schemas/examples/<id>/`
+(`tools/check_schemas.py`, `tests/schema_examples_tests.cpp`, `tests/schema_registry_tests.cpp`). The M2 examples
+are written in the canonical form, so the valid ones double as round-trip goldens.
 Component bodies are not validated by `workbook-1` (their `schemas/components/<type>-<version>.schema.json`
 belong to the component owners). `tools/check_keymap_coverage.py` is the AC-M1-06 lint (`--rows-only` is
 registered in ctest; the full check needs `KEYMAP_TEST("<command.id>")` rows under `tests/ui/keymap/`).
@@ -98,3 +119,81 @@ registered in ctest; the full check needs `KEYMAP_TEST("<command.id>")` rows und
   `Keymap::rowsFor`, `kKeymapContexts`/`kKeymapMilestones`, `normaliseKeySequence`, `Profile::findDetail`,
   `Profile::save`, `WorkbookFile::worksheet`, `isKnownComponentType`/`supportedComponentVersion`,
   `saveWithBackup`.
+
+## M2: persistence (07 §5.1; `docs/milestones/M2.md`)
+
+The persistence work lives in `src/persistence/` (headers in `include/esses/project/`); no `M2-STUB` is left in
+this library.
+
+- **Channel documents** (02 §6.3): `ChannelOverrides` keyed by channel name as written (case-insensitive lookup,
+  names differing only in case kept and logged); every `{v, unit}` is a `model::Quantityd` with the written unit
+  symbol, so a canonical document round-trips byte-identically; unknown members of an override entry are kept in
+  `Entry::unknown`. `Aliases` read into `model::AliasTable` (`enabled` has one flag per candidate, all enabled
+  when absent, always written); names are unique case-insensitively; `cycleThrough(name)` follows the resolver's
+  expansion (02 §4.6 rule 17: a candidate spelled like its own alias is that channel, an alias already being
+  expanded closes the cycle; disabled candidates count, so enabling one later cannot create a cycle the editor
+  allowed); a cycle is logged on load, not refused. `Mappings` rows with each logged name at most once
+  (case-insensitively); `unitlessOnly` written only when true.
+- **`SchemaRegistry`**: every `*.schema.json` of `findSchemasDir()` (`<dataDir>/schemas`, `Paths::resolve()`'s data
+  directory, `<exe dir>/data/schemas`, then the source tree, `ESSES_PROJECT_SOURCE_DIR`) compiled once with
+  json-schema-validator; read-only afterwards, so concurrent `validate` calls need no lock. `validate` accepts the
+  id in any of the four forms; `Invalid` names every error with its pointer and puts the first in
+  `context.detail`; `schemaOf` returns the name, the major and the document's minor.
+- **`Migrations`**: `upgrade` stamps `schemaVersion` after each step and logs it; `latest(schema)` is one above
+  the highest registered step. The shipped step `project-1` 1 -> 2 (D-162): Data-window filter keys become
+  `"default"` or `"xxh3:<32 lower-case hex digits>"` (`model::hashText` of the source's quick hash, the form of
+  every other hash in project-1); a key of 32 bare hex digits gains the prefix (lower-cased), any other key
+  moves with its filter to `x-esses-legacy.dataWindowFilters`. `ProjectFile::kSchemaVersion` is 2.
+- **`Journal`** (02 §6.8, D-070): `append` writes `.journal/<seq>.json` (`JournalFile`, `journal-1`) atomically,
+  `seq` one above every file on disk and every seq this object wrote; entry paths must stay inside the project
+  folder; an entry's hash is computed when zero and checked otherwise (`JournalEntry::of` builds one from a
+  document's `toJson()`). Every file is its session's complete unsaved state, so `append` deletes the files the
+  object wrote before (D-187). `replay` takes each session's newest file (a damaged entry there falls back to the
+  same path in the session's next older file), merges the sessions newest entry per path by (seq, at, file name)
+  and logs a path two sessions changed, reports a `baseHash` that no longer matches the bytes on disk (or a file
+  that appeared where `baseHash` is null) as a conflict, and skips (and logs) a file that is not a readable
+  `journal-1` document: a kill mid-write leaves only an `AtomicFile` temporary file, which is ignored and removed by
+  `clear`. `pending`, `replay` and `clear` take `JournalSessions` (`All`, this object's session `Own`, `Others`).
+  `recover(prompt)` is the recovery hook of AC-M2-06 (`Recover` returns the replay, `Discard` clears it, `Later`
+  leaves it). Project files are
+  never written by the journal; the 2-minute timer and the prompt are `ProjectSession`'s (`esses_qtmodel`), which
+  reads the interval from `ProjectFile::autosaveMinutes()` (`options.general.autosaveMinutes`, 0 = off, default 2)
+  and the lap-stretch toggle and tolerance from `ProjectFile::lapStretchSettings()` (`options.lapStretch`).
+- **R-38** (M1 §6 item 7): every document type carries `schemaVersion` (the minor written on save) and a newer
+  minor is never downgraded; see "Reading and writing".
+
+Tests (`project.*`): `channel_documents_tests` (the 02 §6.3 examples, edits, loader-only rules, the alias cycle
+rule), `schema_registry_tests` (every shipped schema, every example at its pointer, id forms, `schemaOf`, a
+directory with unusable schemas), `migrations_tests` (step mechanics, the shipped step, migrate-on-load with
+dirty and the backup on the first save, R-38), `journal_tests` (append, refusals, replay across sessions and
+conflicts, a simulated kill and damaged files, the recovery hook, `journal-1` round trip),
+`roundtrip_m2_tests` (AC-M2-07: byte-identical canonical documents of every kind, idempotent saves of every valid
+example, an unknown component type and the `x-i2` bags; `maths-1` through `esses_maths`' `MathModuleIo`, skipped
+with the stub's message only while a reader is still a stub). `channel_documents_contract_tests` keeps the M2-contract checks.
+
+Consumers: `esses_qtmodel` (`ProjectSession`, `undo_commands.hpp`: `ChannelOverrides`, `Aliases`, `Mappings`,
+`Journal`), `esses-cli` (`Migrations` in `validate`).
+
+### Deviations of the M2 work from the design text
+
+- `{v, unit}` members of `overrides-1` are `model::Quantityd` (the written unit symbol kept, so a canonical
+  document round-trips byte-identically, 02 §6.3); `warn`/`fault` stay `JsonDoc` (checked on load) until a typed
+  form is needed. The unit conversion to base and the D-010 family check are the host's, which has the registry.
+- `Migrations::instance()` is mutable (steps register before the first load), `upgrade` also stamps the version,
+  and `latest()` is an addition (`esses-cli validate` migrates to it).
+- The journal adds `JournalReplay` (newest entry per path, `baseHash` conflicts, the paths whose file already holds
+  the entry (`applied`, not replayed), the skipped count, log), `JournalFile` (the `journal-1` document, so the kind
+  has its own round trip), `JournalEntry::of`, `JournalRecovery` and `Journal::recover` (the Qt-free recovery hook;
+  it deletes a journal holding only applied entries without asking). Journal files are named
+  `<seq>-<session tag>.json` (a decimal seq, the session id's first eight hex digits; untagged `<seq>.json` files of
+  older journals are still read); `clear(All)` renames the folder away before deleting it and every clear deletes
+  oldest first, and only the files it listed when it began (a file another session writes meanwhile stays;
+  `src/persistence/journal_hooks.hpp` is the test seam between the listing and the deletions);
+  `ownFileExists()` tells a session whether its newest file is still there (D-190).
+- `saveWithBackup` copies the previous version to `backup/` before it writes and takes an optional `backupError`:
+  without it an error means the document was not written; with it a failed copy is reported there and the
+  document written all the same (D-190).
+- `SchemaRef` adds `schemaVersion` (the document's minor) next to the name and the major.
+- Load order (D-163): the typed reader runs before `SchemaRegistry`, which validates the written form, where 02
+  §6.1 writes "validate -> migrate -> parse"; without a schemas directory the typed reader is the only check.
+- `project-1` minor 2 (D-162) fixes the Data-window filter keys that 02 §6.2's key table calls "SourceId hex".

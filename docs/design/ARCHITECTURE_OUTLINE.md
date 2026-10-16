@@ -24,7 +24,7 @@ Conventions: C++20; namespace `esses`; CMake targets `esses_<lib>`; executables 
 | 3 | `esses_cli` | executable `esses-cli` | `info`, `channels`, `laps`, `eval`, `convert`, `export`, `validate`, `fixture add/verify/diff`, `bench`; all `--json` | all Qt-free libs, CLI11 | free |
 | 3 | `esses_capi` (v1.1) | static/shared | stable `extern "C"` surface over formats + model + maths for bindings | all Qt-free libs | free |
 | 3 | `esses_script` (v1.1) | static lib | Lua 5.4 + sol2 sandbox, object model, scripted `IMathFunction`/`IRangeRule`/`IImporter` | all Qt-free libs, lua, sol2 | free |
-| 4 | `esses_qtmodel` | static lib | `DataSelectionModel`, `WorkspaceViewModel` (shared zoom, cursor, datum; D-133), `WorksheetViewModel`, `RenderService` (keyed build submission, 04 §6.3), `AppRuntime` (owns pool, cache, dispatcher, sinks), `ProjectSession` (+`QUndoStack` commands), `SourceLoader`, `MathsService`, `Dispatcher`, `CommandRegistry`, `KeymapBinder`, `SettingsStore`, `MessagesModel` | all Qt-free libs, Qt::Core | Core |
+| 4 | `esses_qtmodel` | static lib | `DataSelectionModel`, `WorkspaceViewModel` (shared zoom, cursor, datum; D-133), `WorksheetViewModel`, `RenderService` (keyed build submission, 04 §6.3), `AppRuntime` (owns pool, cache, dispatcher, sinks), `ProjectSession` (+`QUndoStack` commands), `SourceLoader`, `MathsService`, `Dispatcher`, `CommandRegistry`, `KeymapBinder`, `SettingsStore`, `MessagesModel` | all Qt-free libs, Qt::Core, Qt::Gui undo framework (D-161) | Core (+ Gui undo, D-161) |
 | 4 | `esses_qtrender` | static lib | `RasterBackend : IRenderBackend` (QPainter → `QImage` layers), `LayerCache` (Static `QImage` + directly painted Dynamic/Chrome lists, D-137), `OffscreenRenderer` (goldens, print, clipboard), `SchemeFonts`, `QtTextMetrics`; later `GlBackend` | plotcore, Qt::Gui | Gui |
 | 4 | `esses_render` | executable `esses-render` | `esses-render <workbook.json> <log…> --worksheet N -o out.png [--dpr 2]` | qtmodel, qtrender | Gui (offscreen) |
 | 5 | `esses_widgets` | static lib | `DockHost`, `WorksheetCanvas`, `ComponentWidget` base and all components, docks, dialogs/editors, `PropertiesDialog`, `MappingPanel`, `ZoomSummaryBar` | qtmodel, qtrender, Qt::Widgets, ADS | Widgets |
@@ -37,7 +37,7 @@ Conventions: C++20; namespace `esses`; CMake targets `esses_<lib>`; executables 
 ```
 base ← units ← store ← model ← { formats, analysis } ← maths ← project ← plotcore ← cli
                                    (formats never depends on maths or analysis; analysis never depends on maths)
-qtmodel  ← all Qt-free libs + Qt::Core
+qtmodel  ← all Qt-free libs + Qt::Core (+ Qt::Gui for QUndoStack/QUndoCommand only, D-161)
 qtrender ← plotcore + Qt::Gui                (no dependency on qtmodel)
 widgets  ← qtmodel + qtrender + Qt::Widgets + ADS
 app      ← widgets
@@ -230,6 +230,112 @@ Registered here under the §10 rule; the defining document is in brackets.
 - `esses_plotcore`: `ITextMetrics` with the `FixedTextMetrics` test double (implemented by `esses_qtrender` as `QtTextMetrics`), `DistanceChain`, `AutoscaleCache`, `TextRun`, `Bitmap`, `CmdKind` [04].
 - `esses_qtmodel`: `WorkspaceViewModel`, `RenderService`, `AppRuntime` [01, 04, 06]; stale-source handling in `SourceLoader` and the command `file.reload_source` (Reload File in the Data window and on the Messages row; M4, 02 §1 behaviour 5, §8 AC-4a) [02, 06]. `esses_base`: `ThreadRole` [01, 04].
 - `esses_cli`: subcommands `maths check`, `maths functions`, `units scan`, `bench formats` (D-090) [03, 05].
+
+### Names added by the M2 contracts (2026-10-12)
+
+Registered under the §10 rule when the M2 headers were laid down (`docs/milestones/M2.md` §2); each library's
+`README.md` lists them with their files and their departures from the design text.
+- `esses_maths`: `TokenKind`, `Token`; `kBlockSamples`; `NodeId` (03 §4.3 rule 9); `Stage::Ref`, `PlanInput::unit`,
+  `Plan::rangeGroups`, `evaluateWhole`; `intrinsicName`, `intrinsicClass`, `registerIntrinsics`,
+  `makeIntrinsicKernel`; `FunctionRegistry::intrinsicId`, `external`, `builtin`; `MathsScheduler::submit`;
+  `GpsCorrectionsModule` (`esses.gps_corrections`); `TableSpec::Axis`, `TableSpec::Interp`,
+  `TableSpec::OutOfRange`; `MathModule::kLocalId`, `kTransientId`, `unknown`.
+- `esses_formats`: `TextProfile::Sniff`, `Preamble`, `Header`, `Time`, `Column`, `LapSource`,
+  `effectiveImporterId`, `contentHash`; `Dictionary::Match`, `Entry`, `Bit`, `Device`, `Bitfield`;
+  `UnitMappingProfile::Rule`, `Resolution`, `resolve`, `fileStem`; `kLegacyCsvImporterId`, `kGenericCsvProfileId`,
+  `kGenericCsvImporterId`, `makeLegacyCsvWriter`, `makeGenericCsvWriter`; `UnresolvedRow`, `ImporterRegistry::resume`
+  and `addProfile` (05 §2 names them; the declarations are new).
+- `esses_model`: `SidecarDocument::setAnnotation`, `removeAnnotation`, `setLocalMaths`, `restoreLogged`.
+- `esses_analysis`: `LapStretchRow`, `LapStretch::factor`.
+- `esses_project`: `ChannelOverrides::Entry`, `Mappings::Row`, `Mappings::toTable`, `Aliases::cycleThrough`,
+  `JournalEntry`, `JournalReplay`.
+- `esses_qtmodel`: `ChannelStatusModel` (06 §1), `MathsService::StatusRow`, `statusRows`, `check`, `functions`,
+  `setModules`, `setCompat`, `setLocalModule`, `setTransientModule`; `SourceLoader::mappingRequired`,
+  `resolveMapping`, `cancelMapping`, `setMappingHandOff`, `setChannelDocuments`, `registerTextProfiles`;
+  `ProjectSession::undoStack` and its document setters and journal members; `UndoMergeId`, `DocumentCommand`,
+  `SidecarCommand`, `WorkbookCommand`, `SetOverrideCommand`, `EditAliasesCommand`, `EditMappingsCommand`,
+  `EditMathModulesCommand`, `SetProjectOptionsCommand`, `InsertMarkerCommand`, `RemoveMarkerCommand`,
+  `MarkerEditCommand`, `RestoreLoggedLapsCommand`, `SetAnnotationCommand`, `RemoveAnnotationCommand`,
+  `SetLocalMathsCommand` (with 06's `SetRangeTrustCommand`, `OffsetRangeCommand`, `ClearOverrideCommand`,
+  `SetDetailCommand`, `MoveWorksheetCommand`).
+- `esses_widgets`: `SchemeSelector` (07 §5.1 "scheme selector").
+
+### Names added by the M2 persistence work (2026-10-12)
+
+- `esses_analysis`: `LapStretchSettings`, `LapStretchRow::withinTolerance` and `candidate`, `LapStretch::row` and
+  `report`, `DistanceIndex::setStretch` (D-016, D-140).
+- `esses_project`: `SchemaRef::schemaVersion`, `Migrations::latest`, `JournalEntry::of`, `JournalFile` (the
+  `journal-1` document), `JournalRecovery`, `Journal::recover` (the recovery hook); `ProjectFile::kSchemaVersion`,
+  `ProjectFile::dirty`, `ProjectFile::autosaveMinutes` and `lapStretchSettings`, and `schemaVersion` on every
+  document type (D-162, D-163, R-38).
+- `esses-cli`: `validate --all`, `--root`, `--exclude` (08 §5).
+
+### Names added by the M2 maths language work (2026-10-12)
+
+- `esses_maths`: `TypeChecker::Options` (`requester`, `resultUnit`) and the overload of `TypeChecker::check` that
+  takes it; `ScopeEntry::interp`, `dtype`, `number`, `text`, `diags`; `Scope::dataBacked` (03 §3.2-§3.3, D-164,
+  D-165).
+- `esses-cli`: `eval`, `maths check`, `maths functions` implemented as 03 §13 names them (D-166).
+
+### Names added by the M2 CSV import work (2026-10-12)
+
+- `esses_formats`: `kLegacyCsvFormatName`, `kLegacyCsvWriterId`, `kGenericCsvWriterId` (writer ids `motec.csv` and
+  `csv`); `IReader::columnHint`, `dictionary`, `makeTimesProvider`, `timeRange`, `attachColumns` (pipeline step 4a,
+  timestamped channels, the shared slab sweep); `OpenContext::mappings`, `unitMaps`; `open_code::kUnitMapLoadFailed`
+  (`open.unitmap_load_failed`) (05 §2, §7, §8; D-167, D-168).
+- `esses_store`: `WeakColumn` (a non-owning Column reference for `ChunkCache::insertGroup`, D-167).
+- Tools and data: `tools/gen_text_fixtures.py`, `bench/formats_bench` (`esses-formats-bench`), the fuzz targets
+  `fuzz_csv_sniff` and `fuzz_text_profile`; fixture-1 oracle kind `generator` (D-168).
+
+### Names added by the M2 qtmodel work (2026-10-12)
+
+- `esses_qtmodel`: `LiveDiagnostics` (the Maths Editor's debounced live check, 03 §11 item 2), `LapStretchService`
+  (the lap-stretch toggle and the per-lap factors, D-016, D-174), `SessionRestore` and `connectProjectSession`
+  (06 §18 steps 5-6), `connectMathsSelection`; `WorkbookSet`, `ProjectSession::workbookSet`, `setWorkbookSet`,
+  `workbookNames`, `setUnits`, `units`, `mappingTable`, `aliasTable`, `mathsCompat`, `lapStretchSettings`,
+  `looseChannelSearch`, `setDataWindow`, `setLapStretchEnabled`, `journalReplay`, `setRecoveryPrompt`,
+  `setAutosaveInterval`, `autosaveInterval`, `documentTexts`, `lapStretchChanged`, `dirtyChanged`;
+  `WorkbookSetCommand`, `AddWorkbookCommand`, `RemoveWorkbookCommand`, `RenameWorkbookCommand`,
+  `MoveWorkbookCommand`, `AddWorksheetCommand`, `RemoveWorksheetCommand`, `RenameWorksheetCommand`,
+  `AddComponentsCommand`, `RemoveComponentsCommand`, `componentsMime`, `componentsFromMime`,
+  `kComponentsMimeType`, `SetUnitMapCommand`, `applyMappingDecision` (D-172); `MathsService::setResolverTables`,
+  `setSelectionDistances`, `mathSelection`, `modules`, `compat`, `sources`, `gpsCorrectionsModule` (D-173);
+  `ChannelStatusModel::ModuleRole`, `refreshLater`, `rows`; `SourceLoader::pendingMapping`, `mappingTable`,
+  `aliasTable`, `setRangeStretch`; `DataSelectionModel::lapNumbersError`, `defaultFilter`, `session`,
+  `filterRejected`, `filterKindName`, `parseFilterKind`; `ChannelsModel::searchWords` and the `loose` argument of
+  `filterAccepts` (D-175); `registerEditCommands`, `registerLapStretchCommand`.
+
+### Names added by the M2 options and shell work (2026-10-12)
+
+- `esses_widgets`: `RecoveryDialog` (the 06 §18 step 3 prompt, AC-M2-06); `OptionsDialog::reload`,
+  `hasPendingEdits`, `errorText`, `schemeSelector`, `setRevealHandler`, `RevealHandler`, `importKeymap`,
+  `exportKeymap`, `revealKeymap`, `applied`; `SchemeSelector::scheme`, `restoreActive`, `followsSystem`,
+  `setFollowSystem`, `applySystemScheme`, `userSchemeDir`, `duplicateActive`, `importScheme`, `exportActive`,
+  `palette`, `logMessage`, `kToolbarKey`, `kFollowOsKey`, `kActiveKey`; `MainWindow::ExitAnswer`, `setExitPrompt`,
+  `confirmLeaveProject`, `lapStretch`, `schemeSelector`, `optionsDialog`, `recoveryDialog`, `sessionRestore` and
+  the `logs` argument of `openProject`; `LayoutFile::dialogGeometry`, `setDialogGeometry` (D-178).
+
+### Names added by the M2 maths editors work (2026-10-12)
+
+- `esses_widgets`: `ActiveChannelCommands` (with `Host`, `FilterChoice`, `ScaleOffsetChoice`, `FilterPrompt`,
+  `ScaleOffsetPrompt`; the handlers of the 06 §14.4 "Active channel" rows), `AliasesDialog` and `MappingsDialog`
+  (06 §13.1 item 7); `MathsEditor::ModuleRef`, `kItemsMimeType`, `setMainSource`, `mainSource`, `currentModule`,
+  `currentItemName`, `revert`, `isPageDirty`, `refusalText`, the module and item operations (`addModule`,
+  `removeModule`, `moveModule`, `setModuleEnabled`, `setModuleCondition`, `importModule`, `exportModule`, `addItem`,
+  `addConstant`, `removeSelected`, `copySelected`, `cutSelected`, `paste`, `setSelectedEnabled`, `recalculate`), the
+  assistance members (`unitPopupVisible`, `unitPopupEntries`, `unitsAt`, `acceptUnitPopup`, `rangePaths`,
+  `insertRange`, `channelNames`, `insertChannel`, `hoverText`), the pane accessors and `message`;
+  `ChannelStatusWindow::errorsOnlyBox`, `detailPane`, `filterModel`, `selectRow`, `currentSourceRow`, `copyTable`,
+  `openRow`; `ChannelEditor::Column`, `filterEdit`, `channelModel`, `currentChannel`, `setDisplayUnit`, `setLimit`,
+  `setDps`, `setColourIndex`, `setInterp`, `clearOverride`, `lastRefusal`, `aliasesDialog`, `mappingsDialog`,
+  `editRefused` (D-177).
+
+### Names added by the rest of the M2 review (2026-10-13, D-190)
+
+- `esses_formats`: `ImportOptions::cancel` (the open's token for `IImporter::open`).
+- `esses_project`: `JournalReplay::applied`, `JournalReplay::skipped`, `Journal::ownFileExists`; the `backupError`
+  argument of `saveWithBackup`.
+- `esses_qtmodel`: `ProjectSession::saveMathsModules` (the Maths Editor's save on close); `SourceLoader::cancelOpens`.
 
 ---
 

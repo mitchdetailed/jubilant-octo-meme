@@ -20,6 +20,7 @@
 #pragma once
 
 #include <esses/base/hash.hpp>
+#include <esses/base/json_doc.hpp>
 #include <esses/base/result.hpp>
 #include <esses/base/time.hpp>
 #include <esses/base/uuid.hpp>
@@ -27,7 +28,7 @@
 #include <esses/model/ids.hpp>
 #include <esses/model/marker.hpp>
 #include <esses/model/notes.hpp>
-#include <esses/model/opaque_json.hpp>
+#include <esses/model/opaque_json.hpp> // compatibility: model::OpaqueJson names JsonDoc
 
 #include <cstddef>
 #include <cstdint>
@@ -82,11 +83,11 @@ struct SidecarLayer {
     std::vector<Marker> markers;         // prov == User only
     std::vector<MarkerEdit> markerEdits; // offset / ignore per marker id, offsetDistance per layer
     std::vector<RangeOverride> rangeOverrides;
-    std::optional<OpaqueJson> localMaths; // a complete maths-1 module with id "local"
+    std::optional<JsonDoc> localMaths; // a complete maths-1 module with id "local"
     std::vector<Annotation> annotations;
     std::vector<VideoLink> videoLinks;
-    std::optional<OpaqueJson> runs;   // reserved (drag profile, v1.0); preserved verbatim
-    std::optional<OpaqueJson> stages; // reserved (rally profile, v1.0); preserved verbatim
+    std::optional<JsonDoc> runs;   // reserved (drag profile, v1.0); preserved verbatim
+    std::optional<JsonDoc> stages; // reserved (rally profile, v1.0); preserved verbatim
 
     bool empty() const noexcept;
     friend bool operator==(const SidecarLayer&, const SidecarLayer&) = default;
@@ -118,10 +119,10 @@ public:
     // "<log>.<ext>.sidecar.json" next to the log.
     static std::filesystem::path pathFor(const std::filesystem::path& log);
 
-    // A missing file is an empty document (ok). Errors: Io (context.path), Format (JSON syntax;
-    // context.offset), Unsupported (another schema major; context.schemaId), Invalid (a sidecar-1 rule;
-    // context.detail = JSON pointer of the offending member). A caller must not save over a file that failed
-    // to load.
+    // A missing file is an empty document (ok). Errors: Io (context.path; also a directory standing where the
+    // sidecar belongs), Format (JSON syntax; context.offset), Unsupported (another schema major;
+    // context.schemaId), Invalid (a sidecar-1 rule; context.detail = JSON pointer of the offending member). A
+    // caller must not save over a file that failed to load.
     static Result<SidecarDocument> load(const std::filesystem::path& path);
     static Result<SidecarDocument> parse(std::string_view json);
 
@@ -158,6 +159,15 @@ public:
     // Adds a user marker (prov forced to User; a nil id gets uuidRandom()). Returns its id.
     MarkerId addUserMarker(std::string_view layerName, Marker m);
     bool removeUserMarker(std::string_view layerName, const MarkerId& id);
+    // M2 (02 section 7, D-032 undoable sidecar edits): inserts or replaces (by id) an annotation; a nil id
+    // gets uuidRandom(). Returns its id.
+    Uuid setAnnotation(std::string_view layerName, Annotation a);
+    bool removeAnnotation(std::string_view layerName, const Uuid& id);
+    // Replaces the layer's local maths (a complete maths-1 module with id "local"); nullopt removes it.
+    void setLocalMaths(std::string_view layerName, std::optional<JsonDoc> module);
+    // "Restore logged laps" (06 section 13.3 item 6): removes every marker edit and user marker of the layer
+    // (one command). Returns whether anything was removed.
+    bool restoreLogged(std::string_view layerName);
 
     // ---- layers -------------------------------------------------------------------------------------------
     // "" is an alias of "Normal". The const overload returns an empty layer when absent.
@@ -178,11 +188,10 @@ public:
     std::optional<Hash128> sourceContentHash; // full hash, written once the Background task produced it
     std::string importerId;
     std::string importerVersion;
-    std::vector<std::string> companions; // companion file names found beside the log
-    DateTime edited;                     // time of the last committed edit
-    int schemaVersion = kSchemaVersion;  // as read; a newer minor is kept on save
-    std::map<std::string, OpaqueJson, std::less<>>
-        unknown; // unknown top-level members, x-esses-legacy included
+    std::vector<std::string> companions;                 // companion file names found beside the log
+    DateTime edited;                                     // time of the last committed edit
+    int schemaVersion = kSchemaVersion;                  // as read; a newer minor is kept on save
+    std::map<std::string, JsonDoc, std::less<>> unknown; // unknown top-level members, x-esses-legacy included
 
     friend bool operator==(const SidecarDocument&, const SidecarDocument&) = default;
 

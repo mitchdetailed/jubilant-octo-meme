@@ -139,7 +139,7 @@
         { "symbol": "kPa g", "scalar": 0.001, "aliases": ["kPag", "dKPA"] },
         { "symbol": "MPa g", "scalar": 0.000001, "aliases": ["MPag", "dMPa"] },
         { "symbol": "bar g", "scalar": 0.00001, "aliases": ["barg", "dbar"] },
-        { "symbol": "psi g", "toBase": 6894.757293168361337, "aliases": ["psig", "dpsi"] } ] },
+        { "symbol": "psi g", "toBase": 6894.757293168361337, "aliases": ["psig", "dpsi", "psi (sg)", "psisg"], "note": "psi (sg), sealed gauge: read against a sealed reference near one standard atmosphere, so a gauge reading (kept for user maths, D-005)." } ] },
 
     { "name": "Temperature", "family": "Temperature", "dim": [0, 0, 0, 0, 1, 0, 0], "base": "K", "deltaFamily": "Temperature Delta",
       "units": [
@@ -207,6 +207,12 @@
       "note": "Distance travelled per volume of fuel.",
       "units": [
         { "symbol": "m/m3", "display": "m/m³" },
-        { "symbol": "km/l", "scalar": 0.000001, "aliases": ["kmpl"] } ] }
+        { "symbol": "km/l", "scalar": 0.000001, "aliases": ["kmpl"] } ] },
+
+    { "name": "Fuel Consumption", "family": "Fuel Consumption", "dim": [2, 0, 0, 0, 0, 0, 0], "base": "m3/m",
+      "note": "Volume of fuel per distance travelled (the reciprocal of Fuel Economy, so a quantity of its own): 1 l/100km = 1e-3 m3 / 1e5 m = 1e-8 m3/m.",
+      "units": [
+        { "symbol": "m3/m", "display": "m³/m" },
+        { "symbol": "l/100km", "display": "l/100 km", "scalar": 100000000, "aliases": ["L/100km", "l/100 km", "L/100 km"] } ] }
   ]
 }

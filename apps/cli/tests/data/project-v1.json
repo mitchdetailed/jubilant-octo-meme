@@ -1,0 +1,16 @@
+{
+  "$schema": "urn:esses:project-1",
+  "schemaVersion": 1,
+  "dataWindow": {
+    "applyToAllSources": false,
+    "filters": {
+      "0123456789ABCDEF0123456789ABCDEF": {
+        "kind": "fastest"
+      },
+      "default": {
+        "kind": "all"
+      }
+    }
+  },
+  "name": "Written by an M1 build"
+}

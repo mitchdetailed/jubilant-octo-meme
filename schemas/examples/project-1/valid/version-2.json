@@ -1,0 +1,24 @@
+{
+  "$schema": "urn:esses:project-1",
+  "schemaVersion": 2,
+  "dataWindow": {
+    "applyToAllSources": true,
+    "filters": {
+      "default": {
+        "kind": "fastest3"
+      },
+      "xxh3:0123456789abcdef0123456789abcdef": {
+        "kind": "lapNumbers",
+        "laps": "3-7"
+      }
+    }
+  },
+  "name": "Version 2",
+  "x-esses-legacy": {
+    "dataWindowFilters": {
+      "old-key": {
+        "kind": "all"
+      }
+    }
+  }
+}

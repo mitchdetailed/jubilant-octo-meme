@@ -6,7 +6,8 @@
 Checks data/keymaps/default.json (keymap-1) against the hotkey tests:
   1. Rows: status is implemented, planned or reserved; a planned or implemented row names its milestone (M1, M2,
      M3, M4, v1.0, later), a reserved row none; a row whose milestone is at or before the current milestone is
-     implemented, and an implemented row's milestone is not after it; no key sequence is bound twice in one
+     implemented, and an implemented row's milestone is at most the milestone in progress (the one after the
+     current milestone: its rows become implemented as they land, M2 note); no key sequence is bound twice in one
      context (06 section 14.2 rule 7; sequences compared after the normalisation of
      esses::project::normaliseKeySequence, key names case-insensitively).
   2. Tests (skipped with --rows-only): every command id with an implemented row has a test registered with
@@ -14,7 +15,8 @@ Checks data/keymaps/default.json (keymap-1) against the hotkey tests:
      with an implemented row. Planned rows are exempt until their milestone; reserved rows are covered by the
      generic row of 06 section 14.5.
 
-The current milestone is CURRENT_MILESTONE below (raised when a milestone closes) or --milestone.
+The current milestone is CURRENT_MILESTONE below (the last closed one; raised when a milestone closes) or
+--milestone; the milestone in progress is the one after it.
 Standard library only. `python -I tools/check_keymap_coverage.py [--root DIR] [--milestone M1] [--rows-only]`;
 `--self-test` checks the checker on built-in cases. Exit status: 0 clean, 1 findings, 2 usage error.
 """
@@ -79,6 +81,7 @@ def check_rows(keymap: Any, current: str) -> tuple[list[str], set[str]]:
     if not isinstance(rows, list):
         return [f"{KEYMAP}: no bindings array"], implemented
     rank = {m: i for i, m in enumerate(MILESTONES)}
+    in_progress = MILESTONES[min(rank[current] + 1, len(MILESTONES) - 1)]
     seen: dict[tuple[str, str], int] = {}  # (context, normalised keys) -> first row index
     for i, row in enumerate(rows):
         where = f"{KEYMAP} /bindings/{i}"
@@ -102,8 +105,9 @@ def check_rows(keymap: Any, current: str) -> tuple[list[str], set[str]]:
             due = rank[milestone] <= rank[current]
             if due and status != "implemented":
                 findings.append(f"{what}: milestone {milestone} is at or before {current} but the row is {status}")
-            if status == "implemented" and not due:
-                findings.append(f"{what}: implemented, but its milestone {milestone} is after {current}")
+            if status == "implemented" and rank[milestone] > rank[in_progress]:
+                findings.append(f"{what}: implemented, but its milestone {milestone} is after {in_progress}, "
+                                f"the milestone in progress")
             if status == "implemented":
                 implemented.add(command)
         for key in row["keys"]:
@@ -196,8 +200,8 @@ def self_test() -> int:
          "not implemented"),
         ("due but planned", good_rows + [row("pan.left", ["Shift+Left"], "graph", "planned", "M1")], good_tests,
          "M1", False, "at or before M1 but the row is planned"),
-        ("implemented too early", good_rows + [row("pan.left", ["Shift+Left"], "graph", "implemented", "M2")],
-         good_tests + 'KEYMAP_TEST("pan.left")', "M1", False, "milestone M2 is after M1"),
+        ("implemented too early", good_rows + [row("pan.left", ["Shift+Left"], "graph", "implemented", "M3")],
+         good_tests + 'KEYMAP_TEST("pan.left")', "M1", False, "milestone M3 is after M2, the milestone in progress"),
         ("bad status", good_rows + [row("pan.left", ["B"], "graph", "done", "M2")], good_tests, "M1", False,
          "status 'done'"),
         ("no milestone", good_rows + [row("pan.left", ["B"], "graph", "planned")], good_tests, "M1", False,
@@ -216,6 +220,11 @@ def self_test() -> int:
         found = run(rows, tests, current, rows_only)
         if not any(needle in f for f in found):
             failures.append(f"{label}: expected '{needle}' in {found}")
+    # A row of the milestone in progress may be implemented (with its test) before the milestone closes.
+    early = good_rows + [row("edit.undo", ["Ctrl+Z"], "global", "implemented", "M2")]
+    early_found = run(early, good_tests + 'KEYMAP_TEST("edit.undo")')
+    if early_found:
+        failures.append(f"implemented row of the milestone in progress: {early_found}")
     # --rows-only ignores the tests but not the rows.
     if run(good_rows, None, rows_only=True):
         failures.append("rows-only with no tests directory reported findings")

@@ -25,6 +25,7 @@ esses_add_library(base LAYER 0 QT_FREE
     src/paths.cpp
     src/priority.cpp
     src/rate.cpp
+    src/read_file.cpp
     src/result.cpp
     src/taskpool.cpp
     src/thread_role.cpp
@@ -57,6 +58,7 @@ esses_add_test(base_tests QT_FREE
     tests/mapped_file_tests.cpp
     tests/paths_tests.cpp
     tests/rate_tests.cpp
+    tests/read_file_tests.cpp
     tests/result_tests.cpp
     tests/taskpool_tests.cpp
     tests/utf8_tests.cpp

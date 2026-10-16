@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:builtin-esses.gps_corrections-1",
+  "title": "GPS corrections settings",
+  "description": "The settings object of the built-in maths module esses.gps_corrections, version 1 (03_MATHS_ENGINE.md section 9.2, D-016, D-027): project.json builtinMaths[\"esses.gps_corrections\"].settings and the settings of a builtin item in a sidecar's localMaths. It is a member of those documents, not a document, so it carries no $schema or schemaVersion. Every member is optional and an absent member takes the module default. From M2 the module applies only its zero-fix step (latitude and longitude both exactly 0 are invalid), whatever the item's enabled flag says; statusChannel, duplicateRemoval and timeShift are validated and kept for the v1.0 correction steps.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "latitude": {"$ref": "#/definitions/gpsChannelName"},
+    "longitude": {"$ref": "#/definitions/gpsChannelName"},
+    "speed": {"$ref": "#/definitions/gpsChannelName"},
+    "additionalChannels": {
+      "description": "Further GPS channels the v1.0 time shift moves with latitude and longitude.",
+      "type": "array",
+      "items": {"$ref": "#/definitions/gpsChannelName"}
+    },
+    "statusChannel": {
+      "description": "A receiver status channel and the comparison that makes a sample valid (v1.0).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "validWhen"],
+      "properties": {
+        "name": {"$ref": "#/definitions/gpsChannelName"},
+        "validWhen": {
+          "description": "A comparison operator and a number, such as \">= 4\".",
+          "type": "string",
+          "pattern": "^\\s*(==|!=|>=|<=|>|<)\\s*-?[0-9]+(\\.[0-9]+)?\\s*$"
+        },
+        "applyToPosition": {"type": "boolean"}
+      }
+    },
+    "duplicateRemoval": {
+      "description": "Replace runs of repeated samples by interpolation (v1.0).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"}
+      }
+    },
+    "timeShift": {
+      "description": "Shift the GPS channels earlier by a share of the update period, or by seconds (v1.0).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "percentOfUpdatePeriod": {"type": "number", "minimum": 0, "maximum": 100},
+        "seconds": {"type": "number"}
+      }
+    },
+    "outputs": {
+      "description": "shadow: the corrected channels replace the inputs (self-maths); prefix: new channels named with the prefix.",
+      "anyOf": [
+        {"const": "shadow"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["prefix"],
+          "properties": {
+            "prefix": {"type": "string", "minLength": 1}
+          }
+        }
+      ]
+    }
+  },
+  "definitions": {
+    "gpsChannelName": {
+      "description": "A channel name as the layer spells it (looked up case-insensitively).",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    }
+  }
+}

@@ -1,0 +1,192 @@
+{
+  "$schema": "urn:esses:probe-1",
+  "schemaVersion": 1,
+  "companions": [],
+  "details": [],
+  "dialect": "semicolon,decimal-comma",
+  "enumTables": [
+    {
+      "entries": [
+        {
+          "label": "RACE",
+          "severity": 0,
+          "value": 0
+        },
+        {
+          "label": "PIT",
+          "severity": 0,
+          "value": 1
+        },
+        {
+          "label": "SAFE",
+          "severity": 0,
+          "value": 2
+        }
+      ],
+      "id": 0
+    }
+  ],
+  "importerId": "text.profile:generic.csv",
+  "importerVersion": "1.0.0",
+  "layers": [
+    {
+      "channels": [
+        {
+          "dps": 2,
+          "dtype": "F32",
+          "flags": 0,
+          "index": 0,
+          "kind": "Real",
+          "loggedName": "Speed",
+          "sampleCount": 1500,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 50
+            }
+          },
+          "vendorDtype": "text",
+          "vendorUnit": "km/h"
+        },
+        {
+          "dps": 2,
+          "dtype": "F32",
+          "flags": 0,
+          "index": 1,
+          "kind": "Real",
+          "loggedName": "Brake Pres",
+          "sampleCount": 1500,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 50
+            }
+          },
+          "vendorDtype": "text",
+          "vendorUnit": "bar"
+        },
+        {
+          "dps": 0,
+          "dtype": "F32",
+          "flags": 0,
+          "index": 2,
+          "kind": "Integer",
+          "loggedName": "Gear",
+          "sampleCount": 1500,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 50
+            }
+          },
+          "vendorDtype": "text",
+          "vendorUnit": ""
+        },
+        {
+          "dps": 0,
+          "dtype": "I32",
+          "enumTable": 0,
+          "flags": 0,
+          "index": 3,
+          "kind": "Enum",
+          "loggedName": "Mode",
+          "sampleCount": 1500,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 50
+            }
+          },
+          "vendorDtype": "text",
+          "vendorUnit": ""
+        }
+      ],
+      "durationUs": 30000000,
+      "markers": [],
+      "name": "Normal"
+    }
+  ],
+  "warnings": [
+    {
+      "code": "text.auto_decimal",
+      "ctx": {
+        "detail": ","
+      },
+      "level": "Info",
+      "message": "decimal separator detected"
+    },
+    {
+      "code": "text.auto_delimiter",
+      "ctx": {
+        "detail": "semicolon"
+      },
+      "level": "Info",
+      "message": "delimiter detected"
+    },
+    {
+      "code": "text.auto_preamble",
+      "ctx": {
+        "detail": "2"
+      },
+      "level": "Info",
+      "message": "preamble detected"
+    },
+    {
+      "code": "text.auto_time_column",
+      "ctx": {
+        "detail": "Time"
+      },
+      "level": "Info",
+      "message": "time column detected"
+    },
+    {
+      "code": "text.auto_time_unit",
+      "ctx": {
+        "detail": "s"
+      },
+      "level": "Info",
+      "message": "time unit detected"
+    },
+    {
+      "code": "text.auto_units_row",
+      "ctx": {
+        "detail": "no"
+      },
+      "level": "Info",
+      "message": "no units row"
+    },
+    {
+      "code": "text.lap_source_absent",
+      "ctx": {
+        "detail": "lap_counter_edge"
+      },
+      "level": "Info",
+      "message": "the profile's lap source is not in this file"
+    },
+    {
+      "code": "text.rate_inferred",
+      "ctx": {
+        "detail": "50 Hz"
+      },
+      "level": "Info",
+      "message": "sample rate inferred from the time column"
+    },
+    {
+      "code": "text.text_column",
+      "ctx": {
+        "channel": "Mode",
+        "detail": "Mode"
+      },
+      "level": "Info",
+      "message": "a text column becomes an enumeration"
+    }
+  ]
+}
