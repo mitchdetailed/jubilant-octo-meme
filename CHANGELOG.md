@@ -175,6 +175,11 @@ All notable changes are recorded here, newest first. The project follows semanti
 
 ## Unreleased (M2)
 
+- The task-pool tests declare their `Gate`s and the other locals their tasks reference before the `TaskPool`,
+  so the pool joins its workers before those locals go out of scope, and `Gate::open()` notifies under its lock
+  (ASan stack-use-after-scope in `base.taskpool: tryRunInline runs a queued task on the caller` on the Linux
+  ASan job; test-only).
+
 - Task-pool, test-output and source-loader fixes (pull request 2). A share-key `TaskPool::submit` no longer joins a
   task whose `Future` is already ready: the worker drops the key a moment after it publishes the result, and a
   submit in that moment got the old result without a run (MathGraph's Recalculate re-evaluation, and timed runs
