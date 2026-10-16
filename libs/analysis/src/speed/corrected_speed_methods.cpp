@@ -17,11 +17,16 @@ namespace esses::analysis {
 namespace {
 
 constexpr double kNaN = std::numeric_limits<double>::quiet_NaN();
-// The time constant of gCorrection's slip reference (D-203 (a)): it integrates the longitudinal acceleration
-// and is pulled towards the wheel by dt / kReferenceSeconds per sample, so a wheel that leaves the car
-// progressively (a lock building over several samples, a driven wheel spinning up) parts from it while an
-// accelerometer offset b only shifts it by b x kReferenceSeconds.
+// The time constant of gCorrection's slip reference (D-203 (a), (ai)): it integrates the longitudinal
+// acceleration less the estimated accelerometer offset and is pulled towards the wheel by dt /
+// kReferenceSeconds per sample, so a wheel that leaves the car progressively (a lock building over several
+// samples, a driven wheel spinning up) parts from it. While the wheel is followed the same error also
+// estimates the offset (gain dt / (4 kReferenceSeconds^2): critically damped), so a constant offset b moves
+// the reference by at most 2 b kReferenceSeconds / e (0.74 b) and then not at all.
 constexpr double kReferenceSeconds = 1.0;
+// The longest prediction (D-203 (ai)): a wheel that is still outside the band this long after the prediction
+// started is taken as right again, and the prediction's drift from it over that time as accelerometer offset.
+constexpr Micros kMaxPredictMicros = 3'000'000;
 
 // The value of `s` at t with the Linear policy (store::Resampler rule 13): the sample at an exact hit, else
 // the interpolation of the bracketing samples; false when either is invalid or t lies outside the samples.
@@ -95,12 +100,20 @@ Result<UniformSignal> CorrectedSpeed::gCorrection(const UniformSignal& wheelSpee
 
     enum class State : std::uint8_t { Follow, Predict, Recover };
     State state = State::Follow;
-    bool have = false; // the previous output is valid
-    double prev = 0.0; // v_corr[i-1]
-    double ref = 0.0;  // the slip reference (D-203 (a)); the output itself while predicting
+    bool have = false;      // the previous output is valid
+    bool anchored = false;  // Recover after a time-out: the per-sample test starts from the wheel
+    double prev = 0.0;      // v_corr[i-1]
+    double prevWheel = 0.0; // v_wheel[i-1]
+    double ref = 0.0;       // the slip reference (D-203 (a)); the output itself while predicting
+    double bias = 0.0;      // the estimated accelerometer offset, m/s^2 (D-203 (ai))
     const double pull = std::min(1.0, dt / kReferenceSeconds);
+    // The offset's gain per unit of reference error; capped at 1 / dt, which keeps the estimate stable at
+    // rates below 1 / kReferenceSeconds (where the reference restarts on the wheel every sample).
+    const double learn = std::min(dt / (4.0 * kReferenceSeconds * kReferenceSeconds), 1.0 / dt);
     double offset = 0.0; // Recover: v_corr - v_wheel when the blend started
     Micros blendStart = 0;
+    Micros predictStart = 0; // the first sample of the current prediction
+    double predictGap = 0.0; // v_corr - v_wheel there
     for (std::size_t i = 0; i < n; ++i) {
         const double wheel = wheelSpeedMps.values[i];
         if (!wheelSpeedMps.validAt(i) || !std::isfinite(wheel)) {
@@ -115,17 +128,36 @@ Result<UniformSignal> CorrectedSpeed::gCorrection(const UniformSignal& wheelSpee
             state = State::Follow; // nothing to predict from: follow the wheel
             ref = wheel;
         } else {
-            const double predicted = prev + accel * dt;
-            const double referenced = ref + accel * dt;
+            const double a = accel - bias;
+            const double predicted = (state == State::Recover && anchored ? prevWheel : prev) + a * dt;
+            const double referenced = ref + a * dt;
             // 03 section 9.1 item 3 compares the wheel with the previous output plus a dt, a per-sample test
             // that a slip building over several samples never fails; the reference catches that too.
             const bool sudden = wheel < predicted - threshold || wheel > predicted + threshold;
             const bool progressive =
                 state != State::Predict && (wheel < referenced - threshold || wheel > referenced + threshold);
-            if (sudden || progressive) {
+            if (state == State::Predict && sudden && t - predictStart >= kMaxPredictMicros) {
+                // No slip lasts this long: the wheel is right, and what the prediction gained on it since it
+                // started is the accelerometer's offset. Back to the wheel; the reference restarts on it.
+                bias += (predicted - wheel - predictGap) / (static_cast<double>(t - predictStart) / 1e6);
+                ref = wheel;
+                anchored = true;
+                if (recover > 0.0) {
+                    offset = predicted - wheel;
+                    blendStart = t;
+                    v = predicted;
+                    state = State::Recover;
+                } else {
+                    state = State::Follow;
+                }
+            } else if (sudden || progressive) {
                 // Lock (below) or spin (above): follow the prediction, from the reference when only it saw
                 // the slip (the previous output already followed the wheel away).
                 v = state != State::Predict && !sudden ? referenced : predicted;
+                if (state != State::Predict) {
+                    predictStart = t;
+                    predictGap = v - wheel;
+                }
                 state = State::Predict;
                 ref = v;
             } else if (state == State::Predict) {
@@ -134,24 +166,31 @@ Result<UniformSignal> CorrectedSpeed::gCorrection(const UniformSignal& wheelSpee
                     blendStart = t;
                     v = predicted;
                     state = State::Recover;
+                    anchored = false;
+                    ref = referenced + pull * (wheel - referenced);
                 } else {
                     state = State::Follow;
+                    ref = wheel;
                 }
             } else if (state == State::Recover) {
                 const double f = static_cast<double>(t - blendStart) / 1e6 / recover;
-                if (f >= 1.0) {
+                if (f >= 1.0) { // back on the wheel: the reference restarts on it
                     state = State::Follow;
+                    ref = wheel;
                 } else {
                     v = wheel + offset * (1.0 - f);
+                    ref = referenced + pull * (wheel - referenced);
                 }
-            }
-            if (state != State::Predict) {
-                ref = referenced + pull * (wheel - referenced);
+            } else { // Follow: the reference's error also estimates the offset
+                const double error = referenced - wheel;
+                ref = referenced - pull * error;
+                bias += learn * error;
             }
         }
         out.values[i] = v;
         out.valid[i] = 1;
         prev = v;
+        prevWheel = wheel;
         have = true;
     }
     if (std::all_of(out.valid.begin(), out.valid.end(), [](std::uint8_t f) { return f != 0; })) {

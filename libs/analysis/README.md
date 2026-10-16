@@ -193,7 +193,10 @@ D-194 records the readings the design leaves open. In short:
 - **`CorrectedSpeed`**: `alternateList` takes the first engaged candidate and clamps it; `compute()` reads the
   list only up to its first usable channel. `gCorrection` follows 03 §9.1 item 3 with a linear blend of the
   difference back to the wheel over `recoverSeconds`; the first sample, a missing acceleration and the sample
-  after an invalid wheel sample follow the wheel; an invalid wheel sample is invalid. In `compute()` the
+  after an invalid wheel sample follow the wheel; an invalid wheel sample is invalid. Besides the per-sample
+  test, a slip reference (1 s) catches slips that build over several samples (D-203 (a)); the acceleration is
+  taken less an offset estimated while the wheel is followed, and a prediction ends after 3 s, so an
+  accelerometer offset cannot hold the output off the wheel for good (D-203 (ai)). In `compute()` the
   longitudinal-G channel is converted through the registry when it has a unit (an acceleration) and taken in G
   otherwise; either channel unusable is NotFound `E-CSD-NO-SPEED` naming it (no fallback: the maths module lists
   exactly these two inputs).

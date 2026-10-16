@@ -2065,7 +2065,8 @@ their owner. The letters are cited in the code and the tests. The per-finding re
 against the previous output plus a dt), a reference integrates the longitudinal acceleration and is pulled
 towards the wheel by dt / 1 s per sample; a wheel that leaves the reference by more than the lock threshold also
 switches to prediction, from the reference. A lock or a spin that builds over several samples passes the
-per-sample test every time and is now caught; an accelerometer offset b moves the reference by at most b x 1 s.
+per-sample test every time and is now caught; an accelerometer offset b moves the reference by at most b x 1 s
+(refined by (ai)).
 (b) **Report rows and units** (refines D-197). With `includeUntrusted` off an untrusted lap is cut out of every
 row that contains it, not only of lap rows (an outing, a detail heading or no heading); a heading named after a
 detail group (Events, Vehicles, Sessions) labels the row with that group's detail (Event, Vehicle Id, Session)
@@ -2156,7 +2157,30 @@ provisional PNGs (D-127). (ag) **Rejected findings**: the time report's band ord
 apply in list order, which is what is built), the time-linear heading correction (measured, (f)). (ah) **Help >
 Keyboard Shortcuts** (06 §2.2, §15 item 5) is the menu command `help.keyboard_shortcuts`, which opens the palette
 with the query `?` and widens its key column; like Component > Add (`component.add`) it has no keymap row,
-because 06 §14.4 gives it no id and the keymap mirrors that table.
+because 06 §14.4 gives it no id and the keymap mirrors that table. (ai) **gCorrection under an accelerometer
+offset** (refines (a); found by the re-verification of the pass). The reference of (a) settles b x 1 s from the
+wheel, so a constant offset above lockThreshold / 1 s (2 m/s^2 by default) started a prediction with no slip at
+all; the per-sample test then compared the wheel with a prediction drifting at b, and the output never came back
+(121.7 m/s off after 60 s at b = 2.1 m/s^2, 10 and 100 Hz alike). With any offset, a slip long enough for the
+prediction to drift past the lock threshold latched the same way (a simulated 120 s lap with random slips: 3 of
+40 runs at 0.5 m/s^2, all 40 at 1 m/s^2). Now: (1) the prediction and the reference integrate the acceleration
+less an estimated offset b, which the reference's error updates while the wheel is followed (gain dt / (4 x
+(1 s)^2) per m/s, critically damped): a constant offset is learnt without overshoot and moves the reference by
+at most 2 b x 1 s / e (0.74 b), so one below about 2.7 m/s^2 never starts a prediction on clean data. The
+reference restarts on the wheel whenever the output is back on it, so the offset is learnt only from followed
+samples; the hand-computed cases of 03 §9.1 item 3 keep their values (their estimate stays 0). (2) A prediction
+lasts at most 3 s: a wheel still outside the band then is taken as right, b gains the prediction's mean drift from
+the wheel over those 3 s (what an offset would have caused), and the output blends back over `recoverSeconds`,
+the blend's per-sample test starting from the previous wheel sample rather than the output. No offset keeps the
+output off the wheel for more than 3 s + `recoverSeconds` at a time, and a constant one does so at most once
+(5 m/s^2 from the first sample: at most 2 + 5 x (dt + 3 s) = 17.5 m/s off, on the wheel for good from 4.0 s at
+10 Hz). (3) The remaining excursion is inherent: for its first 2 s a constant 5 m/s^2 offset is the same input,
+mirrored, as the 5 m/s^2 spin-up that (a) must bridge, so no causal rule stays on the wheel there. A slip longer
+than 3 s is not bridged and teaches a wrong offset, which the next time-out corrects. Not chosen: leaving the
+prediction when the wheel's rate agrees with the acceleration (it does at the top of every smooth slip and under
+a steady slip ratio), and an offset estimated over the whole log (the output at a time would depend on later
+samples). Before/after (constant 30 m/s wheel, 60 s): b = 2.1 and 2.5 m/s^2 now output the wheel sample for
+sample (121.7 and 147.8 m/s off before); b = 5 m/s^2 is off by at most 16.7 m/s for 3.5 s (299 m/s before).
 **Consequences.** Every finding that held has a regression test; the remaining gaps are listed in M3.md §6 with an
 owner. No M1 golden changed; the track position goldens changed with (e) and the zoom summary @2x goldens with
 (q) (DrawList JSON exact, PNGs provisional).

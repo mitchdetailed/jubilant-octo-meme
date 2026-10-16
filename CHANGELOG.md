@@ -4,6 +4,14 @@ All notable changes are recorded here, newest first. The project follows semanti
 
 ## Unreleased (M3)
 
+- The re-verification of the M3 fix pass (D-203 (ai)): `gCorrection` estimates the longitudinal accelerometer's
+  offset while it follows the wheel (from the 1 s slip reference's error, critically damped) and ends a
+  prediction after 3 s, taking its drift from the wheel as offset, so an offset can no longer latch the
+  prediction: a constant 30 m/s wheel under a 2.1 or 2.5 m/s^2 offset now gives the wheel sample for sample (121.7
+  and 147.8 m/s off after 60 s before), under 5 m/s^2 one excursion of at most 3.5 s (at most 16.7 m/s off) and
+  then the wheel; a lock under a 2.5 m/s^2 offset is still bridged (within 0.07 m/s of the car). The
+  `CorrectedSpeed::gCorrection` header describes the algorithm as built. The keymap harness's palette rows
+  (AC-M3-12) send the user's key events: CTRL+SHIFT+P, the command id typed, DOWN, ENTER.
 - The M3 fix pass (D-203): the 89 findings of the M3 reviews checked one by one, 80 fixed with a regression
   test, 2 rejected, 7 deferred. Engine: `gCorrection` catches a lock or spin that builds over several samples (a
   slip reference with a 1 s time constant); the channel report's Overlay 0 delta pairs rows below the compared

@@ -145,18 +145,31 @@ public:
     // "E-CSD-NO-SPEED" when no candidate is engaged.
     static Result<AlternateListChoice> alternateList(std::span<const std::optional<UniformSignal>> candidates,
                                                      const SpeedClamp& clamp);
-    // Item 3, gCorrection: v_pred[i] = v_out[i-1] + a_long[i] * dt; where the wheel speed leaves
-    // v_pred +- lockThreshold (lock or spin) the output follows v_pred, otherwise it blends back to the wheel
-    // speed linearly over recoverSeconds; then the clamp. Stateful, F64, on the wheel speed's grid (the
-    // longitudinal acceleration resampled Linear onto it; m/s^2, i.e. the G channel already converted).
-    // Invalid for a signal without a rate. Not bit-identical to other tools (outline section 9 risk).
+    // Item 3, gCorrection, as refined by D-203 (a) and (ai). Stateful, F64, on the wheel speed's grid (the
+    // longitudinal acceleration resampled Linear onto it; m/s^2, i.e. the G channel already converted), then
+    // the clamp. Invalid for a signal without a rate. Not bit-identical to other tools (outline section 9
+    // risk). With a = a_long[i] - b (b the estimated accelerometer offset, below) and T = lockThreshold:
+    //  - Follow (the output is the wheel speed). A slip starts when the wheel leaves v_pred +- T, v_pred =
+    //    v_out[i-1] + a * dt (item 3's per-sample test: a sudden lock or spin), or leaves r +- T, where the
+    //    slip reference r integrates a and is pulled towards the wheel by dt / 1 s per sample (a slip that
+    //    builds over several samples); the prediction then starts at v_pred, or at r when only r saw it.
+    //    While following, the reference error r - v_wheel also updates b by dt / 4 s^2 per m/s (critically
+    //    damped), so a constant offset is learnt, and one below about 1.36 T / 1 s (2.7 m/s^2 at the default
+    //    threshold) never starts a prediction on clean data.
+    //  - Predict: v_out = v_out[i-1] + a * dt while the wheel stays outside v_pred +- T. Back inside: the
+    //    blend starts at v_pred and decays the difference linearly, v_out = v_wheel + (v_pred[r] -
+    //    v_wheel[r]) * (1 - (t - t_r) / recoverSeconds) until t - t_r reaches recoverSeconds
+    //    (recoverSeconds <= 0: straight back to the wheel); leaving the band during the blend predicts
+    //    again. A prediction lasts at most 3 s: a wheel still outside the band then is taken as right, b
+    //    gains the prediction's mean drift from the wheel over those 3 s (what an offset would have
+    //    caused), and the blend back starts there, its per-sample test from the previous wheel sample rather
+    //    than the output. So no offset keeps the output off the wheel for more than 3 s + recoverSeconds at
+    //    a time, and a constant one at most once.
+    //  - The reference restarts on the wheel whenever the output is back on it (Follow resumes), so the
+    //    offset is learnt only from samples where the wheel is followed.
     // Fixed here (03 section 9.1 leaves them open): the first valid wheel sample, a sample where the
     // acceleration is invalid or outside its samples, and the sample after an invalid wheel sample output
-    // the wheel speed (nothing to predict from); an invalid wheel sample gives an invalid output. The blend
-    // starts at the first sample back inside the band at v_pred and decays the difference linearly:
-    // v_out = v_wheel + (v_pred[r] - v_wheel[r]) * (1 - (t - t_r) / recoverSeconds) until t - t_r reaches
-    // recoverSeconds (recoverSeconds <= 0: straight back to the wheel); leaving the band again during the
-    // blend follows v_pred again.
+    // the wheel speed (nothing to predict from); an invalid wheel sample gives an invalid output.
     static Result<UniformSignal> gCorrection(const UniformSignal& wheelSpeedMps,
                                              const UniformSignal& longAccelMps2,
                                              const GCorrectionSettings& settings, const SpeedClamp& clamp);

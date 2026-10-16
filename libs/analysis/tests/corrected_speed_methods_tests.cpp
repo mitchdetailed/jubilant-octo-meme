@@ -3,8 +3,9 @@
 //
 // CorrectedSpeed::alternateList and CorrectedSpeed::gCorrection (03 section 9.1 items 2-3, D-084; 07 section
 // 6.1): the first engaged candidate with the clamp; the lock/spin correction against a hand-computed
-// reference (prediction while the wheel leaves the band, a linear blend back over recoverSeconds), and both
-// through CorrectedSpeed::compute.
+// reference (prediction while the wheel leaves the band, a linear blend back over recoverSeconds), the slip
+// reference, offset estimate and bounded prediction of D-203 (a) and (ai), and both through
+// CorrectedSpeed::compute.
 #include "analysis_test_support.hpp"
 
 #include <esses/units/unit_registry.hpp>
@@ -14,6 +15,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
@@ -185,6 +188,115 @@ TEST_CASE("corrected_speed_methods: gCorrection catches a slip that builds over 
         REQUIRE(out.ok());
         checkSignal(*out, wheel);
     }
+}
+
+TEST_CASE("corrected_speed_methods: a constant accelerometer offset never holds gCorrection off the wheel",
+          "[unit]") {
+    // D-203 (ai): a car at a constant 30 m/s with no slip at all, the logged acceleration a constant offset
+    // b, 60 s at 10 and 100 Hz, the default lock threshold (2 m/s) and recoverSeconds (0.5 s). Before (ai)
+    // the slip reference settled b x 1 s from the wheel, so any b above 2 m/s^2 started a prediction that
+    // drifted away for good (121.7 m/s off after 60 s at b = 2.1).
+    const GCorrectionSettings defaults{};
+    for (const std::uint32_t hz : {10U, 100U}) {
+        const auto n = static_cast<std::size_t>(60 * hz);
+        const UniformSignal wheel = uniformSignal(hz, std::vector<double>(n, 30.0));
+        const double dt = 1.0 / static_cast<double>(hz);
+        for (const double b : {2.1, 2.5}) {
+            INFO(hz << " Hz, offset " << b << " m/s^2");
+            // Hand-derived: while following, the reference error from rest under a constant offset is
+            // b t e^(-t / 2 s) (critically damped, 1 s time constant), at most 2 b / e = 0.74 b s, i.e. 1.55
+            // and 1.84 m/s (1.86 with the 10 Hz steps), below the threshold: no prediction ever starts, the
+            // output is the wheel sample for sample, and the estimate settles on b.
+            auto out = CorrectedSpeed::gCorrection(wheel, uniformSignal(hz, std::vector<double>(n, b)),
+                                                   defaults, SpeedClamp{});
+            REQUIRE(out.ok());
+            checkSignal(*out, wheel.values);
+        }
+        for (const double b : {5.0, -5.0}) {
+            INFO(hz << " Hz, offset " << b << " m/s^2");
+            // A 5 m/s^2 offset cannot be told from a slip at first: for two seconds it is the input of the
+            // spin-up of "catches a slip that builds over several samples" (mirrored), which must be bridged,
+            // so the reference starts a prediction (b t e^(-t / 2 s) reaches 2 m/s at 0.52 s). Hand-derived
+            // bound: the prediction starts within the threshold plus one step of the wheel and drifts by at
+            // most |b| per second (the estimate learnt so far has b's sign and is smaller) for at most 3 s,
+            // so |v - wheel| <= 2 + |b| (dt + 3 s) = 17.5 m/s at 10 Hz. The time-out then learns b and the
+            // blend back lasts 0.5 s: from 1 + 3 + 0.5 s at the latest (5 s here) the output is the wheel,
+            // for good.
+            auto out = CorrectedSpeed::gCorrection(wheel, uniformSignal(hz, std::vector<double>(n, b)),
+                                                   defaults, SpeedClamp{});
+            REQUIRE(out.ok());
+            REQUIRE(out->size() == n);
+            CHECK(out->valid.empty());
+            double worst = 0.0;
+            std::size_t offAfter5s = 0; // samples from 5 s on that are not the wheel
+            for (std::size_t i = 0; i < n; ++i) {
+                worst = std::max(worst, std::abs(out->values[i] - 30.0));
+                if (i >= 5 * hz && out->values[i] != 30.0) {
+                    ++offAfter5s;
+                }
+            }
+            CHECK(worst <= 2.0 + std::abs(b) * (dt + 3.0));
+            CHECK(offAfter5s == 0);
+        }
+    }
+}
+
+TEST_CASE("corrected_speed_methods: gCorrection bridges a lock under an accelerometer offset", "[unit]") {
+    // D-203 (ai): the logged acceleration reads 2.5 m/s^2 high (or low) throughout. 30 m/s for 10 s, then
+    // braking at 10 m/s^2 to 10 m/s at 12 s, then 10 m/s; the wheel locks (0 m/s) from 10.5 to 11.1 s while
+    // the car slows from 25 to 19 m/s. The car's samples step by exactly a dt (no timing skew).
+    for (const std::uint32_t hz : {10U, 100U}) {
+        for (const double b : {2.5, -2.5}) {
+            INFO(hz << " Hz, offset " << b << " m/s^2");
+            const auto n = static_cast<std::size_t>(15 * hz);
+            std::vector<double> car(n);
+            std::vector<double> wheel(n);
+            std::vector<double> accel(n);
+            for (std::size_t i = 0; i < n; ++i) {
+                const bool braking = i > 10 * hz && i <= 12 * hz;
+                car[i] = i <= 10 * hz ? 30.0
+                         : braking ? 30.0 - 10.0 * static_cast<double>(i - 10 * hz) / static_cast<double>(hz)
+                                   : 10.0;
+                accel[i] = (braking ? -10.0 : 0.0) + b;
+                const bool locked = 2 * i >= 21 * hz && 10 * i < 111 * hz; // [10.5 s, 11.1 s)
+                wheel[i] = locked ? 0.0 : car[i];
+            }
+            auto out = CorrectedSpeed::gCorrection(uniformSignal(hz, wheel), uniformSignal(hz, accel),
+                                                   GCorrectionSettings{}, SpeedClamp{});
+            REQUIRE(out.ok());
+            // Hand-derived: after 10 s of cruise the critically damped estimate is within
+            // |b| (1 + t / 2 s) e^(-t / 2 s) = 0.10 m/s^2 of the offset (about 0.11 with the 10 Hz steps, and
+            // it keeps learning while braking). The wheel drops 25 m/s in one sample, so the per-sample test
+            // predicts from the car's speed at once; over the 0.6 s lock the prediction drifts by at most
+            // 0.11 x 0.6 = 0.07 m/s, and the blend back starts from there. The wheel itself is 19-25 m/s off.
+            double worst = 0.0;
+            double wheelWorst = 0.0;
+            for (std::size_t i = 0; i < n; ++i) {
+                worst = std::max(worst, std::abs(out->values[i] - car[i]));
+                wheelWorst = std::max(wheelWorst, std::abs(wheel[i] - car[i]));
+            }
+            CHECK(wheelWorst >= 19.0);
+            CHECK(worst < 0.1);
+        }
+    }
+}
+
+TEST_CASE("corrected_speed_methods: the default fastestWheel method does not read the long-G channel",
+          "[unit]") {
+    // gCorrection off (the default method): a layer with a strongly offset G channel gives exactly the
+    // per-sample larger front wheel, and the G channel is no input.
+    TestCache tc;
+    model::DataLayer layer;
+    layer.addChannel(channel("Wheel Speed FL", tc.uniform(Rate::fromHz(10), {20, 21, 0, 0, 23})));
+    layer.addChannel(channel("Wheel Speed FR", tc.uniform(Rate::fromHz(10), {19, 22, 21, 22, 24})));
+    layer.addChannel(channel("G Force Long", tc.uniform(Rate::fromHz(10), std::vector<double>(5, 0.5))));
+    const CorrectedSpeedSettings s{};
+    CHECK(s.method == SpeedMethod::FastestWheel);
+    auto r = CorrectedSpeed::compute(s, layer, registry(), {});
+    REQUIRE(r.ok());
+    CHECK(r->inputs == std::vector<std::string>{"Wheel Speed FL", "Wheel Speed FR"});
+    CHECK(r->diagnostics.empty());
+    checkSignal(r->speedMps, {20, 22, 21, 22, 24});
 }
 
 TEST_CASE("corrected_speed_methods: gCorrection with invalid samples, a late acceleration and the clamp",

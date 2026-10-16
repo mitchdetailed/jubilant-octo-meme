@@ -87,6 +87,7 @@
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QSet>
+#include <QSignalSpy>
 #include <QTabWidget>
 #include <QTableView>
 #include <QTemporaryDir>
@@ -1299,15 +1300,25 @@ private Q_SLOTS:
         before.inDock = context == QLatin1String("data_window") || fromDock;
 
         if (viaPalette) {
-            // CTRL+SHIFT+P in the row's context, the command picked by its id, ENTER (AC-M3-12).
-            QVERIFY(f.w->commands().invoke(QStringLiteral("view.command_palette")));
+            // AC-M3-12 with the user's key events: CTRL+SHIFT+P at the row's focus, the command id typed into
+            // the query, DOWN to the command's first row, ENTER.
             CommandPalette& palette = f.w->commandPalette();
+            auto* query = palette.findChild<QLineEdit*>(QStringLiteral("paletteQuery"));
+            QVERIFY(query != nullptr);
+            QTest::keyClick(QApplication::focusWidget(), Qt::Key_P, Qt::ControlModifier | Qt::ShiftModifier);
             QTRY_VERIFY(palette.isVisible());
-            palette.setQuery(command);
+            QTRY_COMPARE(QApplication::focusWidget(), static_cast<QWidget*>(query));
+            QTest::keyClicks(query, command);
+            QCOMPARE(palette.query(), command);
             const qsizetype at = palette.visibleIds().indexOf(command);
             QVERIFY2(at >= 0, qPrintable(command + QStringLiteral(" is not listed by the palette")));
-            palette.setCurrentRow(static_cast<int>(at));
-            QVERIFY2(palette.invokeCurrent(),
+            for (qsizetype down = 0; down < at; ++down) {
+                QTest::keyClick(query, Qt::Key_Down);
+            }
+            QCOMPARE(palette.currentRow(), static_cast<int>(at));
+            QSignalSpy ran(&palette, &CommandPalette::invoked);
+            QTest::keyClick(query, Qt::Key_Return);
+            QVERIFY2(ran.count() == 1 && ran.at(0).at(0).toString() == command,
                      qPrintable(command + QStringLiteral(" did not run from the palette")));
         } else if (c.gesture) {
             c.gesture(f, arg); // a mouse row
