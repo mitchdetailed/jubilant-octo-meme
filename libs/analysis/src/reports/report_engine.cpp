@@ -61,6 +61,11 @@ struct Scan {
     double shift = 0.0;
     double sum = 0.0; // of (v - shift)
     double sumSq = 0.0;
+    // A uniform series covers the interval's bounds when it has a sample within one sample period of them;
+    // a series that starts (ends) inside the interval has no "first (last) sample of the range" and its start
+    // (end) needs the probe (D-197 (a)). A timestamped series always counts as covering them.
+    bool coversStart = true;
+    bool coversEnd = true;
 
     void addSample(std::int64_t pos) noexcept {
         if (samples == 0) {
@@ -102,6 +107,54 @@ struct Scan {
         ++valid;
     }
 };
+
+// Appends the scan of a later, disjoint interval (both in times) to `into`: the trusted pieces of a row that
+// untrusted laps were cut out of (D-197 (b)). The sums move to into's shift exactly (sum of (v - a) over the
+// later piece is sum + n (b - a), and the squares follow), extremes keep the earlier position on a tie.
+void appendScan(Scan& into, const Scan& next) noexcept {
+    if (next.samples == 0) {
+        return;
+    }
+    if (into.samples == 0) {
+        into = next;
+        return;
+    }
+    into.lastSample = next.lastSample;
+    into.samples += next.samples;
+    into.coversEnd = next.coversEnd;
+    if (next.valid == 0) {
+        return;
+    }
+    if (into.valid == 0) {
+        const std::int64_t samples = into.samples;
+        const std::int64_t firstSample = into.firstSample;
+        const bool coversStart = into.coversStart;
+        into = next;
+        into.samples = samples;
+        into.firstSample = firstSample;
+        into.coversStart = coversStart;
+        return;
+    }
+    const auto n = static_cast<double>(next.valid);
+    const double d = next.shift - into.shift;
+    into.sumSq += next.sumSq + 2.0 * d * next.sum + n * d * d;
+    into.sum += next.sum + n * d;
+    if (next.min < into.min) {
+        into.min = next.min;
+        into.minPos = next.minPos;
+    }
+    if (next.max > into.max) {
+        into.max = next.max;
+        into.maxPos = next.maxPos;
+    }
+    if (next.absMax > into.absMax) {
+        into.absMax = next.absMax;
+        into.absMaxPos = next.absMaxPos;
+    }
+    into.lastValidPos = next.lastValidPos;
+    into.lastValid = next.lastValid;
+    into.valid += next.valid;
+}
 
 // The extreme of two lanes: `better` takes the candidate, equal values keep the earlier index (the first
 // occurrence).
@@ -321,6 +374,9 @@ Result<Scan> scanSeries(const store::Series& series, Micros start, Micros end, c
             }
         }
         const auto timeOf = [u](std::int64_t i) { return u->timeAt(i); };
+        const Micros period = u->timeAt(1) - u->timeAt(0);
+        s.coversStart = first > 0 || timeOf(first) - start < period;
+        s.coversEnd = last < n - 1 || end - timeOf(last) <= period;
         s.firstSample = timeOf(s.firstSample);
         s.lastSample = timeOf(s.lastSample);
         if (s.valid > 0) {
@@ -378,7 +434,8 @@ StatValue startOf(const Scan& s, Micros rangeStart, Micros probeUs, const Edges&
     if (edges.start) {
         return StatValue{*edges.start, rangeStart, true};
     }
-    if (s.valid > 0 && (s.firstValidPos == s.firstSample || s.firstValidPos - rangeStart <= probeUs)) {
+    if (s.valid > 0 &&
+        ((s.firstValidPos == s.firstSample && s.coversStart) || s.firstValidPos - rangeStart <= probeUs)) {
         return StatValue{s.firstValid, s.firstValidPos, true};
     }
     return {};
@@ -388,7 +445,8 @@ StatValue endOf(const Scan& s, Micros rangeEnd, Micros probeUs, const Edges& edg
     if (edges.end) {
         return StatValue{*edges.end, rangeEnd, true};
     }
-    if (s.valid > 0 && (s.lastValidPos == s.lastSample || rangeEnd - s.lastValidPos <= probeUs)) {
+    if (s.valid > 0 &&
+        ((s.lastValidPos == s.lastSample && s.coversEnd) || rangeEnd - s.lastValidPos <= probeUs)) {
         return StatValue{s.lastValid, s.lastValidPos, true};
     }
     return {};
@@ -458,6 +516,14 @@ Result<Edges> edgesFor(const store::Series& series, Micros start, Micros end, co
 struct Row {
     std::size_t source = 0; // index into ReportInputs::sources
     std::vector<std::string> path;
+    // The names of the path's levels that lie inside the source range (sections of a lap, laps of an outing):
+    // the Main row pairs with the Overlay 0 row of the same pairKey (D-197 (c)). The levels at or above the
+    // source range (the range itself, an enclosing outing, a detail label) differ between Main and Overlay 0
+    // whenever they compare different laps, outings or drivers, so they never take part.
+    std::vector<std::string> pairKey;
+    // The trusted pieces of [start, end) when untrusted laps were cut out of it (D-197 (b)); empty: the
+    // whole.
+    std::vector<std::pair<Micros, Micros>> pieces;
     Micros start = 0;
     Micros end = 0;
     bool trusted = true;
@@ -467,9 +533,62 @@ struct Row {
     bool hidden = false; // an Overlay 0 row kept only to pair the delta columns (excludeOverlays)
 };
 
-std::string detailLabel(const model::DataSource& src, std::string_view id) {
+// The detail-group headings of the circuit profile (data/rules/circuit.detail-groups.rule.json): the heading
+// a picker offers, the detail it reads and the label of a source without that detail (D-197 (b)). A heading
+// outside the table reads the detail of its own name and is "" without one.
+struct DetailHeading {
+    std::string_view heading;
+    std::string_view detail;
+    std::string_view missing;
+};
+constexpr std::array<DetailHeading, 6> kDetailHeadings{{{"Events", "Event", "(no event)"},
+                                                        {"Vehicles", "Vehicle Id", "(no vehicle)"},
+                                                        {"Sessions", "Session", "(no session)"},
+                                                        {"Driver", "Driver", "(no driver)"},
+                                                        {"Vehicle Id", "Vehicle Id", "(none)"},
+                                                        {"Vehicle Number", "Vehicle Number", "(none)"}}};
+
+std::string detailLabel(const model::DataSource& src, std::string_view heading) {
+    std::string_view id = heading;
+    std::string_view missing;
+    for (const DetailHeading& h : kDetailHeadings) {
+        if (h.heading == heading) {
+            id = h.detail;
+            missing = h.missing;
+            break;
+        }
+    }
     const model::Detail* d = model::findDetail(src.details, id);
-    return d != nullptr ? model::detailValueText(d->value) : std::string();
+    if (d == nullptr) {
+        return std::string(missing);
+    }
+    std::string text = model::detailValueText(d->value);
+    return text.empty() ? std::string(missing) : text;
+}
+
+// [start, end) minus the untrusted laps of `laps` (time-ordered, disjoint); empty when nothing remains.
+std::vector<std::pair<Micros, Micros>> trustedPieces(Micros start, Micros end,
+                                                     const model::RangeGroup* laps) {
+    std::vector<std::pair<Micros, Micros>> out;
+    Micros at = start;
+    if (laps != nullptr) {
+        for (const model::Range& lap : laps->ranges) {
+            if (lap.start >= end) {
+                break;
+            }
+            if (lap.trusted || lap.end <= at) {
+                continue;
+            }
+            if (lap.start > at) {
+                out.emplace_back(at, lap.start);
+            }
+            at = std::max(at, lap.end);
+        }
+    }
+    if (at < end) {
+        out.emplace_back(at, end);
+    }
+    return out;
 }
 
 // The rows of one source range, divided by the headers in order (see the header file).
@@ -498,6 +617,10 @@ void divide(const ReportSpec& spec, const ReportSource& source, std::size_t sour
     if (spec.headers.empty()) {
         rows.front().path.push_back(range.name);
     }
+    // A level inside the source range: a group range that does not enclose the whole source range.
+    const auto inside = [&range](const model::Range& g) {
+        return g.start > range.start || g.end < range.end;
+    };
     for (const std::string& header : spec.headers) {
         std::vector<Row> next;
         const model::RangeGroup* group = resolved.layer->ranges.find(header);
@@ -522,6 +645,9 @@ void divide(const ReportSpec& spec, const ReportSource& source, std::size_t sour
                 }
                 Row child = r;
                 child.path.push_back(g.name);
+                if (inside(g)) {
+                    child.pairKey.push_back(g.name);
+                }
                 child.start = a;
                 child.end = b;
                 child.trusted = r.trusted && g.trusted;
@@ -534,7 +660,20 @@ void divide(const ReportSpec& spec, const ReportSource& source, std::size_t sour
         }
         rows = std::move(next);
     }
+    // Untrusted data stays out of every row (D-197 (b)): the untrusted laps are cut out of rows coarser than
+    // a lap (an outing, a detail heading); a row that lies wholly in them is dropped.
+    const model::RangeGroup* laps =
+        spec.options.includeUntrusted ? nullptr : resolved.layer->ranges.find("Outings:Laps");
     for (Row& r : rows) {
+        if (laps != nullptr) {
+            std::vector<std::pair<Micros, Micros>> pieces = trustedPieces(r.start, r.end, laps);
+            if (pieces.empty()) {
+                continue;
+            }
+            if (pieces.size() > 1 || pieces.front() != std::make_pair(r.start, r.end)) {
+                r.pieces = std::move(pieces);
+            }
+        }
         out.push_back(std::move(r));
     }
 }
@@ -603,24 +742,70 @@ struct ColumnPlan {
     ReportStat stat = ReportStat::Avg;
     bool delta = false;
     std::size_t statColumn = 0; // a delta column: the column it takes the difference of
+    bool hidden = false;        // a min or max the display conversion of min/max/absMax needs (not shown)
 };
 
-double toDisplay(ReportStat stat, double v, const units::Converter& c) noexcept {
+// The base minimum and maximum of a (row, channel), for the conversions that need both.
+struct Extremes {
+    std::optional<StatValue> min;
+    std::optional<StatValue> max;
+};
+
+// A base-unit statistic in the display unit of `c` (an affine x -> a x + b). Values convert with c; a
+// difference with |a| when it is a magnitude (delta, stdDev) and with a when it is signed (change). A
+// negative scale swaps the minimum and the maximum; the largest display magnitude of an affine c lies at the
+// base minimum or maximum, so absMax is max(|c(min)|, |c(max)|) (exactly |a| absMax when b is 0).
+double toDisplay(ReportStat stat, double v, const units::Converter& c, const Extremes& e) noexcept {
     switch (stat) {
     case ReportStat::Change:
+        return c.a * v;
     case ReportStat::Delta:
-        return c.a * v; // a difference: the scale only
     case ReportStat::StdDev:
         return std::abs(c.a) * v;
-    case ReportStat::Avg:
     case ReportStat::Min:
+        return c.a < 0.0 && e.max && e.max->valid ? c(e.max->value) : c(v);
     case ReportStat::Max:
+        return c.a < 0.0 && e.min && e.min->valid ? c(e.min->value) : c(v);
     case ReportStat::AbsMax:
+        if (c.b != 0.0 && e.min && e.max && e.min->valid && e.max->valid) {
+            return std::max(std::abs(c(e.min->value)), std::abs(c(e.max->value)));
+        }
+        return std::abs(c.a) * v;
+    case ReportStat::Avg:
     case ReportStat::Start:
     case ReportStat::End:
         break;
     }
     return c(v);
+}
+
+std::uint64_t piecesHashOf(const std::vector<std::pair<Micros, Micros>>& pieces) {
+    if (pieces.empty()) {
+        return 0;
+    }
+    Hash128Stream h;
+    for (const auto& [a, b] : pieces) {
+        h.updateU64(static_cast<std::uint64_t>(a));
+        h.updateU64(static_cast<std::uint64_t>(b));
+    }
+    return h.digest().lo | 1u;
+}
+
+// One scan over the row's interval, or over its trusted pieces.
+Result<Scan> scanRow(const store::Series& series, Micros start, Micros end,
+                     const std::vector<std::pair<Micros, Micros>>& pieces, const CancelToken& cancel) {
+    if (pieces.empty()) {
+        return scanSeries(series, start, end, cancel);
+    }
+    Scan acc;
+    for (const auto& [a, b] : pieces) {
+        Result<Scan> one = scanSeries(series, a, b, cancel);
+        if (!one) {
+            return Failure{one.error()};
+        }
+        appendScan(acc, *one);
+    }
+    return acc;
 }
 
 std::uint64_t optionsHashOf(const ReportOptions& options, store::Interp interp) {
@@ -699,11 +884,23 @@ Result<ReportTable> ReportEngine::cells(const ReportSpec& spec, const ReportInpu
     // Columns: (channel, stat) in spec order, each followed by its delta column.
     std::vector<ColumnPlan> plan;
     for (std::size_t ch = 0; ch < spec.channels.size(); ++ch) {
-        for (const ReportStat stat : spec.channels[ch].stats) {
+        const std::vector<ReportStat>& stats = spec.channels[ch].stats;
+        for (const ReportStat stat : stats) {
             const std::size_t statColumn = plan.size();
-            plan.push_back(ColumnPlan{ch, stat, false, statColumn});
+            plan.push_back(ColumnPlan{ch, stat, false, statColumn, false});
             if (spec.deltaVsOverlay0) {
-                plan.push_back(ColumnPlan{ch, stat, true, statColumn});
+                plan.push_back(ColumnPlan{ch, stat, true, statColumn, false});
+            }
+        }
+        // min, max and absMax convert through both extremes (toDisplay): a missing one is a hidden column.
+        const auto has = [&stats](ReportStat st) {
+            return std::find(stats.begin(), stats.end(), st) != stats.end();
+        };
+        if (has(ReportStat::Min) || has(ReportStat::Max) || has(ReportStat::AbsMax)) {
+            for (const ReportStat extreme : {ReportStat::Min, ReportStat::Max}) {
+                if (!has(extreme)) {
+                    plan.push_back(ColumnPlan{ch, extreme, false, plan.size(), true});
+                }
             }
         }
     }
@@ -781,6 +978,7 @@ Result<ReportTable> ReportEngine::cells(const ReportSpec& spec, const ReportInpu
                 job.key.range = row.range;
                 job.key.clipStart = row.start;
                 job.key.clipEnd = row.end;
+                job.key.piecesHash = piecesHashOf(row.pieces);
                 if (const std::optional<store::Series>& series = data.series) {
                     job.key.version = columnVersion(store::seriesValues(*series));
                 }
@@ -845,9 +1043,11 @@ Result<ReportTable> ReportEngine::cells(const ReportSpec& spec, const ReportInpu
         for (const std::size_t c : columns) {
             edgesNeeded = edgesNeeded || (!values[job.row * nc + c] && needsEdges(plan[c].stat));
         }
-        Result<Scan> scan = scanSeries(*series, row.start, row.end, cancel);
+        const Micros scanStart = row.pieces.empty() ? row.start : row.pieces.front().first;
+        const Micros scanEnd = row.pieces.empty() ? row.end : row.pieces.back().second;
+        Result<Scan> scan = scanRow(*series, row.start, row.end, row.pieces, cancel);
         Result<Edges> edges =
-            scan ? edgesFor(*series, row.start, row.end, spec.options, job.interp, edgesNeeded, cancel)
+            scan ? edgesFor(*series, scanStart, scanEnd, spec.options, job.interp, edgesNeeded, cancel)
                  : Result<Edges>(Failure{scan.error()});
         if (!edges) {
             if (edges.error().code == ErrorCode::Cancelled) {
@@ -863,7 +1063,7 @@ Result<ReportTable> ReportEngine::cells(const ReportSpec& spec, const ReportInpu
             if (slot) {
                 continue;
             }
-            const StatValue v = statOf(*scan, plan[c].stat, row.start, row.end, probeUs, *edges);
+            const StatValue v = statOf(*scan, plan[c].stat, scanStart, scanEnd, probeUs, *edges);
             slot = v;
             if (job.cacheable) {
                 cache.insert(keyFor(job.key, plan[c].stat, job.interp), v);
@@ -871,10 +1071,63 @@ Result<ReportTable> ReportEngine::cells(const ReportSpec& spec, const ReportInpu
         }
     }
 
-    // 3. The values as display cells (the states set above stay).
+    // The column unit of each channel: the display unit and decimals of the first source that resolves it
+    // (Main rows first). Every other source's values convert into it (D-197 (g)).
+    std::vector<const ReportChannelData*> columnUnits(nch, nullptr);
+    for (std::size_t ch = 0; ch < nch; ++ch) {
+        for (int pass = 0; pass < 2 && columnUnits[ch] == nullptr; ++pass) {
+            for (const Row& row : rows) {
+                if ((pass == 0) != (row.role == ReportSlotRole::Main)) {
+                    continue;
+                }
+                const ReportChannelData& data = lookup(row.source, ch);
+                if (data.series || data.descriptor) {
+                    columnUnits[ch] = &data;
+                    break;
+                }
+            }
+        }
+    }
+    // base -> the column's unit for one (source, channel); nullopt when the units do not convert.
+    const auto converterOf = [&](const ReportChannelData& data,
+                                 std::size_t ch) -> std::optional<units::Converter> {
+        const ReportChannelData* column = columnUnits[ch];
+        if (column == nullptr || column == &data || data.displayUnit == column->displayUnit) {
+            return data.toDisplay;
+        }
+        if (inputs.units == nullptr || !data.descriptor) {
+            return std::nullopt;
+        }
+        const units::UnitRegistry& registry = *inputs.units;
+        const units::UnitId base = data.descriptor->unit;
+        if (!registry.contains(base)) {
+            return std::nullopt;
+        }
+        const std::optional<units::UnitId> target =
+            registry.find(column->displayUnit, registry.quantityOf(base));
+        if (!target) {
+            return std::nullopt;
+        }
+        Result<units::Converter> c = registry.converter(base, *target);
+        if (!c) {
+            return std::nullopt;
+        }
+        return *c;
+    };
+
+    // 3. The values as display cells in the column's unit (the states set above stay).
     for (std::size_t r = 0; r < rows.size(); ++r) {
         for (std::size_t ch = 0; ch < nch; ++ch) {
             const ReportChannelData& data = lookup(rows[r].source, ch);
+            const std::optional<units::Converter> conv = converterOf(data, ch);
+            Extremes extremes;
+            for (const std::size_t c : statColumnsOf[ch]) {
+                if (plan[c].stat == ReportStat::Min) {
+                    extremes.min = values[r * nc + c];
+                } else if (plan[c].stat == ReportStat::Max) {
+                    extremes.max = values[r * nc + c];
+                }
+            }
             for (const std::size_t c : statColumnsOf[ch]) {
                 ReportCell& cell = grid[r * nc + c];
                 const std::optional<StatValue>& v = values[r * nc + c];
@@ -885,22 +1138,26 @@ Result<ReportTable> ReportEngine::cells(const ReportSpec& spec, const ReportInpu
                     cell.state = ReportCellState::Blank;
                     continue;
                 }
-                cell.value = toDisplay(plan[c].stat, v->value, data.toDisplay);
+                if (!conv) {
+                    cell.state = ReportCellState::Error; // the source's unit does not convert to the column's
+                    continue;
+                }
+                cell.value = toDisplay(plan[c].stat, v->value, *conv, extremes);
             }
         }
     }
 
-    // Delta columns: Main minus the Overlay 0 row of the same heading path.
+    // Delta columns: Main minus the Overlay 0 row of the same pairKey (D-197 (c)).
     if (spec.deltaVsOverlay0) {
         std::map<std::vector<std::string>, std::size_t> overlay0;
         for (std::size_t r = 0; r < rows.size(); ++r) {
             if (rows[r].role == ReportSlotRole::Overlay0) {
-                overlay0.try_emplace(rows[r].path, r);
+                overlay0.try_emplace(rows[r].pairKey, r);
             }
         }
         for (std::size_t r = 0; r < rows.size(); ++r) {
             const auto pair =
-                rows[r].role == ReportSlotRole::Main ? overlay0.find(rows[r].path) : overlay0.end();
+                rows[r].role == ReportSlotRole::Main ? overlay0.find(rows[r].pairKey) : overlay0.end();
             for (std::size_t c = 0; c < nc; ++c) {
                 if (!plan[c].delta) {
                     continue;
@@ -924,40 +1181,25 @@ Result<ReportTable> ReportEngine::cells(const ReportSpec& spec, const ReportInpu
         }
     }
 
-    // The table without the hidden rows.
+    // The table without the hidden rows and columns.
     ReportTable table;
     table.transposed = spec.layout == ReportLayout::ChannelsInColumns;
-    for (const ColumnPlan& p : plan) {
+    std::vector<std::size_t> shown;
+    for (std::size_t c = 0; c < nc; ++c) {
+        const ColumnPlan& p = plan[c];
+        if (p.hidden) {
+            continue;
+        }
+        shown.push_back(c);
         ReportColumn column;
         column.channel = p.channel;
         column.stat = p.stat;
         column.deltaVsOverlay0 = p.delta;
+        if (const ReportChannelData* unit = columnUnits[p.channel]) {
+            column.unit = unit->displayUnit;
+            column.dps = unit->dps;
+        }
         table.columns.push_back(std::move(column));
-    }
-    for (std::size_t ch = 0; ch < nch; ++ch) {
-        // The display unit and decimals of the first source that resolves the channel (Main rows first).
-        const ReportChannelData* found = nullptr;
-        for (int pass = 0; pass < 2 && found == nullptr; ++pass) {
-            for (const Row& row : rows) {
-                if ((pass == 0) != (row.role == ReportSlotRole::Main)) {
-                    continue;
-                }
-                const ReportChannelData& data = lookup(row.source, ch);
-                if (data.series || data.descriptor) {
-                    found = &data;
-                    break;
-                }
-            }
-        }
-        if (found == nullptr) {
-            continue;
-        }
-        for (ReportColumn& column : table.columns) {
-            if (column.channel == ch) {
-                column.unit = found->displayUnit;
-                column.dps = found->dps;
-            }
-        }
     }
     for (std::size_t r = 0; r < rows.size(); ++r) {
         if (rows[r].hidden) {
@@ -969,8 +1211,9 @@ Result<ReportTable> ReportEngine::cells(const ReportSpec& spec, const ReportInpu
         heading.trusted = rows[r].trusted;
         heading.source = rows[r].source;
         table.rows.push_back(std::move(heading));
-        table.cells.insert(table.cells.end(), grid.begin() + static_cast<std::ptrdiff_t>(r * nc),
-                           grid.begin() + static_cast<std::ptrdiff_t>((r + 1) * nc));
+        for (const std::size_t c : shown) {
+            table.cells.push_back(grid[r * nc + c]);
+        }
     }
     markExtremes(table);
     return table;

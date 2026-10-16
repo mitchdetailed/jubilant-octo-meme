@@ -138,8 +138,9 @@ private Q_SLOTS:
         QCOMPARE(cell(m, 0, 0), QStringLiteral("test.ld / Lap 1"));
         QCOMPARE(cell(m, 1, 0), QStringLiteral("test.ld / Lap 3 (Overlay 0)"));
         QCOMPARE(cell(m, 0, 1), QStringLiteral("49.50"));
-        // Main - Overlay 0 is paired by heading path: the paths differ ("Lap 1" vs "Lap 3"), so it is blank.
-        QCOMPARE(cell(m, 0, 2), QString());
+        // Main - Overlay 0 pairs the rows below the compared ranges (D-203 (c)): the laps themselves differ
+        // ("Lap 1" vs "Lap 3") and still pair, 49.5 - 249.5 = -200.
+        QCOMPARE(cell(m, 0, 2), QStringLiteral("-200.00"));
         QCOMPARE(cell(m, 1, 2), QString()); // never on the Overlay 0 row
 
         // Headings that pair (the outing level only): Main - Overlay 0 = 49.5 - 249.5 = -200.

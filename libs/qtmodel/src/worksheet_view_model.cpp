@@ -570,14 +570,20 @@ void WorksheetViewModel::setOffsetAxis(bool on) {
         offsetTimer_->stop();
         pendingOffsets_.clear();
         if (offsetCommit_) {
+            // Every selected range, the overlays included while F4 hides them (06 section 14.4).
             const plot::SelectionSnapshot& s = selection_.snapshot();
-            for (const plot::Slot& slot : s.visibleSlots()) {
-                if (const model::Range* r = selection_.resolve(slot.range)) {
+            std::vector<model::RangeRef> ranges{s.main};
+            if (const std::optional<model::RangeRef>& o0 = s.overlay0) {
+                ranges.push_back(*o0);
+            }
+            ranges.insert(ranges.end(), s.overlays.begin(), s.overlays.end());
+            for (const model::RangeRef& range : ranges) {
+                if (const model::Range* r = selection_.resolve(range)) {
                     if (r->offsetUs != 0) {
-                        offsetCommit_(slot.range, plot::Domain::Time, 0.0);
+                        offsetCommit_(range, plot::Domain::Time, 0.0);
                     }
                     if (r->offsetM != 0.0) {
-                        offsetCommit_(slot.range, plot::Domain::Distance, 0.0);
+                        offsetCommit_(range, plot::Domain::Distance, 0.0);
                     }
                 }
             }
@@ -744,7 +750,7 @@ void WorksheetViewModel::setAnimating(bool on) {
 }
 
 void WorksheetViewModel::setAnimationRate(double x) {
-    animationRate_ = std::clamp(x, 0.25, 4.0);
+    animationRate_ = std::clamp(x, 0.25, 10.0); // Data -> Animation Rate, x0.25 to x10 (D-203 (g))
 }
 
 void WorksheetViewModel::animationTick() {

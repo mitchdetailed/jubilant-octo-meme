@@ -161,8 +161,9 @@ private Q_SLOTS:
         QVERIFY(tp->dynamicBuilds() > dynamics);
         t.w.view->zoomTo(plot::XSpan{0.0, 10.0 * kSec});
         t.w.view->setDomain(plot::Domain::Distance);
-        QTest::qWait(50);
+        drainEvents();
         QCOMPARE(tp->staticSubmitted(), statics);
+        QVERIFY(tp->staticUpToDate()); // nothing scheduled either
         // 1000 m from the start line: 350 + 300 + 350 -> the top side's middle, x = 350, y = 300.
         const QImage moved = tp->renderToImage(1.0);
         const plot::PointPx half = fit.toPx(350.0, 300.0);
@@ -224,6 +225,20 @@ private Q_SLOTS:
         QTest::keyClick(&tp, Qt::Key_Minus);
         QCOMPARE(tp.body().zoom, 1.0);
         QTest::keyClick(&tp, Qt::Key_Plus);
+        // A keymap that binds track.zoom_in to Z and nothing to the old keys (D-203 (o)): "=" does nothing
+        // any more, Z zooms; without the shell's provider the defaults are back.
+        const double before = tp.body().zoom;
+        ComponentWidget::setKeysProvider([](const QString& id) {
+            return id == QLatin1String("track.zoom_in") ? QStringList{QStringLiteral("Z")} : QStringList{};
+        });
+        QTest::keyClick(&tp, Qt::Key_Equal);
+        QTest::keyClick(&tp, Qt::Key_Minus);
+        QCOMPARE(tp.body().zoom, before);
+        QTest::keyClick(&tp, Qt::Key_Z);
+        QCOMPARE(tp.body().zoom, before * TrackPosition::kZoomStep);
+        ComponentWidget::setKeysProvider({});
+        QTest::keyClick(&tp, Qt::Key_Minus);
+        QCOMPARE(tp.body().zoom, before);
         // The gesture is one spec edit once it rests.
         QVERIFY(edits.wait(2000));
         QCOMPARE(edits.count(), 1);
@@ -235,7 +250,7 @@ private Q_SLOTS:
         // The canvas applies it: nothing is rebuilt again for the same spec.
         const int submitted = tp.staticSubmitted();
         tp.applySpec(next);
-        QTest::qWait(30);
+        drainEvents();
         QCOMPARE(tp.staticSubmitted(), submitted);
         // track.fit: back to "fit", committed at once.
         QVERIFY(t.w.commands.invoke(QStringLiteral("track.fit")));

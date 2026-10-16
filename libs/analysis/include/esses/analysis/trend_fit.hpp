@@ -32,8 +32,10 @@ struct TrendSpec {
 
 struct TrendResult {
     std::vector<double> coefficients; // c[0] + c[1] x + ... + c[n] x^n (c[0] == 0 when through zero)
-    double r2 = 0.0;                  // 1 - SSres / SStot (SStot about the mean of y; 1 when y is constant)
-    std::size_t samples = 0;          // the finite pairs used
+    // 1 - SSres / SStot with SStot about the mean of y (1 when y is constant); a through-zero fit worse than
+    // the mean of y gives a negative r2 (the convention of the reference, tools/trend_ref.py).
+    double r2 = 0.0;
+    std::size_t samples = 0;                  // the finite pairs used
     double evaluate(double x) const noexcept; // Horner; NaN without coefficients
 };
 

@@ -6,7 +6,7 @@
 ,"dynamic":{"w":360,"h":200,"dpr":2,"cmds":[
 {"k":"rect","c":"#fb8c00","r":[8,8,344,184]},
 {"k":"text","t":"49.3","x":43.47,"y":67.8,"style":"gauge","anchor":"middleLeft","c":"#202124","maxw":336,"scale":2.67},
-{"k":"text","t":"49.3","x":119.6,"y":157.8,"style":"gauge","anchor":"middleLeft","c":"#d32f2f","maxw":336,"scale":1.18}
+{"k":"text","t":"49.3","x":119.6,"y":157.8,"style":"gauge","anchor":"middleLeft","c":"#0288d1","maxw":336,"scale":1.18}
 ]}
 ,"chrome":{"w":360,"h":200,"dpr":2,"cmds":[
 {"k":"rect","c":"#c8cbd0","r":[0,0,360,6]}

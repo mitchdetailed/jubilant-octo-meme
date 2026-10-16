@@ -92,6 +92,10 @@ public:
     const FieldBinding* binding(const QString& pointer) const;
     QWidget* editorFor(const QString& pointer) const;
     bool isModified() const;
+    // Added by the M3 fix pass (D-203 (l)): load() for the rows the user has not changed since the last load
+    // (an undo, a hotkey or a canvas edit of the component while its dialog is open refreshes them); a
+    // changed row keeps its editor and its edit.
+    void loadUntouchedJson(const QJsonValue& body);
 
 Q_SIGNALS:
     void edited(); // any bound editor changed

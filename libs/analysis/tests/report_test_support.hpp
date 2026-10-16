@@ -115,6 +115,16 @@ public:
         d.dps = dps;
         table_[{src.get(), std::move(name)}] = std::move(d);
     }
+    // As add, with the descriptor's base unit set (the column-unit conversion of D-197 (g)).
+    void addWithUnit(const std::shared_ptr<const model::DataSource>& src, std::string name,
+                     store::Series series, units::UnitId base, units::Converter toDisplay, std::string unit,
+                     int dps = 2) {
+        add(src, name, std::move(series), toDisplay, std::move(unit), dps);
+        ReportChannelData& d = table_[{src.get(), std::move(name)}];
+        if (d.descriptor) {
+            d.descriptor->unit = base;
+        }
+    }
     void addStatus(const std::shared_ptr<const model::DataSource>& src, std::string name,
                    model::ChannelStatus status) {
         ReportChannelData d;

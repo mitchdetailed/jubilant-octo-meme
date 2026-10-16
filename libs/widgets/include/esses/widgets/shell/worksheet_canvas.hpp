@@ -56,6 +56,7 @@
 #include <QWidget>
 #include <map>
 #include <memory>
+#include <utility>
 #include <vector>
 
 class QTimer;
@@ -147,6 +148,11 @@ Q_SIGNALS:
     void focusedComponentChanged(esses::widgets::ComponentWidget* component);
     // A component edit was applied to the worksheet definition (M1: no undo stack).
     void componentEdited(const esses::project::ComponentSpec& spec, const QString& undoText);
+    // M3 fix pass (D-203 (k)): a component of a kept, hidden worksheet asked for an edit (its Properties
+    // dialog stays open across a worksheet switch, 06 section 12 item 2; a deferred commit). `worksheet` is
+    // that worksheet's definition with the edit; the shell stores it as that worksheet's undoable edit.
+    void keptComponentEdited(const esses::project::WorksheetDef& worksheet,
+                             const esses::project::ComponentSpec& spec, const QString& undoText);
     // M3: a spec was applied to a shown component (an edit, or a definition change from undo/redo).
     void componentSpecApplied(esses::widgets::ComponentWidget* component);
     // M3: geometry or z order of components changed in worksheet(); `mergeKey` is the id of the one
@@ -154,7 +160,16 @@ Q_SIGNALS:
     void layoutEdited(const QString& undoText, const QString& mergeKey);
     void selectionChanged();
 
+public:
+    // Added by the M3 fix pass (D-203 (t); 06 section 4.3 item 3): the component types Component > Add offers
+    // (type, title) in menu order, and where a new component goes on `sheet` with `grid` cells: the largest
+    // empty rectangle of at least 20 % x 20 %, else the whole canvas.
+    static QList<std::pair<QString, QString>> addableTypes();
+    static project::Rect placeForAdd(const project::WorksheetDef& sheet, QSize grid);
+
 protected:
+    // Added by the M3 fix pass: a right-click on empty canvas offers Add > type (06 section 4.3 item 3).
+    void contextMenuEvent(QContextMenuEvent* event) override;
     bool event(QEvent* event) override;
     bool eventFilter(QObject* watched, QEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;

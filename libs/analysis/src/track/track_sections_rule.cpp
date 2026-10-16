@@ -270,17 +270,25 @@ Result<std::vector<model::RangeGroup>> TrackSectionsRule::sections(const model::
             const auto timeOf = [&](double lapM) {
                 return lap.start + static_cast<Micros>(std::llround(index->timeAt(lapM / stretch) * 1e6));
             };
+            const bool startsAtBeacon = info.index.startsAtBeacon;
+            const bool endsAtBeacon = info.index.endsAtBeacon;
             std::set<std::string, std::less<>> qualifiers;
             for (const TrackSection* s : members) {
-                const std::optional<double> a =
-                    lapDistanceOfTrackDistance(s->startM, lapLength, trackLength, info.index.startsAtBeacon);
+                const std::optional<double> a = lapDistanceOfTrackDistance(s->startM, lapLength, trackLength,
+                                                                           startsAtBeacon, endsAtBeacon);
                 if (!a || *a >= lapLength) {
                     continue; // before the start of a lap measured backwards, or after the lap end
                 }
-                const double b =
-                    std::min(lapLength, lapDistanceOfTrackDistance(s->endM, lapLength, trackLength,
-                                                                   info.index.startsAtBeacon)
-                                            .value_or(lapLength));
+                const double bRaw =
+                    lapDistanceOfTrackDistance(s->endM, lapLength, trackLength, startsAtBeacon, endsAtBeacon)
+                        .value_or(lapLength);
+                // A lap that does not end at a BCN (an in lap, a lap cut by a reset) keeps no section that
+                // would reach past its end: a truncated section is a bogus short time (04 section 13 item 5,
+                // the mirror of the out lap's rule; D-195 (d)).
+                if (!endsAtBeacon && bRaw > lapLength + 1e-6) {
+                    continue;
+                }
+                const double b = std::min(lapLength, bRaw);
                 // A section reaching a lap bound ends (or starts) exactly there, so the sections of a lap add
                 // up to its lap time even where the distance stalls before the beacon.
                 const Micros t0 = *a <= 1e-6 ? lap.start : std::clamp(timeOf(*a), lap.start, lap.end);
@@ -327,8 +335,29 @@ Result<std::vector<model::RangeGroup>> TrackSectionsRule::sections(const model::
     return out;
 }
 
+namespace {
+
+// The proportional scale of a complete lap within the tolerance, else nullopt.
+std::optional<double> proportionalScale(double lapLengthM, double trackLengthM, bool startsAtBeacon,
+                                        bool endsAtBeacon) noexcept {
+    if (!startsAtBeacon || !endsAtBeacon || !(lapLengthM > 0.0) || !(trackLengthM > 0.0)) {
+        return std::nullopt;
+    }
+    const double ratio = lapLengthM / trackLengthM;
+    if (std::abs(ratio - 1.0) > kLapLengthTolerance) {
+        return std::nullopt;
+    }
+    return ratio;
+}
+
+} // namespace
+
 std::optional<double> lapDistanceOfTrackDistance(double trackM, double lapLengthM, double trackLengthM,
-                                                 bool lapStartsAtBeacon) noexcept {
+                                                 bool lapStartsAtBeacon, bool lapEndsAtBeacon) noexcept {
+    if (const std::optional<double> scale =
+            proportionalScale(lapLengthM, trackLengthM, lapStartsAtBeacon, lapEndsAtBeacon)) {
+        return trackM * *scale;
+    }
     if (lapStartsAtBeacon) {
         return trackM;
     }
@@ -339,8 +368,12 @@ std::optional<double> lapDistanceOfTrackDistance(double trackM, double lapLength
     return d;
 }
 
-double trackDistanceOfLapDistance(double lapM, double lapLengthM, double trackLengthM,
-                                  bool lapStartsAtBeacon) noexcept {
+double trackDistanceOfLapDistance(double lapM, double lapLengthM, double trackLengthM, bool lapStartsAtBeacon,
+                                  bool lapEndsAtBeacon) noexcept {
+    if (const std::optional<double> scale =
+            proportionalScale(lapLengthM, trackLengthM, lapStartsAtBeacon, lapEndsAtBeacon)) {
+        return lapM / *scale;
+    }
     if (lapStartsAtBeacon) {
         return lapM;
     }

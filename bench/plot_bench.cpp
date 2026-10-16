@@ -4,19 +4,22 @@
 // bench/plot_bench (AC-M1-02, 07 section 4.2; bench/workloads.md "M1 budget rows"): a time_distance graph
 // with 20 traces (four groups of five channels) whose trace area is 3,800 px wide at DPR 1, on a 30 min log
 // of 20 channels at 1 kHz with 90 s laps (esses-gen-fixtures --bench), the fastest lap as Main.
-//   plot.cursor_move    a cursor move: WorksheetViewModel::setCursor -> the graph's Dynamic layer rebuilt on
-//                       the GUI thread -> a synchronous repaint of its damage (no Static build).   Limit 4
-//                       ms.
+//   plot.cursor_move    a cursor move: WorksheetViewModel::setCursor -> the graph's Dynamic layer rebuilt
+//                       on the GUI thread -> a synchronous repaint of its damage (no Static build).
+//                       Limit 4 ms.
 //   plot.zoom_pan_step  a zoom or pan step (x0.5 / x2 about the cursor, pan +-10 %, F2, W): the command ->
 //                       the Static build on the TaskPool (TraceBuilder::decimateMany) -> delivered through
 //                       the Dispatcher -> rasterised (LayerCache::rasteriseStatic) -> a synchronous full
-//                       repaint.
-//                                                                                                Limit 16 ms.
-//   plot.animation_frame_10x  (M3, AC-M3-10) one animation frame at 10x: the cursor advanced by 10 x 33 ms as
-//                       WorksheetViewModel's animation tick does (CursorSource::Animation, a Cursor-only
-//                       change)
-//                       -> the graph's Dynamic layer -> a synchronous repaint of its damage; no Static build.
-//                                                                                                 Limit 4 ms.
+//                       repaint. Limit 16 ms.
+//   plot.animation_frame_10x  (M3, AC-M3-10) one animation frame at 10x: the cursor advanced by 10 x 33 ms
+//                       as WorksheetViewModel's animation tick does (CursorSource::Animation, a Cursor-only
+//                       change) -> the graph's Dynamic layer -> a synchronous repaint of its damage; no
+//                       Static build. Limit 4 ms.
+//   plot.variance_f3_no_overlay  (M3, AC-M3-05) what F3 (the variance panel) adds to the Static build
+//                       while no overlay is selected: the graph's own inputs built on the pool with
+//                       variance.show off and on, alternately, 10 pairs per run; the row is the median of
+//                       the per-pair differences (on - off), and a build that makes any VarianceTable fails
+//                       the row. Limit 1 ms (timing noise).
 // Each row is the median over --runs runs (default 5, D-042) of the per-run median; the reference machine is
 // the developer's (bench/workloads.md). Prints one line per row and writes --json; --gate makes a row over
 // its limit exit 1. --smoke: a 2 min file and 1 run (ctest bench.plot_bench.smoke checks the harness, not the
@@ -24,6 +27,7 @@
 
 #include "bench_support.hpp"
 
+#include <esses/base/json_doc.hpp>
 #include <esses/base/taskpool.hpp>
 #include <esses/base/thread_role.hpp>
 #include <esses/plotcore/time_distance_builder.hpp>
@@ -40,6 +44,7 @@
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QSysInfo>
 #include <QTextStream>
 #include <QThread>
@@ -56,8 +61,10 @@ constexpr int kTimeoutMs = 120000;
 constexpr double kCursorLimitMs = 4.0;
 constexpr double kZoomPanLimitMs = 16.0;
 constexpr double kAnimationLimitMs = 4.0;   // AC-M3-10: CPU per frame at 10x
-constexpr double kAnimationRate = 10.0;     // the bench rate of AC-M3-10 (the Data menu offers up to x4)
+constexpr double kAnimationRate = 10.0;     // the bench rate of AC-M3-10 (a Data menu rate, D-203 (g))
 constexpr Micros kAnimationTickUs = 33'333; // WorksheetViewModel's 30 Hz tick
+constexpr double kVarianceLimitMs = 1.0;    // AC-M3-05: "F3 costs 0 ms" without an overlay, within noise
+constexpr int kVariancePairs = 10;
 
 double msSince(const QElapsedTimer& t) {
     return static_cast<double>(t.nsecsElapsed()) / 1e6;
@@ -92,7 +99,8 @@ int main(int argc, char** argv) {
     QTextStream err(stderr);
 
     QCommandLineParser parser;
-    parser.setApplicationDescription(QStringLiteral("AC-M1-02: cursor move and zoom/pan step budgets."));
+    parser.setApplicationDescription(QStringLiteral(
+        "AC-M1-02, AC-M3-05, AC-M3-10: cursor move, zoom/pan step, F3 and animation budgets."));
     parser.addHelpOption();
     const QCommandLineOption runsOpt(QStringLiteral("runs"),
                                      QStringLiteral("Runs (default 5, or ESSES_BENCH_REPETITIONS)."),
@@ -138,6 +146,8 @@ int main(int argc, char** argv) {
     std::vector<double> cursorRunMedians;
     std::vector<double> animationRunMedians;
     std::vector<double> zoomRunMedians;
+    std::vector<double> varianceRunMedians;
+    int varianceTablesBuilt = 0;
     QJsonArray runRows;
     QJsonObject phases;
     std::size_t zoomSamples = 0;
@@ -254,8 +264,56 @@ int main(int argc, char** argv) {
             }
         };
 
+        // AC-M3-05: the graph's current inputs (Main only) built on the pool with the variance panel off and
+        // on. The bench thread blocks on the build here, as in --stages.
+        const auto withVariance = [](plot::ComponentBuildInputs in, bool show) {
+            QJsonObject body =
+                QJsonDocument::fromJson(QByteArray::fromStdString(in.spec.body.compact())).object();
+            QJsonObject display = body.value(QStringLiteral("display")).toObject();
+            QJsonObject variance = display.value(QStringLiteral("variance")).toObject();
+            variance.insert(QStringLiteral("show"), show);
+            display.insert(QStringLiteral("variance"), variance);
+            body.insert(QStringLiteral("display"), display);
+            Result<JsonDoc> doc =
+                JsonDoc::parse(QJsonDocument(body).toJson(QJsonDocument::Compact).toStdString());
+            if (doc.ok()) {
+                in.spec.body = std::move(doc).value();
+            }
+            return in;
+        };
+        const auto varianceSequence = [&](std::vector<double>& into) {
+            const plot::ComponentBuildInputs off = withVariance(g.inputs(), false);
+            const plot::ComponentBuildInputs on = withVariance(g.inputs(), true);
+            ThreadRole::set(ThreadRole::Normal);
+            const auto timed = [&h, &varianceTablesBuilt](const plot::ComponentBuildInputs& in) {
+                QElapsedTimer t;
+                t.start();
+                auto f = h.runtime().pool().submit(
+                    Priority::Visible, TaskKey{}, CancelToken{}, [in](const CancelToken& c) {
+                        plot::TdStaticInfo info;
+                        const Result<plot::ComponentBuild> built =
+                            plot::TimeDistanceBuilder::buildStatic(in, plot::TdLocalState{}, c, &info);
+                        return built.ok() ? info.varianceTables : -1;
+                    });
+                const Result<int> taken = std::move(f).take();
+                const int tables = taken.ok() ? taken.value() : -1;
+                const double ms = msSince(t);
+                if (tables != 0) {
+                    varianceTablesBuilt += tables < 0 ? 1 : tables; // a failed build counts against the row
+                }
+                return ms;
+            };
+            for (int i = 0; i < kVariancePairs; ++i) {
+                const double offMs = timed(off);
+                const double onMs = timed(on);
+                into.push_back(onMs - offMs);
+            }
+            ThreadRole::set(ThreadRole::NoBlock);
+        };
+
         std::vector<double> warm;
         zoomSequence(warm); // warm-up: every zoom level's chunks resident
+        varianceSequence(warm);
         cursorSequence(warm);
         animationSequence(warm);
         if (parser.isSet(stagesOpt)) {
@@ -345,6 +403,10 @@ int main(int argc, char** argv) {
             cursorSequence(cursor);
             std::vector<double> animation;
             animationSequence(animation);
+            std::vector<double> variance;
+            varianceSequence(variance);
+            const bench::Stats vs = bench::statsOf(variance);
+            varianceRunMedians.push_back(vs.median);
             const bench::Stats zs = bench::statsOf(zoom);
             const bench::Stats cs = bench::statsOf(cursor);
             const bench::Stats as = bench::statsOf(animation);
@@ -367,10 +429,18 @@ int main(int argc, char** argv) {
                        .arg(as.median, 0, 'f', 3)
                        .arg(as.p95, 0, 'f', 3)
                        .arg(as.max, 0, 'f', 3);
+            out << QStringLiteral(
+                       "run %1: the variance panel (F3) without an overlay adds median %2 ms to the "
+                       "Static build (min %3, max %4)\n")
+                       .arg(r + 1)
+                       .arg(vs.median, 0, 'f', 3)
+                       .arg(vs.min, 0, 'f', 3)
+                       .arg(vs.max, 0, 'f', 3);
             out.flush();
             runRows.append(QJsonObject{{QStringLiteral("cursor"), bench::toJson(cs)},
                                        {QStringLiteral("zoomPan"), bench::toJson(zs)},
-                                       {QStringLiteral("animation"), bench::toJson(as)}});
+                                       {QStringLiteral("animation"), bench::toJson(as)},
+                                       {QStringLiteral("varianceNoOverlay"), bench::toJson(vs)}});
         }
         // The warm-up's phases are left out (the first entries of the phase vectors).
         const auto measured = [](std::vector<double> v, std::size_t skip) {
@@ -403,11 +473,20 @@ int main(int argc, char** argv) {
                   kZoomPanLimitMs);
     bench::report(rows, QStringLiteral("plot.animation_frame_10x"), bench::statsOf(animationRunMedians),
                   kAnimationLimitMs);
+    bench::report(rows, QStringLiteral("plot.variance_f3_no_overlay"), bench::statsOf(varianceRunMedians),
+                  kVarianceLimitMs);
+    if (varianceTablesBuilt != 0) { // AC-M3-05: no VarianceTable without an overlay
+        err << "plot_bench: " << varianceTablesBuilt << " VarianceTable(s) built without an overlay\n";
+        QJsonObject row = rows.value(QStringLiteral("plot.variance_f3_no_overlay")).toObject();
+        row.insert(QStringLiteral("pass"), false);
+        row.insert(QStringLiteral("varianceTables"), varianceTablesBuilt);
+        rows.insert(QStringLiteral("plot.variance_f3_no_overlay"), row);
+    }
     const QString jsonPath =
         parser.isSet(jsonOpt) ? parser.value(jsonOpt) : bench::defaultJsonPath(QStringLiteral("plot_bench"));
     if (!jsonPath.isEmpty()) {
         const QJsonObject doc{{QStringLiteral("bench"), QStringLiteral("plot_bench")},
-                              {QStringLiteral("ac"), QStringLiteral("AC-M1-02, AC-M3-10")},
+                              {QStringLiteral("ac"), QStringLiteral("AC-M1-02, AC-M3-05, AC-M3-10")},
                               {QStringLiteral("cpu"), QSysInfo::currentCpuArchitecture()},
                               {QStringLiteral("os"), QSysInfo::prettyProductName()},
                               {QStringLiteral("threads"), QThread::idealThreadCount()},
@@ -431,6 +510,10 @@ int main(int argc, char** argv) {
         rows.value(QStringLiteral("plot.cursor_move")).toObject().value(QStringLiteral("pass")).toBool() &&
         rows.value(QStringLiteral("plot.zoom_pan_step")).toObject().value(QStringLiteral("pass")).toBool() &&
         rows.value(QStringLiteral("plot.animation_frame_10x"))
+            .toObject()
+            .value(QStringLiteral("pass"))
+            .toBool() &&
+        rows.value(QStringLiteral("plot.variance_f3_no_overlay"))
             .toObject()
             .value(QStringLiteral("pass"))
             .toBool();

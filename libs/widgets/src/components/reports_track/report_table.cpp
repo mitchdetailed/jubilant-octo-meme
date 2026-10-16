@@ -21,6 +21,7 @@
 #include <QVBoxLayout>
 #include <algorithm>
 #include <cmath>
+#include <optional>
 
 namespace esses::widgets::detail {
 
@@ -184,15 +185,44 @@ int ReportTable::contentWidth(int column) const {
     const QFontMetrics header(body_->horizontalHeader()->font());
     int width =
         header.horizontalAdvance(proxy_->headerData(column, Qt::Horizontal).toString()) + kHeaderPadding;
+    // One QFontMetrics per run of cells in the same font, and each (font, text) advance cached across
+    // deliveries: every channelReady or zoom step of a large report re-measures from the cache (D-203 (aa)).
+    constexpr qsizetype kMaxCachedWidths = 65536;
+    std::optional<QFontMetrics> fm;
+    QFont current;
+    QString fontKey;
     for (int r = 0; r < proxy_->rowCount(); ++r) {
         const QModelIndex i = proxy_->index(r, column);
-        const QFontMetrics fm(i.data(Qt::FontRole).value<QFont>());
-        width = std::max(width, fm.horizontalAdvance(i.data(Qt::DisplayRole).toString()) + kCellPadding);
+        const QFont font = i.data(Qt::FontRole).value<QFont>();
+        if (!fm || font != current) {
+            current = font;
+            fm.emplace(font);
+            fontKey = font.key() + QChar(0x1F);
+        }
+        const QString text = i.data(Qt::DisplayRole).toString();
+        const QString key = fontKey + text;
+        int advance = 0;
+        if (const auto it = widthCache_.constFind(key); it != widthCache_.cend()) {
+            advance = it.value();
+        } else {
+            advance = fm->horizontalAdvance(text);
+            if (widthCache_.size() >= kMaxCachedWidths) {
+                widthCache_.clear();
+            }
+            widthCache_.insert(key, advance);
+        }
+        width = std::max(width, advance + kCellPadding);
     }
     return width;
 }
 
+bool deferWhileHidden(const QWidget& report) {
+    const QWidget* top = report.window();
+    return !report.isVisible() && top != &report && top->isVisible();
+}
+
 void ReportTable::applyScheme(const project::Scheme& scheme) {
+    widthCache_.clear(); // the fonts may change
     const qt::SchemeFonts fonts(scheme);
     const QFont table = fonts.role(QStringLiteral("reportTable"));
     const QFont heading = fonts.role(QStringLiteral("reportHeading"));

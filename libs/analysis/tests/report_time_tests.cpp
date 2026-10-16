@@ -22,6 +22,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -232,4 +234,55 @@ TEST_CASE("report_time: eclectic, rollingMinimum and bandOf by hand", "[unit]") 
     const std::vector<TimeReportBand> hidden{TimeReportBand{1.0, 0, false}, TimeReportBand{3.0, 0, true}};
     CHECK(TimeReportEngine::bandOf(1'000'000, 1'000'000, hidden) == 1);
     CHECK(TimeReportEngine::bandOf(1'000'000, 1'000'000, {}) == -1);
+}
+
+TEST_CASE("report_time: a disabled lap is no row; two sections of one name stay two columns", "[unit]") {
+    auto src = std::make_shared<model::DataSource>(*timeSource("disabled"));
+    model::RangeGroupTree& tree = src->layers.front().ranges;
+    // Lap 2 disabled by a rule: neither a row nor the fastest lap time (83 s stays Lap 1's).
+    tree.find(kLaps)->ranges[2].enabled = false;
+    // Lap 3 holds two sections called "S2" (ids a and b) in place of its S2.
+    model::RangeGroup* sections = tree.find(kSections);
+    for (model::Range& r : sections->ranges) {
+        if (r.name == "S2" && r.start == sec(250)) {
+            r.end = sec(265);
+            r.abbrev = "a";
+            model::Range second = r;
+            second.start = sec(265);
+            second.end = sec(280.5);
+            second.abbrev = "b";
+            second.id = model::rangeId(kSections, model::MarkerId{}, "S2b");
+            sections->ranges.push_back(second);
+            break;
+        }
+    }
+    std::stable_sort(sections->ranges.begin(), sections->ranges.end(),
+                     [](const model::Range& a, const model::Range& b) { return a.start < b.start; });
+    const std::shared_ptr<const model::DataSource> shared = src;
+    TimeReportSpec spec;
+    const TimeReportTable t = build(spec, lapsOf(shared, {"Lap 1", "Lap 2", "Lap 3"}));
+    REQUIRE(t.rows.size() == 2);
+    CHECK(t.rows[0].name == "Lap 1");
+    CHECK(t.rows[1].name == "Lap 3");
+    // Columns (Lap 1's order, Lap 3's new keys after its S1): S1, S2 (a), S2 (b), S2 (Lap 1's, no id), S3,
+    // then the lap time.
+    CHECK(t.sections == std::vector<std::string>{"S1", "S2 (a)", "S2 (b)", "S2", "S3"});
+    CHECK(times(t.rows[1]) == secs({31, 15, 15.5, -1, 22.5, 84}));
+    CHECK(times(t.rows[0]) == secs({30, -1, -1, 32, 21, 83}));
+}
+
+TEST_CASE("report_time: impossible dates are no dates; an unambiguous mm/dd/yyyy reads as such", "[unit]") {
+    // 25 October (written mm/dd), 20 October (dd/mm) and 31 February (no such day: no date, so last).
+    const auto us = timeSource("us", "10/25/2026");
+    const auto european = timeSource("european", "20/10/2026");
+    const auto impossible = timeSource("impossible", "31/02/2026");
+    ReportInputs in;
+    in.sources = {sourceRange(impossible, kLaps, "Lap 1"), sourceRange(us, kLaps, "Lap 1"),
+                  sourceRange(european, kLaps, "Lap 1")};
+    TimeReportSpec spec;
+    const TimeReportTable t = build(spec, in);
+    REQUIRE(t.rows.size() == 3);
+    CHECK(t.rows[0].source == 2);
+    CHECK(t.rows[1].source == 1);
+    CHECK(t.rows[2].source == 0);
 }

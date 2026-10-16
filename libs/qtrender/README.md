@@ -138,8 +138,8 @@ Every rendered image (and `*.diff.png` on failure) is written to `<build>/libs/q
 `OffscreenRenderer::builtinBuilders` (final) maps `outing`, `scatter`, `histogram`, `track_position`,
 `gauge_numeric` and `gauge_bar` to their `esses_plotcore` builders (`OutingGeometry`, `ScatterGeometry`,
 `HistogramGeometry`, `TrackGeometry`, `GaugeGeometry`); the table components (`values_list`, `channel_report`,
-`time_report`) and unknown types keep the placeholder. While a builder is an `M3-STUB` its Static build fails
-with Unsupported and the component renders the "Render failed" placeholder.
+`time_report`) and unknown types keep the placeholder. Every one of these builders is implemented (no `M3-STUB`
+remains); a Static build that fails renders the "Render failed" placeholder.
 
 ### Scaled text runs (M3 plots work, D-198 (b))
 

@@ -393,13 +393,16 @@ void SourceLoader::startPhase2(const model::SourceId& id, const std::string& lay
         for (const model::Range& lap : l->ranges.find(detail::kLapsGroup)->ranges) {
             const model::RangeRef ref = detail::makeRef(*src, canonical, detail::kLapsGroup, lap);
             if (auto index = distance_->index(ref, Priority::Background)) {
-                // 04 section 13 item 5: a lap that does not start at a BCN is measured from its end beacon.
+                // 04 section 13 item 5: a lap that does not start at a BCN is measured from its end beacon;
+                // one that does not end at a BCN keeps no section past its end (D-195 (d)).
                 bool atBeacon = !anyBeacon;
+                bool endsAtBeacon = !anyBeacon;
                 for (const model::Marker& m : l->markers) {
-                    atBeacon =
-                        atBeacon || (m.cls == model::MarkerClass::BCN && m.enabled && m.t == lap.start);
+                    const bool beacon = m.cls == model::MarkerClass::BCN && m.enabled;
+                    atBeacon = atBeacon || (beacon && m.t == lap.start);
+                    endsAtBeacon = endsAtBeacon || (beacon && m.t == lap.end);
                 }
-                indexes->emplace(lap.id, analysis::LapIndex{std::move(index), atBeacon});
+                indexes->emplace(lap.id, analysis::LapIndex{std::move(index), atBeacon, endsAtBeacon});
             }
         }
     }

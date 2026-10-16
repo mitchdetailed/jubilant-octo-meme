@@ -540,6 +540,37 @@ bool LayoutEditor::importWorkbook() {
             book.id = Uuid(); // a second copy of a workbook gets its own perspective key
         }
     }
+    // The name is the workbook's file name (workbooks/<name>.workbook.json): the rule of New and Rename
+    // applies, so an imported name with a path or reserved character, or one another workbook has, gets a
+    // safe unique name and the user is told (D-203 (p)).
+    {
+        static const QString bad = QStringLiteral("<>:\"/\\|?*");
+        const QString given = QString::fromStdString(book.name);
+        QString safe;
+        for (const QChar c : given) {
+            safe.append(bad.contains(c) || c.unicode() < 32 ? QLatin1Char('_') : c);
+        }
+        safe = safe.trimmed();
+        if (safe.isEmpty()) {
+            safe = tr("Workbook");
+        }
+        const auto taken = [this](const QString& n) {
+            const auto& books = session_.workbooks();
+            return std::any_of(books.begin(), books.end(),
+                               [&n](const project::WorkbookFile& wb) { return sameName(wb.name, n); });
+        };
+        QString unique = safe;
+        for (int k = 2; taken(unique); ++k) {
+            unique = QStringLiteral("%1 (%2)").arg(safe).arg(k);
+        }
+        if (unique != given) {
+            Q_EMIT message(
+                tr("The imported workbook \"%1\" is named \"%2\" (a workbook name is also its file "
+                   "name)")
+                    .arg(given, unique));
+            book.name = unique.toStdString();
+        }
+    }
     for (const std::string& line : log) {
         Q_EMIT message(QString::fromStdString(line));
     }

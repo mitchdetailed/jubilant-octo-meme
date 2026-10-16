@@ -16,8 +16,10 @@
 // fixture). The methods (track_generator.cpp): GPS fixes are projected, a gap is bridged by a Hermite curve
 // ("W-TRACK-DROPOUT" for gaps from 2.5 sample periods and 0.5 s), the loop is closed by joining its end to
 // its start, and an adaptive Gaussian kernel along the path smooths it (sigma smoothingM / 2 in the corners,
-// up to four times that on the straights); Speed+LatG removes a constant heading-rate bias so the lap turns a
-// whole number of revolutions and spreads the remaining gap along the distance. Lateral acceleration is
+// up to eight times that on the straights); Speed+LatG removes the heading excess over a whole number of
+// revolutions (zero for a figure eight) as a constant heading-rate bias and spreads the remaining gap along
+// the distance; "W-TRACK-NOT-A-LOOP" when the corrected ends are still more than a quarter of the length
+// apart (D-195 (b)). Lateral acceleration is
 // positive to the left (ISO 8855); invertLatAccel reads loggers that log it positive to the right. A map from
 // Speed+LatG has an arbitrary rotation (the lap starts heading east) and the origin of options.origin (else
 // 0, 0). Owner: src/track/ (the track work).

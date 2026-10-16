@@ -115,7 +115,9 @@ same pool. `--smoke` uses 5 laps and one run and checks the table against `Repor
 | `report.time_50lap_12sec` | `TimeReportEngine::build` over the 50 laps (eclectic, rolling minimum, total, two bands) | 0.17-0.20 ms | recorded |
 
 Measured on the reference machine (2026-10-14, a Release build of the Qt-free tree, 15 workers on 16 logical
-processors): the ranges are the medians of 7 runs in three invocations. The scan reads about 1.5 to 2 ns per
+processors): the ranges are the medians of 7 runs in three invocations. The M3 acceptance run (2026-10-16,
+`win-msvc-bench` Release, two invocations of `--runs 7`): cold 102.4 and 93.4 ms, one thread 403.7 and 348.4 ms,
+resident 96.0 and 64.4 ms, cached 1.45 and 1.29 ms, time report 0.26 and 0.17 ms. The scan reads about 1.5 to 2 ns per
 sample on one thread (two interleaved lanes of sums and extremes with the first position of each extreme), so
 the one-thread cold figure is mostly the store's chunk materialisation; the engine prefetches the chunks of the
 next scans (at most 256 chunks ahead) so the pool builds them during the scan (D-197).
@@ -213,3 +215,21 @@ running): median 2.35 ms (min 2.30, p95 2.41 ms), no Static build. In the same r
 and `plot.zoom_pan_step` 21.6 ms, above its 16 ms limit (M1 figures 1.53 and 11.96 ms in that configuration): the
 graph's Static layer now draws the M3 bands, scrollbars and key columns (D-201) and the machine was loaded, so the
 M1 gate needs a quiet re-measurement (milestone note M3, open issues).
+
+The M3 acceptance run (2026-10-16, `win-msvc-bench` Release, Qt 6.7.2, the machine otherwise idle, two invocations
+of `--runs 5` and `--runs 7`): `plot.animation_frame_10x` 1.79 and 1.52 ms, `plot.cursor_move` 1.74 and 1.55 ms,
+`plot.zoom_pan_step` 13.88 and 12.06 ms (inside the 16 ms M1 limit again: the 21.6 ms above was the load).
+
+## M3 variance row (AC-M3-05)
+
+`esses-plot-bench` also times what F3 adds without an overlay (07 §6.2 AC-M3-05: "F3 costs 0 ms when no overlay
+is selected"): on the same graph with Main only, the graph's own inputs are built on the pool with
+`display.variance.show` off and then on, ten pairs per run; the row is the median of the per-pair differences
+(on - off), and a build that makes any `VarianceTable` fails the row (D-202).
+
+| Row | Workload | Measured | Limit |
+|---|---|---|---|
+| `plot.variance_f3_no_overlay` | the 20-trace Static build with F3 on minus off, Main only (no `VarianceTable` built) | **-0.04 and -0.02 ms** | 1 ms (timing noise; AC-M3-05) |
+
+Measured in the M3 acceptance run above: per-run medians between -0.11 and +0.00 ms (single pairs -0.6 to +0.8
+ms), no table built.

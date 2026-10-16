@@ -12,6 +12,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <optional>
 #include <string>
@@ -123,6 +124,67 @@ TEST_CASE("corrected_speed_methods: gCorrection equals the hand-computed lock an
     REQUIRE(snap.ok());
     CHECK(snap->values[6] == 26.0);
     CHECK(snap->values[7] == Catch::Approx(25.5));
+}
+
+TEST_CASE("corrected_speed_methods: gCorrection catches a slip that builds over several samples", "[unit]") {
+    // The per-sample test of 03 section 9.1 item 3 alone never fires on these (D-203 (a)).
+    const auto maxError = [](const UniformSignal& got, const std::vector<double>& car) {
+        double worst = 0.0;
+        for (std::size_t i = 0; i < car.size(); ++i) {
+            worst = std::max(worst, std::abs(got.values[i] - car[i]));
+        }
+        return worst;
+    };
+    GCorrectionSettings g;
+    g.lockThresholdMps = 2.0;
+    g.recoverSeconds = 0.5;
+    SECTION("a lock building at 100 Hz: 48 m/s^2 more braking than the car, 0.48 m/s per sample") {
+        std::vector<double> car(200);
+        std::vector<double> wheel(200);
+        for (std::size_t i = 0; i < car.size(); ++i) {
+            const double t = static_cast<double>(i) * 0.01;
+            car[i] = 40.0 - 10.0 * t;
+            const double slip = t < 0.5   ? 0.0
+                                : t < 0.8 ? 48.0 * (t - 0.5)
+                                : t < 1.0 ? 14.4 * (1.0 - (t - 0.8) / 0.2)
+                                          : 0.0;
+            wheel[i] = car[i] - slip;
+        }
+        auto out = CorrectedSpeed::gCorrection(
+            uniformSignal(100, wheel), uniformSignal(100, std::vector<double>(200, -10.0)), g, SpeedClamp{});
+        REQUIRE(out.ok());
+        // The wheel is up to 14.4 m/s slow; the corrected speed stays within the lock threshold (and a bit).
+        CHECK(maxError(*out, car) < 2.5);
+    }
+    SECTION("a driven wheel spinning up at 10 Hz: 5 m/s^2 more than the car, 0.5 m/s per sample") {
+        std::vector<double> car(60);
+        std::vector<double> wheel(60);
+        for (std::size_t i = 0; i < car.size(); ++i) {
+            const double t = static_cast<double>(i) * 0.1;
+            car[i] = 10.0 + 3.0 * t;
+            const double spin = t < 1.0   ? 0.0
+                                : t < 3.0 ? 5.0 * (t - 1.0)
+                                : t < 3.5 ? 10.0 * (1.0 - (t - 3.0) / 0.5)
+                                          : 0.0;
+            wheel[i] = car[i] + spin;
+        }
+        auto out = CorrectedSpeed::gCorrection(
+            uniformSignal(10, wheel), uniformSignal(10, std::vector<double>(60, 3.0)), g, SpeedClamp{});
+        REQUIRE(out.ok());
+        // The wheel runs up to 10 m/s fast.
+        CHECK(maxError(*out, car) < 2.5);
+    }
+    SECTION("an accelerometer offset alone is no slip") {
+        std::vector<double> wheel(300);
+        for (std::size_t i = 0; i < wheel.size(); ++i) {
+            wheel[i] = 30.0 + 2.0 * static_cast<double>(i) * 0.01;
+        }
+        // Logged acceleration 2.3 m/s^2 for a true 2 m/s^2: the wheel is followed exactly.
+        auto out = CorrectedSpeed::gCorrection(
+            uniformSignal(100, wheel), uniformSignal(100, std::vector<double>(300, 2.3)), g, SpeedClamp{});
+        REQUIRE(out.ok());
+        checkSignal(*out, wheel);
+    }
 }
 
 TEST_CASE("corrected_speed_methods: gCorrection with invalid samples, a late acceleration and the clamp",

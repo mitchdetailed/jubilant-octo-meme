@@ -6,6 +6,9 @@
 
 #include "property_pages.hpp"
 
+#include <esses/plotcore/scatter_geometry.hpp>
+#include <esses/project/profile.hpp>
+
 #include <QCoreApplication>
 #include <QJsonArray>
 #include <QJsonObject>
@@ -42,6 +45,27 @@ FieldRow sub(const char* pointer, K kind, const char* label, Make make) {
 
 FieldRow unitValue(const char* pointer, const char* label) {
     return sub(pointer, K::UnitValue, label, [](QWidget* parent) { return new UnitValueEdit(parent); });
+}
+
+// The report headings a picker suggests before the dialog knows the session's profile: the built-in
+// circuit profile's (04 section 12 item 6). PropertiesDialog replaces them with the active profile's.
+QStringList headingSuggestions() {
+    QStringList out;
+    for (const std::string& h : project::Profile::circuitDefault().reportHeadings) {
+        out.push_back(QString::fromStdString(h));
+    }
+    return out;
+}
+
+// The range-group paths among them (a time report's rows, a graph's band group).
+QStringList rangeGroupSuggestions() {
+    QStringList out;
+    for (const QString& h : headingSuggestions()) {
+        if (h.startsWith(QLatin1String("Outings"))) {
+            out.push_back(h);
+        }
+    }
+    return out;
 }
 
 QJsonObject zeroValue() {
@@ -190,7 +214,8 @@ std::vector<Page> graphPages(const SchemaTree* s, bool outing) {
          leaf("/display/lineWidth", K::Number, "Line width"),
          leaf("/display/pointSize", K::Number, "Point size"), leaf("/display/showGrid", K::Bool, "Grid"),
          leaf("/display/showMarkers", K::Bool, "Markers"), leaf("/display/showBands", K::Bool, "Bands"),
-         leaf("/display/bandMode", K::Enum, "Band mode"), leaf("/display/bandGroup", K::Text, "Band group"),
+         leaf("/display/bandMode", K::Enum, "Band mode"),
+         leaf("/display/bandGroup", K::Text, "Band group", rangeGroupSuggestions()),
          leaf("/display/overlapMode", K::Enum, "Layout"),
          leaf("/display/cursorStyle", K::Enum, "Cursor style"),
          leaf("/display/cursorSnap", K::Bool, "Snap cursor to samples"),
@@ -254,7 +279,9 @@ std::vector<Page> scatterPages(const SchemaTree* s) {
                leaf("/density/auto", K::Bool, "Automatic density"),
                leaf("/density/threshold", K::Integer, "Density threshold"),
                sub("/density/bins", K::Custom, "Density bins (x, y)",
-                   fixedArray(K::Integer, 2, {QStringLiteral("x"), QStringLiteral("y")}, {64.0, 64.0}))}};
+                   fixedArray(K::Integer, 2, {QStringLiteral("x"), QStringLiteral("y")},
+                              {static_cast<double>(plot::ScatterBody{}.densityBinsX),
+                               static_cast<double>(plot::ScatterBody{}.densityBinsY)}))}};
     return {std::move(channels), std::move(display), std::move(colour), std::move(data)};
 }
 
@@ -304,7 +331,7 @@ std::vector<Page> channelReportPages(const SchemaTree* s) {
     Page report{tr("Report"),
                 {leaf("/report/scope", K::Enum, "Scope"),
                  sub("/report/headers", K::Custom, "Headings",
-                     scalarList(K::Text, {}, QStringLiteral("Outings:Laps"))),
+                     scalarList(K::Text, headingSuggestions(), QStringLiteral("Outings:Laps"))),
                  leaf("/report/options/excludeOverlays", K::Bool, "Exclude overlays"),
                  leaf("/report/options/includeUntrusted", K::Bool, "Include untrusted laps"),
                  leaf("/report/options/interpolateBoundaries", K::Bool, "Interpolate at range edges"),
@@ -324,7 +351,8 @@ std::vector<Page> channelReportPages(const SchemaTree* s) {
 
 std::vector<Page> timeReportPages(const SchemaTree* s) {
     Page sections{tr("Sections"),
-                  {leaf("/rowGroup", K::Text, "Rows (range group)"), leaf("/scope", K::Enum, "Scope"),
+                  {leaf("/rowGroup", K::Text, "Rows (range group)", rangeGroupSuggestions()),
+                   leaf("/scope", K::Enum, "Scope"),
                    leaf("/options/includeUntrusted", K::Bool, "Include untrusted laps"),
                    leaf("/summaries/eclectic", K::Bool, "Eclectic lap"),
                    leaf("/summaries/rollingMin", K::Bool, "Rolling minimum"),

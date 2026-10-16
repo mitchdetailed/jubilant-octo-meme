@@ -100,6 +100,7 @@ struct ReportModel::Run {
     analysis::ReportInputs inputs;
     std::vector<int> slotNumbers; // per source: the overlay number (Overlay role), else 0
     std::shared_ptr<analysis::StatCache> cache;
+    std::shared_ptr<const units::UnitRegistry> units; // keeps inputs.units alive on the worker
 };
 
 struct ReportModel::Outcome {
@@ -326,6 +327,8 @@ struct ReportModel::Impl {
                 }
             }
         }
+        run.units = maths.units();
+        run.inputs.units = run.units.get();
         run.inputs.channels = [table](const analysis::ReportSource& s, std::string_view name) {
             const auto it = table->find(ChannelKey{s.source.get(), s.layer, std::string(name)});
             return it != table->end() ? it->second : analysis::ReportChannelData{};
@@ -367,6 +370,9 @@ void ReportModel::setTimeFormat(const QString& format) {
 }
 
 void ReportModel::setProjectTimeFormat(const QString& format) {
+    if (impl_->projectTimeFormat == format) {
+        return; // the shell re-applies the project options on every document change
+    }
     impl_->projectTimeFormat = format;
     rebuildGrid();
 }

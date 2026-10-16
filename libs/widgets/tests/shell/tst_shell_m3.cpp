@@ -28,6 +28,8 @@
 #include <esses/widgets/components/time_distance_graph.hpp>
 #include <esses/widgets/components/track_map_window.hpp>
 #include <esses/widgets/properties_shell/animation_controller.hpp>
+#include <esses/widgets/properties_shell/command_palette.hpp>
+#include <esses/widgets/properties_shell/properties_dialog.hpp>
 #include <esses/widgets/properties_shell/shell_dialogs.hpp>
 #include <esses/widgets/properties_shell/zoom_summary_bar.hpp>
 #include <esses/widgets/shell/command_actions.hpp>
@@ -36,9 +38,15 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QComboBox>
+#include <QContextMenuEvent>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QLineEdit>
 #include <QMenu>
 #include <QPlainTextEdit>
+#include <QPointer>
 #include <QTabBar>
 #include <QTableWidget>
 #include <QToolBar>
@@ -187,7 +195,8 @@ private Q_SLOTS:
         QVERIFY(data != nullptr);
         QMenu* rates = data->findChild<QMenu*>(QStringLiteral("menu.Data/Animation Rate"));
         QVERIFY(rates != nullptr);
-        QCOMPARE(rates->actions().size(), qsizetype{5});
+        QCOMPARE(rates->actions().size(), qsizetype{6}); // x0.25 .. x4 and x10 (D-203 (g))
+        QCOMPARE(rates->actions().back()->text(), QStringLiteral("x10"));
         const int base = sh.w->session().undoStack().index();
         rates->actions().at(1)->trigger(); // x0.5
         QCOMPARE(a.rate(), 0.5);
@@ -318,6 +327,267 @@ private Q_SLOTS:
         QVERIFY(!canvas.nudgeSelection(1, 0));
         stack.undo();
         QVERIFY(!canvas.layoutLocked());
+    }
+
+    // Component > Add > type (06 section 4.3 item 3; D-203 (t)): every MVP type, in the largest empty
+    // rectangle of at least 20 % x 20 % (else the whole canvas), one undo step, focused; a full canvas gives
+    // the whole canvas. Right-clicking empty canvas offers the same.
+    void addComponentsOfEveryType() {
+        Shell sh;
+        QVERIFY(sh.start(false));
+        qt::ProjectSession& s = sh.w->session();
+        // A fresh worksheet with one component on its left half.
+        project::WorksheetDef sheet;
+        sheet.name = "Add";
+        sheet.components.push_back(componentOf("values_list", exampleBody("values_list", "empty"),
+                                               project::Rect{0.0, 0.0, 0.5, 1.0}, 0));
+        s.undoStack().push(new qt::AddWorksheetCommand(s, s.activeWorkbook(), sheet));
+        sh.w->selectWorksheet(sh.w->worksheetCount() - 1);
+        QUndoStack& stack = s.undoStack();
+        const auto stored = [&]() -> const project::WorksheetDef& {
+            return s.workbooks()[static_cast<std::size_t>(s.activeWorkbook())]
+                .worksheets[static_cast<std::size_t>(sh.w->activeWorksheetIndex())];
+        };
+        int expected = 1;
+        for (const auto& [type, title] : WorksheetCanvas::addableTypes()) {
+            const int base = stack.index();
+            QVERIFY(sh.w->commands().invoke(QStringLiteral("component.add"), {type}));
+            QCOMPARE(stack.index(), base + 1);
+            QCOMPARE(stored().components.size(), static_cast<std::size_t>(++expected));
+            const project::ComponentSpec& added = stored().components.back();
+            QCOMPARE(QString::fromStdString(added.type), type);
+            ComponentWidget* c = sh.w->canvas().componentById(added.id);
+            QVERIFY(c != nullptr);
+            QCOMPARE(QLatin1String(c->type()), QLatin1String(type.toLatin1()));
+            QCOMPARE(sh.w->canvas().focusedComponent(), c);
+            if (expected == 2) { // the first one takes the free right half
+                QCOMPARE(added.rect, (project::Rect{0.5, 0.0, 1.0, 1.0}));
+            }
+            QVERIFY((added.rect.r - added.rect.l >= 0.2 - 1e-9 && added.rect.b - added.rect.t >= 0.2 - 1e-9));
+        }
+        // The canvas is full by now: a new one takes the whole canvas.
+        QCOMPARE(WorksheetCanvas::placeForAdd(stored(), sh.w->canvas().grid()),
+                 (project::Rect{0.0, 0.0, 1.0, 1.0}));
+        // Empty canvas: the right-click menu offers Add > type.
+        project::WorksheetDef empty;
+        empty.name = "Empty";
+        s.undoStack().push(new qt::AddWorksheetCommand(s, s.activeWorkbook(), empty));
+        sh.w->selectWorksheet(sh.w->worksheetCount() - 1);
+        QContextMenuEvent menuEvent(QContextMenuEvent::Mouse, QPoint(20, 20),
+                                    sh.w->canvas().mapToGlobal(QPoint(20, 20)));
+        QApplication::sendEvent(&sh.w->canvas(), &menuEvent);
+        auto* addMenu = sh.w->canvas().findChild<QMenu*>(QStringLiteral("canvasAddMenu"));
+        QVERIFY(addMenu != nullptr);
+        QCOMPARE(addMenu->actions().size(), WorksheetCanvas::addableTypes().size());
+        addMenu->actions().front()->trigger();
+        QCOMPARE(stored().components.size(), std::size_t{1});
+        QCOMPARE(stored().components.front().rect, (project::Rect{0.0, 0.0, 1.0, 1.0}));
+        if (QWidget* popup = QApplication::activePopupWidget()) {
+            popup->close();
+        }
+    }
+
+    // The Component menu is also the component's context menu; a right-click on a graph's channel label makes
+    // it active and offers the channel menu (06 section 2.2; 04 section 8.12; D-203 (s)).
+    void contextMenus() {
+        Shell sh;
+        QVERIFY(sh.start());
+        TimeDistanceGraph* g = sh.graph();
+        QVERIFY(g != nullptr);
+        QVERIFY(QTest::qWaitFor([g] { return g->staticUpToDate(); }, 30000));
+        // Elsewhere on the graph: its contextCommands as the registry titles them.
+        const QPoint body(g->width() / 2, g->height() / 2);
+        QContextMenuEvent onBody(QContextMenuEvent::Mouse, body, g->mapToGlobal(body));
+        QApplication::sendEvent(g, &onBody);
+        QMenu* menu = g->findChild<QMenu*>(QStringLiteral("componentContextMenu"));
+        QVERIFY(menu != nullptr);
+        QStringList ids;
+        for (QAction* a : menu->actions()) {
+            ids << a->objectName();
+        }
+        QVERIFY(ids.contains(QStringLiteral("component.properties")));
+        QVERIFY(ids.contains(QStringLiteral("graph.variance")));
+        for (const QString& id : ids) {
+            QVERIFY(g->contextCommands().contains(id) || id == QLatin1String("component.properties"));
+        }
+        menu->close();
+        QTRY_VERIFY(g->findChild<QMenu*>(QStringLiteral("componentContextMenu")) == nullptr);
+        // On the second key label: that channel becomes active, the channel menu shows.
+        QVERIFY(!g->layout().groups.empty());
+        const plot::TdGroupLayout& gl = g->layout().groups.front();
+        QVERIFY(gl.keyGeometry.rowRects.size() >= 2);
+        const plot::RectPx row = gl.keyGeometry.rowRects[1];
+        const double dpr = static_cast<double>(g->layout().dpr > 0.0F ? g->layout().dpr : 1.0F);
+        const QPoint label(static_cast<int>(static_cast<double>(gl.key.x + row.x + 0.25F * row.w) / dpr),
+                           static_cast<int>(static_cast<double>(gl.key.y + row.y + 0.5F * row.h) / dpr));
+        QCOMPARE(g->hitAt(QPointF(label)).kind, plot::HitKind::KeyLabel);
+        const std::string second = g->body().channelNames()[static_cast<std::size_t>(gl.traces[1])];
+        QContextMenuEvent onLabel(QContextMenuEvent::Mouse, label, g->mapToGlobal(label));
+        QApplication::sendEvent(g, &onLabel);
+        QTRY_COMPARE(g->spec().activeChannel, second);
+        QMenu* channel = g->findChild<QMenu*>(QStringLiteral("channelContextMenu"));
+        QVERIFY(channel != nullptr);
+        QStringList channelIds;
+        for (QAction* a : channel->actions()) {
+            channelIds << a->objectName();
+        }
+        QVERIFY(channelIds.contains(QStringLiteral("channel.properties")));
+        QVERIFY(channelIds.contains(QStringLiteral("channel.hide")));
+        channel->close();
+    }
+
+    // D-203 (j): a graph of a hidden (kept) worksheet sees the cursor move but does no Dynamic build for it,
+    // catches up when shown again, and lets go of a source closed while it is hidden.
+    void hiddenWorksheetGraphsIdle() {
+        Shell sh;
+        QVERIFY(sh.start());
+        QVERIFY(sh.w->worksheetCount() >= 2);
+        sh.w->selection().setMain(sh.laps[1]);
+        const int first = sh.w->activeWorksheetIndex();
+        QPointer<TimeDistanceGraph> g(sh.graph());
+        QVERIFY(!g.isNull());
+        QVERIFY(QTest::qWaitFor([&g] { return g->staticUpToDate(); }, 30000));
+        sh.w->selectWorksheet(first == 0 ? 1 : 0);
+        QVERIFY(!g.isNull()); // kept, hidden
+        QVERIFY(!g->isVisible());
+        const int dynamicBefore = g->dynamicBuilds();
+        const int staticBefore = g->staticBuildsSubmitted();
+        qt::WorksheetViewModel& other = *sh.w->activeWorksheet();
+        for (int i = 1; i <= 5; ++i) {
+            other.setCursor(i * kSec, qt::CursorSource::Programmatic);
+        }
+        QCoreApplication::processEvents();
+        QCOMPARE(g->inputs().view.cursorT, 5 * kSec); // it saw the move
+        QCOMPARE(g->dynamicBuilds(), dynamicBefore);  // and built nothing for it
+        QCOMPARE(g->staticBuildsSubmitted(), staticBefore);
+        sh.w->selectWorksheet(first);
+        // Shown: the cursor drawn where it is now (and a Static build only if the data changed meanwhile,
+        // such as the distance or track map arriving: not asserted, it depends on the pool's timing).
+        QTRY_VERIFY_WITH_TIMEOUT(g->dynamicBuilds() > dynamicBefore && g->staticUpToDate(), 30000);
+
+        // Closing the source while the graph is hidden: nothing keeps the source alive (D-203 (j)).
+        sh.w->selectWorksheet(first == 0 ? 1 : 0);
+        std::weak_ptr<const model::DataSource> source = sh.w->selection().sources().front();
+        const model::SourceId id = source.lock()->id;
+        sh.w->loader().close(id); // File > Close: the loader, the maths and the selection let it go
+        QTRY_VERIFY_WITH_TIMEOUT(source.expired(), 30000);
+        QVERIFY(!g.isNull());
+        QVERIFY(g->inputs().slots.empty());
+    }
+
+    // D-203 (ac): renaming or moving worksheets keeps their view models (the F9 domain, the offset axis) and
+    // their components; adding one still rebuilds the tabs.
+    void renameAndMoveKeepTheWorksheets() {
+        Shell sh;
+        QVERIFY(sh.start());
+        QVERIFY(sh.w->worksheetCount() >= 2);
+        qt::ProjectSession& session = sh.w->session();
+        const int wb = session.activeWorkbook();
+        const int first = sh.w->activeWorksheetIndex();
+        qt::WorksheetViewModel* shown = sh.w->activeWorksheet();
+        QVERIFY(shown != nullptr);
+        shown->setOffsetAxis(true);
+        QPointer<TimeDistanceGraph> g(sh.graph());
+        QVERIFY(!g.isNull());
+        // Visit another worksheet so the first is kept hidden, then come back later.
+        const int other = first == 0 ? 1 : 0;
+        sh.w->selectWorksheet(other);
+        qt::WorksheetViewModel* second = sh.w->activeWorksheet();
+        sh.w->selectWorksheet(first);
+        const int keptBefore = sh.w->canvas().keptWorksheetCount();
+
+        session.undoStack().push(new qt::RenameWorksheetCommand(session, wb, first, "Renamed"));
+        QCOMPARE(sh.w->activeWorksheet(), shown);
+        QVERIFY(shown->state().offsetAxis);
+        QVERIFY(!g.isNull());
+        QCOMPARE(sh.w->canvas().keptWorksheetCount(), keptBefore);
+        QTabBar* tabs = sh.w->findChild<QTabBar*>();
+        QVERIFY(tabs != nullptr);
+        QCOMPARE(tabs->tabText(first), QStringLiteral("Renamed"));
+
+        session.undoStack().push(new qt::MoveWorksheetCommand(session, wb, first, other));
+        QCOMPARE(sh.w->activeWorksheet(), shown); // the same view model, at its new index
+        QCOMPARE(sh.w->activeWorksheetIndex(), other);
+        QCOMPARE(tabs->tabText(other), QStringLiteral("Renamed"));
+        QVERIFY(shown->state().offsetAxis);
+        QVERIFY(!g.isNull());
+        sh.w->selectWorksheet(first); // the other worksheet's kept page comes back too
+        QCOMPARE(sh.w->activeWorksheet(), second);
+
+        session.undoStack().undo();
+        session.undoStack().undo();
+        QCOMPARE(tabs->tabText(first),
+                 QString::fromStdString(session.workbooks()[static_cast<std::size_t>(wb)]
+                                            .worksheets[static_cast<std::size_t>(first)]
+                                            .name));
+        sh.w->selectWorksheet(first);
+        QCOMPARE(sh.w->activeWorksheet(), shown);
+        QVERIFY(!g.isNull());
+    }
+
+    // D-203 (l): the channel pickers offer the logged channels and the maths outputs (Corr Speed) of the open
+    // sources, including a log opened while the dialog is open.
+    void channelPickersOfferTheOpenChannels() {
+        Shell sh;
+        QVERIFY(sh.start(false));
+        TimeDistanceGraph* g = sh.graph();
+        QVERIFY(g != nullptr);
+        PropertiesDialog* dialog = PropertiesDialog::openFor(*g);
+        QVERIFY(dialog != nullptr);
+        const auto offered = [dialog](const QString& name) {
+            for (QComboBox* c : dialog->findChildren<QComboBox*>()) {
+                if (c->property("esses.channelPicker").toBool() && c->findText(name) >= 0) {
+                    return true;
+                }
+            }
+            return false;
+        };
+        QVERIFY(!offered(QStringLiteral("Wheel Speed FL")));
+        sh.w->openLog(sh.ld);
+        QTRY_VERIFY_WITH_TIMEOUT(offered(QStringLiteral("Wheel Speed FL")), 30000);
+        QTRY_VERIFY_WITH_TIMEOUT(offered(QStringLiteral("Corr Speed")), 30000);
+        dialog->close();
+    }
+
+    // Help > Keyboard Shortcuts (06 section 2.2, section 15 item 5; D-203 (ah)): the palette with the query
+    // '?', every command listed with its key in a widened column.
+    void helpKeyboardShortcutsOpensThePalette() {
+        Shell sh;
+        QVERIFY(sh.start(false));
+        QAction* action = sh.w->actions().action(QStringLiteral("help.keyboard_shortcuts"));
+        QVERIFY(action != nullptr);
+        action->trigger();
+        CommandPalette& p = sh.w->commandPalette();
+        QTRY_VERIFY(p.isVisible());
+        QCOMPARE(p.query(), QStringLiteral("?"));
+        QVERIFY(p.visibleIds().contains(QStringLiteral("view.command_palette")));
+        QCOMPARE(p.keyText(QStringLiteral("view.command_palette")), QStringLiteral("Ctrl+Shift+P"));
+        const int widened = p.keyColumnWidth();
+        p.setQuery(QStringLiteral("palette"));
+        QVERIFY(widened > p.keyColumnWidth());
+        p.hide();
+    }
+
+    // Export Data runs on the pool and writes the file when it completes (D-203 (x)): the call returns at
+    // once, and deleting the component meanwhile neither crashes nor loses the file.
+    void exportRunsOffTheGuiThread() {
+        Shell sh;
+        QVERIFY(sh.start());
+        TimeDistanceGraph* g = sh.graph();
+        QVERIFY(g != nullptr);
+        QVERIFY(QTest::qWaitFor([g] { return g->staticUpToDate(); }, 30000));
+        const QString file = QDir(sh.logs.path()).filePath(QStringLiteral("export.csv"));
+        MainWindow::Prompts prompts;
+        prompts.choose = [](const QString&, const QStringList&) { return std::optional<int>(2); }; // All data
+        prompts.file = [file](const QString&, const QString&, bool) { return file; };
+        sh.w->setPrompts(prompts);
+        sh.w->canvas().focusComponent(g);
+        QVERIFY(sh.w->commands().invoke(QStringLiteral("component.export_data")));
+        QVERIFY(sh.w->deleteComponents()); // the graph goes while its export may still run
+        QTRY_VERIFY_WITH_TIMEOUT(QFileInfo(file).exists() && QFileInfo(file).size() > 100, 60000);
+        QFile csv(file);
+        QVERIFY(csv.open(QIODevice::ReadOnly));
+        QVERIFY(csv.readLine().startsWith("Time"));
     }
 
     // The component rows are enabled by the focused component's key context, refreshed when the focus moves.

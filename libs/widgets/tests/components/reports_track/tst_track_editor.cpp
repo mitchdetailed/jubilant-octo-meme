@@ -212,6 +212,58 @@ private Q_SLOTS:
         QVERIFY(sectionNamed(*editor.currentMap(), "Span") != nullptr);
     }
 
+    // D-203 (n): a default section the user edited is theirs (kept by a regeneration, no regenerated default
+    // over it); a map write that fails leaves no step on the stack to undo or redo.
+    void editedDefaultsSurviveAndFailedWritesLeaveNoStep() {
+        EditorWorld e("te-edited");
+        TrackEditor editor(e.session, e.w.selection, e.w.maths, e.maps);
+        QVERIFY(generated(editor));
+        editor.accept();
+        const auto map = editor.currentMap();
+        QVERIFY(map != nullptr);
+        const analysis::TrackSection* turn = nullptr;
+        for (const analysis::TrackSection& s : map->sections) {
+            if (s.category == "corner" && !s.userDefined) {
+                turn = &s;
+                break;
+            }
+        }
+        QVERIFY(turn != nullptr);
+        const QString id = QString::fromStdString(turn->id);
+        const double a = turn->startM;
+        const double b = turn->endM;
+        QVERIFY(editor.editSection(id, QStringLiteral("My corner"), a, b, QString()));
+        const analysis::TrackSection* mine = sectionNamed(*editor.currentMap(), "My corner");
+        QVERIFY(mine != nullptr && mine->userDefined);
+        QVERIFY(editor.regenerateDefaultSections());
+        mine = sectionNamed(*editor.currentMap(), "My corner");
+        QVERIFY(mine != nullptr);
+        for (const analysis::TrackSection& s : editor.currentMap()->sections) {
+            if (!s.userDefined && s.set == mine->set) {
+                QVERIFY2(!(s.startM < mine->endM && mine->startM < s.endM), s.name.c_str());
+            }
+        }
+        QVERIFY(generated(editor));
+        editor.accept(); // regenerate the track: still there
+        QVERIFY(sectionNamed(*editor.currentMap(), "My corner") != nullptr);
+
+        // A write that fails (a folder stands where the file goes): no step to undo or redo.
+        const auto path = e.maps.pathFor(editor.currentMap()->venue);
+        std::error_code ec;
+        std::filesystem::remove(path, ec);
+        std::filesystem::create_directories(path / "blocker", ec);
+        QVERIFY(std::filesystem::is_directory(path));
+        QUndoStack& stack = e.session.undoStack();
+        const int count = stack.count();
+        const int index = stack.index();
+        QVERIFY(!editor.addSection(QStringLiteral("Blocked"), 20.0, 60.0, QStringLiteral("corner")));
+        QVERIFY(!editor.lastError().isEmpty());
+        QCOMPARE(stack.count(), count);
+        QCOMPARE(stack.index(), index);
+        QVERIFY(!stack.canRedo());
+        std::filesystem::remove_all(path, ec);
+    }
+
     void renameDeleteAndTheProjectOption() {
         EditorWorld e("te-files");
         TrackEditor editor(e.session, e.w.selection, e.w.maths, e.maps);

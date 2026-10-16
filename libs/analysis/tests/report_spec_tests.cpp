@@ -146,7 +146,8 @@ TEST_CASE("report_cache: least recently used cells leave first", "[unit]") {
         cache.insert(keyOf(i), StatValue{static_cast<double>(i), i, true});
     }
     CHECK(cache.size() == 3);
-    CHECK(cache.bytes() == 3 * StatCache::kBytesPerCell);
+    CHECK(cache.bytes() > 0);
+    CHECK(cache.bytes() <= cache.budgetBytes());
     REQUIRE(cache.find(keyOf(1)).has_value()); // 1 is now the most recent: 2 is the least recent
     cache.insert(keyOf(4), StatValue{4.0, 4, true});
     CHECK(cache.size() == 3);
@@ -201,4 +202,28 @@ TEST_CASE("report_cache: concurrent lookups and inserts keep the budget", "[unit
     }
     CHECK(wrong.load() == 0);
     CHECK(cache.size() == 500);
+    CHECK(cache.bytes() <= cache.budgetBytes());
+}
+
+TEST_CASE("report_cache: the memory the cache holds stays within its budget when full", "[unit]") {
+    // 01 section 7.1: the budget is a cap on what the cache allocates, not an accounting unit. Full, with
+    // churn (every key evicted and inserted again), the slots and index stay within it and every key that
+    // is held is found.
+    for (const std::size_t cells : {std::size_t{1}, std::size_t{7}, std::size_t{1000}, std::size_t{4096}}) {
+        INFO(cells << " cells");
+        StatCache cache(cells * StatCache::kBytesPerCell);
+        for (int round = 0; round < 3; ++round) {
+            for (int i = 0; i < static_cast<int>(2 * cells); ++i) {
+                cache.insert(keyOf(i), StatValue{static_cast<double>(i), i, true});
+                CHECK(cache.bytes() <= cache.budgetBytes());
+            }
+        }
+        CHECK(cache.size() == cells);
+        // The last `cells` keys inserted are the ones held.
+        for (int i = static_cast<int>(cells); i < static_cast<int>(2 * cells); ++i) {
+            CHECK(cache.find(keyOf(i)) == StatValue{static_cast<double>(i), i, true});
+        }
+        CHECK_FALSE(cache.find(keyOf(static_cast<int>(cells) - 1)).has_value());
+        CHECK(cache.bytes() > cells * StatCache::kBytesPerCell / 2); // the real footprint, not a count
+    }
 }

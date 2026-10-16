@@ -19,11 +19,13 @@
 // reset() afterwards. M3 (keymap_m3_cases.hpp, AC-M3-01): the rows of the properties/shell work; a summary
 // row focuses a scatter component, a row may replace the key by a mouse gesture (zoom.extend), and the file
 // rows get their answers from MainWindow::setPrompts (a project folder of the fixture, the third log, an
-// export file).
+// export file). plannedAndReservedRows is the generic row of 06 section 14.5 for the planned (v1.0 and later)
+// and reserved rows: registered, disabled, the milestone or "reserved" in the tool tip.
 
 #include "../../../libs/qtmodel/tests/qtmodel_test_support.hpp"
 
 #include <esses/base/paths.hpp>
+#include <esses/base/read_file.hpp>
 #include <esses/base/uuid.hpp>
 #include <esses/project/keymap.hpp>
 #include <esses/qtmodel/app_runtime.hpp>
@@ -303,11 +305,8 @@ struct Fixture {
         const std::shared_ptr<const model::DataSource> src = sel().source(sel().snapshot().main.src);
         QVERIFY(src != nullptr);
         if (w->trackMaps().mapFor(*src) == nullptr) {
-            std::ifstream in(qt::test::repoRoot() / "schemas" / "examples" / "track-1" / "valid" /
-                                 "full.json",
-                             std::ios::binary);
-            const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-            Result<JsonDoc> doc = JsonDoc::parse(text);
+            Result<JsonDoc> doc = JsonDoc::load(qt::test::repoRoot() / "schemas" / "examples" / "track-1" /
+                                                "valid" / "full.json");
             QVERIFY(doc.ok());
             Result<analysis::TrackMap> map = analysis::TrackMap::fromJson(doc.value());
             QVERIFY(map.ok());
@@ -364,8 +363,8 @@ void pushProbeEdit(Fixture& f);
 double probeSec(const Fixture& f);
 // options.reports.probeSec of a project.json on disk (0 when absent).
 double probeSecOnDisk(const std::filesystem::path& folder) {
-    std::ifstream in(folder / "project.json", std::ios::binary);
-    const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    Result<std::string> read = readWholeFile(folder / "project.json");
+    const std::string text = read ? std::move(read).value() : std::string();
     return QJsonDocument::fromJson(QByteArray::fromStdString(text))
         .object()
         .value(QStringLiteral("options"))
@@ -1186,6 +1185,34 @@ private Q_SLOTS:
         QTest::addColumn<QString>("key");
         QTest::addColumn<int>("arg");
         QTest::addColumn<bool>("fromDock");
+        QTest::addColumn<bool>("viaPalette");
+        // AC-M3-12 (08 section 6.5: the palette reuses this harness by command id): every command of an
+        // implemented row also runs from the command palette, opened in the row's context, against the same
+        // verify step as its key. Not the mouse rows (the palette has no pointer), not the palette's own row.
+        QSet<QString> paletteDone;
+        for (const project::KeyBinding& row : fx->w->session().keymap().bindings) {
+            const QString command = QString::fromStdString(row.command);
+            const auto it = cases().find(command);
+            if (row.status != project::KeymapStatus::Implemented || paletteDone.contains(command) ||
+                it == cases().end() || it->second.gesture ||
+                command == QLatin1String("view.command_palette")) {
+                continue;
+            }
+            int arg = 0;
+            if (row.args.isArray()) {
+                const QJsonArray args =
+                    QJsonDocument::fromJson(QByteArray::fromStdString(row.args.compact())).array();
+                arg = args.isEmpty() ? 0 : args.first().toInt();
+            }
+            if (arg != 0) {
+                continue; // the palette runs a command without arguments: the row of argument 0
+            }
+            paletteDone.insert(command);
+            const QString name =
+                command + QStringLiteral(" (palette) ") + QString::fromStdString(row.context);
+            QTest::newRow(name.toUtf8().constData())
+                << command << QString::fromStdString(row.context) << QString() << 0 << false << true;
+        }
         for (const project::KeyBinding& row : fx->w->session().keymap().bindings) {
             if (row.status != project::KeymapStatus::Implemented) {
                 continue;
@@ -1201,14 +1228,15 @@ private Q_SLOTS:
                 const QString name =
                     command + QStringLiteral(" (menu) ") + QString::fromStdString(row.context);
                 QTest::newRow(name.toUtf8().constData())
-                    << command << QString::fromStdString(row.context) << QString() << arg << false;
+                    << command << QString::fromStdString(row.context) << QString() << arg << false << false;
             }
             for (const std::string& key : row.keys) {
                 const QString command = QString::fromStdString(row.command);
                 const QString name = command + QLatin1Char(' ') + QString::fromStdString(key) +
                                      QLatin1Char(' ') + QString::fromStdString(row.context);
-                QTest::newRow(name.toUtf8().constData()) << command << QString::fromStdString(row.context)
-                                                         << QString::fromStdString(key) << arg << false;
+                QTest::newRow(name.toUtf8().constData())
+                    << command << QString::fromStdString(row.context) << QString::fromStdString(key) << arg
+                    << false << false;
                 // A global row works from any dock (06 section 14.2): the same key with the focus in the Data
                 // window's tree, unless the row places its own focus.
                 const auto it = cases().find(command);
@@ -1216,7 +1244,7 @@ private Q_SLOTS:
                     const QString dockName = name + QStringLiteral(" (from the Data window)");
                     QTest::newRow(dockName.toUtf8().constData())
                         << command << QString::fromStdString(row.context) << QString::fromStdString(key)
-                        << arg << true;
+                        << arg << true << false;
                 }
             }
         }
@@ -1228,6 +1256,7 @@ private Q_SLOTS:
         QFETCH(QString, key);
         QFETCH(int, arg);
         QFETCH(bool, fromDock);
+        QFETCH(bool, viaPalette);
         const auto it = cases().find(command);
         QVERIFY2(it != cases().end(), qPrintable(QStringLiteral("no KEYMAP_TEST for ") + command));
         const Case& c = it->second;
@@ -1269,7 +1298,18 @@ private Q_SLOTS:
         before.trackMapVisible = f.w->docks().isVisible(QStringLiteral("trackmap"));
         before.inDock = context == QLatin1String("data_window") || fromDock;
 
-        if (c.gesture) {
+        if (viaPalette) {
+            // CTRL+SHIFT+P in the row's context, the command picked by its id, ENTER (AC-M3-12).
+            QVERIFY(f.w->commands().invoke(QStringLiteral("view.command_palette")));
+            CommandPalette& palette = f.w->commandPalette();
+            QTRY_VERIFY(palette.isVisible());
+            palette.setQuery(command);
+            const qsizetype at = palette.visibleIds().indexOf(command);
+            QVERIFY2(at >= 0, qPrintable(command + QStringLiteral(" is not listed by the palette")));
+            palette.setCurrentRow(static_cast<int>(at));
+            QVERIFY2(palette.invokeCurrent(),
+                     qPrintable(command + QStringLiteral(" did not run from the palette")));
+        } else if (c.gesture) {
             c.gesture(f, arg); // a mouse row
         } else if (key.isEmpty()) {
             QAction* action = f.w->actions().action(command);
@@ -1283,6 +1323,47 @@ private Q_SLOTS:
         if (c.after) {
             c.after(f);
         }
+    }
+
+    // The generic row of 06 section 14.5 (AC-M3-01): every planned row (after M3) and every reserved row
+    // whose command has no implemented row is registered, disabled, greyed with its milestone ("planned for
+    // v1.0") or "reserved" in the tool tip, and invoking it does nothing.
+    void plannedAndReservedRows() {
+        Fixture& f = *fx;
+        reset(f);
+        QSet<QString> implemented;
+        for (const project::KeyBinding& row : f.w->session().keymap().bindings) {
+            if (row.status == project::KeymapStatus::Implemented) {
+                implemented.insert(QString::fromStdString(row.command));
+            }
+        }
+        int checked = 0;
+        for (const project::KeyBinding& row : f.w->session().keymap().bindings) {
+            const QString id = QString::fromStdString(row.command);
+            if (row.status == project::KeymapStatus::Implemented || implemented.contains(id)) {
+                continue;
+            }
+            QVERIFY2(row.status == project::KeymapStatus::Reserved ||
+                         (row.milestone != "M1" && row.milestone != "M2" && row.milestone != "M3"),
+                     qPrintable(id + QStringLiteral(" is planned for a closed milestone")));
+            QVERIFY2(f.w->commands().find(id) != nullptr,
+                     qPrintable(id + QStringLiteral(" is not registered")));
+            QVERIFY2(!f.w->commands().isEnabled(id), qPrintable(id + QStringLiteral(" is enabled")));
+            QAction* action = f.w->actions().action(id);
+            QVERIFY2(action != nullptr && !action->isEnabled(), qPrintable(id));
+            const QString note =
+                row.status == project::KeymapStatus::Reserved
+                    ? QStringLiteral("reserved")
+                    : QStringLiteral("planned for %1").arg(QString::fromStdString(row.milestone));
+            QVERIFY2(action->toolTip().contains(note),
+                     qPrintable(id + QStringLiteral(": tool tip '") + action->toolTip() + QLatin1Char('\'')));
+            const int undo = f.w->session().undoStack().index();
+            QVERIFY2(!f.w->commands().invoke(id), qPrintable(id + QStringLiteral(" ran")));
+            QCOMPARE(f.w->session().undoStack().index(), undo);
+            ++checked;
+        }
+        QVERIFY(checked > 0);
+        qInfo("%d planned (after M3) or reserved commands checked", checked);
     }
 
     // Every implemented command has a table entry and no entry names another command (the runtime half of

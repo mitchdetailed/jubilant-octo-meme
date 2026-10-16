@@ -73,6 +73,10 @@ public:
     using GeometryLoad = std::function<QByteArray(const QString& type)>;
     using GeometrySave = std::function<void(const QString& type, const QByteArray& geometry)>;
     static void setGeometryStore(GeometryLoad load, GeometrySave save);
+    // The report headings the heading pickers offer: the active profile's reportHeadings (D-203 (y)); unset:
+    // the built-in circuit profile's.
+    using HeadingSource = std::function<QStringList()>;
+    static void setHeadingSource(HeadingSource source);
     // The body schema of a component type ("" JSON null when there is none), cached.
     static JsonDoc bodySchema(const QString& type, int version = 1);
 
@@ -86,6 +90,8 @@ private:
     struct Impl;
     void build();
     void updateButtons();
+    void refreshUntouched();      // the rows the user has not changed follow the component's spec
+    void refreshChannelChoices(); // the channel pickers offer the open sources' channels and outputs
     void saveGeometryNow();
 
     ComponentWidget& component_;

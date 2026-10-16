@@ -119,8 +119,8 @@ ComponentBuilders OffscreenRenderer::builtinBuilders(std::string_view type) {
     if (type == "time_distance") {
         return buildersOf<plot::TimeDistanceBuilder>();
     }
-    // The M3 drawn components (07 section 6.1); their builders are plotcore's (M3-STUBs until implemented,
-    // whose Unsupported Static build renders the "Render failed" placeholder).
+    // The M3 drawn components (07 section 6.1): their builders are plotcore's; a Static build that fails
+    // renders the "Render failed" placeholder.
     if (type == "outing") {
         return buildersOf<plot::OutingGeometry>();
     }

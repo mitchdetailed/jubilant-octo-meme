@@ -58,6 +58,7 @@ public:
     void onViewChanged(const plot::ViewState& view, plot::ChangeMask what) override;
     void onSelectionChanged(const plot::SelectionSnapshot& selection) override;
     void onDataChanged(const model::SourceId& source, std::uint64_t version) override;
+    void onChannelDataChanged(const maths::ChannelKey& key) override; // draws no channel: ignored
     void onSchemeChanged(const project::Scheme& scheme) override;
     OverlayPolicy overlayPolicy() const override;
     qt::CommandContext commandContext() const override;
@@ -100,6 +101,7 @@ protected:
     void mouseDoubleClickEvent(QMouseEvent* event) override;
 
 private:
+    void releaseInputs();
     QString componentId() const;
     void setScheme(std::shared_ptr<const project::Scheme> scheme);
     void scheduleStaticBuild();
@@ -128,6 +130,7 @@ private:
     std::optional<QPointF> dragFrom_;
     bool prepared_ = false;
     bool staticDirty_ = true;
+    bool dynamicDirty_ = false; // a view change while hidden: the Dynamic layer is rebuilt when shown
     bool buildScheduled_ = false;
     bool buildInFlight_ = false;
     std::uint64_t submitSerial_ = 0;

@@ -86,7 +86,14 @@ registered in ctest; the full check needs `KEYMAP_TEST("<command.id>")` rows und
   Pedals (`THROTTLE`, `BRAKE`), Steering (`STEERANGLE`), Engine (`RPMS`), Gear (`GEAR`), next to a `values_list`
   on `[0.75, 0, 1, 1]` (`Corr Speed`, `Corr Dist` and the same channels plus `FUEL`); worksheet 1 "Driver"
   (distance domain). Channel names are the ACC-style logged names of the M1 data path (D-044), resolved
-  case-insensitively by `ChannelResolver`; missing channels draw as missing.
+  case-insensitively by `ChannelResolver`; missing channels draw as missing. M3 (07 §6.1 "Data", D-202) appends
+  worksheets 2-6: "Overview" (distance: graph, `track_position`, two `gauge_numeric`, two `gauge_bar`),
+  "Braking" (distance: graph with F3 ready, brake `histogram`, throttle-vs-brake `scatter` with a polynomial-3
+  trend), "Corners" (distance: graph, lateral-vs-longitudinal G `scatter`, `track_position`), "Reports" (time:
+  `channel_report` Venue › Driver › Lap with Δ vs Overlay 0, `time_report` of the Default sections with bands
+  0.5/1/2 % and a hidden 3 % band) and "Track" (distance: `track_position`, `outing`, graph); with M1's
+  `values_list` every MVP component type appears. The new throttle and brake traces carry `displayUnit` `%`
+  (logged percentages are stored in ratio, D-010); lateral and longitudinal G are `G Force Lat`/`G Force Long`.
 - `light.scheme.json` ("Esses Light") and `dark.scheme.json` ("Esses Dark"): every role and font role of 06 §16
   (`kSchemeRoles`, `kSchemeFontRoles`), Noto Sans throughout, 12-colour channel palettes and 9-colour overlay
   palettes per background (every entry >= 3:1 contrast with `cptBackground`), `overlayStyle` plain channel

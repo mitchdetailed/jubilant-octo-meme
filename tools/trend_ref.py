@@ -104,6 +104,8 @@ CASES = [
     ("speed_poly3", "poly", 3, False, (20.0, 280.0), [0.1, 0.012, 2.5e-5, -6.0e-8], 0.05, 150, 13),
     ("speed_poly6_zero", "poly", 6, True, (20.0, 280.0),
      [0.0, 0.02, -8.0e-5, 4.0e-7, -1.0e-9, 1.5e-12, -6.0e-16], 0.02, 150, 14),
+    # Engine speed in a narrow band far from 0, through zero: plain powers of x are nearly collinear there.
+    ("rpm_band_poly6_zero", "poly", 6, True, (7900.0, 8000.0), [0.0, 1.0e-4], 0.01, 150, 15),
 ]
 
 

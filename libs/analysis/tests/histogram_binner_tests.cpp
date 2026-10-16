@@ -89,7 +89,18 @@ double linearAt(const Plain& p, Micros t) {
     return p.v[j] + f * (p.v[j + 1] - p.v[j]);
 }
 
+// Bins are [lo, hi) except the last regular band, which is closed on its hi (D-194), so a sample at dataMax
+// counts; the open greaterMax band then holds only the values strictly above it.
 std::optional<std::size_t> scan(const std::vector<Band>& bands, double v) {
+    std::optional<std::size_t> lastRegular;
+    for (std::size_t k = 0; k < bands.size(); ++k) {
+        if (!bands[k].lessMin && !bands[k].greaterMax) {
+            lastRegular = k;
+        }
+    }
+    if (lastRegular && v == bands[*lastRegular].hi) {
+        return lastRegular;
+    }
     for (std::size_t k = 0; k < bands.size(); ++k) {
         if (bands[k].lo <= v && v < bands[k].hi) {
             return k;
@@ -225,6 +236,45 @@ TEST_CASE("histogram: counts, percent and time equal brute force with gating and
     CHECK(all->colourSplit.empty());
 }
 
+TEST_CASE("histogram: samples at dataMin and dataMax are counted in width and count mode",
+          "[unit][AC-M3-07]") {
+    // A saturating channel (a brake or throttle in %): 0 and 100 are its most frequent values. Hand-counted:
+    // two samples at 0, three at 100, one each at 25, 50 and 75.
+    TestCache tc;
+    HistogramInput input;
+    input.series = tc.uniform(Rate::fromHz(10), {0, 25, 50, 100, 100, 100, 0, 75, 100});
+    input.spans = {SampleSpan{0, sec(0.8), true}}; // the last 100 lies outside the span
+    const auto countOf = [&](const std::vector<Band>& bins) {
+        auto got = HistogramBinner::bin(input, HistogramRequest{bins, HistogramYMode::Count, true},
+                                        Priority::Visible, {});
+        REQUIRE(got.ok());
+        return got->counts;
+    };
+    SECTION("width mode, no open bands: [0,10) ... [90,100]") {
+        const std::vector<Band> bins = bandsOf(
+            R"({"bandMode": "width", "dataMin": {"v": 0, "unit": ""}, "dataMax": {"v": 100, "unit": ""},
+                        "bandWidth": {"v": 10, "unit": ""}, "lessMinBand": false, "greaterMaxBand": false})");
+        REQUIRE(bins.size() == 10);
+        CHECK(countOf(bins) == std::vector<double>{2, 0, 1, 0, 0, 1, 0, 1, 0, 3});
+    }
+    SECTION("count mode with open bands: 100 is in the last regular band, not above it") {
+        const std::vector<Band> bins = bandsOf(R"({"bandMode": "count", "bandCount": 4,
+                        "dataMin": {"v": 0, "unit": ""}, "dataMax": {"v": 100, "unit": ""}})");
+        REQUIRE(bins.size() == 6); // (-inf,0) [0,25) [25,50) [50,75) [75,100] (100,inf)
+        CHECK(countOf(bins) == std::vector<double>{0, 2, 1, 1, 4, 0});
+    }
+    SECTION("automatic limits: the channel maximum lies on the last edge") {
+        auto doc = JsonDoc::parse(R"({"bandMode": "count", "bandCount": 2, "lessMinBand": false,
+                                      "greaterMaxBand": false})");
+        REQUIRE(doc.ok());
+        auto axis = BandAxis::fromJson(*doc);
+        REQUIRE(axis.ok());
+        auto bins = generateBands(*axis, 0.0, 100.0, nullptr, "");
+        REQUIRE(bins.ok());
+        CHECK(countOf(*bins) == std::vector<double>{3, 5});
+    }
+}
+
 TEST_CASE("histogram: a timestamped channel holds each sample until the next one", "[unit][AC-M3-07]") {
     TestCache tc;
     HistogramInput input;
@@ -272,12 +322,14 @@ TEST_CASE("histogram: binOf, refusals and cancellation", "[unit]") {
     CHECK(HistogramBinner::binOf(9.999, bins) == 1u);
     CHECK_FALSE(HistogramBinner::binOf(10.0, bins).has_value()); // the gap [10, 20)
     CHECK(HistogramBinner::binOf(20.0, bins) == 2u);
-    CHECK(HistogramBinner::binOf(30.0, bins) == 3u);
+    CHECK(HistogramBinner::binOf(30.0, bins) == 2u); // the last regular band is closed on its hi (D-194)
+    CHECK(HistogramBinner::binOf(std::nextafter(30.0, inf), bins) == 3u);
     CHECK(HistogramBinner::binOf(inf, bins) == 3u);
     CHECK_FALSE(HistogramBinner::binOf(std::nan(""), bins).has_value());
     const std::span<const Band> closed(bins.data() + 1, 2);
     CHECK_FALSE(HistogramBinner::binOf(-0.5, closed).has_value());
-    CHECK_FALSE(HistogramBinner::binOf(30.0, closed).has_value());
+    CHECK(HistogramBinner::binOf(30.0, closed) == 1u);
+    CHECK_FALSE(HistogramBinner::binOf(std::nextafter(30.0, inf), closed).has_value());
     CHECK_FALSE(HistogramBinner::binOf(1.0, {}).has_value());
 
     TestCache tc;

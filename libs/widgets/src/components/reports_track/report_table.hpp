@@ -14,6 +14,7 @@
 
 #include <QColor>
 #include <QFont>
+#include <QHash>
 #include <QIdentityProxyModel>
 #include <QWidget>
 #include <cstdint>
@@ -61,6 +62,9 @@ protected:
 private:
     void relayoutColumns();
     int contentWidth(int column) const;
+    // The advance of each (font, text) pair measured so far (D-203 (aa)): a delivery of the same report
+    // measures its cells from here. Cleared with the scheme and when it grows past a bound.
+    mutable QHash<QString, int> widthCache_;
 
     ReportStyleProxy* proxy_ = nullptr;
     QLabel* caption_ = nullptr;
@@ -69,6 +73,10 @@ private:
     bool focusFrame_ = false;
     QColor focusColour_;
 };
+
+// Whether a report waits for its next show before re-running: it sits on a hidden page of a shown window (a
+// kept worksheet, D-203 (z)). A standalone widget (tests, Print to Clipboard) runs at once.
+bool deferWhileHidden(const QWidget& report);
 
 // 0xRRGGBBAA of a "#rrggbb" or "#rrggbbaa" body colour; `fallback` for anything else.
 std::uint32_t parseBodyColour(const QString& text, std::uint32_t fallback);

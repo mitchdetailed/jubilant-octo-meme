@@ -87,6 +87,11 @@ private Q_SLOTS:
                  TrackPosition::kZoomStep);
         dock.fitAction()->trigger();
         QCOMPARE(tp->body().scaleMode, std::string("fit"));
+        // A light/dark switch of the application reaches the dock's map (D-203 (q)): a Static rebuild.
+        QVERIFY(QTest::qWaitFor([&] { return tp->staticUpToDate(); }, 20000));
+        const int builds = tp->staticSubmitted();
+        dock.applyScheme(*w.context->scheme);
+        QTRY_VERIFY(tp->staticSubmitted() > builds);
 
         // Another worksheet: a new embedded widget over it, the dock's settings kept.
         cmptest::World other;

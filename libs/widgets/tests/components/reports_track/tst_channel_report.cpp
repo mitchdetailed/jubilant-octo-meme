@@ -9,6 +9,8 @@
 
 #include "components/reports_track/rt_support.hpp"
 
+#include <esses/maths/channel_key.hpp>
+#include <esses/qtmodel/distance_service.hpp>
 #include <esses/qtmodel/render_service.hpp>
 #include <esses/qtmodel/report_model.hpp>
 #include <esses/qtmodel/worksheet_view_model.hpp>
@@ -184,9 +186,9 @@ private Q_SLOTS:
         // Not zoom linked: a zoom change does not re-run the engine.
         const int unlinked = report.model().deliveries();
         w.view->zoomTo(plot::XSpan{0.0, 5.0e6});
-        QTest::qWait(50);
+        drainEvents();
+        QVERIFY(!report.model().busy()); // no run was started (a started one would be busy until delivered)
         QCOMPARE(report.model().deliveries(), unlinked);
-        QVERIFY(!report.model().busy());
 
         // Zoom linked: the cells follow the worksheet zoom (each range clipped through its own mapper).
         const QJsonObject linked =
@@ -205,10 +207,54 @@ private Q_SLOTS:
         // Data: a source that is not shown does not re-run it; the shown one does.
         const int quiet = report.model().deliveries();
         report.onDataChanged(model::SourceId{}, 0);
-        QTest::qWait(50);
+        drainEvents();
+        QVERIFY(!report.model().busy());
         QCOMPARE(report.model().deliveries(), quiet);
         report.onDataChanged(src->id, 0);
         QVERIFY(settle(report.model(), quiet));
+    }
+
+    // D-203 (z): a report on a hidden page of a shown window (a kept worksheet) runs once when shown again,
+    // not on every change meanwhile; a maths output it does not list never re-runs it.
+    void hiddenReportsWaitForTheirShow() {
+        World w;
+        const auto src = threeLaps(w);
+        w.selection.setMain(refOf(*src, kLaps, "Lap 1"));
+        QWidget window;
+        window.resize(500, 300);
+        auto* page = new QWidget(&window);
+        page->resize(500, 300);
+        auto* report =
+            new ChannelReport(componentSpec(ChannelReport::kType, reportBody(speed({QStringLiteral("avg")}))),
+                              *w.context, page);
+        report->resize(480, 220);
+        window.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&window));
+        QVERIFY(settle(report->model(), 0));
+        QCOMPARE(text(report->tableView(), 0, 1), QStringLiteral("49.50"));
+        // The world's distance pass ends first (its arrival re-runs every report of the source), so nothing
+        // else is in flight when the checks below count runs.
+        QTRY_VERIFY_WITH_TIMEOUT(w.distance.state(src->id) != qt::DistanceState::Pending, 30000);
+        drainEvents();
+        QTRY_VERIFY(!report->model().busy());
+        // An unlisted channel becoming ready: nothing to re-run.
+        const int shown = report->model().deliveries();
+        report->onChannelDataChanged(maths::ChannelKey::make(src->id, "Normal", "Throttle"));
+        drainEvents();
+        QVERIFY(!report->model().busy());
+        QCOMPARE(report->model().deliveries(), shown);
+        // The page hidden (another worksheet shown): changes wait.
+        page->hide();
+        w.selection.setMain(refOf(*src, kLaps, "Lap 2"));
+        w.selection.setMain(refOf(*src, kLaps, "Lap 3"));
+        report->onDataChanged(src->id, 0);
+        drainEvents();
+        QVERIFY(!report->model().busy());
+        QCOMPARE(report->model().deliveries(), shown);
+        // Shown again: one run, with the current selection.
+        page->show();
+        QVERIFY(settle(report->model(), shown));
+        QCOMPARE(text(report->tableView(), 0, 1), QStringLiteral("249.50"));
     }
 
     void bodyLayoutAndDeltaColumns() {

@@ -411,8 +411,10 @@ private Q_SLOTS:
         QTRY_VERIFY_WITH_TIMEOUT(w.distanceReady(), 30000); // no Data change from the prefetch from here on
         w.selection.setMain(w.lap(4));                      // the 30 s in lap, the last of the outing
         WorksheetViewModel ws(sheet("time"), w.workspace, w.selection, w.distance);
+        ws.setAnimationRate(20.0);
+        QCOMPARE(ws.animationRate(), 10.0); // x0.25 .. x10, the menu's rates (D-203 (g))
         ws.setAnimationRate(10.0);
-        QCOMPARE(ws.animationRate(), 4.0); // x0.25 .. x4
+        QCOMPARE(ws.animationRate(), 10.0);
         QSignalSpy changed(&ws, &WorksheetViewModel::changed);
         ws.setAnimating(true);
         QVERIFY(ws.animating());

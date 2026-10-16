@@ -392,8 +392,13 @@ geom::Scale scaleOf(const ScaleSpec& spec, const std::vector<const ResolvedChann
     return s;
 }
 
+// Main in its channel colours, the overlays in their range key colours (04 section 10.1 item 9, 06
+// section 5.3 item 3).
 Rgba setColour(const ComponentBuildInputs& in, const ScatterBody& body, const ScatterSet& set) {
     const SlotData& slot = in.slots[set.slot];
+    if (slot.slot.kind != SlotKind::Main) {
+        return rangeKeyColour(geom::schemeOf(in), slot.slot);
+    }
     const ResolvedChannel* rc =
         set.trace >= 0 ? geom::channelOf(slot, yIndex(set.trace),
                                          body.traces[static_cast<std::size_t>(set.trace)].yChannel)
@@ -416,8 +421,21 @@ Result<std::vector<ScatterSet>> gatherSlot(const ComponentBuildInputs& in, const
     if (spans.empty()) {
         return out;
     }
+    // Every slot draws in the Main slot's display units, the units of the axes and the trend equation: an
+    // overlay whose channel shows another unit converts into Main's (D-196 (f)). A channel of the same
+    // quantity has the same base unit (D-010), so Main's converter applies to it as it is.
+    const SlotData& mainSlot = in.slots.front();
+    const auto inMainUnit = [&](const ResolvedChannel& rc, const ResolvedChannel* mainRc) {
+        if (k == 0 || mainRc == nullptr || !mainRc->descriptor || !rc.descriptor ||
+            rc.displayUnit == mainRc->displayUnit ||
+            rc.descriptor->quantity != mainRc->descriptor->quantity) {
+            return rc.toDisplay;
+        }
+        return mainRc->toDisplay;
+    };
     analysis::ScatterInput input;
-    input.x = analysis::ScatterChannel{*x->series, x->toDisplay, interpOf(*x)};
+    input.x = analysis::ScatterChannel{
+        *x->series, inMainUnit(*x, geom::channelOf(mainSlot, xIndex(), body.xChannel)), interpOf(*x)};
     std::vector<int> traceOf;
     for (const int t : frame.traces) {
         const ScatterTrace& trace = body.traces[static_cast<std::size_t>(t)];
@@ -425,7 +443,8 @@ Result<std::vector<ScatterSet>> gatherSlot(const ComponentBuildInputs& in, const
         if (!geom::readable(y)) {
             continue;
         }
-        input.y.push_back(analysis::ScatterChannel{*y->series, y->toDisplay, interpOf(*y)});
+        input.y.push_back(analysis::ScatterChannel{
+            *y->series, inMainUnit(*y, geom::channelOf(mainSlot, yIndex(t), trace.yChannel)), interpOf(*y)});
         input.yDelayUs.push_back(trace.yDelayUs);
         traceOf.push_back(t);
     }
@@ -435,7 +454,9 @@ Result<std::vector<ScatterSet>> gatherSlot(const ComponentBuildInputs& in, const
     if (!body.colourChannel.empty()) {
         const ResolvedChannel* z = geom::channelOf(slot, zIndex(body), body.colourChannel);
         if (geom::readable(z)) {
-            input.colour = analysis::ScatterChannel{*z->series, z->toDisplay, interpOf(*z)};
+            input.colour = analysis::ScatterChannel{
+                *z->series, inMainUnit(*z, geom::channelOf(mainSlot, zIndex(body), body.colourChannel)),
+                interpOf(*z)};
         }
     }
     if (!body.gatingChannel.empty()) {

@@ -25,6 +25,7 @@
 #include <esses/widgets/components/time_distance_graph.hpp>
 
 #include <QClipboard>
+#include <QContextMenuEvent>
 #include <QGuiApplication>
 #include <QHelpEvent>
 #include <QHideEvent>
@@ -115,8 +116,16 @@ TimeDistanceGraph::TimeDistanceGraph(const project::ComponentSpec& spec, Workshe
         if (!isVisible()) {
             layers_.releaseStatic();
             staticDirty_ = true;
+            releaseSources();
         }
     });
+}
+
+// A hidden graph lets its sources' snapshots go (D-203 (j)); the layout and the hits stay for the next show.
+void TimeDistanceGraph::releaseSources() {
+    inputs_.slots.clear();
+    inputs_.trackMap.reset();
+    prepared_ = false;
 }
 
 TimeDistanceGraph::~TimeDistanceGraph() {
@@ -168,6 +177,18 @@ void TimeDistanceGraph::onViewChanged(const plot::ViewState& view, plot::ChangeM
     }
     inputs_.view = view;
     layers_.invalidate(what);
+    if (!isVisible()) {
+        // A graph of a hidden (kept) worksheet does no work per cursor move or animation frame (it would
+        // read key values for nobody): what changed is rebuilt when it is shown (D-203 (j)).
+        if ((what & (plot::mask(plot::Change::Selection) | plot::mask(plot::Change::Data))) != 0) {
+            releaseSources();
+        }
+        if ((what & static_cast<plot::ChangeMask>(plot::kStaticRebuild | plot::kFullRebuild)) != 0) {
+            staticDirty_ = true;
+        }
+        dynamicDirty_ = dynamicDirty_ || what != 0;
+        return;
+    }
     if ((what & static_cast<plot::ChangeMask>(plot::kStaticRebuild | plot::kFullRebuild)) != 0) {
         // Static (and Dynamic/Chrome with it) after the inputs are prepared again.
         staticDirty_ = true;
@@ -245,6 +266,8 @@ bool TimeDistanceGraph::handleCommand(const QString& id, const QVariantList& arg
     const auto arg = [&args](qsizetype i) { return i < args.size() ? args[i] : QVariant(); };
     if (id == QLatin1String("graph.variance")) {
         toggleVariance();
+    } else if (id == QLatin1String("component.legend")) {
+        toggleKey();
     } else if (id == QLatin1String("graph.measurements")) {
         toggleMeasurements();
     } else if (id == QLatin1String("graph.status_errors")) {
@@ -317,6 +340,13 @@ void TimeDistanceGraph::toggleVariance() {
     plot::TimeDistanceBody body = body_;
     body.variance.show = !body.variance.show;
     requestBody(body, body.variance.show ? tr("Show variance") : tr("Hide variance"));
+}
+
+// L: the key column (06 section 14.4), as the outing graph's: none <-> labels (a "values" key hides too).
+void TimeDistanceGraph::toggleKey() {
+    plot::TimeDistanceBody body = body_;
+    body.keyMode = body.keyMode == "none" ? "labels" : "none";
+    requestBody(body, body.keyMode == "none" ? tr("Hide key") : tr("Show key"));
 }
 
 void TimeDistanceGraph::toggleMeasurements() {
@@ -406,18 +436,25 @@ void TimeDistanceGraph::copyCursorValues() {
     }
 }
 
-bool TimeDistanceGraph::exportData(ExportSink& sink, const ExportOptions& options) const {
+ComponentWidget::ExportJob TimeDistanceGraph::exportJob(const ExportOptions& options) const {
     if (!prepared_ || inputs_.slots.empty()) {
-        return false;
+        return {};
     }
     const plot::ComponentBuildInputs in = plots::exportInputs(inputs_, options.range);
     std::vector<std::size_t> channels;
     for (std::size_t i = 0; i < body_.channelNames().size(); ++i) {
         channels.push_back(i);
     }
-    const std::optional<QByteArray> csv = plots::runOffGui(
-        context_, componentId() + QStringLiteral("/export"),
-        [in, channels](const CancelToken& cancel) { return plots::timeSeriesCsv(in, channels, cancel); });
+    return [in, channels](const CancelToken& cancel) { return plots::timeSeriesCsv(in, channels, cancel); };
+}
+
+bool TimeDistanceGraph::exportData(ExportSink& sink, const ExportOptions& options) const {
+    const ExportJob job = exportJob(options);
+    if (!job) {
+        return false;
+    }
+    const std::optional<QByteArray> csv =
+        plots::runOffGui(context_, componentId() + QStringLiteral("/export"), job);
     return csv && sink.write(*csv);
 }
 
@@ -471,7 +508,12 @@ void TimeDistanceGraph::changeVerticalZoom(int group, plot::TdGroupZoom zoom) {
 void TimeDistanceGraph::verticalZoom(double factor) {
     const int g = activeGroup();
     const plot::TdGroupZoom z = verticalZoomOf(g);
-    const double centre = 0.5 * (z.lo + z.hi);
+    // About the active channel's value at the cursor (06 section 14.4), when it is valid and on the shown
+    // scale; else about the middle of the shown span (D-203 (v)).
+    double centre = 0.5 * (z.lo + z.hi);
+    if (const std::optional<double> f = cursorValueFraction(g)) {
+        centre = z.lo + *f * (z.hi - z.lo);
+    }
     const double half = 0.5 * std::min(1.0, (z.hi - z.lo) * factor);
     double lo = centre - half;
     double hi = centre + half;
@@ -484,6 +526,39 @@ void TimeDistanceGraph::verticalZoom(double factor) {
         hi = 1.0;
     }
     changeVerticalZoom(g, plot::TdGroupZoom{std::max(0.0, lo), hi});
+}
+
+std::optional<double> TimeDistanceGraph::cursorValueFraction(int group) const {
+    if (group < 0 || static_cast<std::size_t>(group) >= local_.builtScales.size() || inputs_.slots.empty() ||
+        spec_.activeChannel.empty()) {
+        return std::nullopt;
+    }
+    const std::optional<std::pair<double, double>>& scale =
+        local_.builtScales[static_cast<std::size_t>(group)];
+    if (!scale || !(scale->second > scale->first)) {
+        return std::nullopt;
+    }
+    const plot::SlotData& main = inputs_.slots.front();
+    std::size_t flat = 0;
+    for (const plot::TdGroup& gr : body_.groups) {
+        for (const plot::TdTrace& t : gr.traces) {
+            const std::size_t index = flat++;
+            if (t.channel != spec_.activeChannel || index >= main.channels.size() ||
+                main.channels[index].name != t.channel) {
+                continue;
+            }
+            double v = std::numeric_limits<double>::quiet_NaN();
+            static_cast<void>(valueText(main.channels[index],
+                                        main.range.start + context_.view.state().cursorT,
+                                        t.dps.value_or(main.channels[index].dps), &v));
+            if (!std::isfinite(v)) {
+                return std::nullopt;
+            }
+            const double f = (v - scale->first) / (scale->second - scale->first);
+            return f >= 0.0 && f <= 1.0 ? std::optional<double>(f) : std::nullopt;
+        }
+    }
+    return std::nullopt;
 }
 
 void TimeDistanceGraph::verticalZoomFull(int group) {
@@ -919,6 +994,7 @@ void TimeDistanceGraph::rebuildDynamic() {
     if (!prepared_) {
         return;
     }
+    dynamicDirty_ = false;
     inputs_.view = context_.view.state();
     plot::DrawList next = plot::TimeDistanceBuilder::buildDynamic(inputs_, local_);
     const plot::Rgba zoomColour = scheme_->role("cursorZoom", kBandFallback);
@@ -1103,9 +1179,11 @@ void TimeDistanceGraph::paintEvent(QPaintEvent* event) {
 void TimeDistanceGraph::showEvent(QShowEvent* event) {
     ComponentWidget::showEvent(event);
     releaseTimer_->stop();
-    if (staticDirty_ || layers_.staticImage().isNull()) {
+    if (staticDirty_ || !prepared_ || layers_.staticImage().isNull()) {
         staticDirty_ = true;
         scheduleStaticBuild();
+    } else if (dynamicDirty_) {
+        rebuildDynamic();
     }
 }
 
@@ -1332,6 +1410,37 @@ void TimeDistanceGraph::mousePressEvent(QMouseEvent* event) {
     default: // bands, markers, annotations: a click never moves the cursor (04 section 8.11 item 1)
         break;
     }
+}
+
+// 04 section 8.12 / 7.2 item 3: a right-click on a channel label makes it active and shows the channel menu;
+// an annotation has its own menu (mousePressEvent); elsewhere the component menu (D-203 (s)).
+void TimeDistanceGraph::contextMenuEvent(QContextMenuEvent* event) {
+    const plot::HitResult hit = hitAt(event->pos());
+    if (hit.kind == plot::HitKind::Annotation) {
+        event->accept();
+        return;
+    }
+    if (hit.kind == plot::HitKind::KeyLabel) {
+        const std::vector<std::string> names = body_.channelNames();
+        if (hit.trace >= 0 && static_cast<std::size_t>(hit.trace) < names.size()) {
+            setActiveChannel(QString::fromStdString(names[static_cast<std::size_t>(hit.trace)]));
+        }
+        Q_EMIT focusRequested();
+        QMenu* menu =
+            commandMenu({QStringLiteral("channel.scale_offset"), QStringLiteral("channel.zero_at_cursor"),
+                         QStringLiteral("channel.filter"), QStringLiteral("channel.properties"),
+                         QStringLiteral("channel.edit_maths"), QStringLiteral("channel.status"),
+                         QStringLiteral("channel.hide"), QStringLiteral("channel.remove")});
+        menu->setObjectName(QStringLiteral("channelContextMenu"));
+        if (menu->isEmpty()) {
+            delete menu;
+        } else {
+            menu->popup(event->globalPos());
+        }
+        event->accept();
+        return;
+    }
+    ComponentWidget::contextMenuEvent(event);
 }
 
 void TimeDistanceGraph::mouseMoveEvent(QMouseEvent* event) {

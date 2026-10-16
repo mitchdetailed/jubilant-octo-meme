@@ -348,14 +348,15 @@ void addM3Cases(std::map<QString, Case>& table) {
                                                            neighbour(f, -1));
                                               },
                                               {}});
-    add(KEYMAP_TEST("component.legend"),
+    add(KEYMAP_TEST("component.legend"), // L on the graph: its key column goes and comes back
         {{},
          {},
-         [undoStep](F& f, const Before& b, int) {
-             QVERIFY(b.focusedSpec.has_value());
-             QCOMPARE(f.w->canvas().focusedComponent()->spec().legend.channels,
-                      !b.focusedSpec->legend.channels);
-             undoStep(f, b);
+         [bodyChanged](F& f, const Before& b, int) {
+             bodyChanged(f, b, "/display/key/mode");
+             auto* g = qobject_cast<TimeDistanceGraph*>(f.w->canvas().focusedComponent());
+             QVERIFY(g != nullptr);
+             const bool hidden = g->body().keyMode == "none";
+             QTRY_VERIFY(hidden ? g->layout().keyColumn.w == 0.0F : g->layout().keyColumn.w > 0.0F);
          },
          [](F& f) { undoToMark(f); }});
     add(KEYMAP_TEST("component.colour_legend"), // a scatter: its colour-channel legend
@@ -367,10 +368,15 @@ void addM3Cases(std::map<QString, Case>& table) {
              undoStep(f, b);
          },
          [](F& f) { undoToMark(f); }});
-    add(KEYMAP_TEST("component.cycle_layout"),
+    add(KEYMAP_TEST("component.cycle_layout"), // G: the graph's panels overlap (the layout follows)
         {{},
          {},
-         [bodyChanged](F& f, const Before& b, int) { bodyChanged(f, b, "/display/overlapMode"); },
+         [bodyChanged](F& f, const Before& b, int) {
+             bodyChanged(f, b, "/display/overlapMode");
+             auto* g = qobject_cast<TimeDistanceGraph*>(f.w->canvas().focusedComponent());
+             QVERIFY(g != nullptr);
+             QTRY_COMPARE(g->layout().overlapped, g->body().overlapMode == "overlapped");
+         },
          [](F& f) { undoToMark(f); }});
     add(KEYMAP_TEST("component.cycle_style"),
         {{},
@@ -464,6 +470,13 @@ void addM3Cases(std::map<QString, Case>& table) {
              const auto& notes = src->sidecar.layer(f.sel().snapshot().main.layer).annotations;
              QVERIFY(std::any_of(notes.begin(), notes.end(),
                                  [](const model::Annotation& a) { return a.text == "Keymap note"; }));
+             // The record names the focused graph's active channel, as the graph's own Add does (D-203 (q)).
+             const std::optional<QString> active = f.w->canvas().focusedComponent()->activeChannel();
+             if (active) {
+                 QVERIFY(std::any_of(notes.begin(), notes.end(), [&active](const model::Annotation& a) {
+                     return a.text == "Keymap note" && a.channel == active->toStdString();
+                 }));
+             }
          },
          [](F& f) { undoToMark(f); }});
 
@@ -562,7 +575,56 @@ void addM3Cases(std::map<QString, Case>& table) {
         };
         return c;
     };
-    add(KEYMAP_TEST("zoom.v_in"), vertical({0.0, 1.0}, {0.25, 0.75}));
+    {
+        // ALT+UP halves the shown fraction about the active channel's value at the cursor, else about the
+        // span's centre (06 section 14.4; D-203 (v)). The expected centre comes from what the graph shows:
+        // the value in its key and the scale on its axis.
+        Case c = vertical({0.0, 1.0}, {0.25, 0.75});
+        c.arrange = [](F& f, int) {
+            TimeDistanceGraph* g = tdGraph(f);
+            QVERIFY(g != nullptr);
+            const int group = std::max(0, g->layout().activeGroup);
+            g->setVerticalZoom(group, plot::TdGroupZoom{});
+            QTRY_VERIFY(graphQuiet(*g));
+            double centre = 0.5;
+            const QString active = QString::fromStdString(g->spec().activeChannel);
+            const auto& scales = g->staticInfo().scales;
+            if (!active.isEmpty() && static_cast<std::size_t>(group) < scales.size() &&
+                scales[static_cast<std::size_t>(group)].has_value()) {
+                const auto [lo, hi] = *scales[static_cast<std::size_t>(group)];
+                for (const QString& line :
+                     g->cursorValuesText().split(QLatin1Char('\n'), Qt::SkipEmptyParts)) {
+                    if (line.section(QLatin1Char('\t'), 0, 0) != active) {
+                        continue;
+                    }
+                    bool ok = false;
+                    const double v = line.section(QLatin1Char('\t'), 1, 1)
+                                         .trimmed()
+                                         .section(QLatin1Char(' '), 0, 0)
+                                         .toDouble(&ok);
+                    const double at = ok && hi > lo ? (v - lo) / (hi - lo) : -1.0;
+                    if (at >= 0.0 && at <= 1.0) {
+                        centre = std::clamp(at, 0.25, 0.75);
+                    }
+                }
+            }
+            f.expect = {centre - 0.25, centre + 0.25};
+        };
+        c.verify = [](F& f, const Before&, int) {
+            TimeDistanceGraph* g = tdGraph(f);
+            QVERIFY(g != nullptr);
+            const plot::TdGroupZoom z = g->verticalZoomOf(std::max(0, g->layout().activeGroup));
+            QVERIFY(std::abs((z.hi - z.lo) - 0.5) < 1e-9);
+            // The key shows the value rounded to its decimal places: a hundredth of the span covers that.
+            QVERIFY2(std::abs(z.lo - f.expect[0]) < 0.01 && std::abs(z.hi - f.expect[1]) < 0.01,
+                     qPrintable(QStringLiteral("[%1, %2] vs [%3, %4]")
+                                    .arg(z.lo)
+                                    .arg(z.hi)
+                                    .arg(f.expect[0])
+                                    .arg(f.expect[1])));
+        };
+        add(KEYMAP_TEST("zoom.v_in"), c);
+    }
     add(KEYMAP_TEST("zoom.v_out"), vertical({0.25, 0.75}, {0.0, 1.0}));
     add(KEYMAP_TEST("zoom.v_full"), vertical({0.25, 0.5}, {0.0, 1.0}));
     add(KEYMAP_TEST("pan.up"), vertical({0.25, 0.75}, {0.30, 0.80}));

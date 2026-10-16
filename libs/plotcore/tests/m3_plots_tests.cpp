@@ -15,6 +15,7 @@
 #include <esses/plotcore/histogram_geometry.hpp>
 #include <esses/plotcore/scatter_geometry.hpp>
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
@@ -564,6 +565,37 @@ TEST_CASE("ScatterGeometry: buildStatic gathers through ScatterBinner", "[unit]"
         expected += s.series.x.size();
     }
     CHECK(drawn == expected);
+}
+
+TEST_CASE("ScatterGeometry: an overlay shown in another display unit draws in Main's unit", "[unit]") {
+    // D-196 (f): the overlay's Corr Speed shown in mph converts into Main's km/h, so the plot is the one
+    // drawn when both show km/h (an overlay in its own unit would sit at 0.62 x its speed on a km/h axis).
+    const test::Fixture fx;
+    test::warmAll(fx.a);
+    test::warmAll(fx.b);
+    const PlotCase c = scatterCases().front(); // Main 'a' and an overlay 'b'
+    const ScatterBody body = ScatterBody::parse(JsonDoc::parse(c.body).value()).value();
+    const ComponentBuildInputs same = plotInputs(fx, c, namesOf(body.channels()), 1.0F);
+    ComponentBuildInputs mixed = same;
+    REQUIRE(mixed.slots.size() == 2);
+    bool changed = false;
+    for (ResolvedChannel& rc : mixed.slots[1].channels) {
+        if (rc.name == "Corr Speed") {
+            rc.toDisplay = units::Converter{3.6 / 1.609344, 0.0};
+            rc.displayUnit = "mph";
+            changed = true;
+        }
+    }
+    REQUIRE(changed);
+    const Result<ComponentBuild> a = ScatterGeometry::buildStatic(same, CancelToken{});
+    const Result<ComponentBuild> b = ScatterGeometry::buildStatic(mixed, CancelToken{});
+    REQUIRE(a.ok());
+    REQUIRE(b.ok());
+    REQUIRE(a->list.verts.size() == b->list.verts.size());
+    for (std::size_t i = 0; i < a->list.verts.size(); ++i) {
+        INFO("vertex coordinate " << i);
+        CHECK(b->list.verts[i] == Catch::Approx(a->list.verts[i]).margin(1e-3));
+    }
 }
 
 TEST_CASE("ScatterGeometry: tiled layout, colour bands and the legend, density and interval average",

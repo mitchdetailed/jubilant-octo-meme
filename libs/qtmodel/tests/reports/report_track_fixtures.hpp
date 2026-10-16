@@ -13,6 +13,7 @@
 #include <esses/analysis/track_map.hpp>
 #include <esses/base/hash.hpp>
 #include <esses/base/rate.hpp>
+#include <esses/base/read_file.hpp>
 #include <esses/base/time.hpp>
 #include <esses/model/channel.hpp>
 #include <esses/model/detail.hpp>
@@ -24,15 +25,21 @@
 #include <esses/store/series.hpp>
 #include <esses/units/unit_registry.hpp>
 
+#include <QByteArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonParseError>
+#include <QJsonValue>
+#include <QLatin1String>
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
-#include <fstream>
 #include <iterator>
 #include <limits>
 #include <memory>
 #include <numbers>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -343,6 +350,8 @@ inline std::shared_ptr<model::DataSource> linearSource(const std::string& tag, c
 // -----
 
 struct CircuitTruth {
+    double originLat = 0.0; // degrees
+    double originLon = 0.0;
     double lengthM = 0.0;
     Micros lapStart = 0;
     Micros lapEnd = 0;
@@ -350,12 +359,18 @@ struct CircuitTruth {
     std::vector<std::pair<double, double>> centre; // ENU metres about the fixture's origin, closed
 };
 
-// The rows of a fixture CSV (header skipped); an empty cell is NaN.
-inline std::vector<std::vector<double>> readCsv(const std::filesystem::path& path) {
-    std::ifstream in(path, std::ios::binary);
-    if (!in) {
+// A fixture file's bytes (esses::readWholeFile: never a raw stream, the PR 2 CI rule).
+inline std::string readFixtureText(const std::filesystem::path& path) {
+    Result<std::string> text = readWholeFile(path);
+    if (!text) {
         throw std::runtime_error("cannot read " + path.string());
     }
+    return std::move(text).value();
+}
+
+// The rows of a fixture CSV (header skipped); an empty cell is NaN.
+inline std::vector<std::vector<double>> readCsv(const std::filesystem::path& path) {
+    std::istringstream in(readFixtureText(path));
     std::vector<std::vector<double>> rows;
     std::string line;
     std::getline(in, line); // header
@@ -384,23 +399,31 @@ inline std::vector<std::vector<double>> readCsv(const std::filesystem::path& pat
     return rows;
 }
 
-// lengthM and the lap window from circuit.json (read as text: the three numbers this needs), the true
-// centreline from expected.centre.csv.
+// The origin, lengthM and the lap window from circuit.json, the true centreline from expected.centre.csv.
 inline CircuitTruth readCircuitTruth(const std::filesystem::path& dir) {
-    std::ifstream in(dir / "circuit.json", std::ios::binary);
-    const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    const auto number = [&](const std::string& key) {
-        const std::size_t at = text.find("\"" + key + "\"");
-        if (at == std::string::npos) {
-            throw std::runtime_error("circuit.json has no " + key);
+    QJsonParseError error{};
+    const QJsonDocument doc =
+        QJsonDocument::fromJson(QByteArray::fromStdString(readFixtureText(dir / "circuit.json")), &error);
+    if (error.error != QJsonParseError::NoError || !doc.isObject()) {
+        throw std::runtime_error("circuit.json is not a JSON object");
+    }
+    const QJsonObject root = doc.object();
+    const auto number = [](const QJsonObject& o, const char* key) {
+        const QJsonValue v = o.value(QLatin1String(key));
+        if (!v.isDouble()) {
+            throw std::runtime_error(std::string("circuit.json has no number ") + key);
         }
-        return std::strtod(text.c_str() + text.find(':', at) + 1, nullptr);
+        return v.toDouble();
     };
+    const QJsonObject origin = root.value(QStringLiteral("origin")).toObject();
+    const QJsonObject lap = root.value(QStringLiteral("lap")).toObject();
     CircuitTruth t;
-    t.lengthM = number("lengthM");
-    t.lapStart = static_cast<Micros>(number("startUs"));
-    t.lapEnd = static_cast<Micros>(number("endUs"));
-    t.signalEnd = static_cast<Micros>(number("signalEndUs"));
+    t.originLat = number(origin, "lat");
+    t.originLon = number(origin, "lon");
+    t.lengthM = number(root, "lengthM");
+    t.lapStart = static_cast<Micros>(number(lap, "startUs"));
+    t.lapEnd = static_cast<Micros>(number(lap, "endUs"));
+    t.signalEnd = static_cast<Micros>(number(lap, "signalEndUs"));
     for (const std::vector<double>& r : readCsv(dir / "expected.centre.csv")) {
         t.centre.emplace_back(r.at(1), r.at(2));
     }

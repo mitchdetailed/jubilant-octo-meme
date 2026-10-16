@@ -190,9 +190,9 @@ private Q_SLOTS:
         QCOMPARE(bar.x, track.x);
         QVERIFY(std::abs(bar.y - yOf(v)) < 1e-3F);
         QVERIFY(std::abs(bar.y + bar.h - yOf(0.0)) < 1e-3F);
-        // The reference overlay's marker (Overlay 1's colour) at its value.
+        // The reference overlay's marker in Overlay 1's key colour (06 section 5.3 item 3) at its value.
         const plot::Slot ref = w.selection.snapshot().visibleSlots().back();
-        const project::Rgba refColour = plot::traceColour(*w.scheme, w.selection.snapshot(), ref, 0);
+        const project::Rgba refColour = plot::rangeKeyColour(*w.scheme, ref);
         bool marker = false;
         const plot::DrawList& d = rig.c->layers().dynamicList();
         for (const plot::DrawCmd& c : d.cmds) {

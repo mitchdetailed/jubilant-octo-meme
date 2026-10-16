@@ -178,6 +178,14 @@ void Histogram::setActiveChannel(const QString& name) {
 }
 
 bool Histogram::handleCommand(const QString& id, const QVariantList& args) {
+    if (id == QLatin1String("zoom.wheel")) { // the wheel's programmatic form [notches] (D-203 (w))
+        if (!prepared()) {
+            return false;
+        }
+        plots::zoomAboutCursor(context_, inputs(),
+                               std::pow(kWheelZoomIn, args.isEmpty() ? 1 : args.front().toInt()));
+        return true;
+    }
     if (id == plots::kCycleLayout) {
         cycleLayout();
         return true;
@@ -190,10 +198,8 @@ bool Histogram::handleCommand(const QString& id, const QVariantList& args) {
         toggleColourLegend();
         return true;
     }
-    if (id == plots::kLegend) {
-        toggleLegend();
-        return true;
-    }
+    // L: no channel legend is drawn (the axis titles name the channels), so the row is "Not available"
+    // here rather than an inert undo step (D-203 (h)).
     return ComponentWidget::handleCommand(id, args);
 }
 
@@ -227,22 +233,28 @@ void Histogram::wheelEvent(QWheelEvent* event) {
 
 // ---- export
 
-bool Histogram::exportData(ExportSink& sink, const ExportOptions& options) const {
+ComponentWidget::ExportJob Histogram::exportJob(const ExportOptions& options) const {
     if (!prepared()) {
-        return false;
+        return {};
     }
     const plot::ComponentBuildInputs in = plots::exportInputs(liveInputs(), options.range);
     const plot::HistogramBody body = body_;
+    return [in, body](const CancelToken& cancel) -> std::optional<QByteArray> {
+        Result<plot::HistogramExport> table = plot::HistogramGeometry::exportTable(in, cancel);
+        if (!table) {
+            return std::nullopt;
+        }
+        return histogramCsv(in, body, *table);
+    };
+}
+
+bool Histogram::exportData(ExportSink& sink, const ExportOptions& options) const {
+    const ExportJob job = exportJob(options);
+    if (!job) {
+        return false;
+    }
     const std::optional<QByteArray> csv =
-        plots::runOffGui(context_, componentId() + QStringLiteral("/export"),
-                         [in, body](const CancelToken& cancel) -> std::optional<QByteArray> {
-                             Result<plot::HistogramExport> table =
-                                 plot::HistogramGeometry::exportTable(in, cancel);
-                             if (!table) {
-                                 return std::nullopt;
-                             }
-                             return histogramCsv(in, body, *table);
-                         });
+        plots::runOffGui(context_, componentId() + QStringLiteral("/export"), job);
     return csv && sink.write(*csv);
 }
 

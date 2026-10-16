@@ -6,6 +6,8 @@
 #include "report_table.hpp"
 
 #include <esses/analysis/report_spec.hpp>
+#include <esses/base/casefold.hpp>
+#include <esses/maths/channel_key.hpp>
 #include <esses/qtmodel/data_selection_model.hpp>
 #include <esses/qtmodel/maths_service.hpp>
 #include <esses/qtmodel/render_service.hpp>
@@ -20,6 +22,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMenu>
+#include <QShowEvent>
 #include <QTableView>
 #include <QVBoxLayout>
 
@@ -70,9 +73,12 @@ ChannelReport::ChannelReport(const project::ComponentSpec& spec, WorksheetContex
     table_->applyScheme(*scheme_);
     table_->bodyView()->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(table_->bodyView(), &QWidget::customContextMenuRequested, this, [this](const QPoint& pos) {
-        QMenu menu(this);
-        menu.addAction(tr("Copy as TSV"), this, [this] { copyTsv(); });
-        menu.exec(table_->bodyView()->viewport()->mapToGlobal(pos));
+        // On the heap and asynchronous: the component may go while the menu is open (a document rebuild, a
+        // closed source); the menu then goes with it and nothing runs on a destroyed object (D-203 (q)).
+        auto* menu = new QMenu(this);
+        menu->setAttribute(Qt::WA_DeleteOnClose);
+        menu->addAction(tr("Copy as TSV"), this, [this] { copyTsv(); });
+        menu->popup(table_->bodyView()->viewport()->mapToGlobal(pos));
     });
     applyBody();
 }
@@ -127,17 +133,43 @@ void ChannelReport::onViewChanged(const plot::ViewState& view, plot::ChangeMask 
         static_cast<plot::ChangeMask>(plot::mask(plot::Change::Zoom) | plot::mask(plot::Change::Domain));
     if ((what & zoomBits) != 0) {
         model_->setZoom(view);
-        model_->refresh();
+        requestRefresh();
     }
 }
 
 void ChannelReport::onSelectionChanged(const plot::SelectionSnapshot&) {
-    model_->refresh();
+    requestRefresh();
 }
 
 void ChannelReport::onDataChanged(const model::SourceId& source, std::uint64_t) {
     if (context_.selection.source(source) != nullptr) {
-        model_->refresh();
+        requestRefresh();
+    }
+}
+
+void ChannelReport::onChannelDataChanged(const maths::ChannelKey& key) {
+    // Only the channels the report lists (a log open readies dozens of maths outputs; D-203 (z)).
+    for (const QString& name : channelNames()) {
+        if (caseFold(name.toStdString()) == key.nameCf) {
+            onDataChanged(key.src, 0);
+            return;
+        }
+    }
+}
+
+void ChannelReport::requestRefresh() {
+    if (detail::deferWhileHidden(*this)) {
+        refreshPending_ = true;
+        return;
+    }
+    refreshPending_ = false;
+    model_->refresh();
+}
+
+void ChannelReport::showEvent(QShowEvent* event) {
+    ComponentWidget::showEvent(event);
+    if (refreshPending_) {
+        requestRefresh();
     }
 }
 

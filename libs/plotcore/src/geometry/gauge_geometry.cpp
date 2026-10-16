@@ -549,7 +549,7 @@ DrawList GaugeGeometry::buildNumericDynamic(const ComponentBuildInputs& inputs) 
             const float refFit =
                 std::min(std::max(0.0F, refArea.w - unitW - gap) / valueW1, refArea.h / lineH1);
             const float refScale = std::clamp(std::min(refFit, 0.5F * scale), minScale, kMaxScale);
-            const Rgba refColour = channelColour(inputs, 1, gaugeChannel(inputs.slots[1], body.channel));
+            const Rgba refColour = rangeKeyColour(geom::schemeOf(inputs), inputs.slots[1].slot); // 06 5.3 3
             emitValueLine(list, refArea, refText,
                           ref.state == GaugeValue::State::Valid ? unit : std::string{}, refScale, refColour,
                           metrics, dpr);
@@ -834,7 +834,7 @@ DrawList GaugeGeometry::buildBarDynamic(const ComponentBuildInputs& inputs) {
             const std::array<float, 4> seg =
                 b.vertical ? std::array<float, 4>{b.track.x, p, b.track.x + b.track.w, p}
                            : std::array<float, 4>{p, b.track.y, p, b.track.y + b.track.h};
-            list.lines(seg.data(), 2, channelColour(inputs, 1, gaugeChannel(inputs.slots[1], body.channel)),
+            list.lines(seg.data(), 2, rangeKeyColour(geom::schemeOf(inputs), inputs.slots[1].slot),
                        2.0F * lineW);
         }
     }

@@ -191,6 +191,22 @@ private Q_SLOTS:
         QCOMPARE(std::lround(c.at(1)->spec().rect.r * 100), 100L);
         QVERIFY(c.canvas->moveSharedEdge(true, 0.4, 0.45));
         QCOMPARE(std::lround(c.at(0)->spec().rect.r * 100), 45L);
+        // ALT held: the edge lands where the pointer left it, off the 1 % grid (06 section 4.3 item 2).
+        {
+            ComponentWidget* l = c.at(0);
+            const QPoint e(l->width() - 2, 100);
+            const QPoint f = l->mapTo(c.canvas, e);
+            QTest::mousePress(l, Qt::LeftButton, Qt::ControlModifier, e);
+            const QPoint to = f + QPoint(-23, 0); // 0.45 - 0.023 = 0.427 of 1000 px
+            QMouseEvent move(QEvent::MouseMove, QPointF(to), QPointF(c.canvas->mapToGlobal(to)), Qt::NoButton,
+                             Qt::LeftButton, Qt::ControlModifier | Qt::AltModifier);
+            QApplication::sendEvent(c.canvas, &move);
+            QTest::mouseRelease(c.canvas, Qt::LeftButton, Qt::ControlModifier | Qt::AltModifier, to);
+            QVERIFY(!onGrid(c.at(0)->spec().rect.r));
+            QVERIFY(std::abs(c.at(0)->spec().rect.r - 0.427) < 0.002);
+            QCOMPARE(c.at(1)->spec().rect.l, c.at(0)->spec().rect.r);
+            QVERIFY(c.canvas->moveSharedEdge(true, c.at(0)->spec().rect.r, 0.45));
+        }
         // Nudge: one cell, the size kept; ALT+arrow through the canvas.
         c.canvas->focusComponent(c.at(2));
         const project::Rect n0 = c.at(2)->spec().rect;

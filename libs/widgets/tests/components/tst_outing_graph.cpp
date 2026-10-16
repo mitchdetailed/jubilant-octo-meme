@@ -11,6 +11,7 @@
 #include "components/plots_test_support.hpp"
 
 #include <esses/widgets/components/outing_graph.hpp>
+#include <esses/widgets/properties_shell/component_commands.hpp>
 
 #include <QTest>
 #include <cmath>
@@ -73,6 +74,15 @@ private Q_SLOTS:
         w.selection.setMain(lapRef(*src, 2));
         QVERIFY(waitQuiet(*rig.c));
         QVERIFY(rig.c->staticBuildsSubmitted() > submitted);
+        // The handles' geometry is cached per inputs, zoom and domain (D-203 (ab)): it follows the new Main
+        // and every later zoom.
+        for (const plot::XSpan zoom : {w.view->state().zoom, plot::XSpan{5.0e6, 25.0e6}}) {
+            w.view->zoomTo(zoom);
+            const QRectF r = rig.c->zoomRectLogical();
+            const double unit = pixelOf(*rig.c);
+            QVERIFY(std::abs(*rig.c->worksheetXAt(r.left()) - w.view->state().zoom.a) <= 1.5 * unit);
+            QVERIFY(std::abs(*rig.c->worksheetXAt(r.right()) - w.view->state().zoom.b) <= 1.5 * unit);
+        }
     }
 
     void dragTheZoomRectangleEndsAndBottomEdge() {
@@ -183,6 +193,19 @@ private Q_SLOTS:
         QCOMPARE(rig.c->body().graph.keyMode, std::string("none"));
         QVERIFY(rig.c->handleCommand(QStringLiteral("component.legend"), {}));
         QCOMPARE(rig.c->body().graph.keyMode, std::string("labels"));
+        // The programmatic forms of the wheel and the zoom rectangle (D-203 (w)): the worksheet zoom.
+        QVERIFY(rig.c->handleCommand(QStringLiteral("zoom.outing_rect"), {5.0e6, 15.0e6}));
+        QCOMPARE(w.view->state().zoom, (plot::XSpan{5.0e6, 15.0e6}));
+        QVERIFY(!rig.c->handleCommand(QStringLiteral("zoom.outing_rect"), {}));
+        QVERIFY(rig.c->handleCommand(QStringLiteral("zoom.wheel"), {1}));
+        QVERIFY(std::abs(w.view->state().zoom.length() - 0.8 * 10.0e6) < 1.0);
+        // G, Y, E and SHIFT+E are the time/distance graph's: the outing graph has none of them (D-203 (h)).
+        QVERIFY(!rig.c->handleCommand(QStringLiteral("component.cycle_layout"), {}));
+        QVERIFY(!hasGenericComponentEdit(QStringLiteral("outing"), QStringLiteral("component.cycle_layout")));
+        QVERIFY(!hasGenericComponentEdit(QStringLiteral("outing"), QStringLiteral("cursor.style")));
+        QVERIFY(!hasGenericComponentEdit(QStringLiteral("outing"), QStringLiteral("graph.status_errors")));
+        QVERIFY(!hasGenericComponentEdit(QStringLiteral("track_position"),
+                                         QStringLiteral("component.colour_legend")));
         // Like-units grouping: a speed joins the Speed group; CTRL makes a new group.
         rig.c->addChannel(QStringLiteral("Wheel Speed FR"), false);
         QCOMPARE(rig.c->body().graph.groups.size(), std::size_t{2});

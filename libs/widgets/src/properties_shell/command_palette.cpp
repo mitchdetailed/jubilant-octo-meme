@@ -113,6 +113,10 @@ void CommandPalette::setQuery(const QString& query) {
     }
 }
 
+int CommandPalette::keyColumnWidth() const {
+    return list_->columnWidth(kKeyColumn);
+}
+
 QString CommandPalette::query() const {
     return edit_->text();
 }
@@ -250,6 +254,15 @@ void CommandPalette::rebuild() {
         rows_.append(e.row);
     }
     list_->setCurrentItem(list_->topLevelItem(0));
+    // The query '?' (Help > Keyboard Shortcuts): the key column widened to its longest key (06 section 15
+    // item 5); otherwise the default width.
+    const int normal = list_->header()->defaultSectionSize();
+    if (withDisabled) {
+        list_->resizeColumnToContents(kKeyColumn);
+        list_->setColumnWidth(kKeyColumn, std::max(list_->columnWidth(kKeyColumn), 2 * normal));
+    } else {
+        list_->setColumnWidth(kKeyColumn, normal);
+    }
 }
 
 QStringList CommandPalette::visibleIds() const {

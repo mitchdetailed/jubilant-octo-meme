@@ -87,6 +87,10 @@ class QLabel;
 class QTabBar;
 class QToolBar;
 
+namespace esses::model {
+struct DataSource;
+} // namespace esses::model
+
 namespace esses::qt {
 class AppRuntime;
 class CommandRegistry;
@@ -294,6 +298,10 @@ private:
     void registerM3Commands();
     void followWorksheetM3(int index);
     void syncLayoutLock();
+    // M3 fix pass (D-203 (u)): the Track Editor's cursor span in track metres, and the auto-generation of an
+    // unknown venue's map when a log opens (06 section 9, section 13.5 items 4 and 6).
+    void syncTrackEditorSpan();
+    void autoGenerateTrackMap(const std::shared_ptr<const model::DataSource>& source, int attempt);
     void hint(const QString& text);
     void openLogDialogNow();
     bool newProjectNow();

@@ -122,8 +122,37 @@ qt::CommandContext ScatterPlot::commandContext() const {
     return qt::CommandContext::Summary;
 }
 
+namespace {
+
+// What the scatter's own axis zoom is a window of: the X channel, the visible Y channels and the layout.
+// When any changes (Properties, a channel drop, undo), the old window means nothing on the new axes.
+std::vector<std::string> zoomIdentity(const plot::ScatterBody& b) {
+    std::vector<std::string> out{b.xChannel, b.layout};
+    for (const plot::ScatterTrace& t : b.traces) {
+        if (t.visible && !t.yChannel.empty()) {
+            out.push_back(t.yChannel);
+        }
+    }
+    return out;
+}
+
+// Tiled with several traces: each tile has its own y channel and unit, so the own zoom keeps to x.
+bool tiledTraces(const plot::ScatterBody& b) {
+    std::size_t visible = 0;
+    for (const plot::ScatterTrace& t : b.traces) {
+        visible += t.visible && !t.yChannel.empty() ? 1U : 0U;
+    }
+    return b.layout == "tiled" && visible > 1;
+}
+
+} // namespace
+
 void ScatterPlot::onSpecApplied() {
-    body_ = parseBody(spec_.body);
+    plot::ScatterBody next = parseBody(spec_.body);
+    if (axisZoom_ && zoomIdentity(next) != zoomIdentity(body_)) {
+        axisZoom_.reset(); // D-203 (i): a window of the old channels is not kept on new ones
+    }
+    body_ = std::move(next);
 }
 
 std::optional<QString> ScatterPlot::activeChannel() const {
@@ -230,12 +259,24 @@ bool ScatterPlot::handleCommand(const QString& id, const QVariantList& args) {
         toggleColourLegend();
         return true;
     }
-    if (id == plots::kLegend) {
-        toggleLegend();
-        return true;
-    }
+    // L: no channel legend is drawn (the axis titles name the channels), so the row is "Not available"
+    // here rather than an inert undo step (D-203 (h)).
     if (id == plots::kCopyEquation) {
         return copyEquation();
+    }
+    if (id ==
+        QLatin1String("zoom.wheel")) { // [notches]: the own axes about the first plot's centre (D-203 (w))
+        const std::vector<plot::ScatterAxes> all = axes();
+        if (all.empty()) {
+            return false;
+        }
+        const plot::ScatterAxes& a = all.front();
+        const double f = std::pow(kWheelZoomIn, args.isEmpty() ? 1 : args.front().toInt());
+        const double cx = 0.5 * (a.xMin + a.xMax);
+        const double cy = 0.5 * (a.yMin + a.yMax);
+        setAxisZoom(AxisZoom{cx - (cx - a.xMin) * f, cx + (a.xMax - cx) * f, cy - (cy - a.yMin) * f,
+                             cy + (a.yMax - cy) * f});
+        return true;
     }
     if (id == plots::kCursorLeft || id == plots::kCursorRight || id == plots::kCursorLeftFast ||
         id == plots::kCursorRightFast) {
@@ -338,8 +379,12 @@ void ScatterPlot::adjustInputs(plot::ComponentBuildInputs& in) const {
     const std::string yUnit = y != nullptr ? y->displayUnit : std::string{};
     body.xScale = plot::ScaleSpec{plot::ScaleMode::Manual, analysis::UnitValue{axisZoom_->xMin, xUnit},
                                   analysis::UnitValue{axisZoom_->xMax, xUnit}};
-    body.yScale = plot::ScaleSpec{plot::ScaleMode::Manual, analysis::UnitValue{axisZoom_->yMin, yUnit},
-                                  analysis::UnitValue{axisZoom_->yMax, yUnit}};
+    // The y window is one tile's: in the tiled layout of several traces each tile keeps its own y scale (its
+    // channel's unit), and only the shared x axis zooms (D-203 (i)).
+    if (!tiledTraces(body)) {
+        body.yScale = plot::ScaleSpec{plot::ScaleMode::Manual, analysis::UnitValue{axisZoom_->yMin, yUnit},
+                                      analysis::UnitValue{axisZoom_->yMax, yUnit}};
+    }
     in.spec.body = body.toJson();
 }
 
@@ -502,22 +547,28 @@ void ScatterPlot::keyPressEvent(QKeyEvent* event) {
 
 // ---- export
 
-bool ScatterPlot::exportData(ExportSink& sink, const ExportOptions& options) const {
+ComponentWidget::ExportJob ScatterPlot::exportJob(const ExportOptions& options) const {
     if (!prepared()) {
-        return false;
+        return {};
     }
     const plot::ComponentBuildInputs in = plots::exportInputs(liveInputs(), options.range);
     const plot::ScatterBody body = body_;
+    return [in, body](const CancelToken& cancel) -> std::optional<QByteArray> {
+        Result<std::vector<plot::ScatterExportSet>> sets = plot::ScatterGeometry::exportSets(in, cancel);
+        if (!sets) {
+            return std::nullopt;
+        }
+        return scatterCsv(in, body, *sets);
+    };
+}
+
+bool ScatterPlot::exportData(ExportSink& sink, const ExportOptions& options) const {
+    const ExportJob job = exportJob(options);
+    if (!job) {
+        return false;
+    }
     const std::optional<QByteArray> csv =
-        plots::runOffGui(context_, componentId() + QStringLiteral("/export"),
-                         [in, body](const CancelToken& cancel) -> std::optional<QByteArray> {
-                             Result<std::vector<plot::ScatterExportSet>> sets =
-                                 plot::ScatterGeometry::exportSets(in, cancel);
-                             if (!sets) {
-                                 return std::nullopt;
-                             }
-                             return scatterCsv(in, body, *sets);
-                         });
+        plots::runOffGui(context_, componentId() + QStringLiteral("/export"), job);
     return csv && sink.write(*csv);
 }
 

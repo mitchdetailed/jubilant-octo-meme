@@ -23,8 +23,11 @@ struct Cycle {
     QStringList values; // the first is the default
 };
 
+// The time_distance graph's body members G, Y, E and SHIFT+E cycle (it answers them itself; this is the
+// fallback). The outing graph draws none of them (OutingGeometry reads keyMode and traceStyle only, D-198
+// (g)), so those rows are "Not available" there rather than inert undo steps (D-203 (h)).
 bool isGraph(const QString& type) {
-    return type == QLatin1String("time_distance") || type == QLatin1String("outing");
+    return type == QLatin1String("time_distance");
 }
 
 std::optional<Cycle> cycleOf(const QString& type, const QString& command) {
@@ -102,16 +105,19 @@ const char* bandListOf(const QString& type) {
     return nullptr;
 }
 
+// The components that draw a colour-channel legend (K). track_position draws none until track contours
+// exist (v1.0), so K is "Not available" there (D-203 (h)).
 bool hasColourLegend(const QString& type) {
-    return type == QLatin1String("scatter") || type == QLatin1String("histogram") ||
-           type == QLatin1String("track_position");
+    return type == QLatin1String("scatter") || type == QLatin1String("histogram");
 }
 
 } // namespace
 
 bool hasGenericComponentEdit(const QString& type, const QString& commandId) {
     if (commandId == QLatin1String("component.legend")) {
-        return true;
+        // L toggles a key the component draws: the graphs answer it themselves (the key column), and no
+        // other component draws spec.legend.channels, so there is no generic edit (D-203 (h)).
+        return false;
     }
     if (commandId == QLatin1String("component.colour_legend")) {
         return hasColourLegend(type);
@@ -133,9 +139,7 @@ std::optional<project::ComponentSpec> genericComponentEdit(const project::Compon
         }
     };
     if (commandId == QLatin1String("component.legend")) {
-        next.legend.channels = !spec.legend.channels;
-        text("Toggle legend");
-        return next;
+        return std::nullopt; // see hasGenericComponentEdit
     }
     if (commandId == QLatin1String("component.colour_legend")) {
         if (!hasColourLegend(type)) {

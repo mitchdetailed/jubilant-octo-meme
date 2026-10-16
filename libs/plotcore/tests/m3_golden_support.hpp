@@ -14,13 +14,13 @@
 #include <esses/analysis/histogram_binner.hpp>
 #include <esses/analysis/scatter_binner.hpp>
 #include <esses/base/env.hpp>
+#include <esses/base/read_file.hpp>
 #include <esses/plotcore/plotcore.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <filesystem>
 #include <fstream>
-#include <sstream>
 #include <string>
 
 namespace esses::plot::test {
@@ -30,14 +30,12 @@ inline std::filesystem::path drawListGoldenDir(const std::string& type) {
 }
 
 inline std::string readGoldenText(const std::filesystem::path& p) {
-    std::ifstream in(p, std::ios::binary);
-    if (!in) {
+    Result<std::string> text = readWholeFile(p);
+    if (!text) {
         return {};
     }
-    std::ostringstream ss;
-    ss << in.rdbuf();
     std::string out;
-    for (const char c : ss.str()) {
+    for (const char c : *text) {
         if (c != '\r') {
             out += c;
         }

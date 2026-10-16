@@ -596,6 +596,33 @@ void FieldBinder::loadJson(const QJsonValue& body) {
     }
 }
 
+void FieldBinder::loadUntouchedJson(const QJsonValue& body) {
+    ++loading_;
+    for (std::size_t i = 0; i < bindings_.size(); ++i) {
+        const FieldBinding& b = bindings_[i];
+        QWidget* e = b.editor.data();
+        if (e == nullptr || (loaded_[i] && editorValue(b) != initial_[i])) {
+            continue; // the user's edit stays
+        }
+        const QJsonValue v = jsonptr::get(body, b.pointer);
+        if (isSubtreeKind(b.kind)) {
+            if (auto* fe = qobject_cast<FieldEditor*>(e)) {
+                fe->setValue(v);
+            }
+        } else {
+            setLeafValue(b.kind, e, v);
+        }
+        initial_[i] = editorValue(b);
+        loaded_[i] = true;
+    }
+    --loading_;
+    const bool valid = validate(nullptr);
+    if (valid != lastValid_) {
+        lastValid_ = valid;
+        Q_EMIT validityChanged(valid);
+    }
+}
+
 JsonDoc FieldBinder::store(const JsonDoc& body) const {
     const QJsonValue base = jsonptr::fromDoc(body);
     const QJsonValue out = storeJson(base);

@@ -62,6 +62,7 @@
 #include <esses/store/series.hpp>
 #include <esses/store/types.hpp>
 #include <esses/units/converter.hpp>
+#include <esses/units/unit_registry.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -102,6 +103,9 @@ using ReportChannelLookup =
 struct ReportInputs {
     std::vector<ReportSource> sources;
     ReportChannelLookup channels;
+    // Converts the cells of a source whose display unit differs from its column's into the column's unit
+    // (D-197 (g)); without a registry, or when the units do not convert, such a source's cells are Error.
+    const units::UnitRegistry* units = nullptr;
 };
 
 enum class ReportCellState : std::uint8_t { Ok, Blank, Pending, Missing, Error };

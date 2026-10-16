@@ -7,17 +7,23 @@
 #include <esses/maths/channel_key.hpp>
 #include <esses/qtmodel/data_selection_model.hpp>
 #include <esses/qtmodel/distance_service.hpp>
+#include <esses/qtmodel/keymap_binder.hpp>
 #include <esses/qtmodel/maths_service.hpp>
 #include <esses/qtmodel/worksheet_view_model.hpp>
 #include <esses/widgets/components/component_widget.hpp>
 #include <esses/widgets/components/placeholder_component.hpp>
 #include <esses/widgets/properties_shell/properties_dialog.hpp>
+#include <esses/widgets/shell/key_event_router.hpp>
 
+#include <QContextMenuEvent>
 #include <QEvent>
 #include <QHash>
+#include <QMenu>
 #include <QMouseEvent>
+#include <QPointer>
 #include <QResizeEvent>
 #include <QTimer>
+#include <algorithm>
 #include <utility>
 
 namespace esses::widgets {
@@ -76,7 +82,7 @@ ComponentWidget::ComponentWidget(const project::ComponentSpec& spec, WorksheetCo
             [this](const plot::SelectionSnapshot& snapshot, qt::DataSelectionModel::Changes) {
                 onSelectionChanged(snapshot);
             });
-    const auto dataFromKey = [this](const maths::ChannelKey& key) { onDataChanged(key.src, 0); };
+    const auto dataFromKey = [this](const maths::ChannelKey& key) { onChannelDataChanged(key); };
     connect(&context_.maths, &qt::MathsService::channelReady, this, dataFromKey);
     connect(&context_.maths, &qt::MathsService::statusChanged, this, dataFromKey);
     const auto dataFromSource = [this](const model::SourceId& source) { onDataChanged(source, 0); };
@@ -87,6 +93,74 @@ ComponentWidget::ComponentWidget(const project::ComponentSpec& spec, WorksheetCo
 
 ComponentWidget::~ComponentWidget() = default;
 
+namespace {
+
+ComponentWidget::KeysProvider& keysProvider() {
+    static ComponentWidget::KeysProvider provider; // GUI thread only
+    return provider;
+}
+
+} // namespace
+
+QMenu* ComponentWidget::commandMenu(const QStringList& commandIds) {
+    auto* menu = new QMenu(this);
+    menu->setAttribute(Qt::WA_DeleteOnClose);
+    menu->setObjectName(QStringLiteral("componentContextMenu"));
+    qt::CommandRegistry& registry = context_.commands;
+    const QPointer<ComponentWidget> self(this);
+    for (const QString& id : commandIds) {
+        const qt::CommandSpec* spec = registry.find(id);
+        if (spec == nullptr || !spec->invoke || (spec->enabled && !spec->enabled())) {
+            continue; // not available on this component now: left out of its menu
+        }
+        QAction* a = menu->addAction(spec->title.isEmpty() ? id : spec->title);
+        a->setObjectName(id);
+        if (spec->checkable && spec->checked) {
+            a->setCheckable(true);
+            a->setChecked(spec->checked());
+        }
+        connect(a, &QAction::triggered, this, [self, id, &registry] {
+            if (!self.isNull()) {
+                Q_EMIT self->focusRequested(); // the shell's commands act on the focused component
+                registry.invoke(id);
+            }
+        });
+    }
+    return menu;
+}
+
+void ComponentWidget::contextMenuEvent(QContextMenuEvent* event) {
+    Q_EMIT focusRequested(); // a keyboard context menu as well as a right-click
+    QStringList ids = contextCommands();
+    if (!ids.contains(QStringLiteral("component.properties"))) {
+        ids.append(QStringLiteral("component.properties")); // the Component menu's Properties... (F5)
+    }
+    QMenu* menu = commandMenu(ids);
+    if (menu->isEmpty()) {
+        delete menu;
+        event->ignore();
+        return;
+    }
+    menu->popup(event->globalPos()); // asynchronous: the component may go while the menu is open
+    event->accept();
+}
+
+void ComponentWidget::setKeysProvider(KeysProvider provider) {
+    keysProvider() = std::move(provider);
+}
+
+bool ComponentWidget::keyBound(const QString& commandId, const QKeyEvent& event,
+                               const QStringList& defaults) {
+    const QString text = KeyEventRouter::keyText(event);
+    if (text.isEmpty()) {
+        return false;
+    }
+    const QStringList keys = keysProvider() ? keysProvider()(commandId) : defaults;
+    const QString key = qt::KeymapBinder::normalise(text);
+    return std::any_of(keys.begin(), keys.end(),
+                       [&key](const QString& k) { return qt::KeymapBinder::normalise(k) == key; });
+}
+
 void ComponentWidget::applySpec(const project::ComponentSpec& spec) {
     spec_ = spec;
     update();
@@ -96,6 +170,9 @@ void ComponentWidget::applySpec(const project::ComponentSpec& spec) {
 void ComponentWidget::onViewChanged(const plot::ViewState&, plot::ChangeMask) {}
 void ComponentWidget::onSelectionChanged(const plot::SelectionSnapshot&) {}
 void ComponentWidget::onDataChanged(const model::SourceId&, std::uint64_t) {}
+void ComponentWidget::onChannelDataChanged(const maths::ChannelKey& key) {
+    onDataChanged(key.src, 0);
+}
 void ComponentWidget::onSchemeChanged(const project::Scheme&) {}
 
 ComponentWidget::OverlayPolicy ComponentWidget::overlayPolicy() const {
@@ -120,6 +197,10 @@ bool ComponentWidget::acceptsChannelDrop() const {
 void ComponentWidget::addChannel(const QString&, bool) {}
 
 QStringList ComponentWidget::contextCommands() const {
+    return {};
+}
+
+ComponentWidget::ExportJob ComponentWidget::exportJob(const ExportOptions&) const {
     return {};
 }
 

@@ -12,6 +12,7 @@
 
 #include <esses/analysis/rule_runner.hpp>
 #include <esses/base/paths.hpp>
+#include <esses/base/read_file.hpp>
 #include <esses/project/track_map_file.hpp>
 #include <esses/qtmodel/app_runtime.hpp>
 #include <esses/qtmodel/data_selection_model.hpp>
@@ -63,8 +64,8 @@ std::size_t filesIn(const std::filesystem::path& dir) {
 }
 
 std::string readText(const std::filesystem::path& path) {
-    std::ifstream in(path, std::ios::binary);
-    return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+    Result<std::string> text = readWholeFile(path);
+    return text ? std::move(text).value() : std::string(); // "" when absent, as the checks expect
 }
 
 std::shared_ptr<const analysis::TrackMap> shared(analysis::TrackMap map) {

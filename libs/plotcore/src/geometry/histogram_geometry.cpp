@@ -442,8 +442,13 @@ void emitHistogramStatic(ComponentBuild& build, const ComponentBuildInputs& in, 
             : static_cast<int>(std::count_if(frame.tiles.begin(), frame.tiles.end(), [&](const PlotTile& t) {
                   return t.bounds.y == frame.tiles.front().bounds.y;
               }));
+    // Main in its channel colours, the overlays in their range key colours (04 section 11.1 item 8, 06
+    // section 5.3 item 3).
     const auto setColour = [&](const HistogramSet& set) {
         const SlotData& slot = in.slots[set.slot];
+        if (slot.slot.kind != SlotKind::Main) {
+            return rangeKeyColour(scheme, slot.slot);
+        }
         const ResolvedChannel* rc = geom::channelOf(slot, static_cast<std::size_t>(set.trace),
                                                     body.traces[static_cast<std::size_t>(set.trace)].channel);
         return traceColour(scheme, in.selection, slot.slot, colourIndexOf(rc, set.trace));

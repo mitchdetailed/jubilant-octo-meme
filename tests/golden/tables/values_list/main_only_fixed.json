@@ -1,0 +1,31 @@
+{
+    "case": "main_only_fixed",
+    "headers": [
+        "Name",
+        "Main",
+        "Overlay",
+        "Δ",
+        "Unit"
+    ],
+    "hiddenColumns": [
+        3,
+        4
+    ],
+    "rows": [
+        [
+            "Throttle",
+            "50",
+            "",
+            "",
+            "%"
+        ],
+        [
+            "Wheel Speed FL",
+            "195.0",
+            "",
+            "",
+            "km/h"
+        ]
+    ],
+    "showHeading": false
+}

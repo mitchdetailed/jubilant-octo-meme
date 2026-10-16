@@ -36,6 +36,16 @@ D-127):
   renders in `<build>/libs/widgets/artefacts/<type>/`); exact goldens beside them: the report tables' contents in
   `tables/<type>/<case>.json` and the track map's `DrawList` JSON in
   `drawlist/track_position/widget_<case>@<dpr>x.json`.
+- `libs/widgets/tests/components/tst_values_list_goldens.cpp` (M3, AC-M3-02, D-202; ctest
+  `widgets.tst_values_list_goldens`): three `values_list` cases (`main_reference`, `main_only_fixed`,
+  `corr_speed_delta`) at DPR 1 and 2, painted by `QWidget::render` like the report tables, into
+  `images/values_list/<case>@<dpr>x.png` with one `goldens.json` (Windows renders, provisional, the renders in
+  `<build>/libs/widgets/artefacts/values_list/`) and exact table goldens `tables/values_list/<case>.json`
+  (headers, hidden columns, cell text), with cells also computed by hand from the synthetic source.
+- M3 key colours (D-202): eleven `DrawList` goldens with overlays (the time_distance `bands_sections`,
+  `dark_full_anatomy`, `offset_axis_*` and `variance_distance` cases, `scatter_overlay_trend`, `histogram_bars`,
+  `track_fit`, `track_manual`, `numeric_background_fixed_font`, `bar_custom_origin_dark`) changed in colour only
+  when the overlays took their range key colours (06 §5.3 item 3); their provisional PNGs were re-rendered.
 - `fonts/`: the only fonts the renderer may use (Noto Sans, OFL-1.1, REUSE-annotated), registered with
   `SchemeFonts::registerApplicationFonts` before any `QtTextMetrics` exists.
 

@@ -10,13 +10,13 @@
 
 #include "analysis_test_support.hpp"
 
+#include <esses/base/read_file.hpp>
+
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <cmath>
-#include <fstream>
-#include <iterator>
 #include <limits>
 #include <numbers>
 #include <sstream>
@@ -67,9 +67,9 @@ inline std::filesystem::path circuitDir() {
 }
 
 inline std::string readText(const std::filesystem::path& path) {
-    std::ifstream in(path, std::ios::binary);
-    REQUIRE(in.good());
-    return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    Result<std::string> text = readWholeFile(path);
+    REQUIRE(text.ok());
+    return std::move(text).value();
 }
 
 // Rows of a CSV file after its header; empty cells are empty strings.

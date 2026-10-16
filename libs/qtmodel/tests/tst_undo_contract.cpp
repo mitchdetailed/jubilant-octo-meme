@@ -73,7 +73,7 @@ private Q_SLOTS:
         ProjectSession session(pathsFor(dir / "config"));
         QVERIFY(session.loadDefaults().ok());
         const project::WorkbookFile original = session.workbooks().front();
-        QCOMPARE(original.worksheets.size(), std::size_t{2});
+        QVERIFY(original.worksheets.size() >= 2); // the shipped workbook: M1's two worksheets and M3's five
 
         session.undoStack().push(new MoveWorksheetCommand(session, 0, 0, 1));
         QCOMPARE(session.workbooks().front().worksheets[1].name, original.worksheets[0].name);

@@ -216,12 +216,17 @@ private Q_SLOTS:
             QCOMPARE(w.docks().state(kMessages), DockState::AutoHide);
             QCOMPARE(w.docks().state(QStringLiteral("channelstatus")), DockState::Closed);
             QCOMPARE(w.docks().state(QStringLiteral("trackmap")), DockState::AutoHide);
-            // The shipped workbook: two worksheets, "Overlay" active (its activeWorksheet), components
-            // placed.
-            QCOMPARE(w.worksheetCount(), 2);
-            QCOMPARE(w.worksheetTabs().count(), 2);
-            QCOMPARE(w.worksheetTabs().tabText(0), QStringLiteral("Overlay"));
-            QCOMPARE(w.worksheetTabs().tabText(1), QStringLiteral("Driver"));
+            // The shipped workbook: seven worksheets (M1's two and M3's five, 07 section 6.1 "Data"),
+            // "Overlay" active (its activeWorksheet), components placed.
+            QCOMPARE(w.worksheetCount(), 7);
+            QCOMPARE(w.worksheetTabs().count(), 7);
+            const QStringList names{QStringLiteral("Overlay"),  QStringLiteral("Driver"),
+                                    QStringLiteral("Overview"), QStringLiteral("Braking"),
+                                    QStringLiteral("Corners"),  QStringLiteral("Reports"),
+                                    QStringLiteral("Track")};
+            for (int i = 0; i < names.size(); ++i) {
+                QCOMPARE(w.worksheetTabs().tabText(i), names.at(i));
+            }
             QCOMPARE(w.activeWorksheetIndex(), 0);
             QVERIFY(w.activeWorksheet() != nullptr);
             QCOMPARE(w.canvas().components().size(), 2);
@@ -271,12 +276,16 @@ private Q_SLOTS:
             QCOMPARE(w.activeWorksheetIndex(), 1);
             QCOMPARE(w.worksheetTabs().currentIndex(), 1);
             QVERIFY(w.valuesWindow().worksheet() == w.activeWorksheet());
-            press(w, Qt::Key_F12); // wraps
+            press(w, Qt::Key_F11); // view.prev_worksheet
             QCOMPARE(w.activeWorksheetIndex(), 0);
-            press(w, Qt::Key_F11); // view.prev_worksheet, wraps
-            QCOMPARE(w.activeWorksheetIndex(), 1);
+            press(w, Qt::Key_F11); // wraps to the last worksheet
+            QCOMPARE(w.activeWorksheetIndex(), 6);
+            press(w, Qt::Key_F12); // wraps to the first
+            QCOMPARE(w.activeWorksheetIndex(), 0);
             QVERIFY(inCanvas(w)); // the switch keeps the focus in the worksheet
-            press(w, Qt::Key_1);  // view.worksheet_n
+            press(w, Qt::Key_2);  // view.worksheet_n
+            QCOMPARE(w.activeWorksheetIndex(), 1);
+            press(w, Qt::Key_1);
             QCOMPARE(w.activeWorksheetIndex(), 0);
             press(w, Qt::Key_2);
             QCOMPARE(w.activeWorksheetIndex(), 1);

@@ -135,6 +135,16 @@ private Q_SLOTS:
         w.view->setDomain(plot::Domain::Distance);
         QTRY_VERIFY(bar.summary().main.b > 1900.0 && bar.summary().main.b < 2100.0); // metres of a 2 km lap
         QVERIFY(bar.summary().extent.a < 0.0);
+        // Main an outing: the ticks are still the laps' starts (D-203 (q)), not the outings'.
+        w.view->setDomain(plot::Domain::Time);
+        const model::RangeGroup* outings = src->layers.front().ranges.find("Outings");
+        QVERIFY(outings != nullptr && !outings->ranges.empty());
+        model::RangeRef outing = lapRef(*src, 0);
+        outing.groupPath = "Outings";
+        outing.range = outings->ranges.front().id;
+        outing.name = outings->ranges.front().name;
+        w.selection.setMain(outing);
+        QTRY_VERIFY(bar.summary().valid && bar.summary().laps.size() == 5);
         // Without a worksheet: empty.
         bar.setWorksheet(nullptr);
         QVERIFY(!bar.summary().valid);

@@ -393,16 +393,10 @@ int activeIndexOf(const ComponentBuildInputs& in, const std::vector<FlatTrace>& 
     return flat.empty() ? -1 : 0;
 }
 
-// The key colour of a slot (the variance trace, the offset sub-axis): its colour for the active channel.
-Rgba keyColourOf(const ComponentBuildInputs& in, const std::vector<FlatTrace>& flat, std::size_t k) {
-    const project::Scheme& scheme = schemeOf(in);
-    const int active = activeIndexOf(in, flat);
-    if (active < 0 || k >= in.slots.size()) {
-        return traceColour(scheme, in.selection, slotOf(in, k), 0);
-    }
-    const FlatTrace& ft = flat[static_cast<std::size_t>(active)];
-    const ResolvedChannel* rc = channelOf(in.slots[k], ft.index, ft.trace->channel);
-    return traceColour(scheme, in.selection, in.slots[k].slot, colourIndexOf(rc, ft.index));
+// The key colour of a slot's range (the variance trace, the offset sub-axis, a range band cell; 06
+// section 5.3 item 3): Main red, Overlay 0 its role, Overlay k overlayPalette[k - 1].
+Rgba keyColourOf(const ComponentBuildInputs& in, const std::vector<FlatTrace>& /*flat*/, std::size_t k) {
+    return rangeKeyColour(schemeOf(in), slotOf(in, k));
 }
 
 // The layer of a slot in its source.
@@ -421,6 +415,20 @@ std::shared_ptr<const analysis::DistanceIndex> lapIndexOf(const SlotData& slot) 
         }
     }
     return nullptr;
+}
+
+// Whether the slot's range spans more than one lap (an outing, a run of laps): the variance panel compares
+// one lap with another, so such a range gets the banner instead of a comparison of its first lap (D-201).
+bool spansLaps(const SlotData& slot) {
+    if (slot.chain == nullptr) {
+        return false;
+    }
+    for (const LapPiece& p : slot.chain->pieces()) {
+        if (p.start <= slot.range.start && slot.range.start < p.end) {
+            return slot.range.end > p.end;
+        }
+    }
+    return false;
 }
 
 // ---- layout
@@ -1957,6 +1965,10 @@ Result<ComponentBuild> TimeDistanceBuilder::buildStatic(const ComponentBuildInpu
         std::vector<Drawn> tables;
         for (std::size_t k = 1; k < inputs.slots.size(); ++k) {
             const SlotData& s = inputs.slots[k];
+            if (spansLaps(main) || spansLaps(s)) {
+                info.varianceSpansLaps = true;
+                continue;
+            }
             const std::shared_ptr<const analysis::DistanceIndex> idx = lapIndexOf(s);
             if (mainIdx == nullptr || idx == nullptr) {
                 info.varianceNoData = true;
@@ -2565,17 +2577,19 @@ DrawList TimeDistanceBuilder::buildChrome(const ComponentBuildInputs& inputs, bo
         }
     }
     // The variance panel's banner (04 section 8.8 item 3): a lap of Main or of an overlay has no
-    // DistanceIndex.
+    // DistanceIndex, or a range spans laps (D-201).
     if (lay.variance.h > 0.0F && !inputs.slots.empty()) {
         bool missing = lapIndexOf(inputs.slots.front()) == nullptr;
+        bool spans = spansLaps(inputs.slots.front());
         for (std::size_t k = 1; k < inputs.slots.size(); ++k) {
             missing = missing || lapIndexOf(inputs.slots[k]) == nullptr;
+            spans = spans || spansLaps(inputs.slots[k]);
         }
-        if (missing) {
-            list.textRun("variance needs distance data", lay.variance.x + 0.5F * lay.variance.w,
-                         lay.variance.y + 0.5F * lay.variance.h, TextStyleId::Banner, TextAnchor::Centre,
-                         colours.foreground, std::max(1.0F, lay.variance.w - 8.0F * dpr), 0,
-                         colours.keyBackground);
+        if (spans || missing) {
+            list.textRun(spans ? "variance compares single laps" : "variance needs distance data",
+                         lay.variance.x + 0.5F * lay.variance.w, lay.variance.y + 0.5F * lay.variance.h,
+                         TextStyleId::Banner, TextAnchor::Centre, colours.foreground,
+                         std::max(1.0F, lay.variance.w - 8.0F * dpr), 0, colours.keyBackground);
         }
     }
     if (inputs.focused && lay.bounds.w > 0.0F) {

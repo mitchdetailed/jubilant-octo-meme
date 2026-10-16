@@ -3,6 +3,7 @@
 //
 // ScatterBinner (04 section 10.1 items 1, 2, 5, 9).
 
+#include "../series_access.hpp"
 #include "series_cursor.hpp"
 
 #include <esses/analysis/scatter_binner.hpp>
@@ -14,6 +15,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace esses::analysis {
 
@@ -35,20 +37,18 @@ constexpr std::int64_t kDenseBins = 1 << 20;
 
 Result<std::vector<ScatterSeries>> ScatterBinner::gather(const ScatterInput& input, Priority prio,
                                                          const CancelToken& cancel) {
-    const store::UniformSeries* x = uniformOf(input.x.series);
-    if (x == nullptr) {
-        return invalid("the scatter's x channel has no rate");
-    }
-    // The union grid: the highest rate among x, the y traces, the colour and the gating channel, on the
-    // first such channel's sample times (x wins a tie).
-    Rate rate = x->rate;
-    Micros t0 = x->t0;
+    // The union grid (04 section 10.1 item 1): the highest rate among the uniform channels (x, the y traces,
+    // the colour and the gating channel; the first such channel's sample times, x first, win a tie); when no
+    // channel is uniform, the x channel's own sample times (a timestamped x, D-194).
+    std::optional<Rate> rate;
+    Micros t0 = 0;
     const auto consider = [&](const store::Series& s) {
-        if (const store::UniformSeries* u = uniformOf(s); u != nullptr && u->rate > rate) {
+        if (const store::UniformSeries* u = uniformOf(s); u != nullptr && (!rate || u->rate > *rate)) {
             rate = u->rate;
             t0 = u->t0;
         }
     };
+    consider(input.x.series);
     for (const ScatterChannel& y : input.y) {
         consider(y.series);
     }
@@ -85,20 +85,15 @@ Result<std::vector<ScatterSeries>> ScatterBinner::gather(const ScatterInput& inp
         if (gating != nullptr) {
             gs.emplace(*gating, input.gatingInterp, prio, cancel);
         }
-        const SampleIdx first = rate.indexAt(span.start - 1, t0) + 1;
-        const SampleIdx last = rate.indexAt(span.end - 1, t0);
-        for (SampleIdx i = first; i <= last; ++i) {
-            if ((i - first) % detail::kVisitBlock == 0 && cancel.checkpoint()) {
-                return Failure{Error{ErrorCode::Cancelled, "cancelled", {}}};
-            }
-            const Micros t = rate.timeAt(i, t0);
+        // One grid time: the points of every y trace there.
+        const auto visit = [&](Micros t) -> Result<void> {
             if (gs) {
                 auto g = gs->at(t);
                 if (!g) {
                     return Failure{g.error()};
                 }
                 if (!(*g > 0.0)) { // <= 0 or invalid (NaN)
-                    continue;
+                    return ok();
                 }
             }
             auto xv = xs.at(t);
@@ -106,7 +101,7 @@ Result<std::vector<ScatterSeries>> ScatterBinner::gather(const ScatterInput& inp
                 return Failure{xv.error()};
             }
             if (std::isnan(*xv)) {
-                continue;
+                return ok();
             }
             const double xd = input.x.toDisplay(*xv);
             double zd = std::numeric_limits<double>::quiet_NaN();
@@ -135,6 +130,34 @@ Result<std::vector<ScatterSeries>> ScatterBinner::gather(const ScatterInput& inp
                     s.z.push_back(zd);
                 }
                 s.t.push_back(t);
+            }
+            return ok();
+        };
+        if (rate) {
+            const SampleIdx first = rate->indexAt(span.start - 1, t0) + 1;
+            const SampleIdx last = rate->indexAt(span.end - 1, t0);
+            for (SampleIdx i = first; i <= last; ++i) {
+                if ((i - first) % detail::kVisitBlock == 0 && cancel.checkpoint()) {
+                    return Failure{Error{ErrorCode::Cancelled, "cancelled", {}}};
+                }
+                if (Result<void> r = visit(rate->timeAt(i, t0)); !r) {
+                    return Failure{r.error()};
+                }
+            }
+            continue;
+        }
+        std::vector<Micros> times;
+        Result<void> listed = detail::forEachSample(input.x.series, span.start, span.end, prio, cancel,
+                                                    [&times](Micros t, double, bool) { times.push_back(t); });
+        if (!listed) {
+            return Failure{listed.error()};
+        }
+        for (std::size_t i = 0; i < times.size(); ++i) {
+            if (i % detail::kVisitBlock == 0 && cancel.checkpoint()) {
+                return Failure{Error{ErrorCode::Cancelled, "cancelled", {}}};
+            }
+            if (Result<void> r = visit(times[i]); !r) {
+                return Failure{r.error()};
             }
         }
     }

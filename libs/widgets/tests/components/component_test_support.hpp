@@ -27,6 +27,8 @@
 #include <esses/units/unit_registry.hpp>
 #include <esses/widgets/components/component_widget.hpp>
 
+#include <QCoreApplication>
+#include <QEventLoop>
 #include <QImage>
 #include <QRect>
 #include <QString>
@@ -40,6 +42,17 @@ class ProjectSession;
 } // namespace esses::qt
 
 namespace esses::widgets::cmptest {
+
+// Delivers every event already posted (queued build requests, Dispatcher deliveries already queued, the
+// canvas's coalesced layout). A component requests a rebuild on the GUI thread through the event queue, so
+// after this a check that nothing was rebuilt or re-run does not pass merely because a slow pool has not got
+// there yet (D-203 (r)); a run already on the pool shows as busy() / !staticUpToDate().
+inline void drainEvents() {
+    for (int i = 0; i < 5; ++i) {
+        QCoreApplication::sendPostedEvents();
+        QCoreApplication::processEvents(QEventLoop::AllEvents);
+    }
+}
 
 std::filesystem::path repoRoot();
 // Before the QApplication exists (initMain): QT_QPA_FONTDIR = tests/golden/fonts unless set.

@@ -26,6 +26,8 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -398,4 +400,162 @@ TEST_CASE("report_cells: chunks prefetched on a pool give the same table", "[uni
     CHECK(tables[0].at(1, 3).value ==
           Catch::Approx(std::sin(30'020.0 * 1e-3) * 50.0 + static_cast<double>(30'020 % 7)));
     pool.join();
+}
+
+TEST_CASE("report_cells: delta pairs Main with Overlay 0 below the compared range (D-197 (c))", "[unit]") {
+    // Main is Lap 2 of the main log, Overlay 0 Lap 1 of the overlay (10 m/s faster than the main's Lap 1):
+    //   Lap 2 avg 102, T1 42, S1 139; overlay Lap 1 avg 59.5, T1 29.5, S1 79.5 (all m/s).
+    Fixture f;
+    ReportSpec spec = speedSpec({ReportStat::Avg}, {std::string(kLaps)});
+    spec.scope = ReportScope::SelectedRanges;
+    spec.deltaVsOverlay0 = true;
+    const auto inputs = f.inputs({sourceRange(f.main, kLaps, "Lap 2"),
+                                  sourceRange(f.overlay, kLaps, "Lap 1", ReportSlotRole::Overlay0)});
+    const auto mainRow = [](const ReportTable& t) {
+        for (std::size_t r = 0; r < t.rows.size(); ++r) {
+            if (t.rows[r].role == ReportSlotRole::Main) {
+                return r;
+            }
+        }
+        FAIL("no Main row");
+        return std::size_t{0};
+    };
+    // One level, the lap itself: the lap names differ, the rows pair.
+    const ReportTable laps = run(spec, inputs, f.cache);
+    REQUIRE(laps.rows.size() == 2);
+    CHECK(laps.at(mainRow(laps), 1).state == ReportCellState::Ok);
+    CHECK(laps.at(mainRow(laps), 1).value == Catch::Approx((102.0 - 59.5) * kKmh));
+    // The demo's headings: a detail (different drivers), then the lap.
+    spec.headers = {"Driver", std::string(kLaps)};
+    const ReportTable byDriver = run(spec, inputs, f.cache);
+    REQUIRE(byDriver.rows.size() == 2);
+    CHECK(byDriver.at(mainRow(byDriver), 1).value == Catch::Approx((102.0 - 59.5) * kKmh));
+    // Sections below the lap pair by section name.
+    spec.headers = {std::string(kLaps), std::string(kSections)};
+    const ReportTable sections = run(spec, inputs, f.cache);
+    REQUIRE(sections.rows.size() == 4);
+    for (std::size_t r = 0; r < sections.rows.size(); ++r) {
+        if (sections.rows[r].role != ReportSlotRole::Main) {
+            continue;
+        }
+        const double want = sections.rows[r].path.back() == "T1" ? 42.0 - 29.5 : 139.0 - 79.5;
+        INFO(sections.rows[r].path.back());
+        CHECK(sections.at(r, 1).value == Catch::Approx(want * kKmh));
+    }
+}
+
+TEST_CASE("report_cells: untrusted laps are cut out of rows coarser than a lap (D-197 (b))", "[unit]") {
+    // The whole outing as one row: without the out lap (50) and the in lap (30), the trusted samples are
+    // Lap 1's 0..99 (sum 4950) and Lap 2's 97 valid samples (sum 9894).
+    Fixture f;
+    ReportSpec spec = speedSpec({ReportStat::Avg, ReportStat::Max, ReportStat::Start, ReportStat::End}, {});
+    const auto outing = f.inputs({sourceRange(f.main, kOutings, "test.ld")});
+    const ReportTable trusted = run(spec, outing, f.cache);
+    REQUIRE(trusted.rows.size() == 1);
+    CHECK(trusted.at(0, 0).value == Catch::Approx((4950.0 + 9894.0) / 197.0 * kKmh));
+    CHECK(trusted.at(0, 1).value == Catch::Approx(198.0 * kKmh));
+    CHECK(trusted.at(0, 2).value == Catch::Approx(0.0).margin(1e-12)); // the first trusted sample, 10 s
+    CHECK(trusted.at(0, 3).value == Catch::Approx(198.0 * kKmh));      // the last trusted sample
+    // A detail heading is as coarse: the same row under the driver's name.
+    spec.headers = {"Driver"};
+    const ReportTable labelled = run(spec, outing, f.cache);
+    REQUIRE(paths(labelled) == std::vector<std::vector<std::string>>{{"Alice"}});
+    CHECK(labelled.at(0, 0).value == Catch::Approx((4950.0 + 9894.0) / 197.0 * kKmh));
+    // Included: every valid sample (397 of them).
+    spec.options.includeUntrusted = true;
+    const ReportTable all = run(spec, outing, f.cache);
+    CHECK(all.at(0, 0).value == Catch::Approx((5000.0 + 4950.0 + 9894.0 + 3000.0) / 397.0 * kKmh));
+    CHECK(all.at(0, 2).value == Catch::Approx(50.0 * kKmh));
+    // Sections that lie wholly in an untrusted lap are no rows: the out lap's S1, the in lap's T1.
+    spec.options.includeUntrusted = false;
+    spec.headers = {std::string(kSections)};
+    const ReportTable sections = run(spec, outing, f.cache);
+    CHECK(sections.rows.size() == 4);
+    for (std::size_t r = 0; r < sections.rows.size(); ++r) {
+        CHECK(sections.at(r, 0).value != Catch::Approx(50.0 * kKmh));
+        CHECK(sections.at(r, 0).value != Catch::Approx(30.0 * kKmh));
+    }
+}
+
+TEST_CASE("report_cells: min, max, absMax and delta under an offset and a negative display scale", "[unit]") {
+    // Lap 1 of "Temp" ramps from 253.15 to 283.15 (base K): -20 to +10 deg C.
+    Fixture f;
+    std::vector<double> temp(400, 273.15);
+    for (std::size_t i = 100; i < 200; ++i) {
+        temp[i] = 253.15 + 30.0 * static_cast<double>(i - 100) / 99.0;
+    }
+    f.channels.add(f.main, "Temp", f.tc.uniform(Rate::fromHz(10), temp), units::Converter{1.0, -273.15},
+                   "degC");
+    // A made-up unit with a negative scale: display = -base.
+    f.channels.add(f.main, "Flip", f.tc.uniform(Rate::fromHz(10), temp), units::Converter{-1.0, 0.0}, "neg");
+    ReportSpec spec;
+    spec.headers = {};
+    spec.channels = {
+        ReportChannel{"Temp", {ReportStat::AbsMax}},
+        ReportChannel{"Flip", {ReportStat::Min, ReportStat::Max, ReportStat::Delta, ReportStat::Change}}};
+    const ReportTable t = run(spec, f.inputs({sourceRange(f.main, kLaps, "Lap 1")}), f.cache);
+    REQUIRE(t.columns.size() == 5);                    // Temp's hidden extremes are not shown
+    CHECK(t.at(0, 0).value == Catch::Approx(20.0));    // |-20 deg C|, not c(283.15) = 10
+    CHECK(t.at(0, 1).value == Catch::Approx(-283.15)); // the display minimum is -max
+    CHECK(t.at(0, 2).value == Catch::Approx(-253.15));
+    CHECK(t.at(0, 3).value == Catch::Approx(30.0));  // a magnitude
+    CHECK(t.at(0, 4).value == Catch::Approx(-30.0)); // a signed difference: -(end - start)
+}
+
+TEST_CASE("report_cells: sources with different display units convert into the column's unit", "[unit]") {
+    static const units::UnitRegistry registry = [] {
+        auto loaded = units::UnitRegistry::loadFiles(repoRoot() / "data" / "units.json");
+        REQUIRE(loaded.ok());
+        return std::move(loaded).value();
+    }();
+    const std::optional<units::UnitId> mps = registry.find("m/s");
+    const std::optional<units::UnitId> mph = registry.find("mph");
+    REQUIRE(mps);
+    REQUIRE(mph);
+    Fixture f;
+    // The overlay shows Speed in mph; the column takes Main's km/h.
+    ChannelTable channels;
+    channels.addWithUnit(f.main, "Speed", speedSeries(f.tc), *mps, units::Converter{kKmh, 0.0}, "km/h", 1);
+    channels.addWithUnit(f.overlay, "Speed", speedSeries(f.tc, 10.0), *mps, registry.fromBase(*mph), "mph",
+                         1);
+    ReportSpec spec = speedSpec({ReportStat::Avg});
+    spec.scope = ReportScope::SelectedRanges;
+    spec.deltaVsOverlay0 = true;
+    ReportInputs inputs{{sourceRange(f.main, kLaps, "Lap 1"),
+                         sourceRange(f.overlay, kLaps, "Lap 1", ReportSlotRole::Overlay0)},
+                        channels.lookup(),
+                        &registry};
+    const ReportTable t = run(spec, inputs, f.cache);
+    REQUIRE(t.rows.size() == 2);
+    CHECK(t.columns[0].unit == "km/h");
+    for (std::size_t r = 0; r < 2; ++r) {
+        const bool isMain = t.rows[r].role == ReportSlotRole::Main;
+        INFO((isMain ? "Main" : "Overlay 0"));
+        CHECK(t.at(r, 0).value == Catch::Approx((isMain ? 49.5 : 59.5) * kKmh).epsilon(1e-9));
+        if (isMain) {
+            CHECK(t.at(r, 1).value == Catch::Approx(-10.0 * kKmh).epsilon(1e-9));
+        }
+    }
+    // Without a registry the overlay's cells cannot convert: Error, never mph under a km/h heading.
+    inputs.units = nullptr;
+    StatCache fresh;
+    const ReportTable unconverted = run(spec, inputs, fresh);
+    for (std::size_t r = 0; r < 2; ++r) {
+        if (unconverted.rows[r].role == ReportSlotRole::Overlay0) {
+            CHECK(unconverted.at(r, 0).state == ReportCellState::Error);
+        }
+    }
+}
+
+TEST_CASE("report_cells: the detail-group headings read their detail, with the profile's missing text",
+          "[unit]") {
+    Fixture f;
+    auto withSession = std::make_shared<model::DataSource>(*f.main);
+    withSession->details.push_back(detailText("Session", "Race 2"));
+    const std::shared_ptr<const model::DataSource> shared = withSession;
+    f.channels.add(shared, "Speed", speedSeries(f.tc), units::Converter{kKmh, 0.0}, "km/h", 1);
+    const ReportTable t = run(speedSpec({ReportStat::Avg}, {"Sessions", "Events", std::string(kLaps)}),
+                              f.inputs({sourceRange(shared, kOutings, "test.ld")}), f.cache);
+    REQUIRE(paths(t) == std::vector<std::vector<std::string>>{{"Race 2", "(no event)", "Lap 1"},
+                                                              {"Race 2", "(no event)", "Lap 2"}});
 }

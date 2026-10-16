@@ -87,6 +87,7 @@ model::DataSource outing() {
 LapIndex lookup(const model::Range& lap) {
     LapIndex out;
     out.startsAtBeacon = lap.lapClass != model::LapClass::Out && lap.lapClass != model::LapClass::Partial;
+    out.endsAtBeacon = lap.lapClass != model::LapClass::In && lap.lapClass != model::LapClass::Partial;
     if (lap.start == sec(0)) {
         out.index = indexOf(lap, 10.0); // 200 m
     } else if (lap.start == sec(20) || lap.start == sec(30)) {
@@ -165,6 +166,51 @@ TEST_CASE("track sections rule: the origin rule of laps that do not start at a b
     CHECK(trackDistanceOfLapDistance(0.0, 400.0, 300.0, false) == -100.0); // pointAt wraps it
 }
 
+TEST_CASE("track sections rule: a complete lap a few percent off the map maps proportionally", "[unit]") {
+    // The proportional rule: a complete lap (BCN to BCN) of 294 m or 306 m on the 300 m map.
+    CHECK(*lapDistanceOfTrackDistance(150.0, 294.0, 300.0, true, true) == 147.0);
+    CHECK(*lapDistanceOfTrackDistance(150.0, 306.0, 300.0, true, true) == 153.0);
+    CHECK(trackDistanceOfLapDistance(306.0, 306.0, 300.0, true, true) == 300.0);
+    // Outside the 5 % tolerance, or a lap that does not end at a BCN: from the start, unscaled.
+    CHECK(*lapDistanceOfTrackDistance(150.0, 330.0, 300.0, true, true) == 150.0);
+    CHECK(*lapDistanceOfTrackDistance(150.0, 294.0, 300.0, true, false) == 150.0);
+
+    // Laps [20, 30 s) and [30, 40 s) at a constant speed whose Corr Dist is 2 % short (29.4 m/s, 294 m) and
+    // 2 % long (30.6 m/s, 306 m), unstretched: every section falls where it does on an exact 300 m lap
+    // (Straight 1 [0, 3.333 s), Turn 1 [3.333, 5 s), Straight 2 [5, 10 s)), and the sections of each lap add
+    // up to its lap time.
+    model::DataSource src = outing();
+    RuleRunner::circuitDefault().run(src);
+    const model::RangeGroupTree& tree = src.layers[0].ranges;
+    const auto offLength = [](const model::Range& lap) {
+        LapIndex out = lookup(lap);
+        if (lap.start == sec(20)) {
+            out.index = indexOf(lap, 29.4);
+        } else if (lap.start == sec(30)) {
+            out.index = indexOf(lap, 30.6);
+        }
+        return out;
+    };
+    auto groups = TrackSectionsRule().sections(tree, track300(), offLength, {});
+    REQUIRE(groups);
+    const model::RangeGroup& def = (*groups)[1];
+    for (const Micros lapStart : {sec(20), sec(30)}) {
+        INFO("lap at " << lapStart);
+        const model::Range* s1 = rangeNamed(def, lapStart, "Straight 1");
+        const model::Range* t1 = rangeNamed(def, lapStart, "Turn 1");
+        const model::Range* s2 = rangeNamed(def, lapStart, "Straight 2");
+        REQUIRE(s1 != nullptr);
+        REQUIRE(t1 != nullptr);
+        REQUIRE(s2 != nullptr);
+        CHECK(s1->start == lapStart);
+        CHECK(std::abs(t1->start - (lapStart + 3'333'333)) <= 1);
+        CHECK(std::abs(t1->end - (lapStart + sec(5))) <= 1);
+        CHECK(std::abs(s2->start - (lapStart + sec(5))) <= 1);
+        CHECK(s2->end == lapStart + sec(10));
+        CHECK((s1->end - s1->start) + (t1->end - t1->start) + (s2->end - s2->start) == sec(10));
+    }
+}
+
 TEST_CASE("track sections rule: hand-computed sections of every lap", "[unit][AC-M3-03]") {
     model::DataSource src = outing();
     const RuleRunner phase1 = RuleRunner::circuitDefault();
@@ -192,8 +238,8 @@ TEST_CASE("track sections rule: hand-computed sections of every lap", "[unit][AC
     // Turn 1 [0, 5 s), Straight 2 [5 s, 20 s).
     // Lap 1 [20, 30 s), 300 m at 30 m/s: Straight 1 [20, 23.333), Turn 1 [23.333, 25), Straight 2 [25, 30).
     // Lap 3 [40, 45 s), 250 m at 50 m/s stretched 1.2: track 100 m is lap 83.33 m (1.667 s), track 150 m is
-    // 125 m (2.5 s). In lap [45, 50 s), 125 m at 25 m/s: Straight 1 [45, 49), Turn 1 [49, 50) clamped,
-    // Straight 2 omitted.
+    // 125 m (2.5 s). In lap [45, 50 s), 125 m at 25 m/s, ending in the pits: Straight 1 [45, 49); Turn 1
+    // would be cut short at the lap end ([49, 50)), so it is omitted (D-195 (d)), as is Straight 2.
     struct Expect {
         Micros lapStart;
         const char* name;
@@ -207,7 +253,6 @@ TEST_CASE("track sections rule: hand-computed sections of every lap", "[unit][AC
         {sec(30), "Turn 1", 33'333'333, sec(35)},     {sec(30), "Straight 2", sec(35), sec(40)},
         {sec(40), "Straight 1", sec(40), 41'666'667}, {sec(40), "Turn 1", 41'666'667, sec(42.5)},
         {sec(40), "Straight 2", sec(42.5), sec(45)},  {sec(45), "Straight 1", sec(45), sec(49)},
-        {sec(45), "Turn 1", sec(49), sec(50)},
     };
     REQUIRE(def.ranges.size() == expected.size());
     for (std::size_t i = 0; i < expected.size(); ++i) {
@@ -234,7 +279,7 @@ TEST_CASE("track sections rule: hand-computed sections of every lap", "[unit][AC
     CHECK(def.ranges[0].abbrev == "t1");
     // The category children hold the same sections with their own ids.
     const model::RangeGroup& corners = (*groups)[3];
-    REQUIRE(corners.ranges.size() == 5);
+    REQUIRE(corners.ranges.size() == 4);
     CHECK(corners.ranges[1].start == def.ranges[3].start);
     CHECK(corners.ranges[1].id == model::rangeId(corners.path, laps->ranges[1].startMarker, "Turn 1"));
     CHECK(corners.ranges[1].id != def.ranges[3].id);

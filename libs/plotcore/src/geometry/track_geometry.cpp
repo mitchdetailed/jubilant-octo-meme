@@ -15,6 +15,7 @@
 #include "body_json.hpp"
 #include "geometry_common.hpp"
 
+#include <esses/analysis/track_sections_rule.hpp>
 #include <esses/model/layer.hpp>
 #include <esses/model/marker.hpp>
 #include <esses/model/source.hpp>
@@ -435,7 +436,10 @@ std::optional<double> TrackGeometry::trackDistanceAt(const SlotData& slot, const
     const double stretch = it->stretch > 0.0 ? it->stretch : 1.0;
     d *= stretch;
     len *= stretch;
-    const double trackM = startsAtBeacon(slot, it->start) ? d : map.lengthM - (len - d);
+    // The origin rule of the sections (D-195 (d)): a complete lap within the tolerance maps proportionally,
+    // so the dot of a lap a little longer than the map reaches the line at the beacon, not before it.
+    const double trackM = analysis::trackDistanceOfLapDistance(
+        d, len, map.lengthM, startsAtBeacon(slot, it->start), startsAtBeacon(slot, it->end));
     if (map.closed) {
         double r = std::fmod(trackM, map.lengthM);
         return r < 0.0 ? r + map.lengthM : r;
@@ -611,7 +615,7 @@ DrawList TrackGeometry::buildDynamic(const ComponentBuildInputs& inputs) {
         const PointPx q = fit.toPx(p.x, p.y);
         const std::array<float, 2> xy{q.x, q.y};
         const Rgba colour =
-            k == 0 ? colours.cursor : traceColour(scheme, inputs.selection, inputs.slots[k].slot, 0);
+            k == 0 ? colours.cursor : rangeKeyColour(scheme, inputs.slots[k].slot); // 06 5.3 3
         list.points(xy.data(), 1, colour, size);
     }
     return list;

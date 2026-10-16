@@ -3,8 +3,10 @@
 //
 // AnimationController (04 section 8.5 item 7; 06 sections 2.1, 2.2 and 4.5; D-027 "animation (A, basic)"; 07
 // section 6.1; AC-M3-10): the shell side of cursor animation. data.animate (A, the toolbar toggle) starts and
-// stops it on the active worksheet; the Data -> Animation Rate menu sets the rate (x0.25, x0.5, x1, x2, x4;
-// options.animation.rate); switching worksheets moves a running animation to the new worksheet; "reduce
+// stops it on the active worksheet; the Data -> Animation Rate menu sets the rate (x0.25, x0.5, x1, x2, x4
+// and x10, the rate of 07 section 6.5 and AC-M3-10, D-203 (g); options.animation.rate; a rate outside them is
+// clamped to x0.25..x10, as WorksheetViewModel clamps it); switching worksheets moves a running animation to
+// the new worksheet; "reduce
 // motion" (QStyleHints) starts it paused and Options -> General "Reduce CPU during animation" lowers the tick
 // rate. The ticks themselves are WorksheetViewModel's (setAnimating / setAnimationRate: a QTimer advancing
 // cursorT by rate * dt, a Cursor-only change, so components repaint Dynamic layers only; AC-M3-10: <= 4 ms
@@ -30,7 +32,7 @@ namespace esses::widgets {
 class AnimationController final : public QObject {
     Q_OBJECT
 public:
-    static constexpr std::array<double, 5> kRates{0.25, 0.5, 1.0, 2.0, 4.0}; // Data -> Animation Rate
+    static constexpr std::array<double, 6> kRates{0.25, 0.5, 1.0, 2.0, 4.0, 10.0}; // Data -> Animation Rate
 
     explicit AnimationController(QObject* parent = nullptr);
     ~AnimationController() override;
@@ -42,8 +44,8 @@ public:
     double rate() const noexcept { return rate_; }
 
     void setAnimating(bool on);
-    void toggle(); // data.animate
-    void setRate(double rate);
+    void toggle();             // data.animate
+    void setRate(double rate); // clamped to kRates.front()..kRates.back(); not positive: ignored
 
 Q_SIGNALS:
     void animatingChanged(bool on);

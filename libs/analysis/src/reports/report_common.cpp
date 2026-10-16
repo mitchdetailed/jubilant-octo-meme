@@ -8,6 +8,7 @@
 #include <esses/model/detail.hpp>
 
 #include <algorithm>
+#include <array>
 #include <charconv>
 #include <numeric>
 #include <string>
@@ -61,11 +62,19 @@ bool expect(std::string_view text, std::size_t& pos, char c) noexcept {
     return false;
 }
 
+// A real calendar date: the day within its month's length (29 February in leap years only).
 bool validDate(std::int64_t y, unsigned m, unsigned d) noexcept {
-    return y >= 1900 && y <= 9999 && m >= 1 && m <= 12 && d >= 1 && d <= 31;
+    if (y < 1900 || y > 9999 || m < 1 || m > 12 || d < 1) {
+        return false;
+    }
+    constexpr std::array<unsigned, 12> kDays{31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    const bool leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
+    return d <= kDays[m - 1] + (m == 2 && leap ? 1U : 0U);
 }
 
-// Days since the epoch of "dd/mm/yyyy" or "yyyy-mm-dd" (leading/trailing text after the date is ignored).
+// Days since the epoch of "a/b/yyyy" or "yyyy-mm-dd" (leading/trailing text after the date is ignored). The
+// loggers write "dd/mm/yyyy"; a text that cannot be that but is a valid "mm/dd/yyyy" (b > 12, a <= 12, as a
+// US-style importer writes it) reads that way, and an impossible date (31/02) is no date (D-197 (b)).
 std::optional<std::int64_t> dateTextDays(std::string_view text) noexcept {
     std::size_t pos = 0;
     const std::optional<unsigned> a = readNumber(text, pos);
@@ -78,10 +87,16 @@ std::optional<std::int64_t> dateTextDays(std::string_view text) noexcept {
             return std::nullopt;
         }
         const std::optional<unsigned> y = readNumber(text, pos);
-        if (!y || !validDate(*y, *m, *a)) {
+        if (!y) {
             return std::nullopt;
         }
-        return daysFromCivil(*y, *m, *a);
+        if (validDate(*y, *m, *a)) {
+            return daysFromCivil(*y, *m, *a);
+        }
+        if (*m > 12 && validDate(*y, *a, *m)) {
+            return daysFromCivil(*y, *a, *m);
+        }
+        return std::nullopt;
     }
     if (expect(text, pos, '-')) {
         const std::optional<unsigned> m = readNumber(text, pos);

@@ -34,8 +34,34 @@ struct LapRow {
     std::string layer;
     Micros start = 0;
     Micros end = 0;
-    std::vector<std::pair<std::string, Micros>> sections; // in time order, first of each name
+    // In time order, the first of each key: the section's name and abbrev (a track section's id), so two
+    // sections of one name in a set stay two columns (D-197 (f)).
+    std::vector<std::pair<std::string, Micros>> sections;
 };
+
+constexpr char kKeySeparator = '';
+
+std::string sectionKey(const model::Range& section) {
+    return section.name + kKeySeparator + section.abbrev;
+}
+
+// The column titles of the keys: the name, and "name (abbrev)" where two columns share a name.
+std::vector<std::string> sectionTitles(const std::vector<std::string>& keys) {
+    std::vector<std::string> names;
+    names.reserve(keys.size());
+    for (const std::string& k : keys) {
+        names.push_back(k.substr(0, k.find(kKeySeparator)));
+    }
+    std::vector<std::string> titles;
+    titles.reserve(keys.size());
+    for (std::size_t i = 0; i < keys.size(); ++i) {
+        const bool shared = std::count(names.begin(), names.end(), names[i]) > 1;
+        const std::size_t at = keys[i].find(kKeySeparator);
+        const std::string abbrev = at == std::string::npos ? std::string() : keys[i].substr(at + 1);
+        titles.push_back(shared && !abbrev.empty() ? names[i] + " (" + abbrev + ")" : names[i]);
+    }
+    return titles;
+}
 
 // Column titles in track order: the section sequences of every lap merged, a name not seen yet going right
 // after the previous name of its own lap (the front when it is the lap's first).
@@ -162,7 +188,9 @@ Result<TimeReportTable> TimeReportEngine::build(const TimeReportSpec& spec, cons
     std::vector<Candidate> candidates;
     for (std::size_t i = 0; i < inputs.sources.size(); ++i) {
         const reports_detail::ResolvedRange resolved = reports_detail::resolveRange(inputs.sources[i]);
-        if (resolved.range == nullptr || (!resolved.range->trusted && !spec.includeUntrusted)) {
+        // A disabled lap is no row, as a disabled header range is none in the channel report (D-197 (f)).
+        if (resolved.range == nullptr || !resolved.range->enabled ||
+            (!resolved.range->trusted && !spec.includeUntrusted)) {
             continue;
         }
         candidates.push_back(Candidate{i, ranks[i], resolved});
@@ -191,10 +219,11 @@ Result<TimeReportTable> TimeReportEngine::build(const TimeReportSpec& spec, cons
                 if (section.start < lap.start || !section.enabled) {
                     continue;
                 }
+                std::string key = sectionKey(section);
                 const bool seen = std::any_of(row.sections.begin(), row.sections.end(),
-                                              [&section](const auto& p) { return p.first == section.name; });
+                                              [&key](const auto& p) { return p.first == key; });
                 if (!seen) {
-                    row.sections.emplace_back(section.name, section.duration());
+                    row.sections.emplace_back(std::move(key), section.duration());
                 }
             }
         }
@@ -205,15 +234,16 @@ Result<TimeReportTable> TimeReportEngine::build(const TimeReportSpec& spec, cons
     }
 
     TimeReportTable table;
-    table.sections = mergeSectionOrder(laps);
-    const std::size_t ns = table.sections.size();
+    const std::vector<std::string> keys = mergeSectionOrder(laps);
+    table.sections = sectionTitles(keys);
+    const std::size_t ns = keys.size();
     // Section times per lap at the column positions, then the lap time.
     std::vector<std::vector<std::optional<Micros>>> times(laps.size(),
                                                           std::vector<std::optional<Micros>>(ns + 1));
     for (std::size_t r = 0; r < laps.size(); ++r) {
         for (const auto& section : laps[r].sections) {
-            const auto it = std::find(table.sections.begin(), table.sections.end(), section.first);
-            times[r][static_cast<std::size_t>(it - table.sections.begin())] = section.second;
+            const auto it = std::find(keys.begin(), keys.end(), section.first);
+            times[r][static_cast<std::size_t>(it - keys.begin())] = section.second;
         }
         times[r][ns] = laps[r].end - laps[r].start;
     }

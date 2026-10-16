@@ -14,6 +14,7 @@
 // offsets' undo) run in the shell: tests/ui/tst_offset_axis.
 
 #include "components/component_test_support.hpp"
+#include "components/plots_test_support.hpp"
 
 #include <esses/analysis/rule_runner.hpp>
 #include <esses/base/hash.hpp>
@@ -255,8 +256,9 @@ private Q_SLOTS:
         const int after = g.staticBuildsSubmitted();
         w.view->setCursor(20 * kSec, qt::CursorSource::Programmatic);
         w.view->placeDatum(); // moved: Dynamic only
-        QTest::qWait(60);
+        drainEvents();
         QCOMPARE(g.staticBuildsSubmitted(), after);
+        QVERIFY(g.staticUpToDate());
         w.view->toggleDatum(); // hidden: the key loses the columns
         QVERIFY(waitQuiet(g));
         QVERIFY(!g.layout().keyColumns.datum);
@@ -375,6 +377,11 @@ private Q_SLOTS:
         const auto full = g.staticInfo().scales[0];
         const auto throttle = g.staticInfo().scales[1];
         QVERIFY(full.has_value());
+        // Without an active channel: about the shown span's centre (the active channel case follows).
+        project::ComponentSpec none = g.spec();
+        none.activeChannel.clear();
+        g.applySpec(none);
+        QVERIFY(waitQuiet(g));
         QVERIFY(g.handleCommand(QStringLiteral("zoom.v_in"), {}));
         QVERIFY(waitQuiet(g));
         QCOMPARE(g.verticalZoomOf(0), (plot::TdGroupZoom{0.25, 0.75}));
@@ -390,6 +397,26 @@ private Q_SLOTS:
         QVERIFY(g.handleCommand(QStringLiteral("zoom.v_in"), {}));
         QVERIFY(g.handleCommand(QStringLiteral("zoom.v_full"), {}));
         QCOMPARE(g.verticalZoomOf(0), plot::TdGroupZoom{});
+        // With an active channel: about its value at the cursor (06 section 14.4; D-203 (v)). Wheel Speed FL
+        // 10 s into lap 1 (it starts at 40 s): sample 2500 of the 50 Hz source, in m/s.
+        {
+            project::ComponentSpec active = g.spec();
+            active.activeChannel = "Wheel Speed FL";
+            g.applySpec(active);
+            w.view->setCursor(10 * kSec, qt::CursorSource::Programmatic);
+            QVERIFY(waitQuiet(g));
+            const auto shown = g.staticInfo().scales[0];
+            QVERIFY(shown.has_value());
+            const double v = plotstest::SourceShape{}.wheelFl(2500);
+            const double f = (v - shown->first) / (shown->second - shown->first);
+            QVERIFY(f > 0.0 && f < 1.0);
+            QVERIFY(g.handleCommand(QStringLiteral("zoom.v_in"), {}));
+            const plot::TdGroupZoom z = g.verticalZoomOf(0);
+            QVERIFY(std::abs((z.hi - z.lo) - 0.5) < 1e-12);
+            QVERIFY(std::abs(0.5 * (z.lo + z.hi) - std::clamp(f, 0.25, 0.75)) < 1e-6);
+            QVERIFY(g.handleCommand(QStringLiteral("zoom.v_full"), {}));
+            QVERIFY(waitQuiet(g));
+        }
         // ALT + rubber band over the panel's middle half: the shown fraction [0.25, 0.75].
         QVERIFY(waitQuiet(g));
         const plot::RectPx panel = g.layout().groups[0].panel;

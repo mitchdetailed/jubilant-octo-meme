@@ -23,6 +23,7 @@
 #include <esses/widgets/shell/worksheet_canvas.hpp>
 
 #include <QApplication>
+#include <QComboBox>
 #include <QListWidget>
 #include <QSignalSpy>
 #include <QTabWidget>
@@ -51,6 +52,16 @@ struct Shell {
             return false;
         }
         w = std::make_unique<MainWindow>(*rt, paths);
+        w->setSaveLayoutOnExit(false);
+        if (!showAndActivate(*w)) {
+            return false;
+        }
+        return w->openProject(folder);
+    }
+    // A fresh window and session on the same configuration, the project opened again (AC-M3-08 "reopen").
+    bool reopen() {
+        w.reset();
+        w = std::make_unique<MainWindow>(*rt, pathsFor(config.path()));
         w->setSaveLayoutOnExit(false);
         if (!showAndActivate(*w)) {
             return false;
@@ -195,6 +206,15 @@ private Q_SLOTS:
             const project::ComponentSpec edited = dialog->editedSpec();
             QVERIFY2(!(edited.body == c->spec().body),
                      qPrintable(type + QStringLiteral(": nothing changed")));
+            // Every leaf's edit reached the edited body (a binder that kept one leaf's old value fails here,
+            // not only one that changed nothing at all).
+            const QJsonValue before = jsonptr::fromDoc(c->spec().body);
+            const QJsonValue after = jsonptr::fromDoc(edited.body);
+            for (const QString& p : FieldBinder::schemaPointers(PropertiesDialog::bodySchema(type))) {
+                QVERIFY2(jsonptr::get(after, p) != jsonptr::get(before, p),
+                         qPrintable(type + QStringLiteral(": the edit of ") + p +
+                                    QStringLiteral(" did not reach the body")));
+            }
             QVERIFY2(tree.validate(tree.node(QString()), jsonptr::fromDoc(edited.body), nullptr),
                      qPrintable(type + QStringLiteral(": the edited body breaks its schema ") +
                                 bodyText(edited.body)));
@@ -206,9 +226,9 @@ private Q_SLOTS:
             expected.emplace(id, edited);
             dialog->accept(); // OK with nothing more to apply closes it
         }
-        // Save, reopen, identical.
+        // Save, reopen in a fresh window and session, identical.
         QVERIFY(sh.w->session().save());
-        QVERIFY(sh.w->openProject(sh.folder));
+        QVERIFY(sh.reopen());
         for (const auto& [id, spec] : expected) {
             const project::ComponentSpec* back = sh.stored(id);
             QVERIFY(back != nullptr);
@@ -260,11 +280,91 @@ private Q_SLOTS:
             grid->isChecked(),
             !jsonptr::get(jsonptr::fromDoc(open.body), QStringLiteral("/display/showGrid")).toBool(true));
 
-        // Cancel restores the spec at open time as one more command.
-        dialog->reject();
+        // A move of the component while the dialog is open is not the dialog's: Cancel keeps it (D-203 (l)).
+        project::ComponentSpec moved = c->spec();
+        moved.rect.l += 0.01;
+        moved.rect.r += 0.01;
+        Q_EMIT c->specEditRequested(moved, QStringLiteral("Move"));
         QCOMPARE(stack.index(), base + 2);
-        QVERIFY(c->spec() == open);
+        QCOMPARE(c->spec().rect, moved.rect);
+        // The move refreshed the pages, but the grid row (applied) still shows the applied value.
+        QCOMPARE(
+            grid->isChecked(),
+            !jsonptr::get(jsonptr::fromDoc(open.body), QStringLiteral("/display/showGrid")).toBool(true));
+
+        // Cancel restores the open-time values of what the dialog applied, as one more command; the move
+        // stays.
+        dialog->reject();
+        QCOMPARE(stack.index(), base + 3);
+        QVERIFY(c->spec().body == open.body);
+        QCOMPARE(c->spec().rect, moved.rect);
         QTRY_VERIFY(PropertiesDialog::find(*c) == nullptr);
+    }
+
+    // An edit of the component made elsewhere while the dialog is open (a hotkey, a canvas edit, undo) does
+    // not throw away a field the user changed but has not applied (D-203 (l)).
+    void unappliedEditsSurviveAnOutsideEdit() {
+        Shell sh;
+        QVERIFY(sh.start());
+        const std::vector<Uuid> ids = sh.addWorksheet("full");
+        ComponentWidget* c = sh.w->canvas().componentById(ids.front()); // time_distance
+        QVERIFY(c != nullptr);
+        PropertiesDialog* dialog = PropertiesDialog::openFor(*c);
+        auto* grid =
+            qobject_cast<QCheckBox*>(dialog->binder().editorFor(QStringLiteral("/display/showGrid")));
+        QVERIFY(grid != nullptr);
+        const bool gridBefore = grid->isChecked();
+        grid->click(); // changed, not applied
+        // F3 on the component: the variance row follows, the grid row keeps the user's change.
+        auto* variance =
+            qobject_cast<QCheckBox*>(dialog->binder().editorFor(QStringLiteral("/display/variance/show")));
+        QVERIFY(variance != nullptr);
+        const bool varianceBefore = variance->isChecked();
+        sh.w->canvas().focusComponent(c);
+        QVERIFY(sh.w->commands().invoke(QStringLiteral("graph.variance")));
+        QCOMPARE(variance->isChecked(), !varianceBefore);
+        QCOMPARE(grid->isChecked(), !gridBefore);
+        dialog->apply();
+        QCOMPARE(
+            jsonptr::get(jsonptr::fromDoc(c->spec().body), QStringLiteral("/display/showGrid")).toBool(true),
+            !gridBefore);
+        QCOMPARE(jsonptr::get(jsonptr::fromDoc(c->spec().body), QStringLiteral("/display/variance/show"))
+                     .toBool(false),
+                 !varianceBefore);
+        dialog->accept();
+    }
+
+    // The dialog stays open across a worksheet switch (06 section 12 item 2): its Apply on the hidden
+    // component is stored in that worksheet's definition as one undo step, never only on the widget
+    // (D-203 (k)).
+    void applyOnAHiddenWorksheetIsStored() {
+        Shell sh;
+        QVERIFY(sh.start());
+        const std::vector<Uuid> ids = sh.addWorksheet("full");
+        const int sheet = sh.w->activeWorksheetIndex();
+        ComponentWidget* c = sh.w->canvas().componentById(ids.front());
+        QVERIFY(c != nullptr);
+        PropertiesDialog* dialog = PropertiesDialog::openFor(*c);
+        auto* grid =
+            qobject_cast<QCheckBox*>(dialog->binder().editorFor(QStringLiteral("/display/showGrid")));
+        QVERIFY(grid != nullptr);
+        sh.w->selectWorksheet(sheet == 0 ? 1 : 0);
+        QVERIFY(sh.w->activeWorksheetIndex() != sheet);
+        QVERIFY(PropertiesDialog::find(*c) == dialog); // kept, still open
+        QUndoStack& stack = sh.w->session().undoStack();
+        const int base = stack.index();
+        grid->click();
+        dialog->apply();
+        QCOMPARE(stack.index(), base + 1);
+        const project::ComponentSpec* stored = sh.stored(ids.front());
+        QVERIFY(stored != nullptr);
+        QVERIFY(*stored == c->spec());
+        // Back on that worksheet the same widget shows the stored spec; undo takes the edit back.
+        sh.w->selectWorksheet(sheet);
+        QCOMPARE(sh.w->canvas().componentById(ids.front()), c);
+        stack.undo();
+        QVERIFY(*sh.stored(ids.front()) == c->spec());
+        dialog->reject();
     }
 
     // Invalid fields: red with a reason, OK and Apply disabled, Apply does nothing.
@@ -295,6 +395,67 @@ private Q_SLOTS:
     }
 
     // The component goes: so does its dialog. CTRL+N: the Channels tab at the active channel.
+    // The heading pickers (04 section 12 item 6; D-203 (y)): the channel report's headings offer the active
+    // profile's report headings, the time report's rows only its range groups; free text stays allowed.
+    void headingPickersOfferTheProfileHeadings() {
+        Shell sh;
+        QVERIFY(sh.start());
+        const std::vector<Uuid> ids = sh.addWorksheet("full");
+        QStringList profile;
+        for (const std::string& h : sh.w->session().profile().reportHeadings) {
+            profile.push_back(QString::fromStdString(h));
+        }
+        QVERIFY(profile.contains(QStringLiteral("Outings:Laps")));
+        QVERIFY(profile.contains(QStringLiteral("Driver")));
+        const auto pickerItems = [](const QComboBox& c) {
+            QStringList out;
+            for (int i = 0; i < c.count(); ++i) {
+                out.push_back(c.itemText(i));
+            }
+            return out;
+        };
+        for (std::size_t i = 0; i < ids.size(); ++i) {
+            const QString type = QString::fromLatin1(kMvpTypes[i]);
+            if (type != QLatin1String("channel_report") && type != QLatin1String("time_report")) {
+                continue;
+            }
+            ComponentWidget* c = sh.w->canvas().componentById(ids[i]);
+            QVERIFY(c != nullptr);
+            PropertiesDialog* dialog = PropertiesDialog::openFor(*c);
+            QVERIFY(dialog != nullptr);
+            QList<QComboBox*> pickers;
+            for (QComboBox* box : dialog->findChildren<QComboBox*>()) {
+                if (box->property("esses.headingPicker").toBool()) {
+                    pickers.push_back(box);
+                }
+            }
+            QVERIFY2(!pickers.isEmpty(), qPrintable(type));
+            for (QComboBox* box : pickers) {
+                QVERIFY(box->isEditable());
+                const QStringList items = pickerItems(*box);
+                if (type == QLatin1String("channel_report")) {
+                    QCOMPARE(items, profile);
+                } else {
+                    QVERIFY(items.contains(QStringLiteral("Outings:Laps")));
+                    QVERIFY(!items.contains(QStringLiteral("Driver"))); // not a range group
+                }
+            }
+            if (type == QLatin1String("time_report")) {
+                // A typed value is kept as typed and applied.
+                const FieldBinding* rows = dialog->binder().binding(QStringLiteral("/rowGroup"));
+                QVERIFY(rows != nullptr);
+                auto* box = qobject_cast<QComboBox*>(rows->editor.data());
+                QVERIFY(box != nullptr);
+                box->setEditText(QStringLiteral("Outings:Laps:Track Sections:Default"));
+                dialog->apply();
+                QTRY_COMPARE(
+                    jsonptr::get(jsonptr::fromDoc(c->spec().body), QStringLiteral("/rowGroup")).toString(),
+                    QStringLiteral("Outings:Laps:Track Sections:Default"));
+            }
+            dialog->close();
+        }
+    }
+
     void tracksItsComponentAndChannels() {
         Shell sh;
         QVERIFY(sh.start());

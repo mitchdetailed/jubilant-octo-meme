@@ -109,6 +109,12 @@ void TrackMapWindow::syncActions() {
     labels_->setChecked(body.showSectionLabels);
 }
 
+void TrackMapWindow::applyScheme(const project::Scheme& scheme) {
+    if (position_ != nullptr) {
+        position_->onSchemeChanged(scheme);
+    }
+}
+
 void TrackMapWindow::fit() {
     if (position_ != nullptr) {
         position_->fit();

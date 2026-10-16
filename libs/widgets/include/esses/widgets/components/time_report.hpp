@@ -39,6 +39,7 @@ public:
     void applySpec(const project::ComponentSpec& spec) override;
     void onSelectionChanged(const plot::SelectionSnapshot& selection) override;
     void onDataChanged(const model::SourceId& source, std::uint64_t version) override;
+    void onChannelDataChanged(const maths::ChannelKey& key) override;
     void onSchemeChanged(const project::Scheme& scheme) override;
     OverlayPolicy overlayPolicy() const override;
     qt::CommandContext commandContext() const override;
@@ -58,14 +59,19 @@ public:
 
 protected:
     void onFocusChanged(bool focused) override;
+    void showEvent(QShowEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
 
 private:
     void applyBody();
+    // Reruns the report now, or once when shown again if the component is hidden (a kept worksheet's
+    // report does no work for nobody; D-203 (z)).
+    void requestRefresh();
 
     qt::ReportModel* model_ = nullptr;
     detail::ReportTable* table_ = nullptr;
     std::shared_ptr<const project::Scheme> scheme_;
+    bool refreshPending_ = false;
 };
 
 } // namespace esses::widgets

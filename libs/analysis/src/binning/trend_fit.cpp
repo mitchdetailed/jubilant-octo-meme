@@ -73,9 +73,14 @@ Result<TrendResult> TrendFit::fit(std::span<const double> x, std::span<const dou
         degree = spec.order;
         break;
     }
-    // Unknowns: the coefficients of u^p for p = firstPower..degree, u = (x - shift) / scale.
-    const int firstPower = spec.throughZero ? 1 : 0;
-    const int p = degree - firstPower + 1;
+    // Unknowns b_j, j = 0..p-1, of the basis lead(x) u^j with u = (x - shift) / scale mapping the x range
+    // onto
+    // [-1, 1]: lead = 1 without through-zero (degree + 1 unknowns); through zero lead = x / absMax and degree
+    // unknowns, x times a centred polynomial of degree - 1 (D-194), which keeps the columns well conditioned
+    // when the x values lie in a narrow band far from 0 (engine speed 7900-8000 rpm); plain powers of x /
+    // absMax there are nearly collinear.
+    const bool throughZero = spec.throughZero;
+    const int p = throughZero ? degree : degree + 1;
 
     std::size_t m = 0;
     double xMin = std::numeric_limits<double>::infinity();
@@ -95,9 +100,14 @@ Result<TrendResult> TrendFit::fit(std::span<const double> x, std::span<const dou
     if (m < static_cast<std::size_t>(p)) {
         return invalid("a trend of this order needs at least " + std::to_string(p) + " points");
     }
-    // Through zero keeps the origin (no shift); otherwise the x range maps onto [-1, 1].
-    const double shift = spec.throughZero ? 0.0 : 0.5 * (xMin + xMax);
-    const double scale = spec.throughZero ? absMax : 0.5 * (xMax - xMin);
+    const double shift = 0.5 * (xMin + xMax);
+    double scale = 0.5 * (xMax - xMin);
+    if (throughZero && !(absMax > 0.0)) {
+        return invalid("the x values do not determine a trend");
+    }
+    if (throughZero && !(scale > 0.0)) {
+        scale = absMax; // one x value: u = 0, so only the linear term is determined (the rank test below)
+    }
     if (!(scale > 0.0)) {
         return invalid("the x values do not determine a trend");
     }
@@ -113,7 +123,7 @@ Result<TrendResult> TrendFit::fit(std::span<const double> x, std::span<const dou
             continue;
         }
         const double u = (x[i] - shift) / scale;
-        double up = firstPower == 1 ? u : 1.0;
+        double up = throughZero ? x[i] / absMax : 1.0;
         for (int j = 0; j < p; ++j) {
             row[static_cast<std::size_t>(j)] = up;
             up *= u;
@@ -149,7 +159,7 @@ Result<TrendResult> TrendFit::fit(std::span<const double> x, std::span<const dou
         rMax = std::max(
             rMax, std::abs(r[static_cast<std::size_t>(j) * kMaxUnknowns + static_cast<std::size_t>(j)]));
     }
-    std::array<double, kMaxUnknowns> b{}; // coefficients of u^(firstPower + j)
+    std::array<double, kMaxUnknowns> b{}; // coefficients of lead(x) u^j
     for (int j = p - 1; j >= 0; --j) {
         const auto uj = static_cast<std::size_t>(j);
         const double rjj = r[uj * kMaxUnknowns + uj];
@@ -163,14 +173,18 @@ Result<TrendResult> TrendFit::fit(std::span<const double> x, std::span<const dou
         }
         b[uj] = v / rjj;
     }
-    // Back to powers of x: sum_k b_k ((x - shift) / scale)^k = sum_n c_n x^n with
-    // c_n = sum_{k >= n} b_k C(k, n) (-shift)^(k - n) / scale^k.
+    // Back to powers of x: sum_k b_k ((x - shift) / scale)^k = sum_n d_n x^n with
+    // d_n = sum_{k >= n} b_k C(k, n) (-shift)^(k - n) / scale^k; through zero the sum is multiplied by
+    // x / absMax, so d_n is the coefficient of x^(n + 1) divided by absMax.
     TrendResult out;
     out.coefficients.assign(static_cast<std::size_t>(degree) + 1, 0.0);
-    for (int k = firstPower; k <= degree; ++k) {
-        const double bk = b[static_cast<std::size_t>(k - firstPower)] / std::pow(scale, k);
+    const int lift = throughZero ? 1 : 0;
+    const double leadScale = throughZero ? absMax : 1.0;
+    for (int k = 0; k < p; ++k) {
+        const double bk = b[static_cast<std::size_t>(k)] / (std::pow(scale, k) * leadScale);
         for (int n = 0; n <= k; ++n) {
-            out.coefficients[static_cast<std::size_t>(n)] += bk * binomial(k, n) * std::pow(-shift, k - n);
+            out.coefficients[static_cast<std::size_t>(n) + static_cast<std::size_t>(lift)] +=
+                bk * binomial(k, n) * std::pow(-shift, k - n);
         }
     }
     out.r2 = ssTot > 0.0 ? 1.0 - ssRes / ssTot : 1.0;

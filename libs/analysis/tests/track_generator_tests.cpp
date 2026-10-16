@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <numbers>
 
 using namespace esses;
@@ -273,6 +274,89 @@ TEST_CASE("track generator: options, invalid input and cancellation", "[unit][AC
     auto ccw = TrackGenerator::fromSpeedLatG(f.lap, f.speed, mirrored, inverted, {});
     REQUIRE(ccw);
     CHECK(ccw->map.direction == TrackDirection::CounterClockwise);
+}
+
+TEST_CASE("track generator: a GPS dropout across the start line is bridged, not cut by a chord", "[unit]") {
+    // A circle of radius 100 m at 30 m/s, 10 Hz fixes without noise from 3 s before the lap to 3 s after it;
+    // every fix within 1 s of the lap start and of the lap end is lost, so the seam is a 2 s gap on a curve
+    // (a chord would cut it by about 4.5 m).
+    constexpr double kR = 100.0;
+    constexpr double kV = 30.0;
+    const double lapS = 2.0 * std::numbers::pi * kR / kV;
+    const TrackOrigin origin{48.0, 11.0, 0.0};
+    const double mPerDegLat = 111'132.0;
+    const double mPerDegLon = 111'132.0 * std::cos(48.0 * std::numbers::pi / 180.0);
+    const LapWindow lap{sec(3.0), sec(3.0 + lapS)};
+    UniformSignal lat;
+    lat.rate = Rate::fromHz(10);
+    UniformSignal lon = lat;
+    std::vector<Xy2> truth;
+    for (int i = 0; static_cast<double>(i) / 10.0 <= lapS + 6.0; ++i) {
+        const double t = static_cast<double>(i) / 10.0;
+        const double phi = kV * (t - 3.0) / kR;
+        const double la = origin.lat + kR * std::sin(phi) / mPerDegLat;
+        const double lo = origin.lon + kR * std::cos(phi) / mPerDegLon;
+        const TrackPoint e = TrackGenerator::toEnu(origin, la, lo);
+        truth.push_back(Xy2{e.x, e.y});
+        const bool lost = std::abs(t - 3.0) <= 1.0 || std::abs(t - (3.0 + lapS)) <= 1.0;
+        lat.values.push_back(lost ? std::numeric_limits<double>::quiet_NaN() : la);
+        lon.values.push_back(lost ? std::numeric_limits<double>::quiet_NaN() : lo);
+    }
+    TrackGeneratorOptions options;
+    options.origin = origin;
+    auto made = TrackGenerator::fromGps(GpsLap{lap, lat, lon}, options, {});
+    REQUIRE(made);
+    CHECK(hasDiagnostic(made->report, "W-TRACK-DROPOUT"));
+    double worst = 0.0;
+    for (const TrackPoint& p : made->map.centre) {
+        worst = std::max(worst, distanceToPolyline(Xy2{p.x, p.y}, truth));
+    }
+    WARN("seam dropout: worst distance from the circle " << worst << " m");
+    CHECK(worst < 1.5);
+    CHECK(made->map.lengthM == Catch::Approx(2.0 * std::numbers::pi * kR).epsilon(0.01));
+}
+
+TEST_CASE("track generator: a figure eight (no net turn) is closed and its heading drift removed", "[unit]") {
+    // Two circles of radius R = 20 m/s x 16 s / 2 pi (one left, one right, 16 s each) at 20 m/s: the heading
+    // returns to its start without a net revolution. The lateral acceleration carries a constant offset of
+    // 0.3 m/s^2 (a heading drift of 0.48 rad over the lap) that the loop closure must remove.
+    constexpr double kV = 20.0;
+    constexpr double kT = 16.0;
+    const double r = kV * kT / (2.0 * std::numbers::pi);
+    const double w = 2.0 * std::numbers::pi / kT;
+    UniformSignal speed;
+    speed.rate = Rate::fromHz(50);
+    speed.values.assign(1601, kV);
+    UniformSignal lat = speed;
+    for (std::size_t i = 0; i < lat.values.size(); ++i) {
+        const double t = static_cast<double>(i) / 50.0;
+        lat.values[i] = (t < kT ? kV * kV / r : -kV * kV / r) + 0.3;
+    }
+    const auto truthAt = [&](double t) {
+        if (t < kT) {
+            return Xy2{r * std::sin(w * t), r * (1.0 - std::cos(w * t))};
+        }
+        const double u = t - kT;
+        return Xy2{r * std::sin(w * u), -r * (1.0 - std::cos(w * u))};
+    };
+    auto made =
+        TrackGenerator::fromSpeedLatG(LapWindow{0, sec(2.0 * kT)}, speed, lat, TrackGeneratorOptions{}, {});
+    REQUIRE(made);
+    CHECK_FALSE(hasDiagnostic(made->report, "W-TRACK-NOT-A-LOOP"));
+    CHECK(made->map.closed);
+    CHECK(made->map.lengthM == Catch::Approx(2.0 * kV * kT).epsilon(0.01));
+    std::vector<Xy2> a;
+    std::vector<Xy2> b;
+    for (int k = 0; k < 400; ++k) {
+        const double u = static_cast<double>(k) / 400.0;
+        const TrackPoint p = made->map.pointAt(u * made->map.lengthM);
+        a.push_back(Xy2{p.x, p.y});
+        b.push_back(truthAt(u * 2.0 * kT));
+    }
+    const double rms = rigidRms(a, b);
+    WARN("figure eight: RMS after rigid alignment " << rms << " m, closure error before correction "
+                                                    << made->report.closureErrorM << " m");
+    CHECK(rms < 3.0);
 }
 
 TEST_CASE("track generator: a straight run without a loop reports it and stays open-shaped", "[unit]") {

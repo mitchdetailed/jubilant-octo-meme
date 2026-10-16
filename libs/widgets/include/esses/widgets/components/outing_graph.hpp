@@ -46,6 +46,7 @@ public:
     void addChannel(const QString& name, bool newPanel) override;
     QStringList contextCommands() const override;
     bool exportData(ExportSink& sink, const ExportOptions& options) const override;
+    ExportJob exportJob(const ExportOptions& options) const override;
     bool handleCommand(const QString& id, const QVariantList& args) override;
     plot::HitResult hitAt(QPointF logical) const override; // the zoom handles first, then the Static hits
     bool cancelTransient() override;                       // ESC: drops a rubber band in progress
@@ -81,6 +82,16 @@ private:
         double length = 0.0; // worksheet units of the whole outing
     };
     std::optional<Axis> axis() const;
+    // The outing axis and the zoom rectangle (device px), computed once per inputs revision, zoom and domain:
+    // hitAt, worksheetXAt and the handles run on every mouse move (D-203 (ab)).
+    struct Geometry {
+        std::uint64_t revision = 0;
+        plot::XSpan zoom;
+        plot::Domain domain = plot::Domain::Time;
+        std::optional<Axis> axis;
+        plot::RectPx zoomRect{};
+    };
+    const Geometry& geometry() const;
     void setCursorAtLogicalX(double logicalX);
     void requestOutingBody(const plot::OutingBody& body, const QString& undoText);
 
@@ -91,6 +102,7 @@ private:
     std::optional<double> bandStart_; // rubber band, worksheet x
     double bandEnd_ = 0.0;
     int wheelRemainder_ = 0;
+    mutable Geometry geometry_;
 };
 
 } // namespace esses::widgets

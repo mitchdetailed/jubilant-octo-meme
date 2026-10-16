@@ -285,6 +285,9 @@ QWidget* makeLeafEditor(FieldKind kind, const QStringList& enumValues, const QJs
 QJsonValue leafValue(FieldKind kind, const QWidget* editor);
 void setLeafValue(FieldKind kind, QWidget* editor, const QJsonValue& value);
 // The names a Channel field offers (set by the PropertiesDialog for its component's sources).
+// Replaces the suggestions of a heading picker (a Text leaf made with suggestions: report headings, range
+// groups), keeping its text; range-group pickers keep only the "Outings..." paths (D-203 (y)).
+void setHeadingChoices(QWidget* headingEditor, const QStringList& headings);
 void setChannelChoices(QWidget* channelEditor, const QStringList& names);
 // Marks a field invalid (red frame, the reason as tool tip) or valid again.
 void markInvalid(QWidget* editor, const QString& reason);

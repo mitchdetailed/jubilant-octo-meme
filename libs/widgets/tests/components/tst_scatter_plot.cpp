@@ -181,17 +181,18 @@ private Q_SLOTS:
         QCOMPARE(rig.c->body().cursorStyle, std::string("none"));
         QVERIFY(rig.c->handleCommand(QStringLiteral("cursor.style"), {}));
         QCOMPARE(rig.c->body().cursorStyle, std::string("cross"));
-        // K and L: the header's legends.
+        // K: the colour legend. L: no channel legend is drawn (the axis titles name the channels), so the
+        // scatter declines it and nothing is edited (D-203 (h)).
         QVERIFY(!rig.c->spec().legend.colour);
         QVERIFY(rig.c->handleCommand(QStringLiteral("component.colour_legend"), {}));
         QVERIFY(rig.c->spec().legend.colour);
-        QVERIFY(rig.c->handleCommand(QStringLiteral("component.legend"), {}));
-        QVERIFY(!rig.c->spec().legend.channels);
-        QCOMPARE(rig.edits, 11);
+        QVERIFY(!rig.c->handleCommand(QStringLiteral("component.legend"), {}));
+        QVERIFY(rig.c->spec().legend.channels);
+        QCOMPARE(rig.edits, 10);
         QVERIFY(!rig.lastUndoText.isEmpty());
         // ALT+n is not the scatter's (a BandAxis has no per-band visibility, D-198): the shell's turn.
         QVERIFY(!rig.c->handleCommand(QStringLiteral("component.colour_band"), {QVariant(0)}));
-        QCOMPARE(rig.edits, 11);
+        QCOMPARE(rig.edits, 10);
         // addChannel: a Y trace, CTRL: the X channel.
         rig.c->addChannel(QStringLiteral("Corr Speed"), false);
         QCOMPARE(rig.c->body().traces.size(), std::size_t{3});
@@ -275,6 +276,49 @@ private Q_SLOTS:
         QVERIFY(!rig.c->axisZoom().has_value());
         QVERIFY(waitQuiet(*rig.c));
         QCOMPARE(rig.c->axes().front().xMin, full.xMin);
+    }
+
+    // D-203 (i): in the tiled layout of two y channels the own zoom keeps to x (each tile keeps its y scale),
+    // and a change of channel drops the window of the old one.
+    void ownZoomIsXOnlyWhenTiledAndDroppedOnAChannelChange() {
+        World w;
+        const auto src = w.publish(SourceOptions{});
+        buildSummaries(*src);
+        selectMain(w, lapRef(*src, 1));
+        Rig<ScatterPlot> rig(w,
+                             specOf("scatter",
+                                    R"({"xChannel":"Wheel Speed FL","layout":"tiled",)"
+                                    R"("traces":[{"yChannel":"Throttle"},{"yChannel":"Wheel Speed FR"}]})"),
+                             QSize{520, 300});
+        QVERIFY(waitQuiet(*rig.c));
+        const std::vector<plot::ScatterAxes> full = rig.c->axes();
+        QCOMPARE(full.size(), std::size_t{2});
+        const double x0 = full[1].xMin + 0.25 * (full[1].xMax - full[1].xMin);
+        const double x1 = full[1].xMin + 0.75 * (full[1].xMax - full[1].xMin);
+        // A window boxed in tile 1 (Wheel Speed FR, m/s): x applies to both tiles, each y stays its own.
+        rig.c->setAxisZoom(ScatterPlot::AxisZoom{x0, x1, full[1].yMin + 0.1, full[1].yMin + 0.2});
+        QVERIFY(waitQuiet(*rig.c));
+        const std::vector<plot::ScatterAxes> zoomed = rig.c->axes();
+        QCOMPARE(zoomed.size(), std::size_t{2});
+        for (std::size_t t = 0; t < 2; ++t) {
+            QCOMPARE(zoomed[t].xMin, x0);
+            QCOMPARE(zoomed[t].xMax, x1);
+            QCOMPARE(zoomed[t].yMin, full[t].yMin);
+            QCOMPARE(zoomed[t].yMax, full[t].yMax);
+        }
+        // Another X channel: the window of the old one goes.
+        project::ComponentSpec next = rig.c->spec();
+        next.body = JsonDoc::parse(R"({"xChannel":"Throttle","layout":"tiled",)"
+                                   R"("traces":[{"yChannel":"Throttle"},{"yChannel":"Wheel Speed FR"}]})")
+                        .value();
+        rig.c->applySpec(next);
+        QVERIFY(!rig.c->axisZoom().has_value());
+        // The same channels again (a caption edit, say): a window is kept.
+        rig.c->setAxisZoom(ScatterPlot::AxisZoom{0.1, 0.2, 0.0, 1.0});
+        next = rig.c->spec();
+        next.caption.text = "renamed";
+        rig.c->applySpec(next);
+        QVERIFY(rig.c->axisZoom().has_value());
     }
 
     void colourChannelShowsItsLegend() {

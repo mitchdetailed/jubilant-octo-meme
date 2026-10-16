@@ -246,6 +246,7 @@ struct TdStaticInfo {
     XSpan scrollExtent;     // the Main outing extent the scrollbar spans
     int varianceTables = 0; // VarianceTable::build calls (AC-M3-05: none without an overlay)
     bool varianceNoData = false;
+    bool varianceSpansLaps = false; // Main or an overlay spans laps: no table, the banner (D-201)
 };
 
 class TimeDistanceBuilder {

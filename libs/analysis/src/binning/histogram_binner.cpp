@@ -153,8 +153,18 @@ std::optional<std::size_t> HistogramBinner::binOf(double value, std::span<const 
     if (std::isnan(value) || bins.empty()) {
         return std::nullopt;
     }
-    // The last bin whose lo <= value; it holds the value when value < hi (an open greaterMax band reaches
-    // +inf, an open lessMin band starts at -inf).
+    // The last regular band is closed on its hi (D-194): a sample at dataMax (a saturating throttle or brake,
+    // or the channel maximum when dataMax is automatic) is in it, and the open greaterMax band holds only the
+    // values strictly above.
+    const std::size_t regularEnd = bins.back().greaterMax ? bins.size() - 1 : bins.size();
+    if (regularEnd > 0) {
+        const Band& last = bins[regularEnd - 1];
+        if (!last.lessMin && value == last.hi) {
+            return regularEnd - 1;
+        }
+    }
+    // Otherwise the last bin whose lo <= value; it holds the value when value < hi (an open greaterMax band
+    // reaches +inf, an open lessMin band starts at -inf).
     const auto it = std::upper_bound(bins.begin(), bins.end(), value,
                                      [](double v, const Band& band) { return v < band.lo; });
     if (it == bins.begin()) {

@@ -32,6 +32,7 @@
 // maximiseRequested (06 section 4.3 item 6).
 #pragma once
 
+#include <esses/base/cancel.hpp>
 #include <esses/model/ids.hpp>
 #include <esses/plotcore/change_mask.hpp>
 #include <esses/plotcore/hit_tester.hpp>
@@ -54,6 +55,9 @@
 #include <memory>
 #include <optional>
 
+class QContextMenuEvent;
+class QKeyEvent;
+class QMenu;
 class QTimer;
 
 namespace esses::qt {
@@ -63,6 +67,10 @@ class MathsService;
 class RenderService;
 class WorksheetViewModel;
 } // namespace esses::qt
+
+namespace esses::maths {
+struct ChannelKey;
+} // namespace esses::maths
 
 namespace esses::widgets {
 
@@ -124,6 +132,12 @@ public:
     virtual void addChannel(const QString& name, bool newPanel);
     virtual QStringList contextCommands() const; // command ids of the Component menu / context menu
     virtual bool exportData(ExportSink& sink, const ExportOptions& options) const;
+    // Added by the M3 fix pass (D-203 (x)): Export Data as a self-contained job (it holds copies of the
+    // inputs, never the component) that produces the CSV on a worker; empty when the component exports
+    // nothing or only synchronously (exportData). The shell runs it on the pool and writes the file when it
+    // completes, so the GUI thread never waits on it (04 section 6.3) and the component may go meanwhile.
+    using ExportJob = std::function<std::optional<QByteArray>(const CancelToken&)>;
+    virtual ExportJob exportJob(const ExportOptions& options) const;
     virtual QImage renderToImage(qreal dpr) const; // Print to Clipboard: current layers, never blocks
     virtual void openProperties(int tabIndex = 0); // F5 / CTRL+N: PropertiesDialog::openFor (M3)
     // Added in M1: the first context of the key chain while this component has the focus (06 section 14.2:
@@ -146,6 +160,14 @@ public:
     virtual bool handleCommand(const QString& id, const QVariantList& args);
     // Added in M3: the caption bar height in logical px (the canvas's move zone, the maximise zone).
     int captionBarHeight() const { return captionHeight(); }
+    // Added by the M3 fix pass (D-203 (o)): the keys the user's keymap binds to a command, for the keys a
+    // component handles itself where no command reaches it (the Track Map dock's map, ALT+n inside a report
+    // table without a shell). The shell sets the provider (KeymapBinder::keysFor) and clears it when it
+    // goes; without one the defaults are the binding. keyBound: whether `event` is one of those keys, so a
+    // key the user unbound or rebound in keymap.json never acts through the component.
+    using KeysProvider = std::function<QStringList(const QString& commandId)>;
+    static void setKeysProvider(KeysProvider provider);
+    static bool keyBound(const QString& commandId, const QKeyEvent& event, const QStringList& defaults);
 
     WorksheetContext& context() noexcept { return context_; }
 
@@ -168,11 +190,21 @@ Q_SIGNALS:
 
 protected:
     virtual void onFocusChanged(bool focused);
+    // Added by the M3 fix pass (D-203 (j)): a maths channel became ready or changed its status
+    // (MathsService::channelReady / statusChanged). The default is a data change of its source
+    // (onDataChanged(key.src, 0)); a component that knows the channels it draws ignores the others.
+    virtual void onChannelDataChanged(const maths::ChannelKey& key);
     // Height of the caption bar in logical px (0 when hidden): the double-click-to-maximise zone.
     virtual int captionHeight() const;
 
     bool event(QEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
+    // Added by the M3 fix pass (D-203 (s)): the Component menu is also the component's context menu (06
+    // section 2.2): contextCommands() as the registry titles them, the commands not available now left out,
+    // each run on this component (it takes the focus first). commandMenu builds such a menu of any ids (on
+    // the heap, deleted when closed; empty when none applies).
+    void contextMenuEvent(QContextMenuEvent* event) override;
+    QMenu* commandMenu(const QStringList& commandIds);
     void mousePressEvent(QMouseEvent* event) override;
     void mouseDoubleClickEvent(QMouseEvent* event) override;
 

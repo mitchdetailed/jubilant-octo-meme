@@ -63,6 +63,7 @@ public:
     void onViewChanged(const plot::ViewState& view, plot::ChangeMask what) override;
     void onSelectionChanged(const plot::SelectionSnapshot& selection) override;
     void onDataChanged(const model::SourceId& source, std::uint64_t version) override;
+    void onChannelDataChanged(const maths::ChannelKey& key) override; // only the channels it draws
     void onSchemeChanged(const project::Scheme& scheme) override;
     QStringList channelNames() const override; // plot::componentChannelUses
     QImage renderToImage(qreal dpr) const override;
@@ -116,6 +117,9 @@ protected:
     void rebuildDynamic();
     void rebuildChrome();
     bool prepared() const noexcept { return prepared_; }
+    // Bumped whenever the inputs are prepared again or released: geometry derived from inputs() alone may be
+    // cached under it (D-203 (ab)).
+    std::uint64_t inputsRevision() const noexcept { return inputsRevision_; }
     // Device px of a widget-logical point, in the DPR of the hit regions.
     QPointF devicePoint(QPointF logical) const;
     float hitsDpr() const noexcept { return hitsDpr_ > 0.0F ? hitsDpr_ : 1.0F; }
@@ -132,6 +136,7 @@ protected:
     void hideEvent(QHideEvent* event) override;
 
 private:
+    void releaseInputs();
     void setScheme(std::shared_ptr<const project::Scheme> scheme);
     void requestStaticBuild();
     void prepare();
@@ -150,10 +155,12 @@ private:
     float hitsDpr_ = 1.0F;
     bool prepared_ = false;
     bool staticDirty_ = true;
+    bool dynamicDirty_ = false; // a view change while hidden: the Dynamic layer is rebuilt when shown
     bool buildScheduled_ = false;
     bool buildInFlight_ = false;
     bool pendingShown_ = false;
     std::uint64_t submitSerial_ = 0;
+    std::uint64_t inputsRevision_ = 1;
     std::uint64_t builtViewVersion_ = 0;
     int staticSubmitted_ = 0;
     int staticDelivered_ = 0;

@@ -7,6 +7,7 @@
 #include <esses/widgets/properties_shell/animation_controller.hpp>
 
 #include <QTimer>
+#include <algorithm>
 
 namespace esses::widgets {
 
@@ -83,7 +84,12 @@ void AnimationController::toggle() {
 }
 
 void AnimationController::setRate(double rate) {
-    if (rate > 0.0 && rate != rate_) {
+    if (!(rate > 0.0)) {
+        return;
+    }
+    // The view model's range (WorksheetViewModel::setAnimationRate), so the rate shown is the rate run.
+    rate = std::clamp(rate, kRates.front(), kRates.back());
+    if (rate != rate_) {
         rate_ = rate;
         if (worksheet_ != nullptr) {
             worksheet_->setAnimationRate(rate);

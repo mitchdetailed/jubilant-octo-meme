@@ -371,7 +371,8 @@ Registered under the §10 rule when the M3 headers were laid down (`docs/milesto
   `HistogramGeometry::exportTable` (D-198); `TdScaleLine`, `TdVariance`, `TdStatusChannel`, `TdGroupZoom`,
   `TdLocalState`, `TdBandEntry`, `TdMarkerEntry`, `TdMeasurementEntry`, `TdStaticInfo`, the `buildStatic`/
   `buildDynamic` overloads with them, `TimeDistanceBuilder::zoomedScale`/`offsetText`, the M3 members of
-  `TimeDistanceBody`, `TdGroup`, `TdGroupLayout` and `TdLayout`, `ResolvedChannel::limitMin`/`limitMax` (D-201).
+  `TimeDistanceBody`, `TdGroup`, `TdGroupLayout` and `TdLayout`, `ResolvedChannel::limitMin`/`limitMax` (D-201);
+  `rangeKeyColour`, the key colour of a range of 06 §5.3 item 3 (D-202).
 - `esses_qtmodel`: `ReportModel` (04 §12 names it) with its styling roles and `Highlight`, `setHighlight`, `setTimeFormat`,
   `setProjectTimeFormat`, `setDistanceService`, `busy`, `deliveries`, `lastError`, `quoteField`, `channelTable`,
   `timeTable`; `TrackMapService`, `TrackMapCommand`, `TrackGenerationRequest`, `TrackGenerationState`,

@@ -51,10 +51,13 @@ struct TrackSectionsSettings { // the rule-1 "track-sections" members
     bool supportsReporting = true;
 };
 
-// The lap's DistanceIndex (null: the lap has none, so it gets no sections) and whether it starts at a BCN.
+// The lap's DistanceIndex (null: the lap has none, so it gets no sections) and whether it starts and ends at
+// a BCN. A lap that ends elsewhere (an in lap stopping in the pits, a lap cut by a reset) keeps no section
+// that would reach past its end (D-195 (d)).
 struct LapIndex {
     std::shared_ptr<const DistanceIndex> index;
     bool startsAtBeacon = true;
+    bool endsAtBeacon = true;
 };
 using LapIndexLookup = std::function<LapIndex(const model::Range& lap)>;
 
@@ -91,11 +94,20 @@ private:
     std::vector<std::string> layers_;
 };
 
+// A complete lap (from one BCN to the next) whose stretched length is within this fraction of the map's
+// length is mapped onto the map proportionally (D-195 (d)): the default stretch tolerance (U-05, 5 %).
+inline constexpr double kLapLengthTolerance = 0.05;
+
 // The origin rule: the lap distance of track distance `trackM` (nullopt when it falls before the lap start of
-// a lap that is measured backwards), and its inverse (track_position, 04 section 14 item 5).
+// a lap that is measured backwards), and its inverse (track_position, 04 section 14 item 5). A complete lap
+// (lapStartsAtBeacon and lapEndsAtBeacon) within kLapLengthTolerance of trackLengthM maps proportionally
+// (lap = track x lapLength / trackLength), so a Corr Dist that differs from the map by a few percent still
+// puts every section in place and the sections add up to the lap; any other lap that starts at a BCN
+// measures from its start, one that does not from its end.
 std::optional<double> lapDistanceOfTrackDistance(double trackM, double lapLengthM, double trackLengthM,
-                                                 bool lapStartsAtBeacon) noexcept;
-double trackDistanceOfLapDistance(double lapM, double lapLengthM, double trackLengthM,
-                                  bool lapStartsAtBeacon) noexcept;
+                                                 bool lapStartsAtBeacon,
+                                                 bool lapEndsAtBeacon = false) noexcept;
+double trackDistanceOfLapDistance(double lapM, double lapLengthM, double trackLengthM, bool lapStartsAtBeacon,
+                                  bool lapEndsAtBeacon = false) noexcept;
 
 } // namespace esses::analysis

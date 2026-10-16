@@ -173,7 +173,8 @@ void ZoomSummaryBar::recompute() {
     summary_.valid = true;
     summary_.extent = plot::outingExtentIn(domain_, geom_, outing, chain_.get(), kNoDistanceLength);
     summary_.main = plot::XSpan{0.0, plot::mainExtentIn(domain_, geom_, chain_.get(), kNoDistanceLength)};
-    if (const model::RangeGroup* laps = layer->ranges.find(main.groupPath)) {
+    // The lap boundaries are the laps' whatever Main is (a lap, an outing, a track section; D-203 (q)).
+    if (const model::RangeGroup* laps = layer->ranges.find("Outings:Laps")) {
         for (const model::Range& lap : laps->ranges) {
             if (lap.start >= outing.start && lap.start < outing.end) {
                 summary_.laps.push_back(xOfT(static_cast<double>(lap.start - r->start)));
@@ -234,8 +235,9 @@ plot::DrawList ZoomSummaryBar::buildDrawList(const Summary& s, const plot::Layou
                 ticks.insert(ticks.end(), {p, bar.y, p, bar.y + bar.h});
             }
         }
-        if (!ticks.empty()) {
-            list.lines(ticks.data(), ticks.size() / 2, scheme.role("cptForeground2", 0x606060FFU), 1.0F);
+        if (!ticks.empty()) { // logical widths times the DPR (04 section 6.6 item 1)
+            list.lines(ticks.data(), ticks.size() / 2, scheme.role("cptForeground2", 0x606060FFU),
+                       std::max(1.0F, std::round(dpr)));
         }
         // The zoom span.
         const float z0 = clampPx(px(s.zoom.a));
@@ -258,7 +260,7 @@ plot::DrawList ZoomSummaryBar::buildDrawList(const Summary& s, const plot::Layou
             line(*s.cursor, scheme.role("cursorMain", 0xFF0000FFU));
         }
     }
-    list.rectOutline(bar, scheme.role("cptFrame", 0x808080FFU), 1.0F);
+    list.rectOutline(bar, scheme.role("cptFrame", 0x808080FFU), std::max(1.0F, std::round(dpr)));
     return list;
 }
 

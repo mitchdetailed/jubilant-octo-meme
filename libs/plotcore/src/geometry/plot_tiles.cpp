@@ -168,13 +168,14 @@ void emitBandLegend(DrawList& list, const RectPx& rect, const std::vector<analys
     }
     const int decimals = geom::decimalsForStep(step);
     float y = rect.y + 2.0F * pad;
-    for (auto it = bands.rbegin(); it != bands.rend(); ++it) {
+    for (std::size_t k = bands.size(); k-- > 0;) { // the highest band at the top
+        const analysis::Band& b = bands[k];
         if (y + rowH > rect.y + rect.h) {
             break;
         }
-        list.filledRect(RectPx{rect.x + pad, y + 0.5F * (rowH - sw), sw, sw}, static_cast<Rgba>(it->colour));
+        list.filledRect(RectPx{rect.x + pad, y + 0.5F * (rowH - sw), sw, sw}, static_cast<Rgba>(b.colour));
         const std::string label =
-            it->lessMin ? "< " + geom::formatValue(it->hi, decimals) : geom::formatValue(it->lo, decimals);
+            b.lessMin ? "< " + geom::formatValue(b.hi, decimals) : geom::formatValue(b.lo, decimals);
         list.textRun(label, rect.x + 2.0F * pad + sw, y + 0.5F * rowH, TextStyleId::ColourBand,
                      TextAnchor::MiddleLeft, colours.foreground, std::max(1.0F, rect.w - 3.0F * pad - sw));
         y += rowH;

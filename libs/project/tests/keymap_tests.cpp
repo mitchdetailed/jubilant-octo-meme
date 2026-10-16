@@ -178,9 +178,8 @@ TEST_CASE("keymap: hotkey batch 1 is implemented in M1, M2 and M3 rows as they l
             }
             break;
         case KeymapStatus::Planned:
-            CHECK(b.milestone !=
-                  "M1"); // at or before the current milestone means implemented (06 section 14.5)
-            CHECK_FALSE(b.milestone.empty());
+            // At or before the current milestone (M3, AC-M3-01) means implemented (06 section 14.5).
+            CHECK((b.milestone == "M4" || b.milestone == "v1.0" || b.milestone == "later"));
             break;
         case KeymapStatus::Reserved:
             CHECK(b.milestone.empty());

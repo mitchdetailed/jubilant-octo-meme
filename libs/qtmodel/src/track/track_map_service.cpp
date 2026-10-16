@@ -397,10 +397,17 @@ void TrackMapCommand::apply(const std::shared_ptr<const analysis::TrackMap>& map
 void TrackMapCommand::redo() {
     apply(after_, backupFirst_ && !redone_);
     redone_ = true;
+    if (failed()) {
+        setObsolete(
+            true); // the stack drops a command whose write failed: nothing to undo or redo (D-203 (n))
+    }
 }
 
 void TrackMapCommand::undo() {
     apply(before_, false);
+    if (failed()) {
+        setObsolete(true);
+    }
 }
 
 } // namespace esses::qt

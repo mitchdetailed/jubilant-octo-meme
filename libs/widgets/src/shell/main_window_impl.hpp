@@ -37,6 +37,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -189,6 +190,8 @@ struct MainWindow::Impl {
     QPointer<LayoutEditor> layoutEditor;
     QPointer<CorrectedSpeedDialog> correctedSpeed;
     QPointer<TrackEditor> trackEditor;
+    QMetaObject::Connection trackSpanFollow; // the active worksheet's changes -> the editor's cursor span
+    std::set<std::string> autoTrackVenues;   // venues whose map auto-generation was started this session
     QPointer<UnitsListDialog> unitsList;
     QPointer<SelectWorksheetDialog> selectWorksheet;
     QPointer<OpenLogDialog> openLog;

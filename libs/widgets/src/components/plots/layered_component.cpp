@@ -6,6 +6,8 @@
 // pending stripe after 100 ms, the 30 s release of a hidden component), with the builders and the Static
 // change bits supplied by the subclass.
 
+#include <esses/base/casefold.hpp>
+#include <esses/maths/channel_key.hpp>
 #include <esses/plotcore/component_bodies.hpp>
 #include <esses/qtmodel/data_selection_model.hpp>
 #include <esses/qtmodel/render_service.hpp>
@@ -68,8 +70,20 @@ LayeredComponent::LayeredComponent(const project::ComponentSpec& spec, Worksheet
         if (!isVisible()) {
             layers_.releaseStatic();
             staticDirty_ = true;
+            releaseInputs();
         }
     });
+}
+
+// The build inputs hold the sources' snapshots (DataSource, columns, chunk-cache entries, the file mapping):
+// a hidden component lets them go when the selection or the data changes (a closed log must not stay alive
+// through a worksheet visited earlier, D-203 (j)); showing it prepares them again.
+void LayeredComponent::releaseInputs() {
+    const plot::ViewState view = inputs_.view;
+    inputs_ = plot::ComponentBuildInputs{};
+    inputs_.view = view;
+    prepared_ = false;
+    ++inputsRevision_;
 }
 
 LayeredComponent::~LayeredComponent() {
@@ -118,6 +132,18 @@ void LayeredComponent::applySpec(const project::ComponentSpec& spec) {
 void LayeredComponent::onViewChanged(const plot::ViewState& view, plot::ChangeMask what) {
     inputs_.view = view;
     layers_.invalidate(what);
+    if (!isVisible()) {
+        // A component of a hidden (kept) worksheet does no work per cursor move or animation frame: what
+        // changed is rebuilt when it is shown (D-203 (j)).
+        if ((what & (plot::mask(plot::Change::Selection) | plot::mask(plot::Change::Data))) != 0) {
+            releaseInputs();
+        }
+        if ((what & staticMask_) != 0) {
+            staticDirty_ = true;
+        }
+        dynamicDirty_ = dynamicDirty_ || what != 0;
+        return;
+    }
     if ((what & staticMask_) != 0) {
         // Static (and Dynamic/Chrome with it) after the inputs are prepared again.
         staticDirty_ = true;
@@ -138,6 +164,16 @@ void LayeredComponent::onSelectionChanged(const plot::SelectionSnapshot&) {
 void LayeredComponent::onDataChanged(const model::SourceId& source, std::uint64_t) {
     if (showsSource(source)) {
         onViewChanged(context_.view.state(), plot::mask(plot::Change::Data));
+    }
+}
+
+void LayeredComponent::onChannelDataChanged(const maths::ChannelKey& key) {
+    // A maths output this component does not draw changes nothing on it (a log open readies dozens).
+    for (const plot::ChannelUse& use : plot::componentChannelUses(spec_)) {
+        if (caseFold(use.name) == key.nameCf) {
+            onDataChanged(key.src, 0);
+            return;
+        }
     }
 }
 
@@ -196,6 +232,7 @@ void LayeredComponent::prepare() {
     inputs_.focused = isFocusedComponent();
     adjustInputs(inputs_);
     prepared_ = true;
+    ++inputsRevision_;
 }
 
 plot::ComponentBuildInputs LayeredComponent::liveInputs() const {
@@ -283,6 +320,7 @@ void LayeredComponent::rebuildDynamic() {
     if (!prepared_) {
         return;
     }
+    dynamicDirty_ = false;
     inputs_.view = context_.view.state();
     plot::DrawList next = builders_.buildDynamic ? builders_.buildDynamic(inputs_) : plot::DrawList{};
     next.widthPx = inputs_.layout.widthPx;
@@ -378,8 +416,10 @@ void LayeredComponent::paintEvent(QPaintEvent* event) {
 void LayeredComponent::showEvent(QShowEvent* event) {
     ComponentWidget::showEvent(event);
     releaseTimer_->stop();
-    if (staticDirty_ || layers_.staticImage().isNull()) {
-        scheduleStaticBuild();
+    if (staticDirty_ || !prepared_ || layers_.staticImage().isNull()) {
+        scheduleStaticBuild(); // prepares the inputs and rebuilds Dynamic and Chrome with them
+    } else if (dynamicDirty_) {
+        rebuildDynamic();
     }
 }
 

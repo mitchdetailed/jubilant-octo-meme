@@ -99,14 +99,21 @@ bool NumericGauge::handleCommand(const QString& id, const QVariantList& args) {
     return ComponentWidget::handleCommand(id, args);
 }
 
-bool NumericGauge::exportData(ExportSink& sink, const ExportOptions& options) const {
+ComponentWidget::ExportJob NumericGauge::exportJob(const ExportOptions& options) const {
     if (!prepared()) {
-        return false;
+        return {};
     }
     const plot::ComponentBuildInputs in = plots::exportInputs(liveInputs(), options.range);
+    return [in](const CancelToken& cancel) { return plots::timeSeriesCsv(in, {0}, cancel); };
+}
+
+bool NumericGauge::exportData(ExportSink& sink, const ExportOptions& options) const {
+    const ExportJob job = exportJob(options);
+    if (!job) {
+        return false;
+    }
     const std::optional<QByteArray> csv =
-        plots::runOffGui(context_, componentId() + QStringLiteral("/export"),
-                         [in](const CancelToken& cancel) { return plots::timeSeriesCsv(in, {0}, cancel); });
+        plots::runOffGui(context_, componentId() + QStringLiteral("/export"), job);
     return csv && sink.write(*csv);
 }
 

@@ -142,7 +142,9 @@ public:
     const std::string& venue() const noexcept { return venue_; }
     const std::shared_ptr<const analysis::TrackMap>& before() const noexcept { return before_; }
     const std::shared_ptr<const analysis::TrackMap>& after() const noexcept { return after_; }
-    // The last redo()/undo() could not write the file (the error is in lastError()).
+    // The last redo()/undo() could not write the file (the error is in lastError()); the command then marks
+    // itself obsolete, so QUndoStack drops it (pushed: not added; undone or redone: removed) and no step that
+    // did not happen stays on the stack (D-203 (n)). Read failed() only before pushing or inside a parent.
     bool failed() const noexcept { return lastError_.has_value(); }
     const std::optional<Error>& lastError() const noexcept { return lastError_; }
 

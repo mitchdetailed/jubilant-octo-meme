@@ -262,7 +262,7 @@ TEST_CASE("TimeDistanceBuilder: the variance panel builds one table per visible 
         }
         if (inVariance && c.kind == CmdKind::Polyline) {
             overlay0 = overlay0 || c.colour == scheme.role("overlay0");
-            overlay1 = overlay1 || c.colour == scheme.channelColour(0);
+            overlay1 = overlay1 || c.colour == scheme.overlayColour(1); // the range key colour (06 5.3 3)
             if (c.colour == scheme.role("overlay0")) {
                 for (std::uint32_t v = 0; v < c.vertexCount; ++v) {
                     overlay0Vertices.emplace_back(
@@ -321,6 +321,23 @@ TEST_CASE("TimeDistanceBuilder: the variance panel builds one table per visible 
     CHECK(noData.varianceTables == 0);
     CHECK(hasText(TimeDistanceBuilder::buildChrome(banner, false), "variance needs distance data"));
     CHECK_FALSE(hasText(TimeDistanceBuilder::buildChrome(in, false), "variance needs distance data"));
+    // Main spanning two laps (an outing, a run of laps): no comparison of its first lap, the banner (D-201).
+    ComponentBuildInputs spanning = in;
+    REQUIRE(spanning.slots[0].chain != nullptr);
+    const std::vector<LapPiece>& pieces = spanning.slots[0].chain->pieces();
+    std::size_t first = 0;
+    while (first < pieces.size() && !(pieces[first].start <= spanning.slots[0].range.start &&
+                                      spanning.slots[0].range.start < pieces[first].end)) {
+        ++first;
+    }
+    REQUIRE(first + 1 < pieces.size());
+    spanning.slots[0].range.end = pieces[first + 1].end;
+    TdStaticInfo spans;
+    REQUIRE(TimeDistanceBuilder::buildStatic(spanning, TdLocalState{}, CancelToken{}, &spans).ok());
+    CHECK(spans.varianceSpansLaps);
+    CHECK(spans.varianceTables == 0);
+    CHECK(hasText(TimeDistanceBuilder::buildChrome(spanning, false), "variance compares single laps"));
+    CHECK_FALSE(info.varianceSpansLaps);
 }
 
 TEST_CASE("TimeDistanceBuilder: measurements equal the samples' min, max and avg over the visible span",

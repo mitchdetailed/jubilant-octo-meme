@@ -102,9 +102,9 @@ private Q_SLOTS:
     }
 
     void animationControllerState() {
-        QCOMPARE(AnimationController::kRates.size(), std::size_t{5});
+        QCOMPARE(AnimationController::kRates.size(), std::size_t{6});
         QCOMPARE(AnimationController::kRates.front(), 0.25);
-        QCOMPARE(AnimationController::kRates.back(), 4.0);
+        QCOMPARE(AnimationController::kRates.back(), 10.0); // x10 of 07 section 6.5 (D-203 (g))
         AnimationController a;
         QSignalSpy on(&a, &AnimationController::animatingChanged);
         QSignalSpy rate(&a, &AnimationController::rateChanged);

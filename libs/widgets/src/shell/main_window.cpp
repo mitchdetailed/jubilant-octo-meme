@@ -232,6 +232,9 @@ MainWindow::MainWindow(qt::AppRuntime& runtime, Paths paths, QWidget* parent)
     registerM3Commands(); // M3: replaces file.open_log and registers the M3 rows (main_window_m3.cpp)
     registerPlannedCommands();
     const QStringList rejected = d.keymap->setKeymap(d.session->keymap());
+    // Keys a component handles itself follow the user's keymap (D-203 (o)).
+    ComponentWidget::setKeysProvider(
+        [keymap = d.keymap.get()](const QString& commandId) { return keymap->keysFor(commandId); });
     for (const QString& line : rejected) {
         post(*impl_->messages, qt::Message::Severity::Warning, qt::Message::Origin::System,
              QStringLiteral("keymap"), line);
@@ -310,6 +313,7 @@ MainWindow::MainWindow(qt::AppRuntime& runtime, Paths paths, QWidget* parent)
 
 MainWindow::~MainWindow() {
     Impl& d = *impl_;
+    ComponentWidget::setKeysProvider({}); // the keymap goes with the window (D-203 (o))
     if (d.saveLayoutOnExit && !d.layoutSaved) {
         saveLayout();
     }
@@ -567,6 +571,34 @@ void MainWindow::buildWidgets() {
                     *i.session, wb, std::move(book), undoText.isEmpty() ? tr("Edit component") : undoText,
                     qt::UndoMergeId::None, spec.id.str()));
                 i.valuesWindow->refreshChannels();
+            });
+    // An edit of a component on a kept (hidden) worksheet: that worksheet's undoable edit (D-203 (k)).
+    connect(d.canvas, &WorksheetCanvas::keptComponentEdited, this,
+            [this](const project::WorksheetDef& sheet, const project::ComponentSpec& spec,
+                   const QString& undoText) {
+                Impl& i = *impl_;
+                const int wb = i.session->activeWorkbook();
+                const auto& books = i.session->workbooks();
+                if (wb < 0 || static_cast<std::size_t>(wb) >= books.size()) {
+                    return;
+                }
+                project::WorkbookFile book = books[static_cast<std::size_t>(wb)];
+                for (project::WorksheetDef& def : book.worksheets) {
+                    if (def.id != sheet.id) {
+                        continue;
+                    }
+                    for (project::ComponentSpec& c : def.components) {
+                        if (c.id == spec.id) {
+                            c = spec;
+                        }
+                    }
+                }
+                if (book == books[static_cast<std::size_t>(wb)]) {
+                    return;
+                }
+                i.session->undoStack().push(new qt::WorkbookCommand(
+                    *i.session, wb, std::move(book), undoText.isEmpty() ? tr("Edit component") : undoText,
+                    qt::UndoMergeId::None, spec.id.str()));
             });
     connect(d.canvas, &WorksheetCanvas::focusedComponentChanged, this, [this](ComponentWidget* component) {
         if (component != nullptr) {
@@ -1315,7 +1347,50 @@ void MainWindow::syncDocuments() {
         sheets = book.worksheets[i].id != d.worksheets[i]->definition().id ||
                  QString::fromStdString(book.worksheets[i].name) != d.tabs->tabText(static_cast<int>(i));
     }
-    if (sheets) {
+    // A rename or a move inside the shown workbook keeps every view model, context and kept page (their F9
+    // domain, offset axis and component view state; D-203 (ac)): only the order and the tab texts change.
+    const auto keepAndReorder = [&]() -> bool {
+        if (book.id != d.shownWorkbook || book.worksheets.size() != d.worksheets.size()) {
+            return false;
+        }
+        std::vector<std::size_t> from(book.worksheets.size());
+        std::vector<bool> used(d.worksheets.size(), false);
+        for (std::size_t i = 0; i < book.worksheets.size(); ++i) {
+            std::size_t j = 0;
+            while (j < d.worksheets.size() &&
+                   (used[j] || d.worksheets[j]->definition().id != book.worksheets[i].id)) {
+                ++j;
+            }
+            if (j == d.worksheets.size() || book.worksheets[i].id.isNil()) {
+                return false; // added or removed: a full rebuild
+            }
+            used[j] = true;
+            from[i] = j;
+        }
+        std::vector<std::unique_ptr<qt::WorksheetViewModel>> worksheets;
+        std::vector<std::unique_ptr<WorksheetContext>> contexts;
+        int active = -1;
+        for (std::size_t i = 0; i < from.size(); ++i) {
+            worksheets.push_back(std::move(d.worksheets[from[i]]));
+            contexts.push_back(std::move(d.contexts[from[i]]));
+            if (static_cast<int>(from[i]) == d.activeWorksheet) {
+                active = static_cast<int>(i);
+            }
+        }
+        d.worksheets = std::move(worksheets);
+        d.contexts = std::move(contexts);
+        d.activeWorksheet = active;
+        const QSignalBlocker block(d.tabs);
+        for (std::size_t i = 0; i < book.worksheets.size(); ++i) {
+            const int t = static_cast<int>(i);
+            d.tabs->setTabText(t, QString::fromStdString(book.worksheets[i].name));
+            d.tabs->setTabToolTip(t, i < 10 ? tr("Worksheet %1 (key %2)").arg(i + 1).arg((i + 1) % 10)
+                                            : QString());
+        }
+        d.tabs->setCurrentIndex(active);
+        return true;
+    };
+    if (sheets && !keepAndReorder()) {
         const qt::WorksheetViewModel* vm = activeWorksheet();
         const Uuid keep = vm == nullptr ? Uuid() : vm->definition().id;
         const int old = d.activeWorksheet;
@@ -1359,6 +1434,7 @@ void MainWindow::syncDocuments() {
             if (focusInCanvas) {
                 returnFocus();
             }
+            syncLayoutLock(); // the project options of components the edit created (M3)
         }
     }
 }
@@ -1386,6 +1462,9 @@ void MainWindow::applyScheme() {
     }
     if (d.zoomBar != nullptr) {
         d.zoomBar->setScheme(scheme);
+    }
+    if (d.trackMap != nullptr) {
+        d.trackMap->applyScheme(*scheme); // the dock's track view is no worksheet's (D-203 (q))
     }
     QApplication::setPalette(SchemeSelector::palette(*scheme));
 }

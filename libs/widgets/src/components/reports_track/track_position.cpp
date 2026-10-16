@@ -57,8 +57,17 @@ TrackPosition::TrackPosition(const project::ComponentSpec& spec, WorksheetContex
         if (!isVisible()) {
             layers_.releaseStatic();
             staticDirty_ = true;
+            releaseInputs();
         }
     });
+}
+
+// A hidden track view lets its sources' snapshots go (D-203 (j)); showing it prepares them again.
+void TrackPosition::releaseInputs() {
+    const plot::ViewState view = inputs_.view;
+    inputs_ = plot::ComponentBuildInputs{};
+    inputs_.view = view;
+    prepared_ = false;
 }
 
 TrackPosition::~TrackPosition() {
@@ -107,6 +116,18 @@ void TrackPosition::onViewChanged(const plot::ViewState& view, plot::ChangeMask 
     // Zoom and Domain.
     const plot::ChangeMask staticBits = plot::Change::Size | plot::Change::Scheme | plot::Change::Selection |
                                         plot::Change::Data | plot::Change::Offsets | plot::Change::Scale;
+    if (!isVisible()) {
+        // Hidden (a kept worksheet page): no work per cursor move; rebuilt when shown (D-203 (j)).
+        if ((what & (plot::mask(plot::Change::Selection) | plot::mask(plot::Change::Data))) != 0) {
+            releaseInputs();
+        }
+        if ((what & staticBits) != 0) {
+            layers_.invalidate(static_cast<plot::ChangeMask>(what & staticBits));
+            staticDirty_ = true;
+        }
+        dynamicDirty_ = dynamicDirty_ || what != 0;
+        return;
+    }
     if ((what & staticBits) != 0) {
         layers_.invalidate(static_cast<plot::ChangeMask>(what & staticBits));
         staticDirty_ = true;
@@ -127,6 +148,11 @@ void TrackPosition::onDataChanged(const model::SourceId& source, std::uint64_t) 
             return;
         }
     }
+}
+
+void TrackPosition::onChannelDataChanged(const maths::ChannelKey&) {
+    // The track view draws no channel (plot::componentChannelUses lists none): its data changes are the
+    // distance indexes (DistanceService) and the venue's map (TrackMapService), not a maths output.
 }
 
 void TrackPosition::onSchemeChanged(const project::Scheme& scheme) {
@@ -224,6 +250,7 @@ void TrackPosition::rebuildDynamic() {
     if (!prepared_) {
         return;
     }
+    dynamicDirty_ = false;
     inputs_.view = context_.view.state();
     plot::DrawList next = plot::TrackGeometry::buildDynamic(inputs_);
     ++dynamicBuilds_;
@@ -313,9 +340,11 @@ void TrackPosition::paintEvent(QPaintEvent* event) {
 void TrackPosition::showEvent(QShowEvent* event) {
     ComponentWidget::showEvent(event);
     releaseTimer_->stop();
-    if (staticDirty_ || layers_.staticImage().isNull()) {
+    if (staticDirty_ || !prepared_ || layers_.staticImage().isNull()) {
         staticDirty_ = true;
         scheduleStaticBuild();
+    } else if (dynamicDirty_) {
+        rebuildDynamic();
     }
 }
 
@@ -440,27 +469,28 @@ bool TrackPosition::handleCommand(const QString& id, const QVariantList& args) {
         fit();
         return true;
     }
+    if (id == QLatin1String("zoom.wheel")) { // [notches] about the centre (D-203 (w))
+        const int notches = args.isEmpty() ? 1 : args.front().toInt();
+        zoomBy(std::pow(kZoomStep, notches));
+        return true;
+    }
     return ComponentWidget::handleCommand(id, args);
 }
 
 // ---- keys and mouse -------------------------------------------------------------------------------------
 
 void TrackPosition::keyPressEvent(QKeyEvent* event) {
-    const Qt::KeyboardModifiers mods = event->modifiers() & ~(Qt::KeypadModifier | Qt::ShiftModifier);
-    if (mods == Qt::NoModifier) {
-        switch (event->key()) {
-        case Qt::Key_Plus:
-        case Qt::Key_Equal:
-            zoomBy(kZoomStep);
-            event->accept();
-            return;
-        case Qt::Key_Minus:
-            zoomBy(1.0 / kZoomStep);
-            event->accept();
-            return;
-        default:
-            break;
-        }
+    // Where no command reaches the map (the Track Map dock, no shell): the keys the keymap binds to the track
+    // rows, never a key the user unbound or rebound (D-203 (o)).
+    if (keyBound(QStringLiteral("track.zoom_in"), *event, {QStringLiteral("+"), QStringLiteral("=")})) {
+        zoomBy(kZoomStep);
+        event->accept();
+        return;
+    }
+    if (keyBound(QStringLiteral("track.zoom_out"), *event, {QStringLiteral("-")})) {
+        zoomBy(1.0 / kZoomStep);
+        event->accept();
+        return;
     }
     ComponentWidget::keyPressEvent(event);
 }

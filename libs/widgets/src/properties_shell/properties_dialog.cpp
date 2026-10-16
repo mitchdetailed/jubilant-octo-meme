@@ -5,8 +5,10 @@
 
 #include "property_pages.hpp"
 
+#include <esses/maths/channel_key.hpp>
 #include <esses/project/schema_registry.hpp>
 #include <esses/qtmodel/data_selection_model.hpp>
+#include <esses/qtmodel/maths_service.hpp>
 #include <esses/widgets/components/component_widget.hpp>
 #include <esses/widgets/properties_shell/field_binder.hpp>
 #include <esses/widgets/properties_shell/field_editors.hpp>
@@ -34,6 +36,11 @@
 namespace esses::widgets {
 
 namespace {
+
+PropertiesDialog::HeadingSource& headingSource() {
+    static PropertiesDialog::HeadingSource source; // GUI thread only
+    return source;
+}
 
 QHash<const ComponentWidget*, QPointer<PropertiesDialog>>& openDialogs() {
     static QHash<const ComponentWidget*, QPointer<PropertiesDialog>> table; // GUI thread only
@@ -91,9 +98,12 @@ QString typeOf(const ComponentWidget& c) {
 }
 
 // The channel names of the open sources (their Normal layers), sorted, plus the names the body uses.
+// The names a channel picker offers: the logged channels and the maths outputs (Corr Speed, Corr Dist, the
+// user's maths) of every open source, and the component's own (D-203 (l)).
 QStringList channelChoices(const ComponentWidget& c) {
     std::set<QString> names;
-    const qt::DataSelectionModel& sel = const_cast<ComponentWidget&>(c).context().selection;
+    WorksheetContext& context = const_cast<ComponentWidget&>(c).context();
+    const qt::DataSelectionModel& sel = context.selection;
     for (const auto& src : sel.sources()) {
         if (src == nullptr) {
             continue;
@@ -101,6 +111,11 @@ QStringList channelChoices(const ComponentWidget& c) {
         if (const model::DataLayer* layer = src->layer("Normal")) {
             for (const model::Channel& ch : layer->channels) {
                 names.insert(QString::fromStdString(ch.desc.name));
+            }
+        }
+        for (const maths::ChannelKey& key : context.maths.outputs(src->id, "Normal")) {
+            if (const std::optional<model::ChannelDescriptor> d = context.maths.descriptor(key)) {
+                names.insert(QString::fromStdString(d->name));
             }
         }
     }
@@ -155,6 +170,7 @@ struct PropertiesDialog::Impl {
     QDialogButtonBox* buttons = nullptr;
     FieldBinder* header = nullptr;
     project::ComponentSpec openSpec;
+    project::ComponentSpec lastApplied; // the spec the last Apply emitted
     bool applied = false;
     bool closing = false;
     QString type;
@@ -229,10 +245,17 @@ PropertiesDialog::PropertiesDialog(ComponentWidget& component, QWidget* parent)
     if (WorksheetCanvas* canvas = canvasOf(&component)) {
         connect(canvas, &WorksheetCanvas::componentSpecApplied, this, [this](ComponentWidget* c) {
             if (c == d_->guard.data()) {
-                refresh(); // undo, redo or another edit of this component while the dialog is open
+                // Undo, redo or another edit of this component while the dialog is open: the rows the user
+                // has not changed follow it, an unapplied edit stays (D-203 (l)).
+                refreshUntouched();
             }
         });
     }
+    // Sources opened or closed, maths outputs appearing: the channel pickers offer what exists now.
+    connect(&component.context().selection, &qt::DataSelectionModel::sourcesChanged, this,
+            &PropertiesDialog::refreshChannelChoices);
+    connect(&component.context().maths, &qt::MathsService::statusChanged, this,
+            &PropertiesDialog::refreshChannelChoices);
     connect(binder_, &FieldBinder::edited, this, &PropertiesDialog::updateButtons);
     connect(d_->header, &FieldBinder::edited, this, &PropertiesDialog::updateButtons);
     if (geometryLoad()) {
@@ -310,6 +333,11 @@ void PropertiesDialog::build() {
             for (const FieldRow& r : pages::headerRows()) {
                 QWidget* editor = makeLeafEditor(r.kind, r.enumValues, {}, group);
                 editor->setObjectName(r.pointer);
+                if (r.pointer.startsWith(QLatin1String("/links/"))) {
+                    // Kept with the component; honouring them waits for M4 (D-203 (m)).
+                    editor->setToolTip(tr("Kept with the component; every component follows the worksheet's "
+                                          "zoom, cursor and datum until component links are built"));
+                }
                 headerForm->addRow(r.label, editor);
                 d_->header->bind(r.pointer, r.kind, editor, r.label);
             }
@@ -319,10 +347,36 @@ void PropertiesDialog::build() {
         scroll->setWidget(page);
         d_->tabs->addTab(scroll, p.title);
     }
+    refreshChannelChoices();
+}
+
+void PropertiesDialog::refreshChannelChoices() {
+    if (d_->guard.isNull()) {
+        return;
+    }
     const QStringList choices = channelChoices(component_);
+    const HeadingSource& headings = headingSource();
+    const QStringList headingList = headings ? headings() : QStringList();
     for (QComboBox* c : findChildren<QComboBox*>()) {
         setChannelChoices(c, choices);
+        if (!headingList.isEmpty()) {
+            setHeadingChoices(c, headingList);
+        }
     }
+}
+
+void PropertiesDialog::setHeadingSource(HeadingSource source) {
+    headingSource() = std::move(source);
+}
+
+void PropertiesDialog::refreshUntouched() {
+    if (d_->guard.isNull()) {
+        return;
+    }
+    const project::ComponentSpec& s = component_.spec();
+    binder_->loadUntouchedJson(jsonptr::fromDoc(s.body));
+    d_->header->loadUntouchedJson(headerJson(s));
+    updateButtons();
 }
 
 QStringList PropertiesDialog::tabTitles() const {
@@ -389,6 +443,7 @@ void PropertiesDialog::apply() {
         return;
     }
     d_->applied = true;
+    d_->lastApplied = next;
     Q_EMIT component_.specEditRequested(next, tr("Edit %1 properties").arg(d_->type));
     if (!d_->guard.isNull() && component_.spec() == next) {
         refresh(); // the pages now describe the applied spec
@@ -447,8 +502,38 @@ void PropertiesDialog::accept() {
 }
 
 void PropertiesDialog::reject() {
-    if (!d_->closing && !d_->guard.isNull() && d_->applied && !(component_.spec() == d_->openSpec)) {
-        Q_EMIT component_.specEditRequested(d_->openSpec, tr("Edit %1 properties").arg(d_->type));
+    if (!d_->closing && !d_->guard.isNull() && d_->applied) {
+        // Back to the open-time values of what the dialog applied, on top of the component's current spec:
+        // a move, a resize, the z order, the active channel or a hotkey toggle made meanwhile stays
+        // (D-203 (l)).
+        const project::ComponentSpec current = component_.spec();
+        project::ComponentSpec revert = current;
+        QJsonValue body = jsonptr::fromDoc(current.body);
+        if (body.isUndefined()) {
+            body = QJsonObject();
+        }
+        const QJsonValue open = jsonptr::fromDoc(d_->openSpec.body);
+        const QJsonValue applied = jsonptr::fromDoc(d_->lastApplied.body);
+        for (const QString& pointer : binder_->boundPointers()) {
+            const QJsonValue was = jsonptr::get(open, pointer);
+            if (jsonptr::get(applied, pointer) != was) {
+                body = jsonptr::set(body, pointer, was);
+            }
+        }
+        revert.body = jsonptr::toDoc(body);
+        const QJsonValue openHeader = headerJson(d_->openSpec);
+        const QJsonValue appliedHeader = headerJson(d_->lastApplied);
+        QJsonValue header = headerJson(current);
+        for (const QString& pointer : d_->header->boundPointers()) {
+            const QJsonValue was = jsonptr::get(openHeader, pointer);
+            if (jsonptr::get(appliedHeader, pointer) != was) {
+                header = jsonptr::set(header, pointer, was);
+            }
+        }
+        applyHeader(revert, header.toObject());
+        if (!(revert == current)) {
+            Q_EMIT component_.specEditRequested(revert, tr("Edit %1 properties").arg(d_->type));
+        }
     }
     saveGeometryNow();
     d_->closing = true;

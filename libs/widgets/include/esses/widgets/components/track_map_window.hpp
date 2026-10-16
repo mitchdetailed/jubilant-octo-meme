@@ -43,6 +43,8 @@ public:
     // The dock's track_position spec (its body holds the dock's display settings).
     const project::ComponentSpec& spec() const noexcept { return spec_; }
     void fit();
+    // A scheme change of the application (light/dark): the embedded map redraws with it.
+    void applyScheme(const project::Scheme& scheme);
     void setShowSections(bool shown);
     void setShowSectionLabels(bool shown);
 

@@ -60,6 +60,7 @@ public:
     void addChannel(const QString& name, bool newPanel) override;
     QStringList contextCommands() const override;
     bool exportData(ExportSink& sink, const ExportOptions& options) const override;
+    ExportJob exportJob(const ExportOptions& options) const override;
     bool handleCommand(const QString& id, const QVariantList& args) override;
     bool cancelTransient() override; // ESC: drops a box zoom in progress
 

@@ -35,7 +35,9 @@ using trackpath::Xy;
 constexpr std::size_t kMinSamples = 10;
 constexpr double kMinSpeedMps = 2.0; // below it the heading is held
 constexpr double kMaxBiasM = 0.5;    // the smoother's bound on the offset towards a curve's inside
-constexpr double kFitWindowS = 1.5;  // quadratic fits beside a gap
+// A closed lap's corrected ends lie closer than this fraction of its length; farther apart it is not a loop.
+constexpr double kNotALoopFraction = 0.25;
+constexpr double kFitWindowS = 1.5; // quadratic fits beside a gap
 constexpr std::size_t kFitMaxPoints = 15;
 constexpr double kPi = std::numbers::pi;
 
@@ -344,6 +346,15 @@ Result<LineResult> gpsLine(const GpsLap& lap, const TrackOrigin& origin, const T
         static_cast<double>(lap.lap.end - path.back().t) * 1e-6 > dropoutS) {
         result.diagnostics.emplace_back("W-TRACK-DROPOUT"); // no fix near a lap bound
     }
+    result.closureErrorM = std::hypot(path.back().p.x - path.front().p.x, path.back().p.y - path.front().p.y);
+    // A closed lap whose fixes stop short of a lap bound (a dropout across the start line) bridges the seam
+    // like any other gap: from its last fix to its first one a lap later, with the tangents of both sides,
+    // instead of the smoother's straight chord (D-195 (a)). The virtual point is the start again and leaves
+    // before the smoothing.
+    const bool seam = options.closeLoop && (path.front().t > lap.lap.start || path.back().t < lap.lap.end);
+    if (seam) {
+        path.push_back(Fix{path.front().t + (lap.lap.end - lap.lap.start), path.front().p, false});
+    }
 
     // Bridge the gaps.
     std::vector<Fix> bridged;
@@ -363,7 +374,9 @@ Result<LineResult> gpsLine(const GpsLap& lap, const TrackOrigin& origin, const T
             result.diagnostics.emplace_back("W-TRACK-DROPOUT");
         }
         const std::optional<Edge> ea = quadraticEdge(fitSide(path, i, true), a.t);
-        const std::optional<Edge> eb = quadraticEdge(fitSide(path, i + 1, false), b.t);
+        const bool toSeam = seam && i + 2 == path.size(); // the virtual start: the start's tangent
+        const std::optional<Edge> eb = toSeam ? quadraticEdge(fitSide(path, 0, false), path.front().t)
+                                              : quadraticEdge(fitSide(path, i + 1, false), b.t);
         const Xy va = ea ? ea->v : Xy{};
         const Xy vb = eb ? eb->v : Xy{};
         for (Micros t = a.t + periodUs; t < b.t - periodUs / 2; t += periodUs) {
@@ -380,12 +393,12 @@ Result<LineResult> gpsLine(const GpsLap& lap, const TrackOrigin& origin, const T
                                   false});
         }
     }
-    const Xy start = bridged.front().p;
-    const Xy end = bridged.back().p;
-    result.closureErrorM = std::hypot(end.x - start.x, end.y - start.y);
-    if (options.closeLoop && bridged.size() > 2 && !bridged.back().observed &&
-        bridged.back().t == lap.lap.end) {
-        bridged.pop_back(); // the point at the lap end is the start again; a last real fix is kept
+    // The virtual start of a bridged seam, or the point at the lap end that is the start again (a last real
+    // fix is kept), is dropped: the loop closes on the first point.
+    const bool lapEndIsStart = options.closeLoop && bridged.size() > 2 && !bridged.back().observed &&
+                               bridged.back().t == lap.lap.end;
+    if (seam || lapEndIsStart) {
+        bridged.pop_back();
     }
 
     // The arc parameter from a [1 2 1] pre-smoothed copy (noise would inflate raw chord lengths).
@@ -550,18 +563,21 @@ Result<GeneratedTrack> TrackGenerator::fromSpeedLatG(const LapWindow& lap, const
         return Failure{Error{ErrorCode::NotFound, "the car does not move during the lap", {}}};
     }
     if (options.closeLoop) {
+        // The heading excess over a whole number of revolutions (0 for a figure eight: a closed lap need not
+        // turn at all) is removed as a constant heading-rate bias, linearly in time (D-195 (b)). A lateral
+        // offset model (in proportion to the integral of dt / v) measured worse on the AC-M3-04 fixture
+        // (4.35 m against 4.11 m RMS), so the bias stays linear.
         const double turns = std::round(theta.back() / (2.0 * kPi));
-        if (turns != 0.0) {
-            const double excess = theta.back() - turns * 2.0 * kPi;
-            const auto span = static_cast<double>(times.back() - times.front());
-            for (std::size_t k = 0; k < n; ++k) {
-                theta[k] -= excess * static_cast<double>(times[k] - times.front()) / span;
-            }
-            pts = integrate(theta);
-        } else {
+        const double excess = theta.back() - turns * 2.0 * kPi;
+        const auto span = static_cast<double>(times.back() - times.front());
+        for (std::size_t k = 0; k < n; ++k) {
+            theta[k] -= excess * static_cast<double>(times[k] - times.front()) / span;
+        }
+        pts = integrate(theta);
+        const Xy gap{pts.back().x - pts.front().x, pts.back().y - pts.front().y};
+        if (std::hypot(gap.x, gap.y) > kNotALoopFraction * length) {
             out.report.diagnostics.emplace_back("W-TRACK-NOT-A-LOOP");
         }
-        const Xy gap{pts.back().x - pts.front().x, pts.back().y - pts.front().y};
         for (std::size_t k = 0; k < n; ++k) {
             const double f = dist[k] / length;
             pts[k].x -= f * gap.x;

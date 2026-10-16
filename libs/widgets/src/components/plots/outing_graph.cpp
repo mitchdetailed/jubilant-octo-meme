@@ -215,6 +215,28 @@ bool OutingGraph::handleCommand(const QString& id, const QVariantList& args) {
         toggleKey();
         return true;
     }
+    // The programmatic forms of the mouse rows the shell offers here (D-200 (a); D-203 (w)): the wheel
+    // [notches] zooms the worksheet about its cursor; the zoom rectangle [a, b] (domain units) sets it.
+    if (id == QLatin1String("zoom.wheel")) {
+        if (!prepared()) {
+            return false;
+        }
+        const int notches = args.isEmpty() ? 1 : args.front().toInt();
+        plots::zoomAboutCursor(context_, liveInputs(), std::pow(kWheelZoomIn, notches));
+        return true;
+    }
+    if (id == QLatin1String("zoom.outing_rect")) {
+        if (args.size() < 2) {
+            return false;
+        }
+        const double a = args.at(0).toDouble();
+        const double b = args.at(1).toDouble();
+        if (!(b != a)) {
+            return false;
+        }
+        context_.view.zoomTo(plot::XSpan{std::min(a, b), std::max(a, b)});
+        return true;
+    }
     if (id == plots::kCycleStyle) {
         cycleStyle();
         return true;
@@ -224,25 +246,36 @@ bool OutingGraph::handleCommand(const QString& id, const QVariantList& args) {
 
 // ---- outing coordinates
 
-std::optional<OutingGraph::Axis> OutingGraph::axis() const {
+const OutingGraph::Geometry& OutingGraph::geometry() const {
+    const plot::ViewState& view = context_.view.state();
+    if (geometry_.revision == inputsRevision() && geometry_.zoom == view.zoom &&
+        geometry_.domain == view.domain) {
+        return geometry_;
+    }
+    geometry_ = Geometry{inputsRevision(), view.zoom, view.domain, std::nullopt, plot::RectPx{}};
     if (!prepared() || inputs().slots.empty()) {
-        return std::nullopt;
+        return geometry_;
     }
     plot::ComponentBuildInputs in = liveInputs();
+    geometry_.zoomRect = plot::OutingGeometry::zoomRect(in);
     const plot::DomainMapper map = worksheetMainMapper(in);
     if (in.view.domain == plot::Domain::Distance && !map.hasDistance()) {
-        return std::nullopt;
+        return geometry_;
     }
     const plot::XSpan ext = map.outingExtent();
     if (!(ext.length() > 0.0)) {
-        return std::nullopt;
+        return geometry_;
     }
     in.view.zoom = ext; // the whole outing: zoomRect() is then the whole trace area
     const plot::RectPx r = plot::OutingGeometry::zoomRect(in);
-    if (!(r.w > 0.0F)) {
-        return std::nullopt;
+    if (r.w > 0.0F) {
+        geometry_.axis = Axis{static_cast<double>(r.x), static_cast<double>(r.w), ext.a, ext.length()};
     }
-    return Axis{static_cast<double>(r.x), static_cast<double>(r.w), ext.a, ext.length()};
+    return geometry_;
+}
+
+std::optional<OutingGraph::Axis> OutingGraph::axis() const {
+    return geometry().axis;
 }
 
 std::optional<double> OutingGraph::worksheetXAt(double logicalX) const {
@@ -268,7 +301,7 @@ QRectF OutingGraph::zoomRectLogical() const {
     if (!prepared() || inputs().slots.empty()) {
         return {};
     }
-    const plot::RectPx r = plot::OutingGeometry::zoomRect(liveInputs());
+    const plot::RectPx r = geometry().zoomRect;
     const double dpr = static_cast<double>(inputs().layout.dpr > 0.0F ? inputs().layout.dpr : 1.0F);
     return QRectF(static_cast<double>(r.x) / dpr, static_cast<double>(r.y) / dpr,
                   static_cast<double>(r.w) / dpr, static_cast<double>(r.h) / dpr);
@@ -505,18 +538,25 @@ void OutingGraph::keyPressEvent(QKeyEvent* event) {
 
 // ---- export
 
-bool OutingGraph::exportData(ExportSink& sink, const ExportOptions& options) const {
+ComponentWidget::ExportJob OutingGraph::exportJob(const ExportOptions& options) const {
     if (!prepared()) {
-        return false;
+        return {};
     }
     const plot::ComponentBuildInputs in = plots::exportInputs(liveInputs(), options.range);
     std::vector<std::size_t> channels;
     for (std::size_t i = 0; i < body_.channelNames().size(); ++i) {
         channels.push_back(i);
     }
-    const std::optional<QByteArray> csv = plots::runOffGui(
-        context_, componentId() + QStringLiteral("/export"),
-        [in, channels](const CancelToken& cancel) { return plots::timeSeriesCsv(in, channels, cancel); });
+    return [in, channels](const CancelToken& cancel) { return plots::timeSeriesCsv(in, channels, cancel); };
+}
+
+bool OutingGraph::exportData(ExportSink& sink, const ExportOptions& options) const {
+    const ExportJob job = exportJob(options);
+    if (!job) {
+        return false;
+    }
+    const std::optional<QByteArray> csv =
+        plots::runOffGui(context_, componentId() + QStringLiteral("/export"), job);
     return csv && sink.write(*csv);
 }
 

@@ -274,6 +274,23 @@ void report(json& rows, const std::string& id, const Stats& s, std::optional<dou
     rows[id] = r;
 }
 
+// Until the pool has nothing queued, running or parked: a run's chunk tasks (prefetches the report never
+// waited for) hold their ColumnCore while they run, so its columns and their ChunkCache may go only after
+// this (the M2 maths_bench teardown, ea32897).
+void waitIdle(const TaskPool& pool) {
+    for (;;) {
+        const TaskPool::Stats st = pool.stats();
+        std::size_t queued = 0;
+        for (const std::size_t q : st.queued) {
+            queued += q;
+        }
+        if (st.running == 0 && st.parked == 0 && queued == 0) {
+            return;
+        }
+        std::this_thread::yield();
+    }
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -283,6 +300,7 @@ int main(int argc, char** argv) {
     }
     bool smoke = false;
     bool gate = false;
+    unsigned workers = 0; // 0: TaskPool's default worker count
     std::string jsonPath;
     if (const auto e = getEnv("ESSES_BENCH_OUT"); e && !e->empty()) {
         jsonPath = pathToUtf8(pathFromUtf8(*e) / "report_bench.json");
@@ -298,8 +316,12 @@ int main(int argc, char** argv) {
             gate = true;
         } else if (a == "--json") {
             jsonPath = next();
+        } else if (a == "--workers") {
+            workers = static_cast<unsigned>(std::max(1, std::atoi(next().c_str())));
         } else {
-            std::fprintf(stderr, "usage: esses-report-bench [--runs N] [--smoke] [--gate] [--json file]\n");
+            std::fprintf(
+                stderr,
+                "usage: esses-report-bench [--runs N] [--workers N] [--smoke] [--gate] [--json file]\n");
             return 2;
         }
     }
@@ -320,9 +342,9 @@ int main(int argc, char** argv) {
 
     json rows = json::object();
     bool tableOk = true;
-    // The application's path: a TaskPool (the default workers), the report on one of its workers at
-    // Background, the columns scheduling their chunk tasks on the same pool.
-    TaskPool pool;
+    // The application's path: a TaskPool (the default workers, or --workers), the report on one of its
+    // workers at Background, the columns scheduling their chunk tasks on the same pool.
+    TaskPool pool(workers > 0 ? workers : TaskPool::defaultWorkerCount());
     const auto onPool = [&pool](const analysis::ReportSpec& sp, const analysis::ReportInputs& in,
                                 analysis::StatCache& stats) {
         return pool
@@ -352,12 +374,14 @@ int main(int argc, char** argv) {
             (pooled ? coldMs : coldSerialMs).push_back(ms(std::chrono::steady_clock::now() - t0));
             if (!table) {
                 std::fprintf(stderr, "report_bench: %s\n", table.error().toString().c_str());
+                waitIdle(pool);
                 return 2;
             }
             if (r == 0) {
                 tableOk = checkTable(*table, spec, *bound, *src, laps) && tableOk;
             }
-            bound.reset(); // the columns before their cache
+            waitIdle(pool); // the prefetches of this run before its columns and cache
+            bound.reset();  // the columns before their cache
         }
     }
     // Resident and cached: one chunk cache warmed by an untimed run.
@@ -370,6 +394,7 @@ int main(int argc, char** argv) {
         {
             analysis::StatCache warm;
             if (!onPool(spec, inputs, warm)) {
+                waitIdle(pool);
                 return 2;
             }
         }
@@ -386,6 +411,7 @@ int main(int argc, char** argv) {
                 tableOk = false;
             }
         }
+        waitIdle(pool);
         bound.reset();
     }
     std::vector<double> timeMs;

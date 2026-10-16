@@ -42,6 +42,7 @@ public:
     void addChannel(const QString& name, bool newPanel) override; // appends a trace
     QStringList contextCommands() const override;
     bool exportData(ExportSink& sink, const ExportOptions& options) const override;
+    ExportJob exportJob(const ExportOptions& options) const override;
     bool handleCommand(const QString& id, const QVariantList& args) override;
 
     const plot::HistogramBody& body() const noexcept { return body_; }

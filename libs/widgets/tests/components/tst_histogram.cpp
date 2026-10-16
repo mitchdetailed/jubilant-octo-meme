@@ -13,6 +13,7 @@
 #include <esses/widgets/components/histogram.hpp>
 
 #include <QTest>
+#include <algorithm>
 #include <array>
 #include <cmath>
 
@@ -113,7 +114,8 @@ private Q_SLOTS:
         rig.c->onViewChanged(w.view->state(), plot::mask(plot::Change::Data));
         QVERIFY(waitQuiet(*rig.c));
         const plot::Slot overlay = w.selection.snapshot().visibleSlots().back();
-        const project::Rgba overlayColour = plot::traceColour(*w.scheme, w.selection.snapshot(), overlay, 0);
+        // The overlay in its range key colour, Main in its channel colour (06 section 5.3 item 3).
+        const project::Rgba overlayColour = plot::rangeKeyColour(*w.scheme, overlay);
         const plot::Slot main = w.selection.snapshot().visibleSlots().front();
         const project::Rgba mainColour = plot::traceColour(*w.scheme, w.selection.snapshot(), main, 0);
         QVERIFY(countCmds(last, plot::CmdKind::Polyline, overlayColour) > 0); // outlined bars
@@ -170,8 +172,9 @@ private Q_SLOTS:
         }
         QVERIFY(rig.c->handleCommand(QStringLiteral("component.colour_legend"), {}));
         QVERIFY(rig.c->spec().legend.colour);
-        QVERIFY(rig.c->handleCommand(QStringLiteral("component.legend"), {}));
-        QVERIFY(!rig.c->spec().legend.channels);
+        // L: no channel legend is drawn, so the histogram declines it (D-203 (h)).
+        QVERIFY(!rig.c->handleCommand(QStringLiteral("component.legend"), {}));
+        QVERIFY(rig.c->spec().legend.channels);
         QVERIFY(!rig.c->handleCommand(QStringLiteral("component.colour_band"), {QVariant(1)})); // D-198
         QVERIFY(!rig.c->handleCommand(QStringLiteral("cursor.style"), {}));
         // ENTER / drop: a trace is appended once.
@@ -269,14 +272,15 @@ private Q_SLOTS:
         const QList<QByteArray> lines = csvLines(sink.bytes);
         QCOMPARE(lines.size(), 11);
         QCOMPARE(lines.front(), QByteArray("bin_lo,bin_hi,\"Throttle@Main\""));
-        // Brute force: the 2500 samples of the lap in bins of 10 % (100 % in none).
+        // Brute force: the 2500 samples of the lap in bins of 10 %, the last bin closed on 100 % (D-194 as
+        // amended by D-203 (d): a sample at dataMax counts).
         const SourceShape shape;
         std::array<int, 10> counts{};
         int inBins = 0;
         for (std::size_t i = 40 * 50; i < 90 * 50; ++i) {
             const double v = shape.throttle(i);
-            if (v >= 0.0 && v < 100.0) {
-                ++counts[static_cast<std::size_t>(std::floor(v / 10.0))];
+            if (v >= 0.0 && v <= 100.0) {
+                ++counts[std::min<std::size_t>(9, static_cast<std::size_t>(std::floor(v / 10.0)))];
                 ++inBins;
             }
         }

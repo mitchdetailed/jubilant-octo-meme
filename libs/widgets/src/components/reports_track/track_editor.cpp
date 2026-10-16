@@ -116,6 +116,42 @@ QString sourceLabel(const model::DataSource& src) {
 
 } // namespace
 
+namespace {
+
+// A rename as one command: its children remove the old venue's map and write the new one. A child that fails
+// reverts what the other did and the command drops from the stack (obsolete), so no half-done rename can be
+// undone or redone (D-203 (n)).
+class RenameMapCommand final : public QUndoCommand {
+public:
+    explicit RenameMapCommand(const QString& text) : QUndoCommand(text) {}
+    void redo() override {
+        QUndoCommand::redo();
+        if (anyFailed()) {
+            QUndoCommand::undo();
+            setObsolete(true);
+        }
+    }
+    void undo() override {
+        QUndoCommand::undo();
+        if (anyFailed()) {
+            setObsolete(true);
+        }
+    }
+
+private:
+    bool anyFailed() const {
+        for (int i = 0; i < childCount(); ++i) {
+            if (const auto* c = dynamic_cast<const qt::TrackMapCommand*>(child(i));
+                c != nullptr && c->failed()) {
+                return true;
+            }
+        }
+        return false;
+    }
+};
+
+} // namespace
+
 TrackEditor::TrackEditor(qt::ProjectSession& session, qt::DataSelectionModel& selection,
                          qt::MathsService& maths, qt::TrackMapService& maps, QWidget* parent)
     : QDialog(parent), session_(session), selection_(selection), maths_(maths), maps_(maps) {
@@ -614,6 +650,7 @@ void TrackEditor::accept() {
     if (Result<void> sections = analysis::SectionDetector::defaults(next); !sections) {
         setStatus(tr("Default sections: %1").arg(QString::fromStdString(sections.error().toString())));
     }
+    keepEditedDefaults(next);
     if (pushMap(std::make_shared<const analysis::TrackMap>(std::move(next)),
                 previous != nullptr ? tr("Regenerate track map") : tr("Generate track map"), true)) {
         accept_->setEnabled(false);
@@ -621,18 +658,45 @@ void TrackEditor::accept() {
     }
 }
 
+// A default section the user edited is theirs (userDefined, kept by a regeneration, 06 section 13.5 item 3);
+// a regenerated default section that overlaps one of them in its set gives way to it (D-203 (n)).
+void TrackEditor::keepEditedDefaults(analysis::TrackMap& map) {
+    std::vector<const analysis::TrackSection*> edited;
+    for (const analysis::TrackSection& s : map.sections) {
+        if (s.userDefined && s.set == analysis::TrackMap::kDefaultSet) {
+            edited.push_back(&s);
+        }
+    }
+    if (edited.empty()) {
+        return;
+    }
+    std::vector<analysis::TrackSection> kept;
+    kept.reserve(map.sections.size());
+    for (const analysis::TrackSection& s : map.sections) {
+        const bool overlapped =
+            !s.userDefined && s.set == analysis::TrackMap::kDefaultSet &&
+            std::any_of(edited.begin(), edited.end(), [&s](const analysis::TrackSection* e) {
+                return s.startM < e->endM && e->startM < s.endM;
+            });
+        if (!overlapped) {
+            kept.push_back(s);
+        }
+    }
+    map.sections = std::move(kept);
+}
+
 bool TrackEditor::pushMap(std::shared_ptr<const analysis::TrackMap> after, const QString& text,
                           bool backupFirst) {
     const std::optional<model::RangeRef> l = lap();
     const std::string venue = after != nullptr ? after->venue : (l ? venueOf(*l) : std::string());
-    auto* command =
-        new qt::TrackMapCommand(maps_, venue, maps_.map(venue), std::move(after), text, backupFirst);
-    session_.undoStack().push(command); // redo() runs now
-    if (command->failed()) {
-        const std::optional<Error>& e = command->lastError();
-        error_ = e ? QString::fromStdString(e->toString()) : tr("The track map could not be written");
+    const std::shared_ptr<const analysis::TrackMap> expected = after;
+    // A write that fails drops the command (TrackMapCommand marks itself obsolete): nothing to undo or
+    // redo is left on the stack (D-203 (n)). The service holds `expected` exactly when it was written.
+    session_.undoStack().push(
+        new qt::TrackMapCommand(maps_, venue, maps_.map(venue), std::move(after), text, backupFirst));
+    if (maps_.map(venue) != expected) {
+        error_ = tr("The track map could not be written");
         setStatus(error_);
-        session_.undoStack().undo(); // the cache never changed: undo is a no-op write of the same state
         return false;
     }
     error_.clear();
@@ -718,6 +782,7 @@ bool TrackEditor::regenerateDefaultSections() {
         setStatus(error_);
         return false;
     }
+    keepEditedDefaults(next);
     return pushMap(std::make_shared<const analysis::TrackMap>(std::move(next)),
                    tr("Regenerate default sections"));
 }
@@ -788,6 +853,7 @@ bool TrackEditor::editSection(const QString& id, const QString& name, double sta
     it->name = name.trimmed().toStdString();
     it->startM = startM;
     it->endM = endM;
+    it->userDefined = true; // an edited default section is the user's: a regeneration keeps it (D-203 (n))
     if (!category.trimmed().isEmpty()) {
         it->category = category.trimmed().toStdString();
     }
@@ -832,15 +898,14 @@ bool TrackEditor::renameVenue(const QString& to) {
     analysis::TrackMap moved = *map;
     moved.venue = target;
     moved.name = target;
-    auto* parent = new QUndoCommand(tr("Rename track map to %1").arg(to));
-    auto* remove = new qt::TrackMapCommand(maps_, map->venue, map, nullptr, QString(), false, parent);
-    auto* add = new qt::TrackMapCommand(
-        maps_, target, nullptr, std::make_shared<const analysis::TrackMap>(moved), QString(), false, parent);
-    session_.undoStack().push(parent);
-    if (remove->failed() || add->failed()) {
+    const auto movedMap = std::make_shared<const analysis::TrackMap>(moved);
+    auto* parent = new RenameMapCommand(tr("Rename track map to %1").arg(to));
+    new qt::TrackMapCommand(maps_, map->venue, map, nullptr, QString(), false, parent);
+    new qt::TrackMapCommand(maps_, target, nullptr, movedMap, QString(), false, parent);
+    session_.undoStack().push(parent); // a failed half reverts the other and drops the command
+    if (maps_.map(target) != movedMap || maps_.map(map->venue) != nullptr) {
         error_ = tr("The track map could not be renamed");
         setStatus(error_);
-        session_.undoStack().undo();
         return false;
     }
     error_.clear();
@@ -853,12 +918,11 @@ bool TrackEditor::deleteMap() {
         error_ = tr("No track map");
         return false;
     }
-    auto* command = new qt::TrackMapCommand(maps_, map->venue, map, nullptr, tr("Delete track map"));
-    session_.undoStack().push(command);
-    if (command->failed()) {
+    session_.undoStack().push(
+        new qt::TrackMapCommand(maps_, map->venue, map, nullptr, tr("Delete track map")));
+    if (maps_.map(map->venue) != nullptr) { // a failed removal dropped the command (D-203 (n))
         error_ = tr("The track map could not be deleted");
         setStatus(error_);
-        session_.undoStack().undo();
         return false;
     }
     error_.clear();

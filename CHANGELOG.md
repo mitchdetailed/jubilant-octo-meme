@@ -4,6 +4,45 @@ All notable changes are recorded here, newest first. The project follows semanti
 
 ## Unreleased (M3)
 
+- The M3 fix pass (D-203): the 89 findings of the M3 reviews checked one by one, 80 fixed with a regression
+  test, 2 rejected, 7 deferred. Engine: `gCorrection` catches a lock or spin that builds over several samples (a
+  slip reference with a 1 s time constant); the channel report's Overlay 0 delta pairs rows below the compared
+  ranges (different laps now have delta cells), untrusted laps are cut out of outing and detail rows too, `start`
+  and `end` need the channel to cover the bound, `absMax` and `delta` are right under offset and negative-scale
+  units, each column has one display unit across sources, detail-group headings read their detail, impossible
+  dates are refused and an unambiguous mm/dd/yyyy is read as such; the time report skips disabled laps and keeps
+  two sections of one name; `StatCache` fits its 64 bytes per cell; a sample at the histogram's upper limit is
+  counted; track sections map proportionally onto a lap within 5 % of the map and stop at the end of a lap that
+  does not end at a beacon; Speed+LatG closes figure-eight circuits; GPS dropouts across the start line are
+  bridged; timestamped scatter x channels, the through-zero trend basis, scatter overlay units and the variance
+  banner for multi-lap ranges are fixed. UI: hidden worksheets idle (no Dynamic builds, sources released, reports
+  wait for their show) and keep their view models through worksheet renames and moves; edits from a dialog of a
+  hidden worksheet are stored and undoable; Cancel keeps outside edits and unapplied rows survive them; channel
+  pickers list the maths outputs and follow new logs; heading pickers offer the profile's report headings;
+  Component > Add and right-click menus (channel label, component, canvas); Export Data runs on the pool;
+  ALT+UP/DOWN zoom about the active channel's cursor value; the animation rates reach x10 in the menu; L, G, Y,
+  E, SHIFT+E and K are offered only where they change something; component keys follow the user's keymap; the
+  Track Editor gets the cursor span and a missing venue map is generated on open; Help > Keyboard Shortcuts
+  (`help.keyboard_shortcuts`, a menu command without a keymap row, like Component > Add). Tests: the keymap harness runs every implemented
+  command through the palette as well (AC-M3-12), the properties round trip checks every leaf, the demo checks
+  the datum and delta numbers, negative checks drain the pool first. Docs: D-203 (amends D-127 (a): 21
+  time_distance cases, locally rendered PNGs committed as provisional), CLEANROOM rows for D-200, D-202 and D-203,
+  the track fixture family's layout recorded; the CI lint job's timeout is 75 min.
+- The M3 acceptance pass (07 §6.2, §6.5; AC-M3-01 to AC-M3-12; D-202): the shipped circuit workbook gains the
+  Overview, Braking, Corners, Reports and Track worksheets, so every MVP component type appears in it (M1's
+  Overlay and Driver worksheets unchanged); the range key colour of 06 §5.3 item 3 (`plot::rangeKeyColour`: Main
+  red, Overlay 0 its role, Overlay k `overlayPalette[k - 1]`) now colours the variance traces, the offset
+  sub-axes, the range band's overlay cells, the Track Position dots, scatter and histogram overlays and a gauge's
+  reference value, where the slot's trace colour made every overlay the same channel colour (eleven `DrawList`
+  goldens changed in colour only, their provisional PNGs re-rendered); O turning the offset axis off zeroes every
+  selected range's offsets as one undo step ("Clear alignment offsets"); the channel and time reports' `project`
+  time format follows `options.lapTimeFormat`; `esses-plot-bench` gains
+  `plot.variance_f3_no_overlay` (AC-M3-05: F3 without an overlay costs nothing and builds no `VarianceTable`);
+  `tools/check_keymap_coverage.py` takes M3 as the current milestone and `ui.tst_keymap` gains the generic row of
+  06 §14.5 for the planned and reserved rows. New tests: `widgets.tst_values_list_goldens` (three values_list
+  cases at DPR 1 and 2: exact table goldens, provisional Windows PNGs), `ui.tst_offset_axis` (AC-M3-09 in the
+  shell: steps per source, the Data window amounts, O zeroing as one step, the sidecar surviving a reopen) and
+  `ui.tst_demo_m3` (the demo script of 07 §6.5 offscreen, over a log written on the synthetic circuit).
 - The properties dialogs and the shell's M3 wiring (07 §6.1; AC-M3-01, AC-M3-08, AC-M3-10, AC-M3-11, AC-M3-12;
   D-200): `PropertiesDialog` with schema-driven tabs for the ten MVP types (F5, CTRL+N on the Channels tab;
   modeless, Apply/OK one undo step, Cancel restores, refreshed by undo/redo, geometry per type), `FieldBinder`

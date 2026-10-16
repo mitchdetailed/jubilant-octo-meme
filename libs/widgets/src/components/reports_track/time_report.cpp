@@ -20,6 +20,7 @@
 #include <QJsonObject>
 #include <QKeyEvent>
 #include <QMenu>
+#include <QShowEvent>
 #include <QTableView>
 #include <QVBoxLayout>
 
@@ -49,9 +50,12 @@ TimeReport::TimeReport(const project::ComponentSpec& spec, WorksheetContext& con
     table_->applyScheme(*scheme_);
     table_->bodyView()->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(table_->bodyView(), &QWidget::customContextMenuRequested, this, [this](const QPoint& pos) {
-        QMenu menu(this);
-        menu.addAction(tr("Copy as TSV"), this, [this] { copyTsv(); });
-        menu.exec(table_->bodyView()->viewport()->mapToGlobal(pos));
+        // On the heap and asynchronous: the component may go while the menu is open (a document rebuild, a
+        // closed source); the menu then goes with it and nothing runs on a destroyed object (D-203 (q)).
+        auto* menu = new QMenu(this);
+        menu->setAttribute(Qt::WA_DeleteOnClose);
+        menu->addAction(tr("Copy as TSV"), this, [this] { copyTsv(); });
+        menu->popup(table_->bodyView()->viewport()->mapToGlobal(pos));
     });
     // ALT+n reaches keyPressEvent from the table views, which ignore ALT chords (the event propagates).
     applyBody();
@@ -120,22 +124,47 @@ bool TimeReport::handleCommand(const QString& id, const QVariantList& args) {
 }
 
 void TimeReport::keyPressEvent(QKeyEvent* event) {
+    // ALT+n where no command reached the report (no shell): only while the keymap binds it (D-203 (o)).
     const Qt::KeyboardModifiers mods = event->modifiers() & ~Qt::KeypadModifier;
     if (mods == Qt::AltModifier && event->key() >= Qt::Key_0 && event->key() <= Qt::Key_9) {
-        toggleBand(event->key() - Qt::Key_0);
-        event->accept();
-        return;
+        const int n = event->key() - Qt::Key_0;
+        if (keyBound(QStringLiteral("component.colour_band"), *event, {QStringLiteral("Alt+%1").arg(n)})) {
+            toggleBand(n);
+            event->accept();
+            return;
+        }
     }
     ComponentWidget::keyPressEvent(event);
 }
 
 void TimeReport::onSelectionChanged(const plot::SelectionSnapshot&) {
-    model_->refresh();
+    requestRefresh();
 }
 
 void TimeReport::onDataChanged(const model::SourceId& source, std::uint64_t) {
     if (context_.selection.source(source) != nullptr) {
-        model_->refresh();
+        requestRefresh();
+    }
+}
+
+void TimeReport::onChannelDataChanged(const maths::ChannelKey&) {
+    // The report shows range times, no channel: a maths output becoming ready changes nothing on it (the
+    // ranges and the distance arrive through onDataChanged; D-203 (z)).
+}
+
+void TimeReport::requestRefresh() {
+    if (detail::deferWhileHidden(*this)) {
+        refreshPending_ = true;
+        return;
+    }
+    refreshPending_ = false;
+    model_->refresh();
+}
+
+void TimeReport::showEvent(QShowEvent* event) {
+    ComponentWidget::showEvent(event);
+    if (refreshPending_) {
+        requestRefresh();
     }
 }
 

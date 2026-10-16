@@ -214,7 +214,7 @@ TEST_CASE("scatter: gather equals brute force on the union grid with delays and 
         }
     }
 
-    // Without a colour channel z stays empty; without y there is nothing; a timestamped x is refused.
+    // Without a colour channel z stays empty; without y there is nothing.
     ScatterInput plain = input;
     plain.colour.reset();
     auto noZ = ScatterBinner::gather(plain, Priority::Visible, {});
@@ -224,11 +224,49 @@ TEST_CASE("scatter: gather equals brute force on the union grid with delays and 
     plain.y.clear();
     CHECK(ScatterBinner::gather(plain, Priority::Visible, {})->empty());
     plain.x.series = tc.timestamped({0, 1000}, {1, 2});
-    CHECK(ScatterBinner::gather(plain, Priority::Visible, {}).error().code == ErrorCode::Invalid);
+    CHECK(ScatterBinner::gather(plain, Priority::Visible, {})->empty());
     CancelSource cancel;
     cancel.cancel();
     CHECK(ScatterBinner::gather(input, Priority::Visible, cancel.token()).error().code ==
           ErrorCode::Cancelled);
+}
+
+TEST_CASE("scatter: a timestamped x channel takes the union grid, or its own sample times", "[unit]") {
+    TestCache tc;
+    // x logged at 0, 0.1, ..., 0.9 s (values 0..9, Linear); y uniform at 10 Hz from 0 s (100..109): the grid
+    // is the uniform y channel's, and x is read at its own sample times there.
+    std::vector<std::int64_t> times;
+    std::vector<double> xs;
+    std::vector<double> ys;
+    for (int k = 0; k < 10; ++k) {
+        times.push_back(static_cast<std::int64_t>(k) * 100'000);
+        xs.push_back(static_cast<double>(k));
+        ys.push_back(100.0 + static_cast<double>(k));
+    }
+    ScatterInput input;
+    input.x = ScatterChannel{tc.timestamped(times, xs), units::Converter{}, store::Interp::Linear};
+    input.y.push_back(
+        ScatterChannel{tc.uniform(Rate::fromHz(10), ys), units::Converter{}, store::Interp::Linear});
+    input.spans = {SampleSpan{0, sec(1.0), true}};
+    auto grid = ScatterBinner::gather(input, Priority::Visible, {});
+    REQUIRE(grid.ok());
+    REQUIRE((*grid)[0].x.size() == 10);
+    for (std::size_t k = 0; k < 10; ++k) {
+        CHECK((*grid)[0].x[k] == Catch::Approx(static_cast<double>(k)));
+        CHECK((*grid)[0].y[k] == Catch::Approx(100.0 + static_cast<double>(k)));
+    }
+    // Every channel timestamped: the x channel's own times (0, 0.25, 0.5, 0.75 s).
+    ScatterInput both;
+    both.x = ScatterChannel{tc.timestamped({0, 250'000, 500'000, 750'000}, {1, 2, 3, 4}), units::Converter{},
+                            store::Interp::Linear};
+    both.y.push_back(ScatterChannel{tc.timestamped({0, 250'000, 500'000, 750'000}, {10, 20, 30, 40}),
+                                    units::Converter{}, store::Interp::Linear});
+    both.spans = {SampleSpan{0, sec(1.0), true}};
+    auto own = ScatterBinner::gather(both, Priority::Visible, {});
+    REQUIRE(own.ok());
+    CHECK((*own)[0].x == std::vector<double>{1, 2, 3, 4});
+    CHECK((*own)[0].y == std::vector<double>{10, 20, 30, 40});
+    CHECK((*own)[0].t == std::vector<Micros>{0, 250'000, 500'000, 750'000});
 }
 
 TEST_CASE("scatter: interval average and density grid", "[unit]") {

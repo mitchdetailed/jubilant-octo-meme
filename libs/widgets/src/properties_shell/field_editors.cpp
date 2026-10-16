@@ -131,6 +131,21 @@ QWidget* makeLeafEditor(FieldKind kind, const QStringList& enumValues, const QJs
         return c;
     }
     case FieldKind::Text:
+        if (!enumValues.isEmpty()) {
+            // A heading picker (04 section 12 item 6; D-203 (y)): the suggestions, free text still allowed.
+            auto* c = new QComboBox(parent);
+            c->setEditable(true);
+            c->setInsertPolicy(QComboBox::NoInsert);
+            c->setProperty("esses.headingPicker", true);
+            c->setProperty("esses.rangeGroupsOnly",
+                           std::all_of(enumValues.begin(), enumValues.end(), [](const QString& h) {
+                               return h.startsWith(QLatin1String("Outings"));
+                           }));
+            c->addItems(enumValues);
+            c->setEditText(QString());
+            return c;
+        }
+        break;
     case FieldKind::UnitValue:
     case FieldKind::BandAxis:
     case FieldKind::ColourBands:
@@ -181,6 +196,9 @@ QJsonValue leafValue(FieldKind kind, const QWidget* editor) {
         if (const auto* e = qobject_cast<const QLineEdit*>(editor)) {
             return e->text();
         }
+        if (const auto* c = qobject_cast<const QComboBox*>(editor)) {
+            return c->currentText();
+        }
         break;
     case FieldKind::UnitValue:
     case FieldKind::BandAxis:
@@ -226,6 +244,8 @@ void setLeafValue(FieldKind kind, QWidget* editor, const QJsonValue& value) {
     case FieldKind::Text:
         if (auto* e = qobject_cast<QLineEdit*>(editor)) {
             e->setText(value.toString());
+        } else if (auto* c = qobject_cast<QComboBox*>(editor)) {
+            c->setEditText(value.toString());
         }
         return;
     case FieldKind::UnitValue:
@@ -237,6 +257,25 @@ void setLeafValue(FieldKind kind, QWidget* editor, const QJsonValue& value) {
         }
         return;
     }
+}
+
+void setHeadingChoices(QWidget* headingEditor, const QStringList& headings) {
+    auto* c = qobject_cast<QComboBox*>(headingEditor);
+    if (c == nullptr || !c->isEditable() || !c->property("esses.headingPicker").toBool()) {
+        return;
+    }
+    QStringList shown;
+    const bool rangeGroups = c->property("esses.rangeGroupsOnly").toBool();
+    for (const QString& h : headings) {
+        if (!rangeGroups || h.startsWith(QLatin1String("Outings"))) {
+            shown.push_back(h);
+        }
+    }
+    const QString text = c->currentText();
+    const QSignalBlocker block(c);
+    c->clear();
+    c->addItems(shown);
+    c->setEditText(text);
 }
 
 void setChannelChoices(QWidget* channelEditor, const QStringList& names) {

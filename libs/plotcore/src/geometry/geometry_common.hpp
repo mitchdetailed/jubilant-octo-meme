@@ -106,8 +106,8 @@ std::optional<std::size_t> bandIndexOf(double v, std::span<const analysis::Band>
 // c[0] + c[1] x + ... + c[n] x^n by Horner's rule (TrendResult's coefficients).
 inline double polyval(const std::vector<double>& c, double x) {
     double y = 0.0;
-    for (auto it = c.rbegin(); it != c.rend(); ++it) {
-        y = y * x + *it;
+    for (std::size_t k = c.size(); k-- > 0;) {
+        y = y * x + c[k];
     }
     return y;
 }

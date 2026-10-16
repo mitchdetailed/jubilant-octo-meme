@@ -5,11 +5,14 @@
 // coalescing and the M1 edit path; M3: in-place definition updates, selection, move/resize/snap, splitters,
 // nudge, z order and the layout lock.
 
+#include <esses/qtmodel/command_registry.hpp>
 #include <esses/widgets/shell/worksheet_canvas.hpp>
 
 #include <QApplication>
+#include <QContextMenuEvent>
 #include <QEvent>
 #include <QKeyEvent>
+#include <QMenu>
 #include <QMouseEvent>
 #include <QPaintEvent>
 #include <QPainter>
@@ -110,6 +113,7 @@ struct WorksheetCanvas::Gesture {
     QPointer<ComponentWidget> target;
     int edges = 0;         // Resize: kLeft | kRight | kTop | kBottom
     bool vertical = false; // Splitter: a vertical edge (x) or a horizontal one (y)
+    bool noSnap = false;   // ALT held at the last move: the commit does not snap (06 section 4.3 item 2)
     double edgeFrom = 0.0; // Splitter: the edge's fraction at the press
     double edgeTo = 0.0;   // Splitter: where it is now
     bool additive = false; // RubberBand with CTRL: add to the selection
@@ -178,7 +182,10 @@ void WorksheetCanvas::setWorksheet(const project::WorksheetDef& worksheet, Works
     if (const auto it = kept_.find(key); it != kept_.end()) {
         KeptWorksheet page = std::move(it->second);
         kept_.erase(it);
-        if (page.context == &context && page.worksheet == worksheet) {
+        // A renamed worksheet keeps its components (D-203 (ac)): the name is not theirs.
+        project::WorksheetDef renamed = page.worksheet;
+        renamed.name = worksheet.name;
+        if (page.context == &context && renamed == worksheet) {
             components_ = std::move(page.components);
             maximised_ = page.maximised;
             focused_.clear(); // selectFocused below announces the worksheet's focused component again
@@ -549,6 +556,31 @@ void WorksheetCanvas::applyEdit(ComponentWidget* component, const project::Compo
     if (component == nullptr) {
         return;
     }
+    const bool shown =
+        std::any_of(components_.begin(), components_.end(),
+                    [component](const QPointer<ComponentWidget>& w) { return w == component; });
+    if (!shown) {
+        // A component of a kept (hidden) worksheet: the edit goes to that worksheet's definition and the
+        // shell stores it there, so the widget never shows what the session does not hold (D-203 (k)).
+        for (auto& [key, page] : kept_) {
+            const bool inPage =
+                std::any_of(page.components.begin(), page.components.end(),
+                            [component](const QPointer<ComponentWidget>& w) { return w == component; });
+            if (!inPage) {
+                continue;
+            }
+            for (project::ComponentSpec& c : page.worksheet.components) {
+                if (c.id == component->spec().id) {
+                    c = spec;
+                }
+            }
+            component->applySpec(spec);
+            Q_EMIT componentSpecApplied(component);
+            Q_EMIT keptComponentEdited(page.worksheet, spec, undoText);
+            return;
+        }
+        return; // not this canvas's: nothing to store it in
+    }
     if (project::ComponentSpec* c = specOf(component->spec().id)) {
         *c = spec;
     }
@@ -556,6 +588,94 @@ void WorksheetCanvas::applyEdit(ComponentWidget* component, const project::Compo
     layoutComponents(); // rect or z may have changed
     Q_EMIT componentSpecApplied(component);
     Q_EMIT componentEdited(spec, undoText);
+}
+
+QList<std::pair<QString, QString>> WorksheetCanvas::addableTypes() {
+    return {{QStringLiteral("time_distance"), tr("Time/Distance Graph")},
+            {QStringLiteral("outing"), tr("Outing Graph")},
+            {QStringLiteral("scatter"), tr("Scatter Plot")},
+            {QStringLiteral("histogram"), tr("Histogram")},
+            {QStringLiteral("channel_report"), tr("Channel Report")},
+            {QStringLiteral("time_report"), tr("Time Report")},
+            {QStringLiteral("track_position"), tr("Track Position")},
+            {QStringLiteral("values_list"), tr("Values List")},
+            {QStringLiteral("gauge_numeric"), tr("Numeric Gauge")},
+            {QStringLiteral("gauge_bar"), tr("Bar Gauge")}};
+}
+
+project::Rect WorksheetCanvas::placeForAdd(const project::WorksheetDef& sheet, QSize grid) {
+    const int w = std::max(1, grid.width());
+    const int h = std::max(1, grid.height());
+    std::vector<std::uint8_t> busy(static_cast<std::size_t>(w) * static_cast<std::size_t>(h), 0);
+    for (const project::ComponentSpec& c : sheet.components) {
+        const int x0 = std::clamp(static_cast<int>(std::floor(c.rect.l * w + 1e-9)), 0, w);
+        const int x1 = std::clamp(static_cast<int>(std::ceil(c.rect.r * w - 1e-9)), 0, w);
+        const int y0 = std::clamp(static_cast<int>(std::floor(c.rect.t * h + 1e-9)), 0, h);
+        const int y1 = std::clamp(static_cast<int>(std::ceil(c.rect.b * h - 1e-9)), 0, h);
+        for (int y = y0; y < y1; ++y) {
+            for (int x = x0; x < x1; ++x) {
+                busy[static_cast<std::size_t>(y) * static_cast<std::size_t>(w) +
+                     static_cast<std::size_t>(x)] = 1;
+            }
+        }
+    }
+    // The largest free rectangle at least 20 % x 20 %: every maximal free rectangle is the widest run of
+    // free columns at least as tall as one column's free height above a row (the histogram method).
+    const int minW = static_cast<int>(std::ceil(0.2 * w - 1e-9));
+    const int minH = static_cast<int>(std::ceil(0.2 * h - 1e-9));
+    std::vector<int> heights(static_cast<std::size_t>(w), 0);
+    long best = 0;
+    project::Rect out{0.0, 0.0, 1.0, 1.0};
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            const bool free = busy[static_cast<std::size_t>(y) * static_cast<std::size_t>(w) +
+                                   static_cast<std::size_t>(x)] == 0;
+            heights[static_cast<std::size_t>(x)] = free ? heights[static_cast<std::size_t>(x)] + 1 : 0;
+        }
+        std::vector<int> stack;
+        for (int x = 0; x <= w; ++x) {
+            const int current = x < w ? heights[static_cast<std::size_t>(x)] : 0;
+            while (!stack.empty() && heights[static_cast<std::size_t>(stack.back())] >= current) {
+                const int tall = heights[static_cast<std::size_t>(stack.back())];
+                stack.pop_back();
+                const int left = stack.empty() ? 0 : stack.back() + 1;
+                const int wide = x - left;
+                const long area = static_cast<long>(tall) * wide;
+                if (tall >= minH && wide >= minW && area > best) {
+                    best = area;
+                    out = project::Rect{static_cast<double>(left) / w, static_cast<double>(y + 1 - tall) / h,
+                                        static_cast<double>(x) / w, static_cast<double>(y + 1) / h};
+                }
+            }
+            stack.push_back(x);
+        }
+    }
+    return out;
+}
+
+void WorksheetCanvas::contextMenuEvent(QContextMenuEvent* event) {
+    const bool onComponent = std::any_of(components_.begin(), components_.end(), [event](const auto& w) {
+        return !w.isNull() && w->isVisible() && w->geometry().contains(event->pos());
+    });
+    if (context_ == nullptr || onComponent) {
+        event->ignore();
+        return;
+    }
+    auto* menu = new QMenu(this);
+    menu->setAttribute(Qt::WA_DeleteOnClose);
+    menu->setObjectName(QStringLiteral("canvasContextMenu"));
+    QMenu* add = menu->addMenu(tr("Add"));
+    add->setObjectName(QStringLiteral("canvasAddMenu"));
+    qt::CommandRegistry& registry = context_->commands;
+    for (const auto& [type, title] : addableTypes()) {
+        QAction* a = add->addAction(title);
+        a->setObjectName(type);
+        a->setEnabled(!locked_);
+        connect(a, &QAction::triggered, this,
+                [&registry, id = type] { registry.invoke(QStringLiteral("component.add"), {id}); });
+    }
+    menu->popup(event->globalPos());
+    event->accept();
 }
 
 bool WorksheetCanvas::event(QEvent* event) {
@@ -1124,6 +1244,7 @@ bool WorksheetCanvas::mouseMove(QMouseEvent* event) {
         }
         g.current.emplace_back(g.startRects.front().first, r);
     } else if (g.kind == Gesture::Kind::Splitter) {
+        g.noSnap = !snap;
         g.edgeTo = std::clamp(g.edgeFrom + (g.vertical ? d.x() : d.y()), 0.0, 1.0);
         // Preview: place every touching component as the commit will.
         for (ComponentWidget* c : components()) {
@@ -1192,7 +1313,7 @@ void WorksheetCanvas::finishGesture(bool commit) {
     }
     if (g->kind == Gesture::Kind::Splitter) {
         layoutComponents();
-        moveSharedEdge(g->vertical, g->edgeFrom, g->edgeTo, true);
+        moveSharedEdge(g->vertical, g->edgeFrom, g->edgeTo, !g->noSnap);
         return;
     }
     const QString text = g->kind == Gesture::Kind::Move ? tr("Move components") : tr("Resize component");

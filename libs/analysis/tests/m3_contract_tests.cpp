@@ -3,9 +3,9 @@
 //
 // The M3 contract of esses_analysis (07 section 6.1): what is final in the new headers. The value types'
 // defaults follow the design (04 sections 10-13, 02 section 6.9), the statistic and scope names are the body
-// spellings, TrackMap::sectionSets orders "Default" first, the track-sections rule is phase 2 and stays
-// skipped by RuleRunner::fromRuleIds until its parser exists, ReportTable counts pending cells. The M3-STUB
-// functions are tested by their owners (src/track, src/reports, src/binning, src/variance, src/speed).
+// spellings, TrackMap::sectionSets orders "Default" first, the track-sections rule is phase 2 and the shipped
+// document makes it, ReportTable counts pending cells. The implementations are tested by their owners
+// (src/track, src/reports, src/binning, src/variance, src/speed).
 #include "analysis_test_support.hpp"
 
 #include <esses/analysis/analysis.hpp>
@@ -82,7 +82,7 @@ TEST_CASE("m3 contract: TrackMap::sectionSets lists Default first, then first ap
     CHECK(map.sections[1].lengthM() == 20.0);
 }
 
-TEST_CASE("m3 contract: the track-sections rule is phase 2 and skipped until its parser exists", "[unit]") {
+TEST_CASE("m3 contract: the track-sections rule is phase 2 and the shipped document makes it", "[unit]") {
     const TrackSectionsRule rule;
     CHECK(rule.kind() == "track-sections");
     CHECK(rule.phase() == 2);
@@ -91,11 +91,10 @@ TEST_CASE("m3 contract: the track-sections rule is phase 2 and skipped until its
     const auto doc = RuleDocument::load(repoRoot() / "data" / "rules" / "circuit.track-sections.rule.json");
     REQUIRE(doc);
     const auto made = makeRangeRule(*doc);
-    if (!made) {
-        CHECK(made.error().code == ErrorCode::Unsupported); // M3-STUB: fromRuleIds skips it
-    } else {
-        CHECK((*made)->kind() == "track-sections");
-    }
+    REQUIRE(made);
+    CHECK((*made)->kind() == "track-sections");
+    CHECK((*made)->phase() == 2);
+    CHECK((*made)->id() == "circuit.track-sections");
 }
 
 TEST_CASE("m3 contract: ReportTable counts its pending cells", "[unit]") {
@@ -114,5 +113,5 @@ TEST_CASE("m3 contract: ReportTable counts its pending cells", "[unit]") {
 TEST_CASE("m3 contract: StatCache keeps its budget", "[unit]") {
     const StatCache cache(1024);
     CHECK(cache.budgetBytes() == 1024);
-    CHECK(cache.bytes() == cache.size() * StatCache::kBytesPerCell);
+    CHECK(cache.bytes() <= cache.budgetBytes());
 }

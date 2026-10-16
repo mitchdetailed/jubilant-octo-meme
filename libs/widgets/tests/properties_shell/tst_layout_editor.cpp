@@ -16,6 +16,9 @@
 #include <esses/widgets/properties_shell/layout_editor.hpp>
 
 #include <QCheckBox>
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QSignalSpy>
 #include <QTreeWidget>
 #include <QUndoStack>
@@ -224,6 +227,24 @@ private Q_SLOTS:
         QCOMPARE(p.session->workbooks().size(), books + 1);
         QVERIFY(p.session->workbooks().back().id != p.book(0).id);
         QCOMPARE(sheetNames(p.session->workbooks().back()), sheetNames(p.book(0)));
+        // The copy has a name of its own: a second workbook may not share the file name (D-203 (p)).
+        QVERIFY(p.session->workbooks().back().name != p.book(0).name);
+        QVERIFY(!messages.isEmpty());
+        // A name with path and reserved characters becomes a safe file name, and the user is told.
+        {
+            QFile f(exported);
+            QVERIFY(f.open(QIODevice::ReadOnly));
+            QJsonObject o = QJsonDocument::fromJson(f.readAll()).object();
+            f.close();
+            o.insert(QStringLiteral("name"), QStringLiteral("../evil:book"));
+            QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Truncate));
+            f.write(QJsonDocument(o).toJson());
+        }
+        const int told = static_cast<int>(messages.count());
+        QVERIFY(editor.importWorkbook());
+        const std::string imported = p.session->workbooks().back().name;
+        QCOMPARE(imported, std::string(".._evil_book"));
+        QVERIFY(messages.count() > told);
         // Lock Layout: project.json ui.layoutLocked, one undo step.
         const int base = stack.index();
         editor.lockBox().setChecked(true);

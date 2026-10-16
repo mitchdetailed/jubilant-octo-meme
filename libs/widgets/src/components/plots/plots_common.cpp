@@ -52,7 +52,7 @@ std::optional<QByteArray> runOffGui(WorksheetContext& context, const QString& ke
     QObject guard; // the posting context: alive for the whole wait
     QObject::connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, &loop, &QEventLoop::quit);
     context.render.submitBuild(
-        context.worksheetId, key, Priority::Background,
+        context.worksheetId, key, Priority::Visible,
         [work = std::move(work), produced](const CancelToken& cancel) -> Result<plot::ComponentBuild> {
             *produced = work(cancel);
             return plot::ComponentBuild{}; // never Cancelled: the result is always delivered

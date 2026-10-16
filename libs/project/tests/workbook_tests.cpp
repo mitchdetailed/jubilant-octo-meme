@@ -74,6 +74,51 @@ TEST_CASE("workbook: the shipped circuit-default workbook loads and round-trips 
     CHECK(wb->worksheet("Nope") == nullptr);
 }
 
+TEST_CASE("workbook: the shipped circuit-default workbook has the M3 worksheets (07 section 6.1 Data)",
+          "[unit]") {
+    std::vector<std::string> log;
+    const auto wb = WorkbookFile::load(pt::dataFile(kCircuitDefaultWorkbook), log);
+    REQUIRE(wb.ok());
+    const auto typesOf = [&](const char* name) {
+        const WorksheetDef* sheet = wb->worksheet(name);
+        std::vector<std::string> types;
+        if (sheet != nullptr) {
+            for (const ComponentSpec& c : sheet->components) {
+                CHECK(c.known); // every M3 type is registered and of a supported version
+                CHECK(c.rect.l < c.rect.r);
+                CHECK(c.rect.t < c.rect.b);
+                types.push_back(c.type);
+            }
+        }
+        return types;
+    };
+    CHECK(typesOf("Overview") == std::vector<std::string>{"time_distance", "track_position", "gauge_numeric",
+                                                          "gauge_numeric", "gauge_bar", "gauge_bar"});
+    CHECK(typesOf("Braking") == std::vector<std::string>{"time_distance", "histogram", "scatter"});
+    CHECK(typesOf("Corners") == std::vector<std::string>{"time_distance", "scatter", "track_position"});
+    CHECK(typesOf("Reports") == std::vector<std::string>{"channel_report", "time_report"});
+    CHECK(typesOf("Track") == std::vector<std::string>{"track_position", "outing", "time_distance"});
+    // Every MVP component type appears somewhere in the workbook.
+    std::vector<std::string> all;
+    for (const WorksheetDef& w : wb->worksheets) {
+        for (const ComponentSpec& c : w.components) {
+            all.push_back(c.type);
+        }
+    }
+    for (const char* type :
+         {"time_distance", "values_list", "outing", "scatter", "histogram", "channel_report", "time_report",
+          "track_position", "gauge_numeric", "gauge_bar"}) {
+        INFO(type);
+        CHECK(std::find(all.begin(), all.end(), type) != all.end());
+    }
+    const WorksheetDef* braking = wb->worksheet("Braking");
+    REQUIRE(braking != nullptr);
+    CHECK(braking->domain == "distance");
+    const WorksheetDef* reports = wb->worksheet("Reports");
+    REQUIRE(reports != nullptr);
+    CHECK(reports->domain == "time");
+}
+
 TEST_CASE("workbook: missing ids are derived from the file name and the indices, and mark it dirty",
           "[unit]") {
     const std::string text = R"({"$schema": "urn:esses:workbook-1", "schemaVersion": 1, "name": "Hand",

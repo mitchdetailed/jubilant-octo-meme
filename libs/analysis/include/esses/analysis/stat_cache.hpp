@@ -3,8 +3,9 @@
 //
 // StatCache (04 section 12 item 1; 01 sections 4.2 and 7.1; ARCHITECTURE_OUTLINE section 4 esses_analysis):
 // the report cells already computed, keyed (channel id, column version, range id, statistic) plus what else
-// changes the value (the interval, the options that affect a statistic). About 64 bytes per cell, LRU with a
-// 64 MB cap (01 section 7.1): the capacity is budgetBytes / kBytesPerCell cells. Thread-safe: report workers
+// changes the value (the interval, the options that affect a statistic). At most 64 bytes per cell, LRU with
+// a 64 MB cap (01 section 7.1): the capacity is budgetBytes / kBytesPerCell cells, and bytes() (the heap the
+// cache holds) never exceeds the budget. Thread-safe: report workers
 // look up and insert concurrently; one cache per workspace, owned by esses_qtmodel (ReportModel's service).
 // Keys are held as 128-bit digests of their fields.
 #pragma once
@@ -32,6 +33,8 @@ struct StatKey {
     Micros clipStart = 0;
     Micros clipEnd = 0;
     std::uint64_t optionsHash = 0; // probeSeconds, interpolateBoundaries (what changes the value)
+    // The trusted pieces scanned when untrusted laps were cut out of the interval (D-197 (b)); 0: the whole.
+    std::uint64_t piecesHash = 0;
     friend bool operator==(const StatKey&, const StatKey&) = default;
 };
 
@@ -56,7 +59,7 @@ public:
     void insert(const StatKey& key, const StatValue& value); // evicts the least recently used over budget
     void clear();
     std::size_t size() const;  // cells held
-    std::size_t bytes() const; // size() * kBytesPerCell
+    std::size_t bytes() const; // the slots and index the cache holds (<= budgetBytes)
     std::size_t budgetBytes() const noexcept { return budget_; }
 
 private:

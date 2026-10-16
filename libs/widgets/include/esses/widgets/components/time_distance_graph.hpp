@@ -101,6 +101,7 @@ public:
     void addChannel(const QString& name, bool newPanel) override;
     QStringList contextCommands() const override;
     bool exportData(ExportSink& sink, const ExportOptions& options) const override;
+    ExportJob exportJob(const ExportOptions& options) const override;
     QImage renderToImage(qreal dpr) const override;
     plot::HitResult hitAt(QPointF logical) const override;
     bool cancelTransient() override; // ESC: drops a rubber band in progress
@@ -116,6 +117,7 @@ public:
     // ---- the graph's commands (body edits are undoable spec edits)
     void toggleVariance();     // F3
     void toggleMeasurements(); // M
+    void toggleKey();          // L: the key column (keyMode none <-> labels)
     void toggleStatusStrip();  // E
     void toggleDeviceEvents(); // SHIFT+E
     void cycleCursorStyle();   // Y: line -> crosshair -> none
@@ -127,7 +129,7 @@ public:
     QString cursorValuesText() const;
     void copyCursorValues();
     // Vertical zoom and pan of the active group (04 section 8.3 item 6; local view state).
-    void verticalZoom(double factor);        // < 1 zooms in about the shown span's centre
+    void verticalZoom(double factor); // < 1 zooms in about the active channel's cursor value, else the centre
     void verticalZoomFull(int group = -1);   // -1: the active group
     void verticalPan(double fractionOfSpan); // + up
     void setVerticalZoom(int group, plot::TdGroupZoom zoom);
@@ -184,6 +186,7 @@ public:
     void setBuildObserver(BuildObserver observer) { observer_ = std::move(observer); }
 
 protected:
+    void contextMenuEvent(QContextMenuEvent* event) override;
     void onFocusChanged(bool focused) override;
     int captionHeight() const override;
     bool event(QEvent* event) override;
@@ -199,6 +202,9 @@ protected:
     void leaveEvent(QEvent* event) override;
 
 private:
+    // The active channel's value at the cursor as a fraction of group `group`'s shown scale (ALT+UP/DOWN).
+    std::optional<double> cursorValueFraction(int group) const;
+    void releaseSources();
     enum class Drag : std::uint8_t { None, Cursor, Pan, Thumb, VPan, VThumb, Offset, Handle };
     enum class BandAxis : std::uint8_t { Horizontal, Vertical, Box };
 
@@ -244,6 +250,7 @@ private:
     float hitsDpr_ = 1.0F; // the DPR of the Static list the hit regions came with
     bool prepared_ = false;
     bool staticDirty_ = true;
+    bool dynamicDirty_ = false; // a view change while hidden: the Dynamic layer is rebuilt when shown
     bool buildScheduled_ = false;
     bool buildInFlight_ = false;
     bool pendingShown_ = false;

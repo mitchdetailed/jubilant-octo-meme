@@ -15,7 +15,7 @@ GCC/Clang so the `DrawList` goldens match MSVC bit for bit.
 |---|---|---|
 | `view_state.hpp` | `Domain`, `XSpan`, `ViewState` | 04 §2.1 |
 | `change_mask.hpp` | `Change`, `ChangeMask`, `operator|`, `has`, `mask`, `kDynamicOnly`, `kStaticRebuild`, `kFullRebuild` | 04 §2.2, 01 §5.5 |
-| `selection_snapshot.hpp` | `SlotKind`, `Slot`, `SelectionSnapshot`, `traceColour`, `traceDash`, `traceWidthScale`, `adjustLightness` | 04 §2.3, D-017, D-100 |
+| `selection_snapshot.hpp` | `SlotKind`, `Slot`, `SelectionSnapshot`, `traceColour`, `rangeKeyColour` (06 §5.3 item 3: the variance traces, offset sub-axes, range band, Track Position dots, scatter/histogram overlays and gauge reference values, D-202), `traceDash`, `traceWidthScale`, `adjustLightness` | 04 §2.3, D-017, D-100, D-202 |
 | `domain_mapper.hpp` | `RangeGeom`, `OutingGeom`, `ILapDistance`, `LapPiece`, `DistanceChain`, `DomainMapper`; F9: `mainExtentIn`, `outingExtentIn`, `convertZoom` | 04 §3, D-016, D-134, AC-M1-09 |
 | `trace_builder.hpp` | `M4Column`, `M4Flag`, `TraceStyle`, `TraceSpec`, `YMap`, `TraceJob`, `DecimatedTrace`, `TraceBuilder` (`decimate`, `decimateSummary`, `decimateMany`, `emit`) | 04 §4, D-012 |
 | `draw_list.hpp` | `LayerKind`, `CmdKind`, `DashId`, `TextStyleId`, `TextAnchor`, `RectPx`, `LayoutContext`, `TextRun`, `DrawCmd`, `DrawList` (builder helpers, `append`, `toJson`) | 04 §5.1-5.2 |

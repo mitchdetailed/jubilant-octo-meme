@@ -125,6 +125,7 @@ private:
     void setStatus(const QString& text);
     bool pushMap(std::shared_ptr<const analysis::TrackMap> after, const QString& text,
                  bool backupFirst = false);
+    static void keepEditedDefaults(analysis::TrackMap& map);
     bool checkSection(const analysis::TrackMap& map, double startM, double endM, const QString& name);
     std::optional<model::RangeRef> lapAt(const QComboBox* combo) const;
     std::string venueOf(const model::RangeRef& lap) const;

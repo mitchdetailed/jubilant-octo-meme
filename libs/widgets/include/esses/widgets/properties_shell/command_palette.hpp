@@ -80,6 +80,9 @@ public:
     bool invokeCurrent(Qt::KeyboardModifiers modifiers);
     QStringList recentIds() const;
     qt::CommandContext capturedContext() const noexcept { return context_; }
+    // The width of the key column (device-independent px): widened for the query '?'.
+    int keyColumnWidth() const;
+    static constexpr int kKeyColumn = 2;
     static constexpr int kRecentMax = 20;
     static constexpr const char* kRecentKey = "palette.recent";
 

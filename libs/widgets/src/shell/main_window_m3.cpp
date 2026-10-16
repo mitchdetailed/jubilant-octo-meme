@@ -7,9 +7,20 @@
 
 #include "main_window_impl.hpp"
 
+#include <esses/analysis/section_detector.hpp>
+#include <esses/analysis/track_sections_rule.hpp>
 #include <esses/base/uuid.hpp>
+#include <esses/model/marker.hpp>
 #include <esses/plotcore/component_bodies.hpp>
+#include <esses/qtmodel/distance_service.hpp>
+#include <esses/qtmodel/maths_service.hpp>
+#include <esses/qtmodel/render_service.hpp>
+#include <esses/qtmodel/report_model.hpp>
+#include <esses/qtmodel/source_loader.hpp>
+#include <esses/qtmodel/track_map_service.hpp>
 #include <esses/qtmodel/undo_commands.hpp>
+#include <esses/widgets/components/channel_report.hpp>
+#include <esses/widgets/components/time_report.hpp>
 #include <esses/widgets/docks/data_window.hpp>
 #include <esses/widgets/docks/messages_window.hpp>
 #include <esses/widgets/docks/values_window.hpp>
@@ -90,6 +101,18 @@ double projectOptionNumber(const qt::ProjectSession& session, const char* group,
                              .toObject()
                              .value(QLatin1String(name));
     return v.isDouble() ? v.toDouble() : fallback;
+}
+
+// A top-level string of project.json `options` (`lapTimeFormat`), `fallback` when absent.
+QString projectOptionString(const qt::ProjectSession& session, const char* name, const QString& fallback) {
+    const JsonDoc& options = session.projectFile().options;
+    if (!options.isObject()) {
+        return fallback;
+    }
+    const QJsonValue v = QJsonDocument::fromJson(QByteArray::fromStdString(options.compact()))
+                             .object()
+                             .value(QLatin1String(name));
+    return v.isString() && !v.toString().isEmpty() ? v.toString() : fallback;
 }
 
 } // namespace
@@ -248,6 +271,13 @@ void MainWindow::buildM3Widgets(QWidget* central) {
                      DockState::AutoHide);
     connect(d.trackMap, &TrackMapWindow::editorRequested, this,
             [this] { impl_->commands->invoke(QStringLiteral("tools.track_editor")); });
+    // A log of a venue without a map: generate it when the project asks for it (06 section 9; D-203 (u)).
+    connect(
+        d.loader.get(), &qt::SourceLoader::sourcePublished, this,
+        [this](const std::shared_ptr<const model::DataSource>& source) { autoGenerateTrackMap(source, 0); });
+    // The editor's cursor span follows the selection and the venue's map as well as the worksheet.
+    connect(d.selection.get(), &qt::DataSelectionModel::changed, this, [this] { syncTrackEditorSpan(); });
+    connect(d.trackMaps.get(), &qt::TrackMapService::mapChanged, this, [this] { syncTrackEditorSpan(); });
     connect(d.trackMap, &TrackMapWindow::regenerateRequested, this,
             [this] { impl_->commands->invoke(QStringLiteral("tools.track_editor")); });
 
@@ -391,6 +421,17 @@ void MainWindow::buildM3Widgets(QWidget* central) {
             }
         });
 
+    // The heading pickers offer the active profile's report headings (04 section 12 item 6; D-203 (y)).
+    PropertiesDialog::setHeadingSource([self]() {
+        QStringList out;
+        if (!self.isNull() && self->impl_ != nullptr) {
+            for (const std::string& h : self->session().profile().reportHeadings) {
+                out.push_back(QString::fromStdString(h));
+            }
+        }
+        return out;
+    });
+
     // The default questions: Qt's dialogs.
     d.prompts.file = [this](const QString& title, const QString& filter, bool save) {
         return save ? QFileDialog::getSaveFileName(this, title, QString(), filter)
@@ -414,6 +455,23 @@ void MainWindow::buildM3Widgets(QWidget* central) {
 
 void MainWindow::buildM3Menus() {
     Impl& d = *impl_;
+    // Component > Add > type (06 section 2.2, section 4.3 item 3; D-203 (t)).
+    if (QMenu* componentMenu = d.actions->menu(QStringLiteral("Component"))) {
+        QMenu* add = componentMenu->addMenu(tr("Add"));
+        add->setObjectName(QStringLiteral("menu.Component/Add"));
+        for (const auto& [type, title] : WorksheetCanvas::addableTypes()) {
+            QAction* a = add->addAction(title);
+            a->setObjectName(QStringLiteral("add.") + type);
+            connect(a, &QAction::triggered, this,
+                    [this, id = type] { impl_->commands->invoke(QStringLiteral("component.add"), {id}); });
+        }
+        connect(add, &QMenu::aboutToShow, add, [this, add] {
+            const bool can = activeWorksheet() != nullptr && !impl_->canvas->layoutLocked();
+            for (QAction* a : add->actions()) {
+                a->setEnabled(can);
+            }
+        });
+    }
     // Data > Animation Rate (06 section 2.2): one checkable entry per rate of AnimationController::kRates.
     QMenu* dataMenu = d.actions->menu(QStringLiteral("Data"));
     if (dataMenu == nullptr) {
@@ -446,6 +504,12 @@ void MainWindow::followWorksheetM3(int index) {
                                      : nullptr;
     d.zoomBar->setWorksheet(ws);
     d.animation->setWorksheet(ws); // a running animation moves to the new worksheet (06 section 4.5)
+    disconnect(d.trackSpanFollow);
+    if (ws != nullptr) {
+        d.trackSpanFollow =
+            connect(ws, &qt::WorksheetViewModel::changed, this, [this] { syncTrackEditorSpan(); });
+    }
+    syncTrackEditorSpan();
     d.trackMap->setContext(index >= 0 && static_cast<std::size_t>(index) < d.contexts.size()
                                ? d.contexts[static_cast<std::size_t>(index)].get()
                                : nullptr);
@@ -487,6 +551,193 @@ void MainWindow::syncLayoutLock() {
     if (d.animation != nullptr) {
         const double rate = projectOptionNumber(*d.session, "animation", "rate", d.animation->rate());
         d.animation->setRate(rate);
+    }
+    // The reports' "project" time format is options.lapTimeFormat (04 section 13 item 6, 02 section 6.2;
+    // D-202).
+    if (d.canvas != nullptr) {
+        const QString format = projectOptionString(*d.session, "lapTimeFormat", QStringLiteral("m:ss.fff"));
+        for (ComponentWidget* c : d.canvas->components()) {
+            if (auto* report = qobject_cast<ChannelReport*>(c)) {
+                report->model().setProjectTimeFormat(format);
+            } else if (auto* times = qobject_cast<TimeReport*>(c)) {
+                times->model().setProjectTimeFormat(format);
+            }
+        }
+    }
+}
+
+// ---- the Track Editor's cursor span and auto-generation (06 sections 9, 13.5; D-203 (u)) ------------------
+
+namespace {
+
+bool beaconAt(const model::DataLayer& layer, Micros t) {
+    bool any = false;
+    for (const model::Marker& m : layer.markers) {
+        if (m.cls == model::MarkerClass::BCN && m.enabled) {
+            any = true;
+            if (m.t == t) {
+                return true;
+            }
+        }
+    }
+    return !any; // a layer without beacons: its laps start and end at "the line"
+}
+
+bool projectOptionBool(const qt::ProjectSession& session, const char* group, const char* name,
+                       bool fallback) {
+    const JsonDoc& options = session.projectFile().options;
+    if (!options.isObject()) {
+        return fallback;
+    }
+    const QJsonValue v = QJsonDocument::fromJson(QByteArray::fromStdString(options.compact()))
+                             .object()
+                             .value(QLatin1String(group))
+                             .toObject()
+                             .value(QLatin1String(name));
+    return v.isBool() ? v.toBool() : fallback;
+}
+
+// The lap a map is generated from: the fastest trusted flying lap, else the longest trusted lap.
+std::optional<model::RangeRef> generationLap(const model::DataSource& src) {
+    const model::DataLayer* layer = src.layer("Normal");
+    const model::RangeGroup* laps = layer == nullptr ? nullptr : layer->ranges.find("Outings:Laps");
+    if (laps == nullptr) {
+        return std::nullopt;
+    }
+    const model::Range* best = nullptr;
+    for (const model::Range& r : laps->ranges) {
+        if (!r.trusted || !r.enabled) {
+            continue;
+        }
+        const bool flying = r.lapClass == model::LapClass::Flying;
+        const bool bestFlying = best != nullptr && best->lapClass == model::LapClass::Flying;
+        if (best == nullptr || (flying && !bestFlying) ||
+            (flying == bestFlying &&
+             (flying ? r.duration() < best->duration() : r.duration() > best->duration()))) {
+            best = &r;
+        }
+    }
+    if (best == nullptr) {
+        return std::nullopt;
+    }
+    model::RangeRef ref;
+    ref.src = src.id;
+    ref.layer = std::string(layer->name);
+    ref.groupPath = "Outings:Laps";
+    ref.range = best->id;
+    ref.name = best->name;
+    return ref;
+}
+
+} // namespace
+
+void MainWindow::syncTrackEditorSpan() {
+    Impl& d = *impl_;
+    if (d.trackEditor.isNull()) {
+        return;
+    }
+    // The span between the datum and the cursor, as track distances of the Main lap through the origin rule
+    // of the Track Sections (D-195 (d)); none without a datum, a venue map or the Main lap's distance index.
+    std::optional<std::pair<double, double>> span;
+    const qt::WorksheetViewModel* ws = activeWorksheet();
+    const qt::DataSelectionModel& sel = *d.selection;
+    if (ws != nullptr && sel.hasMain() && ws->state().datumT.has_value()) {
+        const model::RangeRef main = sel.snapshot().main;
+        const auto src = sel.source(main.src);
+        const model::Range* r = sel.resolve(main);
+        const model::DataLayer* layer = src == nullptr ? nullptr : src->layer(main.layer);
+        const std::shared_ptr<const analysis::TrackMap> map =
+            src == nullptr ? nullptr : d.trackMaps->mapFor(*src);
+        const std::shared_ptr<const analysis::DistanceIndex> index =
+            r == nullptr ? nullptr : d.distance->index(main, Priority::Interactive);
+        if (r != nullptr && layer != nullptr && map != nullptr && index != nullptr &&
+            index->lengthM() > 0.0 && map->lengthM > 0.0) {
+            const double stretch = index->stretch() > 0.0 ? index->stretch() : 1.0;
+            const double lapLength = index->lengthM() * stretch;
+            const bool starts = beaconAt(*layer, r->start);
+            const bool ends = beaconAt(*layer, r->end);
+            const auto trackOf = [&](Micros t) {
+                const double lapM = index->distAt(r->start + t) * stretch;
+                return std::clamp(
+                    analysis::trackDistanceOfLapDistance(lapM, lapLength, map->lengthM, starts, ends), 0.0,
+                    map->lengthM);
+            };
+            const double a = trackOf(ws->state().cursorT);
+            const double b = trackOf(*ws->state().datumT);
+            span = std::make_pair(std::min(a, b), std::max(a, b));
+        }
+    }
+    d.trackEditor->setCursorSpan(span);
+}
+
+void MainWindow::autoGenerateTrackMap(const std::shared_ptr<const model::DataSource>& source, int attempt) {
+    Impl& d = *impl_;
+    if (source == nullptr || !projectOptionBool(*d.session, "trackMaps", "autoGenerateOnOpen", true)) {
+        return;
+    }
+    const std::string venue = qt::TrackMapService::venueOf(*source);
+    if (venue.empty() || d.trackMaps->mapFor(*source) != nullptr ||
+        (attempt == 0 && d.autoTrackVenues.count(venue) != 0)) {
+        return; // no venue to name the map, a map already, or this session tried it
+    }
+    const std::optional<model::RangeRef> lap = generationLap(*source);
+    if (!lap) {
+        return;
+    }
+    d.autoTrackVenues.insert(venue);
+    // GPS when the log has it, else Speed+LatG; an input still evaluating is waited for (a few tries).
+    qt::TrackGenerationRequest request;
+    request.lap = *lap;
+    request.method = attempt % 2 == 0 ? analysis::TrackMethod::Gps : analysis::TrackMethod::SpeedLatG;
+    const QPointer<MainWindow> self(this);
+    const std::weak_ptr<const model::DataSource> weak = source;
+    const qt::TrackGenerationStatus status =
+        d.trackMaps->generate(request, this, [self, weak, venue](Result<analysis::GeneratedTrack> result) {
+            const std::shared_ptr<const model::DataSource> src = weak.lock();
+            if (self.isNull() || self->impl_ == nullptr || src == nullptr) {
+                return;
+            }
+            Impl& i = *self->impl_;
+            if (!result) {
+                post(*i.messages, qt::Message::Severity::Warning, qt::Message::Origin::Project,
+                     tr("Track maps"),
+                     tr("No track map could be generated for %1: %2")
+                         .arg(QString::fromStdString(venue),
+                              QString::fromStdString(result.error().toString())));
+                return;
+            }
+            if (i.trackMaps->mapFor(*src) != nullptr) {
+                return; // the user made one meanwhile (the Track Editor): theirs stays
+            }
+            analysis::TrackMap map = std::move(result).value().map;
+            static_cast<void>(analysis::SectionDetector::defaults(map));
+            // An automatic step, not the user's: written without an undo command, announced in Messages.
+            if (Result<void> written =
+                    i.trackMaps->setMap(venue, std::make_shared<const analysis::TrackMap>(map));
+                !written) {
+                post(*i.messages, qt::Message::Severity::Warning, qt::Message::Origin::Project,
+                     tr("Track maps"), QString::fromStdString(written.error().toString()));
+                return;
+            }
+            post(*i.messages, qt::Message::Severity::Info, qt::Message::Origin::Project, tr("Track maps"),
+                 tr("Generated the track map of %1 (%2 m) from the opened log")
+                     .arg(QString::fromStdString(venue))
+                     .arg(map.lengthM, 0, 'f', 0));
+        });
+    if (status.state == qt::TrackGenerationState::Pending && attempt < 40) {
+        // An input (Corr Speed, the GPS chain) is being evaluated: try again when a channel is ready.
+        auto* once = new QObject(this);
+        connect(d.maths.get(), &qt::MathsService::channelReady, once, [this, once, weak, attempt] {
+            once->deleteLater();
+            if (const std::shared_ptr<const model::DataSource> src = weak.lock()) {
+                autoGenerateTrackMap(src, attempt + 2);
+            }
+        });
+        return;
+    }
+    if (status.state == qt::TrackGenerationState::Failed && request.method == analysis::TrackMethod::Gps &&
+        attempt < 40) {
+        autoGenerateTrackMap(source, attempt + 1); // no GPS: Speed+LatG
     }
 }
 
@@ -783,6 +1034,11 @@ void MainWindow::registerM3Commands() {
             const QList<C> chain = w.impl_->router->chainFor(QApplication::focusWidget());
             w.impl_->palette->popup(chain.isEmpty() ? C::Global : chain.front());
         });
+    // Help > Keyboard Shortcuts (06 section 2.2 and section 15 item 5): the palette with the query '?' (every
+    // command, its keys in a widened column). A menu command without a keymap row, as Component > Add: 06
+    // section 14.4 gives it no id (D-203 (ah)).
+    add("help.keyboard_shortcuts", tr("Keyboard Shortcuts"), "Help", C::Global, {},
+        [](MainWindow& w, const QVariantList&) { w.impl_->palette->popup(C::Global, QStringLiteral("?")); });
     add(
         "view.fullscreen", tr("Full Screen"), "View", C::Global, {},
         [](MainWindow& w, const QVariantList&) { w.setFullScreenMode(!w.fullScreenMode()); }, {},
@@ -839,6 +1095,33 @@ void MainWindow::registerM3Commands() {
         options.range = *range == 1   ? ExportOptions::Range::SelectedPadded
                         : *range == 2 ? ExportOptions::Range::AllData
                                       : ExportOptions::Range::CurrentZoom;
+        // A drawn component's export runs on the pool and the file is written when it completes: the GUI
+        // thread never waits for it and the component may go meanwhile (D-203 (x)).
+        if (const ComponentWidget::ExportJob job = c->exportJob(options)) {
+            Impl& i = *w.impl_;
+            auto produced = std::make_shared<std::optional<QByteArray>>();
+            const QString key = QStringLiteral("export/") + QString::fromStdString(c->spec().id.str());
+            w.hint(tr("Exporting to %1...").arg(QFileInfo(file).fileName()));
+            i.render->submitBuild(
+                c->context().worksheetId, key, Priority::Interactive,
+                [job, produced](const CancelToken& cancel) -> Result<plot::ComponentBuild> {
+                    *produced = job(cancel);
+                    return plot::ComponentBuild{};
+                },
+                &w,
+                [self = QPointer<MainWindow>(&w), produced, file](Result<plot::ComponentBuild>) {
+                    if (self.isNull()) {
+                        return;
+                    }
+                    FileSink sink(file);
+                    if (*produced && sink.write(**produced)) {
+                        self->hint(tr("Exported to %1").arg(QFileInfo(file).fileName()));
+                    } else {
+                        self->hint(tr("This component has no data to export"));
+                    }
+                });
+            return;
+        }
         FileSink sink(file);
         if (c->exportData(sink, options)) {
             w.hint(tr("Exported to %1").arg(QFileInfo(file).fileName()));
@@ -852,7 +1135,10 @@ void MainWindow::registerM3Commands() {
 
     // ---- tools ----
     add("tools.track_editor", tr("Track Editor..."), "Tools", C::Global, {},
-        [](MainWindow& w, const QVariantList&) { w.showEditor(w.trackEditor(), "trackEditor"); });
+        [](MainWindow& w, const QVariantList&) {
+            w.showEditor(w.trackEditor(), "trackEditor");
+            w.syncTrackEditorSpan(); // "Add from Cursor Span" follows the worksheet from now on
+        });
     add("tools.corrected_speed", tr("Corrected Speed and Distance..."), "Tools", C::Global, {},
         [](MainWindow& w, const QVariantList&) {
             w.showEditor(w.correctedSpeedDialog(), CorrectedSpeedDialog::kGeometryKey);
@@ -974,6 +1260,62 @@ void MainWindow::registerM3Commands() {
         },
         hasFocused);
 
+    // ---- Component > Add > type (06 section 4.3 item 3; D-203 (t)): menu and canvas only, args [type] ----
+    add(
+        "component.add", tr("Add Component"), "", C::Worksheet, {},
+        [](MainWindow& w, const QVariantList& args) {
+            Impl& i = *w.impl_;
+            const QString type = args.isEmpty() ? QString() : args.front().toString();
+            if (i.canvas->layoutLocked()) {
+                w.hint(tr("The layout is locked"));
+                return;
+            }
+            QString title;
+            for (const auto& [t, name] : WorksheetCanvas::addableTypes()) {
+                if (t == type) {
+                    title = name;
+                }
+            }
+            if (title.isEmpty() || !ComponentWidget::isRegistered(type)) {
+                w.hint(tr("No component type %1").arg(type));
+                return;
+            }
+            const int wb = i.session->activeWorkbook();
+            const auto& books = i.session->workbooks();
+            if (wb < 0 || static_cast<std::size_t>(wb) >= books.size() || i.activeWorksheet < 0 ||
+                static_cast<std::size_t>(i.activeWorksheet) >=
+                    books[static_cast<std::size_t>(wb)].worksheets.size()) {
+                return;
+            }
+            const project::WorksheetDef& sheet =
+                books[static_cast<std::size_t>(wb)].worksheets[static_cast<std::size_t>(i.activeWorksheet)];
+            project::ComponentSpec spec;
+            spec.id = uuidRandom();
+            spec.type = type.toStdString();
+            spec.version = 1;
+            spec.body = JsonDoc::parse("{}").value();
+            spec.rect = WorksheetCanvas::placeForAdd(sheet, i.canvas->grid());
+            int z = 0;
+            std::set<Uuid> before;
+            for (const project::ComponentSpec& c : sheet.components) {
+                z = std::max(z, c.z + 1);
+                before.insert(c.id);
+            }
+            spec.z = z;
+            i.session->undoStack().push(new qt::AddComponentsCommand(*i.session, wb, i.activeWorksheet,
+                                                                     {spec}, tr("Add %1").arg(title)));
+            for (const project::ComponentSpec& c :
+                 i.session->workbooks()[static_cast<std::size_t>(wb)]
+                     .worksheets[static_cast<std::size_t>(i.activeWorksheet)]
+                     .components) {
+                if (before.count(c.id) == 0) {
+                    i.canvas->selectIds({c.id});
+                    i.canvas->focusComponent(i.canvas->componentById(c.id)); // it receives focus
+                }
+            }
+        },
+        hasWorksheet);
+
     // ---- the edit rows of components (06 section 4.3 item 10) ----
     add(
         "component.cut", tr("Cut Components"), "Edit", C::Worksheet, {QStringLiteral("Ctrl+X")},
@@ -1085,10 +1427,15 @@ void MainWindow::registerM3Commands() {
                     w.hint(tr("Not available for this component"));
                 }
             },
-            [focused, contexts](MainWindow& w) {
+            [focused, contexts, id](MainWindow& w) {
                 const ComponentWidget* c = focused(w);
-                return c != nullptr &&
-                       std::find(contexts.begin(), contexts.end(), c->commandContext()) != contexts.end();
+                if (c == nullptr ||
+                    std::find(contexts.begin(), contexts.end(), c->commandContext()) == contexts.end()) {
+                    return false;
+                }
+                // The outing graph's zoom rectangle is the outing graph's alone (D-203 (w)).
+                return id != QLatin1String("zoom.outing_rect") ||
+                       QLatin1String(c->type()) == QLatin1String("outing");
             });
     }
 
@@ -1141,7 +1488,29 @@ void MainWindow::registerM3Commands() {
         "offset.axis_toggle", tr("Offset Axis"), "Component/Offset", C::Graph, {QStringLiteral("O")},
         [](MainWindow& w, const QVariantList&) {
             qt::WorksheetViewModel* ws = w.activeWorksheet();
-            ws->setOffsetAxis(!ws->state().offsetAxis);
+            const bool on = !ws->state().offsetAxis;
+            // Turning the axis off zeroes every selected range's offsets as one undo command (04 section 3.3
+            // item 2), although the view model commits each range and domain on its own.
+            bool offsets = false;
+            const plot::SelectionSnapshot& snap = w.selection().snapshot();
+            std::vector<model::RangeRef> ranges{snap.main}; // the overlays too while F4 hides them
+            if (const std::optional<model::RangeRef>& o0 = snap.overlay0) {
+                ranges.push_back(*o0);
+            }
+            ranges.insert(ranges.end(), snap.overlays.begin(), snap.overlays.end());
+            for (const model::RangeRef& range : ranges) {
+                const model::Range* r = w.selection().resolve(range);
+                offsets = offsets || (r != nullptr && (r->offsetUs != 0 || r->offsetM != 0.0));
+            }
+            QUndoStack& stack = w.session().undoStack();
+            const bool macro = !on && offsets;
+            if (macro) {
+                stack.beginMacro(MainWindow::tr("Clear alignment offsets"));
+            }
+            ws->setOffsetAxis(on);
+            if (macro) {
+                stack.endMacro();
+            }
         },
         hasWorksheet,
         [](MainWindow& w) {
@@ -1190,8 +1559,14 @@ void MainWindow::registerM3Commands() {
     // ---- annotations and the zoom summary bar ----
     add(
         "cursor.add_annotation", tr("Add Annotation..."), "Component/Cursor", C::Graph, {},
-        [](MainWindow& w, const QVariantList&) {
+        [focused](MainWindow& w, const QVariantList& args) {
             Impl& i = *w.impl_;
+            // The focused graph adds it itself (with its active channel, as its marker band does), so both
+            // Add paths store the same record (D-203 (q)).
+            if (ComponentWidget* c = focused(w);
+                c != nullptr && c->handleCommand(QStringLiteral("cursor.add_annotation"), args)) {
+                return;
+            }
             const model::RangeRef main = i.selection->snapshot().main;
             const auto src = i.selection->source(main.src);
             const model::Range* r = i.selection->resolve(main);
@@ -1207,6 +1582,11 @@ void MainWindow::registerM3Commands() {
             a.id = uuidRandom();
             a.tUs = r->start + w.activeWorksheet()->state().cursorT; // Main-source absolute time (rule 6)
             a.text = text->trimmed().toStdString();
+            if (ComponentWidget* c = focused(w)) {
+                if (const std::optional<QString> active = c->activeChannel()) {
+                    a.channel = active->toStdString();
+                }
+            }
             i.session->undoStack().push(
                 new qt::SetAnnotationCommand(*i.loader, *src, main.layer, std::move(a)));
         },
