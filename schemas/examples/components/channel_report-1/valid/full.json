@@ -1,0 +1,36 @@
+{
+  "report": {
+    "scope": "selectedRanges",
+    "headers": ["Outings:Laps"],
+    "channels": [
+      {
+        "name": "Corr Speed",
+        "stats": ["max", "avg"]
+      }
+    ],
+    "options": {
+      "excludeOverlays": false,
+      "includeUntrusted": false,
+      "interpolateBoundaries": false,
+      "probeSeconds": 5,
+      "zoomLinked": false
+    }
+  },
+  "layout": "channelsInRows",
+  "highlight": {
+    "min": {
+      "on": true,
+      "colour": "#2060ff"
+    },
+    "max": {
+      "on": true,
+      "colour": "#ff3030"
+    }
+  },
+  "deltaVsOverlay0": false,
+  "timeFormat": "project",
+  "splitter": {
+    "mode": "none",
+    "pos": 0.5
+  }
+}

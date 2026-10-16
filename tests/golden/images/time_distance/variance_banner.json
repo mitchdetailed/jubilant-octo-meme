@@ -1,0 +1,75 @@
+{
+    "activeChannel": "Corr Speed",
+    "body": {
+        "display": {
+            "axis": {
+                "showXScrollbar": false,
+                "showYScrollbar": false
+            },
+            "showBands": false,
+            "showMarkers": false,
+            "variance": {
+                "show": true
+            }
+        },
+        "groups": [
+            {
+                "name": "Speed",
+                "scaleMode": "channel",
+                "traces": [
+                    {
+                        "channel": "Corr Speed",
+                        "displayUnit": "km/h",
+                        "dps": 1
+                    }
+                ]
+            }
+        ]
+    },
+    "case": "variance_banner",
+    "cursorUs": 12000000,
+    "data": "libs/plotcore/tests/td_m3_cases.hpp (the synthetic sources of td_golden_cases.hpp with laps, track sections, markers, device events, status channels, annotations and lap distance indexes)",
+    "datumUs": null,
+    "domain": "distance",
+    "dprs": [
+        1,
+        2
+    ],
+    "focused": false,
+    "fonts": "tests/golden/fonts (Noto Sans), QtTextMetrics",
+    "offsetAxis": false,
+    "overrideLimitsBase": {
+    },
+    "pendingStripe": false,
+    "scheme": "Test Light",
+    "shows": "F3 with an overlay whose source has no distance data: the variance banner",
+    "sizeLogical": [
+        440,
+        300
+    ],
+    "slots": [
+        {
+            "distanceData": true,
+            "kind": "Main",
+            "lap": 0,
+            "number": 0,
+            "offsetM": 0,
+            "offsetUs": 0,
+            "source": "synthetic_a.ld"
+        },
+        {
+            "distanceData": false,
+            "kind": "Overlay",
+            "lap": 0,
+            "number": 1,
+            "offsetM": 0,
+            "offsetUs": 0,
+            "source": "synthetic_c.ld"
+        }
+    ],
+    "type": "time_distance",
+    "zoom": [
+        0,
+        1500
+    ]
+}

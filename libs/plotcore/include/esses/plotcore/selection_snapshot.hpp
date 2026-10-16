@@ -50,6 +50,12 @@ struct SelectionSnapshot {
 Rgba traceColour(const project::Scheme& scheme, const SelectionSnapshot& selection, const Slot& slot,
                  int channelColourIndex);
 
+// The key colour of a range (06 section 5.3 item 3: the range band, Track Position dots, variance traces, the
+// offset sub-axes, scatter / histogram overlays, a gauge's reference value): Main -> roles.cursorMain,
+// Overlay 0 -> roles.overlay0, Overlay k -> overlayPalette[(k - 1) mod 9]. Traces themselves take
+// traceColour.
+Rgba rangeKeyColour(const project::Scheme& scheme, const Slot& slot);
+
 // The overlayStyle dash and width scale of a slot (D-100): Overlay n takes scheme.overlayStyle ("solid",
 // "dash", "dot", "dashDot"; widthScale > 0), Main and Overlay 0 are solid at scale 1.
 DashId traceDash(const project::Scheme& scheme, const Slot& slot);

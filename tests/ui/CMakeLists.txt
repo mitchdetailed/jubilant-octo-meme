@@ -3,7 +3,8 @@
 #
 # Qt Test suites across the Qt layers (07 section 4.2): tst_walkthrough_m1 (AC-M1-01), tst_f9_preservation
 # (AC-M1-09), tst_corr_dist_prefetch (AC-M1-10), tst_render_parity (AC-M1-05), the keymap rows (AC-M1-06); M2:
-# tst_project_recovery (AC-M2-06), tst_lap_editor (AC-M2-05) and tst_mapping_panel (AC-M2-11) in the shell.
+# tst_project_recovery (AC-M2-06), tst_lap_editor (AC-M2-05) and tst_mapping_panel (AC-M2-11) in the shell; M3:
+# tst_offset_axis (AC-M3-09) and tst_demo_m3 (the demo script of 07 section 6.5), each over a log it writes.
 # Every tst_<name>.cpp here is one executable (ctest ui.tst_<name>, offscreen); other .cpp files are shared
 # helpers. Added from the top-level CMakeLists.txt with ESSES_BUILD_QT and ESSES_BUILD_TESTS.
 

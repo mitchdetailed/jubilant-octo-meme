@@ -1,0 +1,69 @@
+{
+    "activeChannel": "",
+    "body": {
+        "cursorStyle": "none",
+        "intervalAverage": {
+            "binWidth": {
+                "unit": "km/h",
+                "v": 10
+            },
+            "enabled": true
+        },
+        "layout": "average",
+        "showGrid": false,
+        "style": "trend",
+        "traces": [
+            {
+                "yChannel": "Corr Speed"
+            },
+            {
+                "yChannel": "Ground Speed"
+            }
+        ],
+        "trend": {
+            "order": 3,
+            "type": "poly"
+        },
+        "xChannel": "Corr Speed"
+    },
+    "caption": true,
+    "case": "scatter_average_poly",
+    "colourLegend": false,
+    "cursorUs": 5000000,
+    "data": "libs/plotcore/tests/td_golden_cases.hpp (synthetic rational data, sources synthetic_a/b/c.ld); cases in libs/plotcore/tests/plots_golden_cases.hpp",
+    "datumUs": null,
+    "domain": "time",
+    "dprs": [
+        1,
+        2
+    ],
+    "focused": true,
+    "fonts": "tests/golden/fonts (Noto Sans), QtTextMetrics",
+    "pendingStripe": false,
+    "scheme": "Test Light",
+    "sizeLogical": [
+        420,
+        260
+    ],
+    "slots": [
+        {
+            "distanceData": true,
+            "kind": "Main",
+            "lap": 1,
+            "number": 0,
+            "source": "synthetic_a.ld"
+        },
+        {
+            "distanceData": true,
+            "kind": "Overlay0",
+            "lap": 1,
+            "number": 0,
+            "source": "synthetic_b.ld"
+        }
+    ],
+    "type": "scatter",
+    "zoom": [
+        0,
+        20000000
+    ]
+}

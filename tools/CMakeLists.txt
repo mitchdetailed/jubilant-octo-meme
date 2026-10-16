@@ -67,6 +67,11 @@ if(Python3_Interpreter_FOUND)
            COMMAND "${Python3_EXECUTABLE}" -I "${CMAKE_CURRENT_SOURCE_DIR}/gen_text_fixtures.py"
                    --root "${CMAKE_SOURCE_DIR}" --check)
   set_tests_properties(fixtures.text_generator_current PROPERTIES LABELS "fixtures;lint" TIMEOUT 120)
+  # M3 (AC-M3-04): the synthetic circuit of the track tests is what tools/gen_track_fixtures.py writes.
+  add_test(NAME fixtures.track_generator_current
+           COMMAND "${Python3_EXECUTABLE}" -I "${CMAKE_CURRENT_SOURCE_DIR}/gen_track_fixtures.py"
+                   --root "${CMAKE_SOURCE_DIR}" --check)
+  set_tests_properties(fixtures.track_generator_current PROPERTIES LABELS "fixtures;lint" TIMEOUT 120)
 endif()
 
 # The generator is deterministic: the same family written twice is bit-identical.

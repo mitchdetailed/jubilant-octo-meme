@@ -1,0 +1,183 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:track-1",
+  "title": "Esses track map (track-1)",
+  "description": "A venue's track map: trackmaps/<venue>.track.json in a project (02 section 6.9, D-027), owned by esses_analysis TrackMap and wrapped by esses_project TrackMapFile. The centreline is ENU metres about origin, rows [x, y, cumDist]; optional inner and outer lines; named sections at least 10 m long in section sets (Default for the generated Turns/Straights), each with a category (corner, straight or a user category). Unknown top-level members are preserved.",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "lines"],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072).",
+      "type": "string",
+      "pattern": "^(urn:esses:track-1|esses:track-1|https://[^/\\s]+(/[^/\\s]+)*/track-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "name": {
+      "type": "string"
+    },
+    "venue": {
+      "description": "The Venue detail the map binds to.",
+      "type": "string"
+    },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lat", "lon"],
+      "properties": {
+        "lat": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "lon": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "alt": {
+          "type": "number"
+        }
+      }
+    },
+    "rotationDeg": {
+      "type": "number",
+      "minimum": -360,
+      "maximum": 360
+    },
+    "direction": {
+      "enum": ["cw", "ccw"]
+    },
+    "closed": {
+      "type": "boolean"
+    },
+    "length": {
+      "description": "A length with its unit (D-010).",
+      "$ref": "#/definitions/unitValue"
+    },
+    "generatedFrom": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "enum": ["gps", "speedLatG"]
+        },
+        "source": {
+          "type": "string"
+        },
+        "lap": {
+          "type": "string"
+        }
+      }
+    },
+    "lines": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["centre"],
+      "properties": {
+        "centre": {
+          "type": "array",
+          "items": {
+            "description": "[x, y, cumDist] in metres (ENU about origin).",
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "inner": {
+          "type": "array",
+          "items": {
+            "description": "[x, y, cumDist] in metres (ENU about origin).",
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "outer": {
+          "type": "array",
+          "items": {
+            "description": "[x, y, cumDist] in metres (ENU about origin).",
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "startDist", "endDist"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "set": {
+            "description": "Section set; Default when absent.",
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "startDist": {
+            "description": "A length with its unit (D-010).",
+            "$ref": "#/definitions/unitValue"
+          },
+          "endDist": {
+            "description": "A length with its unit (D-010).",
+            "$ref": "#/definitions/unitValue"
+          },
+          "category": {
+            "description": "corner, straight or a user category.",
+            "type": "string",
+            "minLength": 1
+          },
+          "userDefined": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "x-i2": {
+      "description": "Imported attributes that are not implemented (D-019).",
+      "type": "object"
+    }
+  },
+  "definitions": {
+    "unitSymbolOrEmpty": {
+      "description": "A unit symbol or alias of the unit registry (units-1), or \"\" for the unitless unit; no leading or trailing white space.",
+      "type": "string",
+      "pattern": "^(\\S(.*\\S)?)?$"
+    },
+    "unitValue": {
+      "description": "A persisted number with its unit (D-010): {\"v\": number, \"unit\": symbol}, \"\" for a unitless value. The value is in the unit as written; readers convert, writers keep the written unit.",
+      "type": "object",
+      "required": ["v", "unit"],
+      "properties": {
+        "v": {
+          "type": "number"
+        },
+        "unit": {
+          "$ref": "#/definitions/unitSymbolOrEmpty"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

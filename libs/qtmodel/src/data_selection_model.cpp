@@ -767,7 +767,19 @@ void DataSelectionModel::setTrusted(const model::RangeRef& r, bool trusted) {
     }
     ov.trusted = trusted;
     doc.setRangeOverride(layer, std::move(ov));
+    commitSidecar(src->id, std::move(doc), tr("Edit trust"));
+}
+
+bool DataSelectionModel::commitSidecar(const model::SourceId& id, model::SidecarDocument doc,
+                                       const QString& undoText) {
+    const auto src = source(id);
+    if (!sidecarCommit_ || src == nullptr) {
+        return false;
+    }
+    sidecarCommitText_ = undoText;
     sidecarCommit_(src, std::move(doc));
+    sidecarCommitText_.clear();
+    return true;
 }
 
 void DataSelectionModel::setFilter(const model::SourceId& source, const FilterSpec& spec) {

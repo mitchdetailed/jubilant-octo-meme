@@ -1,0 +1,22 @@
+{
+  "bad-direction.json": {
+    "pointer": "/direction",
+    "why": "the direction is cw or ccw"
+  },
+  "missing-lines.json": {
+    "pointer": "",
+    "why": "a track map has a centreline"
+  },
+  "point-two-values.json": {
+    "pointer": "/lines/centre/0",
+    "why": "centreline rows are [x, y, cumDist]"
+  },
+  "section-without-unit.json": {
+    "pointer": "/sections/0/startDist",
+    "why": "section distances carry their unit (D-010)"
+  },
+  "wrong-schema-id.json": {
+    "pointer": "/$schema",
+    "why": "the $schema names track-1"
+  }
+}

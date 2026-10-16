@@ -2,6 +2,185 @@
 
 All notable changes are recorded here, newest first. The project follows semantic versioning from 0.1.
 
+## Unreleased (M3)
+
+- The re-verification of the M3 fix pass (D-203 (ai)): `gCorrection` estimates the longitudinal accelerometer's
+  offset while it follows the wheel (from the 1 s slip reference's error, critically damped) and ends a
+  prediction after 3 s, taking its drift from the wheel as offset, so an offset can no longer latch the
+  prediction: a constant 30 m/s wheel under a 2.1 or 2.5 m/s^2 offset now gives the wheel sample for sample (121.7
+  and 147.8 m/s off after 60 s before), under 5 m/s^2 one excursion of at most 3.5 s (at most 16.7 m/s off) and
+  then the wheel; a lock under a 2.5 m/s^2 offset is still bridged (within 0.07 m/s of the car). The
+  `CorrectedSpeed::gCorrection` header describes the algorithm as built. The keymap harness's palette rows
+  (AC-M3-12) send the user's key events: CTRL+SHIFT+P, the command id typed, DOWN, ENTER.
+- The M3 fix pass (D-203): the 89 findings of the M3 reviews checked one by one, 80 fixed with a regression
+  test, 2 rejected, 7 deferred. Engine: `gCorrection` catches a lock or spin that builds over several samples (a
+  slip reference with a 1 s time constant); the channel report's Overlay 0 delta pairs rows below the compared
+  ranges (different laps now have delta cells), untrusted laps are cut out of outing and detail rows too, `start`
+  and `end` need the channel to cover the bound, `absMax` and `delta` are right under offset and negative-scale
+  units, each column has one display unit across sources, detail-group headings read their detail, impossible
+  dates are refused and an unambiguous mm/dd/yyyy is read as such; the time report skips disabled laps and keeps
+  two sections of one name; `StatCache` fits its 64 bytes per cell; a sample at the histogram's upper limit is
+  counted; track sections map proportionally onto a lap within 5 % of the map and stop at the end of a lap that
+  does not end at a beacon; Speed+LatG closes figure-eight circuits; GPS dropouts across the start line are
+  bridged; timestamped scatter x channels, the through-zero trend basis, scatter overlay units and the variance
+  banner for multi-lap ranges are fixed. UI: hidden worksheets idle (no Dynamic builds, sources released, reports
+  wait for their show) and keep their view models through worksheet renames and moves; edits from a dialog of a
+  hidden worksheet are stored and undoable; Cancel keeps outside edits and unapplied rows survive them; channel
+  pickers list the maths outputs and follow new logs; heading pickers offer the profile's report headings;
+  Component > Add and right-click menus (channel label, component, canvas); Export Data runs on the pool;
+  ALT+UP/DOWN zoom about the active channel's cursor value; the animation rates reach x10 in the menu; L, G, Y,
+  E, SHIFT+E and K are offered only where they change something; component keys follow the user's keymap; the
+  Track Editor gets the cursor span and a missing venue map is generated on open; Help > Keyboard Shortcuts
+  (`help.keyboard_shortcuts`, a menu command without a keymap row, like Component > Add). Tests: the keymap harness runs every implemented
+  command through the palette as well (AC-M3-12), the properties round trip checks every leaf, the demo checks
+  the datum and delta numbers, negative checks drain the pool first. Docs: D-203 (amends D-127 (a): 21
+  time_distance cases, locally rendered PNGs committed as provisional), CLEANROOM rows for D-200, D-202 and D-203,
+  the track fixture family's layout recorded; the CI lint job's timeout is 75 min.
+- The M3 acceptance pass (07 §6.2, §6.5; AC-M3-01 to AC-M3-12; D-202): the shipped circuit workbook gains the
+  Overview, Braking, Corners, Reports and Track worksheets, so every MVP component type appears in it (M1's
+  Overlay and Driver worksheets unchanged); the range key colour of 06 §5.3 item 3 (`plot::rangeKeyColour`: Main
+  red, Overlay 0 its role, Overlay k `overlayPalette[k - 1]`) now colours the variance traces, the offset
+  sub-axes, the range band's overlay cells, the Track Position dots, scatter and histogram overlays and a gauge's
+  reference value, where the slot's trace colour made every overlay the same channel colour (eleven `DrawList`
+  goldens changed in colour only, their provisional PNGs re-rendered); O turning the offset axis off zeroes every
+  selected range's offsets as one undo step ("Clear alignment offsets"); the channel and time reports' `project`
+  time format follows `options.lapTimeFormat`; `esses-plot-bench` gains
+  `plot.variance_f3_no_overlay` (AC-M3-05: F3 without an overlay costs nothing and builds no `VarianceTable`);
+  `tools/check_keymap_coverage.py` takes M3 as the current milestone and `ui.tst_keymap` gains the generic row of
+  06 §14.5 for the planned and reserved rows. New tests: `widgets.tst_values_list_goldens` (three values_list
+  cases at DPR 1 and 2: exact table goldens, provisional Windows PNGs), `ui.tst_offset_axis` (AC-M3-09 in the
+  shell: steps per source, the Data window amounts, O zeroing as one step, the sidecar surviving a reopen) and
+  `ui.tst_demo_m3` (the demo script of 07 §6.5 offscreen, over a log written on the synthetic circuit).
+- The properties dialogs and the shell's M3 wiring (07 §6.1; AC-M3-01, AC-M3-08, AC-M3-10, AC-M3-11, AC-M3-12;
+  D-200): `PropertiesDialog` with schema-driven tabs for the ten MVP types (F5, CTRL+N on the Channels tab;
+  modeless, Apply/OK one undo step, Cancel restores, refreshed by undo/redo, geometry per type), `FieldBinder`
+  (untouched members left as they were, inline validation against the body schema) and its editors
+  (`field_editors.hpp`); the zoom summary bar above the worksheet tabs (click, drag, SHIFT+click, double-click);
+  the Corrected Speed and Distance dialog; the Layout Editor (CTRL+F7: move, copy, move to, rename, delete,
+  duplicate, new, import/export, Lock Layout); the command palette (CTRL+SHIFT+P; `>` worksheets, `@` channels,
+  `#` ranges, `?` disabled commands, recent first); animation (A, the tool bar, Data > Animation Rate; the cursor
+  advances with Dynamic-only repaints); Print to Clipboard and Export Data; component cut/copy/paste/delete and
+  multi-select, move, resize, splitters, ALT+arrow nudges, z order and maximise on the canvas (edited in place,
+  merged undo steps, the layout lock); the Track Map dock and one `TrackMapService` for the window; full screen;
+  Select Worksheet (F7), Units List, Open Log with a Details pane, New/Open/Close Project, Close All, Import
+  Data; the offset axis rows and Add Annotation; `ComponentWidget::handleCommand`, through which the shell
+  offers the component rows (vertical zoom and pan, CTRL+SHIFT+C, the track view, Copy Equation, the mouse rows)
+  to the focused component, and the generic L, K, G, S, ALT+n, Y, E, SHIFT+E, F3, M body edits. Every M3 keymap
+  row is implemented with its keymap test (the mouse rows by pointer events). `esses-plot-bench` gains
+  `plot.animation_frame_10x` (AC-M3-10). Goldens: the zoom summary bar's DrawList JSON (exact) and provisional
+  Windows PNGs (`tests/golden/{drawlist,images}/zoom_summary/`).
+- The time_distance completion (07 §6.1, parity-first §5.4, 04 §8; AC-M3-02, AC-M3-05, AC-M3-09; D-201):
+  `TimeDistanceBuilder` draws the range, section and marker bands (neighbouring laps, track sections by category,
+  beacons, device events, sidecar annotations with their dotted lines), overlapped mode with Lo/Hi handles, the
+  zero / min / max scale lines (the channel override limits, now on `ResolvedChannel`), the status strip, the
+  variance panel (one `VarianceTable` per visible overlay, none without one), the offset axis with each slot's
+  offset, the horizontal and the active group's vertical scrollbar, the key's value@datum and Δ and the
+  measurements row (min / max / avg read on the worker), and the crosshair and "none" cursor styles; every
+  member of `time_distance-1` is typed. `TimeDistanceGraph` answers F3, M, E, SHIFT+E, Y, G, S (undoable body
+  edits), CTRL+SHIFT+C, the vertical zoom and pan keys and the programmatic forms of the mouse rows; band
+  double-clicks zoom to a range or section, the scrollbars pan, page and reset, Lo/Hi handles and panel splitters
+  edit the groups, sub-axis drags offset a slot (one commit at the release), the measurement hover line and
+  double-click, tooltips, annotation Edit / Remove, Export Data. `WorksheetViewModel` steps each range by its own
+  source's sample period and holds the commit during a drag; `DataSelectionModel::commitSidecar`. `KeyLayout`
+  keeps up to 30 % of the key for the labels. Goldens: thirteen M3 time_distance cases as `DrawList` JSON (exact)
+  and provisional Windows PNGs (`goldens.json` gains per-case provenance; `dark_scheme` changed with the datum's
+  key columns and is marked stale until replaced from the ubuntu artefact).
+- The report and track components (07 §6.1; AC-M3-02, AC-M3-03, AC-M3-04; D-199): `esses_qtmodel` `ReportModel`
+  (inputs on the GUI thread, `ReportEngine`/`TimeReportEngine` on the pool, the workspace `StatCache`, scopes,
+  zoom link, both layouts, overlay row labels, pending/missing/error cells, time formats, styling roles, TSV/CSV
+  quoting), the new `TrackMapService` (track maps by venue in `trackmaps/`, written at once with a backup,
+  `generate` for GPS and Speed+LatG on a worker) and `TrackMapCommand` (every track-map edit one undo step),
+  `RenderService::pool`/`dispatcher`/`statCache`/`setTrackMaps` (the Main source's venue map in the build
+  inputs) and `SourceLoader::setTrackMaps` (phase 2 builds the Track Sections groups, again on new lap indexes and
+  map changes). `esses_widgets` `ChannelReport` and `TimeReport` (frozen first column, min/max highlight, delta
+  vs Overlay 0, transposed layout, % bands with ALT+n, italic untrusted rows, Export Data as CSV, Copy as TSV),
+  `TrackPosition` (the venue map with the zoom span and cursor dots; PLUS/MINUS, wheel, drag and double-click as
+  one spec edit per gesture; background mode), `TrackMapWindow` (the Track Map dock's content and actions) and
+  `TrackEditor` (lap and method, Generate with preview, Accept with default sections, user sections, rename,
+  delete, auto-generate option; its constructor no longer takes a `SourceLoader`). Goldens: three cases each at
+  DPR 1 and 2 (provisional pixel goldens in `tests/golden/images/{channel_report,time_report,track_position}/`,
+  exact table goldens in `tests/golden/tables/`, `DrawList` JSON goldens
+  `tests/golden/drawlist/track_position/widget_*`).
+- The plots components (07 §6.1; AC-M3-02; D-198): `ScatterPlot` (points, trend and equation with Copy Equation,
+  overlapped/tiled/average, interval average, colour channel and legend, gating; a click moves the cursor to the
+  nearest Main point, LEFT/RIGHT step Main points; box zoom, wheel and axis restore on its own axes; G, S, Y, K, L),
+  `Histogram` (bar/line/text, overlapped/tiled, gating, colour sub-bars, overlays outlined; the cursor bin; a click
+  on a tile makes its trace active; G, S, K, L), `OutingGraph` (moved to `src/components/plots/`: the draggable
+  zoom rectangle, the lap double-click, the wheel and rubber band on the worksheet zoom, S and L, like-units
+  grouping), `NumericGauge` and `BarGauge` (ALT+n colour bands), all on the new `LayeredComponent` base and each
+  with Export Data as CSV. `esses_plotcore` `GaugeNumericBody`, `GaugeBarBody` and `GaugeGeometry` (the numeric
+  gauge's value and reference with a dynamic font, colour bands on the text or the background; the bar gauge's
+  scale, band lines or strip, bar from its origin, reference marker), `ScatterGeometry::exportSets`/`axes`,
+  `HistogramGeometry::exportTable`, and the binners now read each channel's own interpolation. The `DrawList` IR
+  gains `TextRun::scale` (drawn by `RasterBackend`; in the JSON form only when not 1). Goldens: `DrawList` JSON in
+  `tests/golden/drawlist/gauge_numeric`, `gauge_bar`; pixel goldens of three cases per component in
+  `tests/golden/images/{scatter,histogram,outing,gauge_numeric,gauge_bar}/` (provisional Windows renders,
+  `golden.tst_golden_plots`).
+- `esses_analysis` reports (07 §6.1; AC-M3-03; D-197): `ReportSpec` and `TimeReportSpec` read their body JSON
+  (`ReportSpec::toJson` writes every member); `StatCache` is an LRU of 128-bit key digests within its 64 MB budget;
+  `ReportEngine::statistic` computes avg, min, max, absMax, start, end, change, stdDev and delta over the valid
+  samples with the 5 s probe and interpolated boundaries (one pass per range and channel; new trailing
+  `store::Interp` parameter); `ReportEngine::cells` divides the ranges in scope by the headers in any order
+  (detail headings label rows), excludes untrusted ranges unless included, orders sources by Log Date / Log Time,
+  pairs Main with Overlay 0 for the delta columns, converts to display units, marks column extremes, reuses and
+  fills the StatCache and prefetches chunks ahead of its scans; `TimeReportEngine` builds section-time tables with
+  the eclectic row, the rolling minimum over contiguous laps, totals and % bands. `plot::componentChannelUses` now
+  lists a `channel_report`'s channels. New `bench/report_bench` (`esses-report-bench`; 50 laps x 30 channels x
+  8 statistics cold within 300 ms; ctest `bench.report_bench`, `bench.report_bench.smoke`).
+- `esses_plotcore` M3 geometry (07 §6.1; AC-M3-02; D-196): `BandLayout` (range, section and marker bands with
+  hits), the `KeyLayout` datum and measurement columns (`cellRect`, `emitDatumValues`, `emitMeasurements`;
+  the default columns keep the M1 layout), the `HitTester` point sets (64 x 64 buckets, per-point tags), the
+  `ScaleSpec`/`ColourBands` JSON helpers, and the bodies and builders of `outing` (whole outing from the summary
+  path, lap band, zoom rectangle), `track_position` (fit, origin rule, sections, zoom span, cursor dots, banners),
+  `scatter` (tiles, colour bands and legend, trend and equation, interval average, density, cursor ring) and
+  `histogram` (bin slots, bars with colour sub-bars, lines, text table, cursor bin). `DrawList` JSON goldens at
+  DPR 1 and 2 in `tests/golden/drawlist/{band_layout,key_layout,outing,track_position,scatter,histogram}/`.
+- Track maps and sections (07 §6.1; AC-M3-04; D-195): `esses_analysis` `TrackMap` reads and writes `track-1`
+  (`{v, unit}` lengths, unknown top-level members kept) with `validate` (10 m minimum, bounds, ids) and
+  `pointAt`; `TrackGenerator::fromGps` (WGS-84 tangent-plane projection, Hermite bridging of dropouts, an
+  adaptive local-linear smoother, optional inner and outer lines) and `fromSpeedLatG` (dead reckoning with loop
+  closure; the raw closure error reported; `TrackGeneratorOptions::invertLatAccel`); `SectionDetector::defaults`
+  (Turns and Straights from curvature, 10 m minimum, S-bends, the new `minTurnDeg`, user sections kept);
+  `TrackSectionsRule` (rule-1 parser, the `Outings:Laps:Track Sections:<set>[:<category>]` groups with the
+  backward origin of laps that do not start at a beacon) and a `RuleRunner::runPhase2` overload that builds them
+  from a track map, with D-140 versions; `RuleRunner::fromRuleIds` now loads `circuit.track-sections`.
+  `esses_project` `TrackMapFile` (load pipeline with the map's checks, canonical atomic save into `trackmaps/`,
+  `fileNameFor`). New CC0 fixture `fixtures/track/synthetic-circuit` written by `tools/gen_track_fixtures.py`
+  (true centreline, GPS with noise and a dropout, IMU), ctest `fixtures.track_generator_current`; on it the GPS
+  map lies 0.80 m RMS from the truth and the Speed+LatG map 4.1 m RMS from the GPS map after a rigid alignment.
+- `esses_analysis` binning, variance and corrected speed (07 §6.1; AC-M3-05, AC-M3-06, AC-M3-07; D-194):
+  `BandAxis` JSON and `generateBands` (width, count, centred, arbitrary, open bands, palettes, unit
+  conversion); `HistogramBinner` (counts, percent and time with gating, untrusted exclusion and the colour
+  split); `ScatterBinner` (union grid with per-channel `Interp`, y delay, gating, colour; interval average;
+  density grid); `TrendFit` (linear and polynomial 2-6, through zero, Givens QR, equation text) checked against
+  `tools/trend_ref.py`, an exact-arithmetic least-squares reference with its freshness test;
+  `VarianceTable` (dt(d) and dd(t) per column with offsets and lap stretch) against a brute-force reference;
+  `CorrectedSpeed::alternateList` and `gCorrection` (lock and spin prediction from the longitudinal G with a
+  linear blend back), used by `CorrectedSpeed::compute`, which now evaluates the `gCorrection` method. New
+  defaulted members `ScatterChannel::interp`, `ScatterInput::gatingInterp`, `HistogramInput::colourInterp`.
+- M3 contracts (07 §6.1; `docs/milestones/M3.md` §2; D-193): public headers of every M3 class with stubs marked
+  `// M3-STUB`, each library's `README.md` listing the stubs and their owner roots. `esses_analysis`:
+  `CorrectedSpeed::alternateList`/`gCorrection`, `VarianceTable`, `TrackMap` (`track-1`), `TrackGenerator`,
+  `SectionDetector`, `TrackSectionsRule` (dispatched by `makeRangeRule`, still skipped until its parser exists),
+  `ReportSpec`, `StatCache`, `ReportEngine`, `TimeReportEngine`, `BandAxis`, `HistogramBinner`, `ScatterBinner`,
+  `TrendFit`. `esses_plotcore`: `BandLayout`, the `KeyLayout` datum and measurement columns, the full `HitTester`
+  surface (new kinds and handles, `hitAll`, point sets), the component bodies and `componentChannelUses`,
+  `ScatterGeometry`, `HistogramGeometry`, `TrackGeometry`, `OutingGeometry`, `GaugeGeometry`;
+  `ComponentBuildInputs::trackMap`. `esses_project`: `TrackMapFile`. `esses_qtmodel`: `ReportModel`;
+  `componentChannels` covers every MVP type. `esses_qtrender`: `OffscreenRenderer` wires the drawn M3 types to
+  their builders. `esses_widgets`: the eight new component classes registered by `registerBuiltinComponents`
+  (`OutingGraph`, `ScatterPlot`, `Histogram`, `ChannelReport`, `TimeReport`, `TrackPosition`, `NumericGauge`,
+  `BarGauge`), `TrackMapWindow`, `TrackEditor`, `PropertiesDialog` (F5 opens it through
+  `ComponentWidget::openProperties`), `FieldBinder`, `ZoomSummaryBar`, `CorrectedSpeedDialog`, `LayoutEditor`,
+  `CommandPalette`, `AnimationController`, `ComponentClipboard`; new glob roots so parallel work never edits a
+  shared `CMakeLists.txt`. Schemas: the component body schemas `schemas/components/<type>-1.schema.json` of the
+  ten MVP types (AC-M3-08) and `track-1`, with valid and invalid examples; `tools/check_schemas.py` and the
+  schema example tests read `schemas/components/`, and every component body of the shipped workbook validates
+  against its schema. Final parts with tests: the report statistic and scope names, the value-type defaults,
+  `TrackMap::sectionSets`, `ReportTable::pending`, `HitTester::hitAll`, `componentChannelUses`, the component
+  registrations with their overlay policies and key contexts, `FieldBinder`'s binding table and
+  `AnimationController`'s state.
+
 ## Unreleased (M2)
 
 - The task-pool tests declare their `Gate`s and the other locals their tasks reference before the `TaskPool`,

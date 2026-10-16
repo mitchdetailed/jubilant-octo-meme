@@ -1,0 +1,101 @@
+{
+    "activeChannel": "Corr Speed",
+    "body": {
+        "display": {
+            "axis": {
+                "showXScrollbar": false,
+                "showYScrollbar": false
+            },
+            "cursorStyle": "crosshair",
+            "showBands": false,
+            "showMarkers": false
+        },
+        "groups": [
+            {
+                "lines": {
+                    "max": {
+                        "colour": "#c62828",
+                        "enabled": true
+                    },
+                    "min": {
+                        "colour": "#2e7d32",
+                        "enabled": true
+                    }
+                },
+                "name": "Speed",
+                "scaleMode": "auto",
+                "traces": [
+                    {
+                        "channel": "Corr Speed",
+                        "displayUnit": "km/h",
+                        "dps": 1
+                    }
+                ]
+            },
+            {
+                "lines": {
+                    "zero": {
+                        "colour": "#6a1b9a",
+                        "enabled": true
+                    }
+                },
+                "name": "Throttle",
+                "scaleMax": {
+                    "unit": "%",
+                    "v": 100
+                },
+                "scaleMin": {
+                    "unit": "%",
+                    "v": -20
+                },
+                "scaleMode": "manual",
+                "traces": [
+                    {
+                        "channel": "Throttle Pos"
+                    }
+                ]
+            }
+        ]
+    },
+    "case": "scale_lines_crosshair",
+    "cursorUs": 30000000,
+    "data": "libs/plotcore/tests/td_m3_cases.hpp (the synthetic sources of td_golden_cases.hpp with laps, track sections, markers, device events, status channels, annotations and lap distance indexes)",
+    "datumUs": null,
+    "domain": "time",
+    "dprs": [
+        1,
+        2
+    ],
+    "focused": false,
+    "fonts": "tests/golden/fonts (Noto Sans), QtTextMetrics",
+    "offsetAxis": false,
+    "overrideLimitsBase": {
+        "Corr Speed": [
+            20,
+            60
+        ]
+    },
+    "pendingStripe": false,
+    "scheme": "Test Light",
+    "shows": "scale lines zero, min and max (override limits 20..60 m/s on an auto scale) and the crosshair cursor (Y)",
+    "sizeLogical": [
+        440,
+        300
+    ],
+    "slots": [
+        {
+            "distanceData": true,
+            "kind": "Main",
+            "lap": 0,
+            "number": 0,
+            "offsetM": 0,
+            "offsetUs": 0,
+            "source": "synthetic_a.ld"
+        }
+    ],
+    "type": "time_distance",
+    "zoom": [
+        0,
+        60000000
+    ]
+}

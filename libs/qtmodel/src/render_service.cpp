@@ -7,15 +7,18 @@
 #include "channel_resolution.hpp"
 #include "range_lookup.hpp"
 
+#include <esses/analysis/stat_cache.hpp>
 #include <esses/base/taskpool.hpp>
 #include <esses/maths/channel_key.hpp>
 #include <esses/model/resolver.hpp>
+#include <esses/plotcore/component_bodies.hpp>
 #include <esses/plotcore/time_distance_builder.hpp>
 #include <esses/qtmodel/data_selection_model.hpp>
 #include <esses/qtmodel/dispatcher.hpp>
 #include <esses/qtmodel/distance_service.hpp>
 #include <esses/qtmodel/maths_service.hpp>
 #include <esses/qtmodel/render_service.hpp>
+#include <esses/qtmodel/track_map_service.hpp>
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -65,6 +68,11 @@ std::vector<ChannelRequest> componentChannels(const project::ComponentSpec& spec
                 out.push_back(std::move(r));
             }
         }
+        return out;
+    }
+    // The M3 types: each body lists its channels in builder order (plot::componentChannelUses).
+    for (plot::ChannelUse& use : plot::componentChannelUses(spec)) {
+        out.push_back(ChannelRequest{std::move(use.name), std::move(use.displayUnit), use.dps});
     }
     return out;
 }
@@ -128,7 +136,9 @@ struct RenderService::Impl {
         CancelSource cancel;
     };
     std::shared_ptr<std::atomic<int>> running = std::make_shared<std::atomic<int>>(0);
-    std::map<std::string, Submission> latest; // per replace key: the newest submission
+    std::map<std::string, Submission> latest;               // per replace key: the newest submission
+    mutable std::shared_ptr<analysis::StatCache> statCache; // the workspace's (ReportModel), on first use
+    QPointer<TrackMapService> trackMaps;
 };
 
 RenderService::RenderService(TaskPool& pool, Dispatcher& dispatcher, DataSelectionModel& selection,
@@ -189,6 +199,21 @@ int RenderService::runningBuilds() const noexcept {
     return impl_->running->load();
 }
 
+std::shared_ptr<analysis::StatCache> RenderService::statCache() const {
+    if (impl_->statCache == nullptr) {
+        impl_->statCache = std::make_shared<analysis::StatCache>();
+    }
+    return impl_->statCache;
+}
+
+void RenderService::setTrackMaps(TrackMapService* maps) {
+    impl_->trackMaps = maps;
+}
+
+TrackMapService* RenderService::trackMaps() const {
+    return impl_->trackMaps.data();
+}
+
 plot::ComponentBuildInputs
 RenderService::prepareInputs(const project::ComponentSpec& spec, const plot::ViewState& view,
                              const plot::SelectionSnapshot& selection, const plot::LayoutContext& layout,
@@ -205,6 +230,11 @@ RenderService::prepareInputs(const project::ComponentSpec& spec, const plot::Vie
     inputs.pool = &pool_;
     if (selection.main.range.v.isNil()) {
         return inputs;
+    }
+    if (TrackMapService* maps = impl_->trackMaps.data()) {
+        if (const auto mainSource = selection_.source(selection.main.src)) {
+            inputs.trackMap = maps->mapFor(*mainSource); // the Main source's venue (04 section 14 item 1)
+        }
     }
     const std::vector<ChannelRequest> channels = componentChannels(spec);
     for (const plot::Slot& slot : selection.visibleSlots()) {

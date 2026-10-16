@@ -1,0 +1,10 @@
+{
+  "bad-scale-mode.json": {
+    "pointer": "/scale/mode",
+    "why": "the scale mode is fit or manual"
+  },
+  "zero-zoom.json": {
+    "pointer": "/scale/zoom",
+    "why": "the zoom factor is positive"
+  }
+}

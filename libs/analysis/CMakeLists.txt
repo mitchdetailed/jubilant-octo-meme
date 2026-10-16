@@ -37,3 +37,16 @@ if(TARGET ${ESSES_PREFIX}_analysis_tests)
   target_compile_definitions(${ESSES_PREFIX}_analysis_tests PRIVATE "ESSES_TEST_REPO_ROOT=\"${CMAKE_SOURCE_DIR}\"")
   target_include_directories(${ESSES_PREFIX}_analysis_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 endif()
+
+# AC-M3-06 (D-041): tests/data/trend_fit_cases.json is what the independent exact-arithmetic reference
+# tools/trend_ref.py writes, and the reference passes its own checks.
+find_package(Python3 3.8 COMPONENTS Interpreter QUIET)
+if(ESSES_BUILD_TESTS AND Python3_Interpreter_FOUND)
+  add_test(NAME analysis.trend_reference_current
+           COMMAND "${Python3_EXECUTABLE}" -I "${CMAKE_SOURCE_DIR}/tools/trend_ref.py"
+                   --check "${CMAKE_CURRENT_SOURCE_DIR}/tests/data/trend_fit_cases.json")
+  add_test(NAME analysis.trend_reference_self_test
+           COMMAND "${Python3_EXECUTABLE}" -I "${CMAKE_SOURCE_DIR}/tools/trend_ref.py" --self-test)
+  set_tests_properties(analysis.trend_reference_current analysis.trend_reference_self_test PROPERTIES
+                       LABELS "lint" TIMEOUT 300)
+endif()

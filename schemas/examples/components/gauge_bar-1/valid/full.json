@@ -1,0 +1,27 @@
+{
+  "channel": "Brake Pres",
+  "displayUnit": "bar",
+  "scale": {
+    "mode": "manual",
+    "min": {
+      "v": 0,
+      "unit": "bar"
+    },
+    "max": {
+      "v": 100,
+      "unit": "bar"
+    }
+  },
+  "orientation": "vertical",
+  "originStyle": "min",
+  "customOrigin": {
+    "v": 0,
+    "unit": "bar"
+  },
+  "barColour": null,
+  "scaleDps": 0,
+  "showScale": true,
+  "colourBands": [],
+  "bandLines": "lines",
+  "bandMode": "none"
+}

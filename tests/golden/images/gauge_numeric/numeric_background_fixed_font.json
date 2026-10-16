@@ -1,0 +1,81 @@
+{
+    "activeChannel": "",
+    "body": {
+        "bandMode": "background",
+        "channel": "Brake Pres",
+        "colourBands": [
+            {
+                "colour": "#43a047",
+                "max": {
+                    "unit": "bar",
+                    "v": 5
+                },
+                "min": {
+                    "unit": "bar",
+                    "v": 0
+                },
+                "open": "below",
+                "visible": true
+            },
+            {
+                "colour": "#fb8c00",
+                "max": {
+                    "unit": "bar",
+                    "v": 0
+                },
+                "min": {
+                    "unit": "bar",
+                    "v": 5
+                },
+                "open": "above",
+                "visible": true
+            }
+        ],
+        "dynamicFont": false,
+        "font": {
+            "family": "Noto Sans",
+            "pointSize": 24
+        },
+        "showUnits": false
+    },
+    "caption": false,
+    "case": "numeric_background_fixed_font",
+    "colourLegend": false,
+    "cursorUs": 9000000,
+    "data": "libs/plotcore/tests/td_golden_cases.hpp (synthetic rational data, sources synthetic_a/b/c.ld); cases in libs/plotcore/tests/plots_golden_cases.hpp",
+    "datumUs": null,
+    "domain": "time",
+    "dprs": [
+        1,
+        2
+    ],
+    "focused": false,
+    "fonts": "tests/golden/fonts (Noto Sans), QtTextMetrics",
+    "pendingStripe": false,
+    "scheme": "Test Light",
+    "sizeLogical": [
+        180,
+        100
+    ],
+    "slots": [
+        {
+            "distanceData": true,
+            "kind": "Main",
+            "lap": 0,
+            "number": 0,
+            "source": "synthetic_a.ld"
+        },
+        {
+            "distanceData": true,
+            "kind": "Overlay",
+            "lap": 0,
+            "number": 1,
+            "source": "synthetic_b.ld"
+        }
+    ],
+    "type": "gauge_numeric",
+    "zoom": [
+        0,
+        60000000
+    ]
+}

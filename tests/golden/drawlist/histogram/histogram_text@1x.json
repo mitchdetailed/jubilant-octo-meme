@@ -1,0 +1,49 @@
+{"case":"histogram_text","dpr":1,
+"static":{"w":420,"h":260,"dpr":1,"cmds":[
+{"k":"clear","c":"#ffffff"},
+{"k":"polyline","c":"#a0a4a8","w":1,"d":"solid","v":[49.5,24.5,411.5,24.5,411.5,228.5,49.5,228.5,49.5,24.5]},
+{"k":"text","t":"Corr Speed [km/h]","x":230.5,"y":253.5,"style":"axis","anchor":"centre","c":"#202124","maxw":363},
+{"k":"text","t":"Time [s]","x":6.5,"y":126.5,"style":"axis","anchor":"centre","c":"#202124","maxw":205,"rot":1},
+{"k":"scissor","r":[49,24,363,205]},
+{"k":"text","t":"Bin","x":52,"y":27,"style":"table","anchor":"topLeft","c":"#6b6f75","maxw":115},
+{"k":"text","t":"Corr Speed","x":288,"y":27,"style":"table","anchor":"topRight","c":"#d32f2f","maxw":115},
+{"k":"text","t":"Corr Speed (Lap 1)","x":409,"y":27,"style":"table","anchor":"topRight","c":"#8a8f96","maxw":115},
+{"k":"text","t":"< 50","x":52,"y":39.8,"style":"table","anchor":"topLeft","c":"#202124","maxw":115},
+{"k":"text","t":"0.00","x":288,"y":39.8,"style":"table","anchor":"topRight","c":"#d32f2f","maxw":115},
+{"k":"text","t":"0.00","x":409,"y":39.8,"style":"table","anchor":"topRight","c":"#8a8f96","maxw":115},
+{"k":"text","t":"50 .. 75","x":52,"y":52.6,"style":"table","anchor":"topLeft","c":"#202124","maxw":115},
+{"k":"text","t":"1.10","x":288,"y":52.6,"style":"table","anchor":"topRight","c":"#d32f2f","maxw":115},
+{"k":"text","t":"1.70","x":409,"y":52.6,"style":"table","anchor":"topRight","c":"#8a8f96","maxw":115},
+{"k":"text","t":"75 .. 100","x":52,"y":65.4,"style":"table","anchor":"topLeft","c":"#202124","maxw":115},
+{"k":"text","t":"3.70","x":288,"y":65.4,"style":"table","anchor":"topRight","c":"#d32f2f","maxw":115},
+{"k":"text","t":"4.30","x":409,"y":65.4,"style":"table","anchor":"topRight","c":"#8a8f96","maxw":115},
+{"k":"text","t":"100 .. 125","x":52,"y":78.2,"style":"table","anchor":"topLeft","c":"#202124","maxw":115},
+{"k":"text","t":"8.00","x":288,"y":78.2,"style":"table","anchor":"topRight","c":"#d32f2f","maxw":115},
+{"k":"text","t":"8.95","x":409,"y":78.2,"style":"table","anchor":"topRight","c":"#8a8f96","maxw":115},
+{"k":"text","t":"125 .. 150","x":52,"y":91,"style":"table","anchor":"topLeft","c":"#202124","maxw":115},
+{"k":"text","t":"9.15","x":288,"y":91,"style":"table","anchor":"topRight","c":"#d32f2f","maxw":115},
+{"k":"text","t":"9.45","x":409,"y":91,"style":"table","anchor":"topRight","c":"#8a8f96","maxw":115},
+{"k":"text","t":"150 .. 175","x":52,"y":103.8,"style":"table","anchor":"topLeft","c":"#202124","maxw":115},
+{"k":"text","t":"9.25","x":288,"y":103.8,"style":"table","anchor":"topRight","c":"#d32f2f","maxw":115},
+{"k":"text","t":"9.45","x":409,"y":103.8,"style":"table","anchor":"topRight","c":"#8a8f96","maxw":115},
+{"k":"text","t":"175 .. 200","x":52,"y":116.6,"style":"table","anchor":"topLeft","c":"#202124","maxw":115},
+{"k":"text","t":"15.55","x":288,"y":116.6,"style":"table","anchor":"topRight","c":"#d32f2f","maxw":115},
+{"k":"text","t":"15.95","x":409,"y":116.6,"style":"table","anchor":"topRight","c":"#8a8f96","maxw":115},
+{"k":"text","t":"200 .. 225","x":52,"y":129.4,"style":"table","anchor":"topLeft","c":"#202124","maxw":115},
+{"k":"text","t":"11.75","x":288,"y":129.4,"style":"table","anchor":"topRight","c":"#d32f2f","maxw":115},
+{"k":"text","t":"9.30","x":409,"y":129.4,"style":"table","anchor":"topRight","c":"#8a8f96","maxw":115},
+{"k":"text","t":"225 .. 250","x":52,"y":142.2,"style":"table","anchor":"topLeft","c":"#202124","maxw":115},
+{"k":"text","t":"1.50","x":288,"y":142.2,"style":"table","anchor":"topRight","c":"#d32f2f","maxw":115},
+{"k":"text","t":"0.90","x":409,"y":142.2,"style":"table","anchor":"topRight","c":"#8a8f96","maxw":115},
+{"k":"text","t":">= 250","x":52,"y":155,"style":"table","anchor":"topLeft","c":"#202124","maxw":115},
+{"k":"text","t":"0.00","x":288,"y":155,"style":"table","anchor":"topRight","c":"#d32f2f","maxw":115},
+{"k":"text","t":"0.00","x":409,"y":155,"style":"table","anchor":"topRight","c":"#8a8f96","maxw":115},
+{"k":"scissor","r":[0,0,0,0]}
+]}
+,"dynamic":{"w":420,"h":260,"dpr":1,"cmds":[
+]}
+,"chrome":{"w":420,"h":260,"dpr":1,"cmds":[
+{"k":"rect","c":"#e8eaed","r":[0,0,420,18]},
+{"k":"text","t":"Corr Speed","x":4,"y":9,"style":"caption","anchor":"middleLeft","c":"#202124","maxw":412}
+]}
+}

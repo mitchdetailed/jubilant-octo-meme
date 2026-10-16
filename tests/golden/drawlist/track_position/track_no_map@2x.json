@@ -1,0 +1,12 @@
+{"case":"track_no_map","dpr":2,
+"static":{"w":640,"h":480,"dpr":2,"cmds":[
+{"k":"clear","c":"#ffffff"}
+]}
+,"dynamic":{"w":640,"h":480,"dpr":2,"cmds":[
+]}
+,"chrome":{"w":640,"h":480,"dpr":2,"cmds":[
+{"k":"rect","c":"#e8eaed","r":[0,0,640,36]},
+{"k":"text","t":"Track Position","x":8,"y":18,"style":"caption","anchor":"middleLeft","c":"#202124","maxw":624},
+{"k":"text","t":"No track map (Tools → Track Editor)","x":320,"y":56,"style":"banner","anchor":"topCentre","c":"#202124","maxw":600,"bg":"#f7f7f8"}
+]}
+}

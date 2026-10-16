@@ -52,6 +52,29 @@ const FontEntry& schemeFontEntry(const SchemeFonts& fonts, plot::TextStyleId sty
     return insertThreadFont(fonts.id(), slot, fonts.font(style, rotated));
 }
 
+const FontEntry& schemeFontEntry(const SchemeFonts& fonts, plot::TextStyleId style, bool rotated,
+                                 float scale) {
+    if (!(scale > 0.0F) || !std::isfinite(scale) || scale == 1.0F) {
+        return schemeFontEntry(fonts, style, rotated);
+    }
+    // Slots of scaled fonts: the scale in thousandths above the style slot (< 256), never 0 in the high bits.
+    const auto milli = static_cast<std::uint32_t>(
+        std::clamp(std::lround(static_cast<double>(scale) * 1000.0), 1L, static_cast<long>(0xFFFFFF)));
+    const auto slot =
+        (milli << 8U) | static_cast<std::uint32_t>(static_cast<unsigned>(style) * 2U + (rotated ? 1U : 0U));
+    if (const FontEntry* e = findThreadFont(fonts.id(), slot)) {
+        return *e;
+    }
+    QFont font = fonts.font(style, rotated);
+    if (font.pointSizeF() > 0.0) {
+        font.setPointSizeF(font.pointSizeF() * static_cast<double>(milli) / 1000.0);
+    } else if (font.pixelSize() > 0) {
+        const double px = static_cast<double>(font.pixelSize()) * static_cast<double>(milli) / 1000.0;
+        font.setPixelSize(std::max(1, static_cast<int>(std::lround(px))));
+    }
+    return insertThreadFont(fonts.id(), slot, font);
+}
+
 QTransform TextPlacement::frame() const {
     QTransform t = QTransform::fromTranslate(origin.x(), origin.y());
     if (rotated) {
@@ -172,8 +195,7 @@ CommandBounds commandBounds(const plot::DrawList& list, const plot::DrawCmd& cmd
             return out;
         }
         const plot::TextRun& run = list.texts[cmd.textIndex];
-        const bool rotated = run.quarterTurns == 1;
-        const auto tp = placeText(list, run, schemeFontEntry(fonts, run.style, rotated), dpr);
+        const auto tp = placeText(list, run, runFontEntry(fonts, run), dpr);
         if (!tp) {
             return out;
         }
@@ -448,6 +470,8 @@ std::string staticTextKey(const SchemeFonts& fonts, const plot::TextRun& run, qr
     key.append(reinterpret_cast<const char*>(&id), sizeof id);
     key.push_back(static_cast<char>(run.style));
     key.push_back(static_cast<char>(run.quarterTurns == 1 ? 1 : 0));
+    const float scale = run.scale;
+    key.append(reinterpret_cast<const char*>(&scale), sizeof scale);
     key.append(reinterpret_cast<const char*>(&dprMilli), sizeof dprMilli);
     key.append(utf8.constData(), static_cast<std::size_t>(utf8.size()));
     return key;
@@ -459,8 +483,7 @@ void drawText(QPainter& p, const plot::DrawList& list, const plot::DrawCmd& cmd,
         return;
     }
     const plot::TextRun& run = list.texts[cmd.textIndex];
-    const bool rotated = run.quarterTurns == 1;
-    const detail::FontEntry& font = detail::schemeFontEntry(fonts, run.style, rotated);
+    const detail::FontEntry& font = detail::runFontEntry(fonts, run);
     const auto tp = detail::placeText(list, run, font, dpr);
     if (!tp || tp->text.isEmpty()) {
         return;
@@ -762,8 +785,7 @@ void measureStripCommands(const plot::DrawList& list, const SchemeFonts& fonts, 
             if (cmd.kind == plot::CmdKind::TextRun) {
                 const plot::TextRun& run = list.texts[cmd.textIndex]; // in range: the bounds are not empty
                 const qreal dpr = list.dpr > 0.0F ? static_cast<qreal>(list.dpr) : 1.0;
-                spill = std::ceil(schemeFontEntry(fonts, run.style, run.quarterTurns == 1).metrics.height() *
-                                  dpr);
+                spill = std::ceil(runFontEntry(fonts, run).metrics.height() * dpr);
             }
             c.x0 = static_cast<float>(std::floor(b.rect.left() - spill));
             c.x1 = static_cast<float>(std::ceil(b.rect.right() + spill));

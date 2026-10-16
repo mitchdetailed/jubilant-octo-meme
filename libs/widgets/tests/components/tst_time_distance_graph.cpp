@@ -232,6 +232,9 @@ private Q_SLOTS:
         Rig rig(w, timeDistanceSpec({{"Wheel Speed FL"}, {"Throttle"}}));
         TimeDistanceGraph& g = *rig.graph;
         QTRY_VERIFY_WITH_TIMEOUT(w.distanceReady(a), kTimeoutMs);
+        // M3: a datum appearing adds value@datum and delta to the key (a Static rebuild); place it first, so
+        // the datum move at the end is Dynamic only like the cursor.
+        w.view->placeDatum();
         QVERIFY(waitQuiet(g));
         QTest::qWait(50); // let the first full paint go through
 
@@ -282,7 +285,7 @@ private Q_SLOTS:
             }
         }
         QVERIFY(lineAtCursor);
-        // The datum is Dynamic too.
+        // Moving the datum is Dynamic too.
         w.view->placeDatum();
         QTest::qWait(30);
         QCOMPARE(g.staticBuildsSubmitted(), submitted);

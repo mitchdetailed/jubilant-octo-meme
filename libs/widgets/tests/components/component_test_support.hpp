@@ -27,6 +27,8 @@
 #include <esses/units/unit_registry.hpp>
 #include <esses/widgets/components/component_widget.hpp>
 
+#include <QCoreApplication>
+#include <QEventLoop>
 #include <QImage>
 #include <QRect>
 #include <QString>
@@ -35,7 +37,22 @@
 #include <string>
 #include <vector>
 
+namespace esses::qt {
+class ProjectSession;
+} // namespace esses::qt
+
 namespace esses::widgets::cmptest {
+
+// Delivers every event already posted (queued build requests, Dispatcher deliveries already queued, the
+// canvas's coalesced layout). A component requests a rebuild on the GUI thread through the event queue, so
+// after this a check that nothing was rebuilt or re-run does not pass merely because a slow pool has not got
+// there yet (D-203 (r)); a run already on the pool shows as busy() / !staticUpToDate().
+inline void drainEvents() {
+    for (int i = 0; i < 5; ++i) {
+        QCoreApplication::sendPostedEvents();
+        QCoreApplication::processEvents(QEventLoop::AllEvents);
+    }
+}
 
 std::filesystem::path repoRoot();
 // Before the QApplication exists (initMain): QT_QPA_FONTDIR = tests/golden/fonts unless set.
@@ -67,8 +84,10 @@ project::ComponentSpec valuesListSpec(const std::vector<std::string>& channels, 
 // The qtmodel services of one workspace with one worksheet, and its WorksheetContext.
 struct World {
     // markGuiThreadNoBlock: the calling (GUI) thread carries ThreadRole::NoBlock (AC-M1-12); the caller
-    // resets the role after the World is gone.
-    explicit World(const std::string& domain = "time", bool markGuiThreadNoBlock = false);
+    // resets the role after the World is gone. `session` (optional) is the selection's project session (its
+    // channel overrides reach the graphs).
+    explicit World(const std::string& domain = "time", bool markGuiThreadNoBlock = false,
+                   qt::ProjectSession* session = nullptr);
     ~World();
     World(const World&) = delete;
     World& operator=(const World&) = delete;

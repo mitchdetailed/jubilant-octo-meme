@@ -1,0 +1,17 @@
+{"case":"numeric_reference_text_band","dpr":1,
+"static":{"w":200,"h":160,"dpr":1,"cmds":[
+{"k":"clear","c":"#141517"},
+{"k":"polyline","c":"#3a3d41","w":1,"d":"solid","v":[4.5,22.5,195.5,22.5,195.5,155.5,4.5,155.5,4.5,22.5]}
+]}
+,"dynamic":{"w":200,"h":160,"dpr":1,"cmds":[
+{"k":"text","t":"219.2","x":6,"y":65.55,"style":"gauge","anchor":"middleLeft","c":"#e53935","maxw":156,"scale":2.44},
+{"k":"text","t":"km/h","x":168.4,"y":65.55,"style":"gaugeUnits","anchor":"middleLeft","c":"#e53935"},
+{"k":"text","t":"214.4","x":45,"y":131.55,"style":"gauge","anchor":"middleLeft","c":"#bdbdbd","maxw":156,"scale":1.22},
+{"k":"text","t":"km/h","x":129.4,"y":131.55,"style":"gaugeUnits","anchor":"middleLeft","c":"#bdbdbd"}
+]}
+,"chrome":{"w":200,"h":160,"dpr":1,"cmds":[
+{"k":"rect","c":"#2b2d31","r":[0,0,200,18]},
+{"k":"text","t":"Ground Speed","x":4,"y":9,"style":"caption","anchor":"middleLeft","c":"#e6e6e6","maxw":192},
+{"k":"polyline","c":"#4c9aff","w":2,"d":"solid","v":[1,1,199,1,199,159,1,159,1,1]}
+]}
+}

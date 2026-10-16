@@ -1,0 +1,97 @@
+{
+  "display": {
+    "traceStyle": "line",
+    "lineWidth": 1,
+    "pointSize": 2,
+    "showGrid": true,
+    "showMarkers": true,
+    "showBands": true,
+    "bandMode": "sections",
+    "bandGroup": "Outings:Laps:Track Sections:Default",
+    "overlapMode": "panels",
+    "cursorStyle": "line",
+    "cursorSnap": true,
+    "key": {
+      "mode": "labels",
+      "pos": "left",
+      "values": true,
+      "stats": false
+    },
+    "showStatusStrip": false,
+    "statusChannels": [],
+    "showDeviceEvents": true,
+    "variance": {
+      "show": false,
+      "heightFrac": 0.15,
+      "autoScale": true,
+      "min": {
+        "v": -2,
+        "unit": "s"
+      },
+      "max": {
+        "v": 2,
+        "unit": "s"
+      }
+    },
+    "axis": {
+      "showX": true,
+      "showY": true,
+      "showXScrollbar": true,
+      "showYScrollbar": true
+    }
+  },
+  "groups": [
+    {
+      "name": "Speed",
+      "scaleMode": "channel",
+      "edges": [0.0, 0.33],
+      "lo": 0.0,
+      "hi": 0.33,
+      "lines": {
+        "zero": {
+          "enabled": true
+        },
+        "min": {
+          "enabled": false
+        },
+        "max": {
+          "enabled": false
+        }
+      },
+      "traces": [
+        {
+          "channel": "Corr Speed",
+          "visible": true,
+          "displayUnit": "km/h",
+          "dps": 1
+        },
+        {
+          "channel": "GPS Speed",
+          "visible": true
+        }
+      ]
+    },
+    {
+      "name": "Throttle/Brake",
+      "scaleMode": "manual",
+      "scaleMin": {
+        "v": 0,
+        "unit": "%"
+      },
+      "scaleMax": {
+        "v": 100,
+        "unit": "%"
+      },
+      "edges": [0.33, 0.66],
+      "traces": [
+        {
+          "channel": "Throttle Pos"
+        },
+        {
+          "channel": "Brake Pres",
+          "displayUnit": "bar"
+        }
+      ]
+    }
+  ]
+}

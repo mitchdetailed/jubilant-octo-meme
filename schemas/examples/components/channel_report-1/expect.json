@@ -1,0 +1,10 @@
+{
+  "bad-scope.json": {
+    "pointer": "/report/scope",
+    "why": "the scope is selectedRanges, selectedOutings or allOutings"
+  },
+  "unknown-stat.json": {
+    "pointer": "/report/channels/0/stats/0",
+    "why": "statistics are avg, min, max, absMax, start, end, change, stdDev and delta"
+  }
+}

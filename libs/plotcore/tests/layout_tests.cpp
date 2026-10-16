@@ -115,6 +115,25 @@ TEST_CASE("traceColour: D-017 roles and the D-100 overlayStyle", "[unit]") {
     CHECK(adjustLightness(0x00000080U, 0.5) == 0x80808080U);
 }
 
+TEST_CASE("rangeKeyColour: the key colour of a range (06 section 5.3 item 3)", "[unit]") {
+    project::Scheme scheme = testScheme();
+    scheme.roles["cursorMain"] = 0xE3261CFFU;
+    const Slot main{SlotKind::Main, 0, {}};
+    const Slot o0{SlotKind::Overlay0, 0, {}};
+    const Slot o1{SlotKind::Overlay, 1, {}};
+    const Slot o2{SlotKind::Overlay, 2, {}};
+    const Slot o3{SlotKind::Overlay, 3, {}};
+    CHECK(rangeKeyColour(scheme, main) == 0xE3261CFFU);
+    CHECK(rangeKeyColour(scheme, o0) == 0x8A8F96FFU);
+    CHECK(rangeKeyColour(scheme, o1) == 0x4FC3F7FFU);
+    CHECK(rangeKeyColour(scheme, o2) == 0xAED581FFU);
+    CHECK(rangeKeyColour(scheme, o3) == 0x4FC3F7FFU); // the overlay palette cycles
+    // Unlike the trace colours, two overlays never share a key colour under the default overlayStyle.
+    SelectionSnapshot sel;
+    CHECK(traceColour(scheme, sel, o1, 0) == traceColour(scheme, sel, o2, 0));
+    CHECK(rangeKeyColour(scheme, o1) != rangeKeyColour(scheme, o2));
+}
+
 TEST_CASE("DrawList: helpers, append and the golden JSON form", "[unit]") {
     DrawList list;
     list.widthPx = 100;

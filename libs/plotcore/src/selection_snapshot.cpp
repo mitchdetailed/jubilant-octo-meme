@@ -11,6 +11,7 @@ namespace esses::plot {
 namespace {
 
 constexpr Rgba kOverlay0Fallback = 0xBDBDBDFFU;
+constexpr Rgba kMainKeyFallback = 0xFF0000FFU;
 
 std::uint8_t mixChannel(std::uint8_t c, double lightness) noexcept {
     const auto v = static_cast<double>(c);
@@ -76,6 +77,18 @@ Rgba traceColour(const project::Scheme& scheme, const SelectionSnapshot& selecti
         base = scheme.overlayPalette[n % scheme.overlayPalette.size()];
     }
     return adjustLightness(base, style.lightness);
+}
+
+Rgba rangeKeyColour(const project::Scheme& scheme, const Slot& slot) {
+    switch (slot.kind) {
+    case SlotKind::Main:
+        return scheme.role("cursorMain", kMainKeyFallback);
+    case SlotKind::Overlay0:
+        return scheme.role("overlay0", kOverlay0Fallback);
+    case SlotKind::Overlay:
+        break;
+    }
+    return scheme.overlayColour(std::max(slot.number, 1), kOverlay0Fallback);
 }
 
 DashId traceDash(const project::Scheme& scheme, const Slot& slot) {

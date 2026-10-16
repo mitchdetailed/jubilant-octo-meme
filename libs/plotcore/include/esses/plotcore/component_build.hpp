@@ -13,6 +13,7 @@
 // the inputs), so plotcore never links esses_maths (D-048).
 #pragma once
 
+#include <esses/analysis/track_map.hpp>
 #include <esses/model/channel.hpp>
 #include <esses/model/source.hpp>
 #include <esses/plotcore/domain_mapper.hpp>
@@ -46,6 +47,12 @@ struct ResolvedChannel {
     units::Converter toDisplay;                             // base -> display unit (D-010)
     std::string displayUnit;                                // symbol for labels
     int dps = 2;
+    // Added by the time_distance completion (04 section 8.3 items 2 and 5): the channel override's scale
+    // limits in base units (the Channel Editor's scale min / max), nullopt when unset. Channel scaling takes
+    // them in place of the autoscale and the scale lines min / max draw at them. RenderService::prepareInputs
+    // leaves them unset; the time_distance widget fills them from the project's channel overrides.
+    std::optional<double> limitMin;
+    std::optional<double> limitMax;
 };
 
 struct SlotData {
@@ -73,6 +80,9 @@ struct ComponentBuildInputs {
     // Added in M1: the TaskPool the Static build fans its per-trace decimation out to (04 section 6.3 item
     // 2). Null: TaskPool::currentWorkerPool(), else the traces are decimated in order on the calling thread.
     TaskPool* pool = nullptr;
+    // Added by the M3 contract: the track map bound by the Main source's Venue detail (track_position, the
+    // section band; 04 section 14 item 1). Null: none ("no track map" banner).
+    std::shared_ptr<const analysis::TrackMap> trackMap;
 };
 
 struct ComponentBuild {

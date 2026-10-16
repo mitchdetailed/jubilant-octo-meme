@@ -8,8 +8,9 @@ the design documents win (section 2), and the disagreement is a bug in this file
 Esses is a clean-room, MIT-licensed reimplementation of a motorsport data-analysis workflow: a Qt 6 Widgets
 application over a Qt-free C++20 core. Status: M0 (foundations) is complete, M1 (walking skeleton) passed its
 acceptance run, and M2 (channels, maths, persistence) is built and in review, waiting on the maintainer's
-decisions listed in `docs/milestones/M2.md`. See `docs/milestones/` for what each milestone actually built and
-where it departs from the design.
+decisions listed in `docs/milestones/M2.md`. M3 (the 80 % components) is built and its criteria are met on the
+maintainer's machine, waiting on CI and the ubuntu pixel goldens (`docs/milestones/M3.md`). See `docs/milestones/`
+for what each milestone actually built and where it departs from the design.
 
 ## 1. Ground rules
 
@@ -186,8 +187,9 @@ New behaviour comes with tests; a bug fix comes with a regression test.
   independent and checked on all three OSes; `ESSES_UPDATE_GOLDENS=1` rewrites them, and a mismatch writes
   `*.actual.json` into the build tree. Geometry-only reference images (`libs/qtrender/tests/reference/`) are
   compared on every OS; `ESSES_UPDATE_REFERENCES=1` rewrites them. **Pixel goldens with text**
-  (`tests/golden/`) are authoritative only on ubuntu with Qt 6.12 (D-127): never render or commit them from a
-  local machine; take them from the `golden-diffs-ubuntu-24.04` artefact of the `qt-app` CI run after review.
+  (`tests/golden/`) are authoritative only on ubuntu with Qt 6.12 (D-127): a locally rendered PNG may be
+  committed only as provisional (`"generatedOn": "windows"` in `goldens.json`, compared in report mode; D-203
+  (ae)), and is replaced from the `golden-diffs-ubuntu-24.04` artefact of the `qt-app` CI run after review.
   Fonts for every golden come only from `tests/golden/fonts/` (Noto Sans, OFL-1.1). An update of any golden
   is a reviewed change whose pull request says why.
 - **CLI goldens:** `esses-cli laps --json` against each fixture's `expected.laps.json` (`fixtures.laps_golden`).

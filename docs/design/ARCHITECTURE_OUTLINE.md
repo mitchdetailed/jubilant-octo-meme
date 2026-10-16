@@ -337,6 +337,65 @@ Registered under the §10 rule when the M2 headers were laid down (`docs/milesto
   argument of `saveWithBackup`.
 - `esses_qtmodel`: `ProjectSession::saveMathsModules` (the Maths Editor's save on close); `SourceLoader::cancelOpens`.
 
+### Names added by the M3 contracts (2026-10-14, D-193)
+
+Registered under the §10 rule when the M3 headers were laid down (`docs/milestones/M3.md` §2); each library's
+`README.md` lists them with their files, their owners and the `M3-STUB`s still to replace.
+- `esses_analysis`: `AlternateListChoice`, `CorrectedSpeed::alternateList`, `CorrectedSpeed::gCorrection`;
+  `VarianceMode`, `VarianceRequest`, `varianceTimeAt`, `varianceDistanceAt`; `TrackDirection`, `TrackMethod`,
+  `TrackOrigin`, `TrackPoint`, `TrackSection`, `TrackGeneratedFrom`; `LapWindow`, `GpsLap`,
+  `TrackGeneratorOptions`, `TrackGenerationReport`, `GeneratedTrack`, `TrackGenerator::toEnu`;
+  `SectionDetectorOptions`; `TrackSectionsSettings`, `LapIndex`, `LapIndexLookup`, `TrackSectionsRule::sections`,
+  `lapDistanceOfTrackDistance`, `trackDistanceOfLapDistance`; `ReportScope`, `ReportStat`, `ReportLayout`,
+  `ReportChannel`, `ReportOptions`, `reportStatName`, `parseReportStat`, `reportScopeName`, `parseReportScope`;
+  `StatKey`, `StatValue`; `ReportSlotRole`, `ReportSource`, `ReportChannelData`, `ReportChannelLookup`,
+  `ReportInputs`, `ReportCellState`, `ReportCell`, `ReportHeading`, `ReportColumn`, `ReportTable`,
+  `ReportEngine::statistic`; `TimeReportBand`, `TimeReportSummaries`, `TimeReportSpec`, `TimeReportCell`,
+  `TimeReportRow`, `TimeReportTable`, `RollingMinimum`; `UnitValue`, `BandAxisMode`, `BandMode`, `BandDef`,
+  `BandAxis`, `Band`, `generateBands`, `SampleSpan`; `HistogramYMode`, `HistogramInput`, `HistogramRequest`,
+  `HistogramResult`; `ScatterChannel`, `ScatterInput`, `ScatterSeries`, `IntervalAverage`, `DensityGrid`;
+  `TrendType`, `TrendSpec`, `TrendResult`; `TrackGeneratorOptions::invertLatAccel`,
+  `SectionDetectorOptions::minTurnDeg`, `TrackSectionsSettings::supportsTrackGeneration`/`supportsReporting` and
+  the `RuleRunner::runPhase2` overload that takes a track map and a `LapIndexLookup` (D-195); the trailing
+  `store::Interp` parameter of `ReportEngine::statistic` (D-197).
+- `esses_project`: `TrackMapFile` members (`parse`, `load`, `toJson`, `save`, `fileNameFor`).
+- `esses_plotcore`: `HitKind` values `GroupHeading` … `Caption`, `HandleKind`, `PointPx`, `HitResult::handleKind`
+  /`point`/`bin`/`section`/`cell`, `HitTester::hitAll`/`addPoints`/`nearestPoint`; `KeyMeasurement`, `KeyColumns`,
+  `KeyCell`, the column-aware `KeyLayout::layout`, `emitDatumValues`, `emitMeasurements`; `BandCell`,
+  `BandMarkerKind`, `BandMarker`, `BandLayoutInput`, `BandColours`, `BandGeometry`; `ChannelUse`,
+  `componentChannelUses`, `ScaleSpec`, `BandOpen`, `ColourBand` and their JSON helpers; `ScatterTrace`,
+  `ScatterBody`; `HistogramTrace`, `HistogramBody`; `TrackPositionBody`, `TrackFit`; `OutingBody`;
+  `GaugeNumericBody`, `GaugeBarBody`, `GaugeGeometry`; `ComponentBuildInputs::trackMap`; `KeyGeometry::valueLines`
+  and the per-point tags of `HitTester::addPoints`/`nearestPoint` (D-196); `TextRun::scale`, `ScatterExportSet`,
+  `ScatterAxes`, `ScatterGeometry::exportSets`/`axes`, `HistogramExportColumn`, `HistogramExport`,
+  `HistogramGeometry::exportTable` (D-198); `TdScaleLine`, `TdVariance`, `TdStatusChannel`, `TdGroupZoom`,
+  `TdLocalState`, `TdBandEntry`, `TdMarkerEntry`, `TdMeasurementEntry`, `TdStaticInfo`, the `buildStatic`/
+  `buildDynamic` overloads with them, `TimeDistanceBuilder::zoomedScale`/`offsetText`, the M3 members of
+  `TimeDistanceBody`, `TdGroup`, `TdGroupLayout` and `TdLayout`, `ResolvedChannel::limitMin`/`limitMax` (D-201);
+  `rangeKeyColour`, the key colour of a range of 06 §5.3 item 3 (D-202).
+- `esses_qtmodel`: `ReportModel` (04 §12 names it) with its styling roles and `Highlight`, `setHighlight`, `setTimeFormat`,
+  `setProjectTimeFormat`, `setDistanceService`, `busy`, `deliveries`, `lastError`, `quoteField`, `channelTable`,
+  `timeTable`; `TrackMapService`, `TrackMapCommand`, `TrackGenerationRequest`, `TrackGenerationState`,
+  `TrackGenerationStatus`; `RenderService::pool`/`dispatcher`/`statCache`/`setTrackMaps`/`trackMaps`;
+  `SourceLoader::setTrackMaps` (D-199); `WorksheetViewModel::beginOffsetDrag`/`endOffsetDrag`/`offsetDragActive`/
+  `offsetRangeBy`/`setSourceSamplePeriod`/`samplePeriodOf`, `DataSelectionModel::commitSidecar`/
+  `sidecarCommitText` (D-201).
+- `esses_widgets`: `OutingGraph`, `ScatterPlot`, `Histogram`, `ChannelReport`, `TimeReport`, `TrackPosition`,
+  `NumericGauge`, `BarGauge` (the §4 component classes), `TrackMapWindow`, `TrackEditor`, `PropertiesDialog`
+  (`openFor`, `find`), `FieldKind`, `FieldBinding`, `FieldBinder`, `ZoomSummaryBar`, `CorrectedSpeedDialog`,
+  `LayoutEditor`, `CommandPalette`, `AnimationController` (07 §6.1 "animation"), `ComponentClipboard` (07 §6.1
+  "clipboard"), `LayeredComponent` (the layer pipeline of the drawn components of the plots work, D-198);
+  `ChannelReport::copyTsv`/`toTsv`, `TimeReport::toggleBand`, `TrackPosition::zoomBy`/`panByLogical`/`fit`/`commitView`,
+  the `TrackMapWindow` actions and `TrackEditor`'s generation, section and file members (D-199);
+  `TimeDistanceGraph`'s commands (`toggleVariance` ... `cycleStyle`, `cursorValuesText`/`copyCursorValues`, the
+  vertical zoom members, `offsetStep`, the annotation members), `staticInfo`, `localState`, `hoverLineX`,
+  `toolTipAt` (D-201); `ComponentWidget::handleCommand`/`captionBarHeight`, `genericComponentEdit`/
+  `hasGenericComponentEdit`, the `FieldBinder` editors (`FieldEditor`, `NumberEdit`, `ColourEdit`, `UnitValueEdit`,
+  `FieldForm`, `RecordListEditor`, `FixedArrayEdit`, `OptionalEditor`, `jsonptr`, `SchemaTree`),
+  `SelectWorksheetDialog`, `UnitsListDialog`, `OpenLogDialog`, `MainWindow::Prompts` and the M3 shell accessors,
+  `WorksheetCanvas`'s selection, geometry, z-order and lock members with `componentSpecApplied`/`layoutEdited`/
+  `selectionChanged` (D-200).
+
 ---
 
 ## 5. Persisted files and schemas

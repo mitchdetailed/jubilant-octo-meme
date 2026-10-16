@@ -490,6 +490,1350 @@
       "id": "dbe1b836-172a-41ba-bdb1-6187b979377f",
       "linkTo": "Laps",
       "name": "Driver"
+    },
+    {
+      "components": [
+        {
+          "activeChannel": "Corr Speed",
+          "body": {
+            "display": {
+              "axis": {
+                "showX": true,
+                "showXScrollbar": true,
+                "showY": true,
+                "showYScrollbar": true
+              },
+              "bandGroup": "Outings:Laps:Track Sections:Default",
+              "bandMode": "sections",
+              "cursorSnap": true,
+              "cursorStyle": "line",
+              "key": {
+                "mode": "labels",
+                "pos": "left",
+                "stats": false,
+                "values": true
+              },
+              "lineWidth": 1,
+              "overlapMode": "panels",
+              "pointSize": 2,
+              "showBands": true,
+              "showDeviceEvents": true,
+              "showGrid": true,
+              "showMarkers": true,
+              "showStatusStrip": false,
+              "statusChannels": [],
+              "traceStyle": "line",
+              "variance": {
+                "autoScale": true,
+                "heightFrac": 0.15,
+                "max": {
+                  "unit": "s",
+                  "v": 2
+                },
+                "min": {
+                  "unit": "s",
+                  "v": -2
+                },
+                "show": false
+              }
+            },
+            "groups": [
+              {
+                "edges": [0, 0.4],
+                "hi": 0.4,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0,
+                "name": "Speed",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "Corr Speed",
+                    "displayUnit": "km/h",
+                    "dps": 1,
+                    "visible": true
+                  }
+                ]
+              },
+              {
+                "edges": [0.4, 0.7],
+                "hi": 0.7,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0.4,
+                "name": "Pedals",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "THROTTLE",
+                    "displayUnit": "%",
+                    "dps": 1,
+                    "visible": true
+                  },
+                  {
+                    "channel": "BRAKE",
+                    "displayUnit": "%",
+                    "dps": 1,
+                    "visible": true
+                  }
+                ]
+              },
+              {
+                "edges": [0.7, 0.85],
+                "hi": 0.85,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0.7,
+                "name": "Gear",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "GEAR",
+                    "dps": 0,
+                    "visible": true
+                  }
+                ]
+              },
+              {
+                "edges": [0.85, 1],
+                "hi": 1,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0.85,
+                "name": "Engine",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "RPMS",
+                    "displayUnit": "rpm",
+                    "dps": 0,
+                    "visible": true
+                  }
+                ]
+              }
+            ]
+          },
+          "caption": {
+            "auto": true,
+            "show": true,
+            "text": ""
+          },
+          "id": "03c9b4b7-7883-458f-8fb8-642397d8065e",
+          "legend": {
+            "channels": true,
+            "colour": false
+          },
+          "links": {
+            "cursor": true,
+            "datum": true,
+            "zoom": true
+          },
+          "rect": [0, 0, 0.62, 1],
+          "type": "time_distance",
+          "version": 1,
+          "z": 0
+        },
+        {
+          "activeChannel": "",
+          "body": {
+            "background": false,
+            "scale": {
+              "mode": "fit",
+              "panX": 0,
+              "panY": 0,
+              "rotation": 0,
+              "zoom": 1
+            },
+            "showSectionColours": true,
+            "showSectionLabels": true,
+            "showSectionMarks": true,
+            "showZoomSpan": true,
+            "sizes": {
+              "cursor": 6,
+              "detail": 2,
+              "material": 2
+            }
+          },
+          "caption": {
+            "auto": true,
+            "show": true,
+            "text": ""
+          },
+          "id": "fd2867f5-1b4d-4a81-afbb-ff56d2275b51",
+          "legend": {
+            "channels": true,
+            "colour": false
+          },
+          "links": {
+            "cursor": true,
+            "datum": true,
+            "zoom": true
+          },
+          "rect": [0.62, 0, 1, 0.55],
+          "type": "track_position",
+          "version": 1,
+          "z": 1
+        },
+        {
+          "activeChannel": "Corr Speed",
+          "body": {
+            "bandMode": "text",
+            "channel": "Corr Speed",
+            "colourBands": [],
+            "displayDps": 0,
+            "displayUnit": "km/h",
+            "dynamicFont": true,
+            "font": null,
+            "showUnits": true
+          },
+          "caption": {
+            "auto": true,
+            "show": true,
+            "text": ""
+          },
+          "id": "ecc18b2b-698a-4e24-84ed-e2d06ec7923a",
+          "legend": {
+            "channels": true,
+            "colour": false
+          },
+          "links": {
+            "cursor": true,
+            "datum": true,
+            "zoom": true
+          },
+          "rect": [0.62, 0.55, 0.81, 0.775],
+          "type": "gauge_numeric",
+          "version": 1,
+          "z": 2
+        },
+        {
+          "activeChannel": "GEAR",
+          "body": {
+            "bandMode": "text",
+            "channel": "GEAR",
+            "colourBands": [],
+            "displayDps": 0,
+            "dynamicFont": true,
+            "font": null,
+            "showUnits": true
+          },
+          "caption": {
+            "auto": true,
+            "show": true,
+            "text": ""
+          },
+          "id": "bc86b6fc-b12e-4c47-9e4d-55f8c4ea889f",
+          "legend": {
+            "channels": true,
+            "colour": false
+          },
+          "links": {
+            "cursor": true,
+            "datum": true,
+            "zoom": true
+          },
+          "rect": [0.81, 0.55, 1, 0.775],
+          "type": "gauge_numeric",
+          "version": 1,
+          "z": 3
+        },
+        {
+          "activeChannel": "THROTTLE",
+          "body": {
+            "bandLines": "none",
+            "bandMode": "none",
+            "barColour": null,
+            "channel": "THROTTLE",
+            "colourBands": [],
+            "customOrigin": {
+              "unit": "%",
+              "v": 0
+            },
+            "displayUnit": "%",
+            "orientation": "vertical",
+            "originStyle": "min",
+            "scale": {
+              "max": {
+                "unit": "%",
+                "v": 100
+              },
+              "min": {
+                "unit": "%",
+                "v": 0
+              },
+              "mode": "manual"
+            },
+            "scaleDps": 0,
+            "showScale": true
+          },
+          "caption": {
+            "auto": true,
+            "show": true,
+            "text": ""
+          },
+          "id": "f8b6b7b4-c23d-4d09-bace-363225ed2795",
+          "legend": {
+            "channels": true,
+            "colour": false
+          },
+          "links": {
+            "cursor": true,
+            "datum": true,
+            "zoom": true
+          },
+          "rect": [0.62, 0.775, 0.81, 1],
+          "type": "gauge_bar",
+          "version": 1,
+          "z": 4
+        },
+        {
+          "activeChannel": "BRAKE",
+          "body": {
+            "bandLines": "none",
+            "bandMode": "none",
+            "barColour": null,
+            "channel": "BRAKE",
+            "colourBands": [],
+            "customOrigin": {
+              "unit": "%",
+              "v": 0
+            },
+            "displayUnit": "%",
+            "orientation": "vertical",
+            "originStyle": "min",
+            "scale": {
+              "max": {
+                "unit": "%",
+                "v": 100
+              },
+              "min": {
+                "unit": "%",
+                "v": 0
+              },
+              "mode": "manual"
+            },
+            "scaleDps": 0,
+            "showScale": true
+          },
+          "caption": {
+            "auto": true,
+            "show": true,
+            "text": ""
+          },
+          "id": "c14f8e25-854b-482a-9cbd-149304071e72",
+          "legend": {
+            "channels": true,
+            "colour": false
+          },
+          "links": {
+            "cursor": true,
+            "datum": true,
+            "zoom": true
+          },
+          "rect": [0.81, 0.775, 1, 1],
+          "type": "gauge_bar",
+          "version": 1,
+          "z": 5
+        }
+      ],
+      "domain": "distance",
+      "grid": [100, 100],
+      "id": "6c845c4e-5ce3-4597-84c9-28f104a94644",
+      "linkTo": "Laps",
+      "name": "Overview"
+    },
+    {
+      "components": [
+        {
+          "activeChannel": "BRAKE",
+          "body": {
+            "display": {
+              "axis": {
+                "showX": true,
+                "showXScrollbar": true,
+                "showY": true,
+                "showYScrollbar": true
+              },
+              "bandGroup": "Outings:Laps:Track Sections:Default",
+              "bandMode": "sections",
+              "cursorSnap": true,
+              "cursorStyle": "line",
+              "key": {
+                "mode": "labels",
+                "pos": "left",
+                "stats": false,
+                "values": true
+              },
+              "lineWidth": 1,
+              "overlapMode": "panels",
+              "pointSize": 2,
+              "showBands": true,
+              "showDeviceEvents": true,
+              "showGrid": true,
+              "showMarkers": true,
+              "showStatusStrip": false,
+              "statusChannels": [],
+              "traceStyle": "line",
+              "variance": {
+                "autoScale": true,
+                "heightFrac": 0.15,
+                "max": {
+                  "unit": "s",
+                  "v": 2
+                },
+                "min": {
+                  "unit": "s",
+                  "v": -2
+                },
+                "show": false
+              }
+            },
+            "groups": [
+              {
+                "edges": [0, 0.35],
+                "hi": 0.35,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0,
+                "name": "Speed",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "Corr Speed",
+                    "displayUnit": "km/h",
+                    "dps": 1,
+                    "visible": true
+                  }
+                ]
+              },
+              {
+                "edges": [0.35, 0.55],
+                "hi": 0.55,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0.35,
+                "name": "Brake",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "BRAKE",
+                    "displayUnit": "%",
+                    "dps": 1,
+                    "visible": true
+                  }
+                ]
+              },
+              {
+                "edges": [0.55, 0.7],
+                "hi": 0.7,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0.55,
+                "name": "Throttle",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "THROTTLE",
+                    "displayUnit": "%",
+                    "dps": 1,
+                    "visible": true
+                  }
+                ]
+              },
+              {
+                "edges": [0.7, 0.85],
+                "hi": 0.85,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0.7,
+                "name": "Long G",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "G Force Long",
+                    "displayUnit": "G",
+                    "dps": 2,
+                    "visible": true
+                  }
+                ]
+              },
+              {
+                "edges": [0.85, 1],
+                "hi": 1,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0.85,
+                "name": "Gear",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "GEAR",
+                    "dps": 0,
+                    "visible": true
+                  }
+                ]
+              }
+            ]
+          },
+          "caption": {
+            "auto": true,
+            "show": true,
+            "text": ""
+          },
+          "id": "0f22f894-4c77-48da-841b-3bdb88d40da4",
+          "legend": {
+            "channels": true,
+            "colour": false
+          },
+          "links": {
+            "cursor": true,
+            "datum": true,
+            "zoom": true
+          },
+          "rect": [0, 0, 0.65, 1],
+          "type": "time_distance",
+          "version": 1,
+          "z": 0
+        },
+        {
+          "activeChannel": "BRAKE",
+          "body": {
+            "binLabelStep": 2,
+            "bins": {
+              "bandMode": "width",
+              "bandWidth": {
+                "unit": "%",
+                "v": 10
+              },
+              "dataMax": {
+                "unit": "%",
+                "v": 100
+              },
+              "dataMin": {
+                "unit": "%",
+                "v": 0
+              },
+              "greaterMaxBand": false,
+              "lessMinBand": false,
+              "mode": "even"
+            },
+            "condensedAxes": false,
+            "excludeUntrusted": true,
+            "layout": "overlapped",
+            "stackLines": false,
+            "style": "bar",
+            "tileCols": 0,
+            "traces": [
+              {
+                "channel": "BRAKE",
+                "visible": true
+              }
+            ],
+            "yMode": "percent",
+            "yScale": {
+              "mode": "auto"
+            }
+          },
+          "caption": {
+            "auto": true,
+            "show": true,
+            "text": ""
+          },
+          "id": "826ccd0a-ad0c-43c0-bf4e-3987b7cdc4d6",
+          "legend": {
+            "channels": true,
+            "colour": false
+          },
+          "links": {
+            "cursor": true,
+            "datum": true,
+            "zoom": true
+          },
+          "rect": [0.65, 0, 1, 0.5],
+          "type": "histogram",
+          "version": 1,
+          "z": 1
+        },
+        {
+          "activeChannel": "BRAKE",
+          "body": {
+            "cursorStyle": "cross",
+            "layout": "overlapped",
+            "pointSize": 2,
+            "scales": {
+              "x": {
+                "mode": "channel"
+              },
+              "y": {
+                "mode": "channel"
+              },
+              "z": {
+                "mode": "channel"
+              }
+            },
+            "showGrid": true,
+            "style": "pointsTrend",
+            "tileCols": 0,
+            "traces": [
+              {
+                "visible": true,
+                "yChannel": "BRAKE",
+                "yDelayUs": 0
+              }
+            ],
+            "trend": {
+              "order": 3,
+              "showEquation": true,
+              "significantDigits": 4,
+              "throughZero": false,
+              "type": "poly"
+            },
+            "xChannel": "THROTTLE"
+          },
+          "caption": {
+            "auto": true,
+            "show": true,
+            "text": ""
+          },
+          "id": "ce596697-6ac2-4590-ad96-393e8104dcd4",
+          "legend": {
+            "channels": true,
+            "colour": false
+          },
+          "links": {
+            "cursor": true,
+            "datum": true,
+            "zoom": true
+          },
+          "rect": [0.65, 0.5, 1, 1],
+          "type": "scatter",
+          "version": 1,
+          "z": 2
+        }
+      ],
+      "domain": "distance",
+      "grid": [100, 100],
+      "id": "3780ad68-e114-42b7-a6a5-cb85470134ec",
+      "linkTo": "Laps",
+      "name": "Braking"
+    },
+    {
+      "components": [
+        {
+          "activeChannel": "Corr Speed",
+          "body": {
+            "display": {
+              "axis": {
+                "showX": true,
+                "showXScrollbar": true,
+                "showY": true,
+                "showYScrollbar": true
+              },
+              "bandGroup": "Outings:Laps:Track Sections:Default",
+              "bandMode": "sections",
+              "cursorSnap": true,
+              "cursorStyle": "line",
+              "key": {
+                "mode": "labels",
+                "pos": "left",
+                "stats": false,
+                "values": true
+              },
+              "lineWidth": 1,
+              "overlapMode": "panels",
+              "pointSize": 2,
+              "showBands": true,
+              "showDeviceEvents": true,
+              "showGrid": true,
+              "showMarkers": true,
+              "showStatusStrip": false,
+              "statusChannels": [],
+              "traceStyle": "line",
+              "variance": {
+                "autoScale": true,
+                "heightFrac": 0.15,
+                "max": {
+                  "unit": "s",
+                  "v": 2
+                },
+                "min": {
+                  "unit": "s",
+                  "v": -2
+                },
+                "show": false
+              }
+            },
+            "groups": [
+              {
+                "edges": [0, 0.35],
+                "hi": 0.35,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0,
+                "name": "Speed",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "Corr Speed",
+                    "displayUnit": "km/h",
+                    "dps": 1,
+                    "visible": true
+                  }
+                ]
+              },
+              {
+                "edges": [0.35, 0.6],
+                "hi": 0.6,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0.35,
+                "name": "Steering",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "STEERANGLE",
+                    "displayUnit": "deg",
+                    "dps": 0,
+                    "visible": true
+                  }
+                ]
+              },
+              {
+                "edges": [0.6, 0.85],
+                "hi": 0.85,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0.6,
+                "name": "Lat G",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "G Force Lat",
+                    "displayUnit": "G",
+                    "dps": 2,
+                    "visible": true
+                  }
+                ]
+              },
+              {
+                "edges": [0.85, 1],
+                "hi": 1,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0.85,
+                "name": "Gear",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "GEAR",
+                    "dps": 0,
+                    "visible": true
+                  }
+                ]
+              }
+            ]
+          },
+          "caption": {
+            "auto": true,
+            "show": true,
+            "text": ""
+          },
+          "id": "f8c7c0d1-fa2c-40e5-a346-7ee1f1dc1e9e",
+          "legend": {
+            "channels": true,
+            "colour": false
+          },
+          "links": {
+            "cursor": true,
+            "datum": true,
+            "zoom": true
+          },
+          "rect": [0, 0, 0.6, 1],
+          "type": "time_distance",
+          "version": 1,
+          "z": 0
+        },
+        {
+          "activeChannel": "G Force Long",
+          "body": {
+            "cursorStyle": "cross",
+            "layout": "overlapped",
+            "pointSize": 2,
+            "scales": {
+              "x": {
+                "mode": "channel"
+              },
+              "y": {
+                "mode": "channel"
+              },
+              "z": {
+                "mode": "channel"
+              }
+            },
+            "showGrid": true,
+            "style": "points",
+            "tileCols": 0,
+            "traces": [
+              {
+                "visible": true,
+                "yChannel": "G Force Long",
+                "yDelayUs": 0
+              }
+            ],
+            "trend": {
+              "order": 2,
+              "showEquation": false,
+              "significantDigits": 4,
+              "throughZero": false,
+              "type": "none"
+            },
+            "xChannel": "G Force Lat"
+          },
+          "caption": {
+            "auto": true,
+            "show": true,
+            "text": ""
+          },
+          "id": "5484957c-7005-4bc6-9bb0-ba6730ced7a4",
+          "legend": {
+            "channels": true,
+            "colour": false
+          },
+          "links": {
+            "cursor": true,
+            "datum": true,
+            "zoom": true
+          },
+          "rect": [0.6, 0, 1, 0.5],
+          "type": "scatter",
+          "version": 1,
+          "z": 1
+        },
+        {
+          "activeChannel": "",
+          "body": {
+            "background": false,
+            "scale": {
+              "mode": "fit",
+              "panX": 0,
+              "panY": 0,
+              "rotation": 0,
+              "zoom": 1
+            },
+            "showSectionColours": true,
+            "showSectionLabels": true,
+            "showSectionMarks": true,
+            "showZoomSpan": true,
+            "sizes": {
+              "cursor": 6,
+              "detail": 2,
+              "material": 2
+            }
+          },
+          "caption": {
+            "auto": true,
+            "show": true,
+            "text": ""
+          },
+          "id": "b971e77a-b8e6-41bf-bf8a-0e3d5277a31e",
+          "legend": {
+            "channels": true,
+            "colour": false
+          },
+          "links": {
+            "cursor": true,
+            "datum": true,
+            "zoom": true
+          },
+          "rect": [0.6, 0.5, 1, 1],
+          "type": "track_position",
+          "version": 1,
+          "z": 2
+        }
+      ],
+      "domain": "distance",
+      "grid": [100, 100],
+      "id": "e5f4ed87-d6ab-4446-b66b-0a33ef5a7d76",
+      "linkTo": "Laps",
+      "name": "Corners"
+    },
+    {
+      "components": [
+        {
+          "activeChannel": "",
+          "body": {
+            "deltaVsOverlay0": true,
+            "highlight": {
+              "max": {
+                "colour": "#ff3030",
+                "on": true
+              },
+              "min": {
+                "colour": "#2060ff",
+                "on": true
+              }
+            },
+            "layout": "channelsInRows",
+            "report": {
+              "channels": [
+                {
+                  "name": "Corr Speed",
+                  "stats": ["avg", "min", "max"]
+                },
+                {
+                  "name": "THROTTLE",
+                  "stats": ["avg", "min", "max"]
+                },
+                {
+                  "name": "BRAKE",
+                  "stats": ["avg", "min", "max"]
+                }
+              ],
+              "headers": ["Venue", "Driver", "Outings:Laps"],
+              "options": {
+                "excludeOverlays": false,
+                "includeUntrusted": false,
+                "interpolateBoundaries": false,
+                "probeSeconds": 5,
+                "zoomLinked": false
+              },
+              "scope": "selectedRanges"
+            },
+            "splitter": {
+              "mode": "none",
+              "pos": 0.5
+            },
+            "timeFormat": "project"
+          },
+          "caption": {
+            "auto": true,
+            "show": true,
+            "text": ""
+          },
+          "id": "bc4db981-18c0-4fc6-b51a-08b5e009b035",
+          "legend": {
+            "channels": true,
+            "colour": false
+          },
+          "links": {
+            "cursor": true,
+            "datum": true,
+            "zoom": true
+          },
+          "rect": [0, 0, 1, 0.5],
+          "type": "channel_report",
+          "version": 1,
+          "z": 0
+        },
+        {
+          "activeChannel": "",
+          "body": {
+            "bands": [
+              {
+                "colour": "#30c030",
+                "pct": 0.5,
+                "visible": true
+              },
+              {
+                "colour": "#80c030",
+                "pct": 1,
+                "visible": true
+              },
+              {
+                "colour": "#c0c030",
+                "pct": 2,
+                "visible": true
+              },
+              {
+                "colour": "#e09030",
+                "pct": 3,
+                "visible": false
+              }
+            ],
+            "options": {
+              "includeUntrusted": false
+            },
+            "rowGroup": "Outings:Laps:Track Sections:Default",
+            "scope": "selectedOutings",
+            "summaries": {
+              "eclectic": true,
+              "rollingMin": true,
+              "total": true
+            },
+            "timeFormat": "project"
+          },
+          "caption": {
+            "auto": true,
+            "show": true,
+            "text": ""
+          },
+          "id": "14084b12-62a0-4652-aa41-cd593c1f8a75",
+          "legend": {
+            "channels": true,
+            "colour": false
+          },
+          "links": {
+            "cursor": true,
+            "datum": true,
+            "zoom": true
+          },
+          "rect": [0, 0.5, 1, 1],
+          "type": "time_report",
+          "version": 1,
+          "z": 1
+        }
+      ],
+      "domain": "time",
+      "grid": [100, 100],
+      "id": "97cfa851-657d-4b00-851a-0da53cfc0da7",
+      "linkTo": "Laps",
+      "name": "Reports"
+    },
+    {
+      "components": [
+        {
+          "activeChannel": "",
+          "body": {
+            "background": false,
+            "scale": {
+              "mode": "fit",
+              "panX": 0,
+              "panY": 0,
+              "rotation": 0,
+              "zoom": 1
+            },
+            "showSectionColours": true,
+            "showSectionLabels": true,
+            "showSectionMarks": true,
+            "showZoomSpan": true,
+            "sizes": {
+              "cursor": 6,
+              "detail": 2,
+              "material": 2
+            }
+          },
+          "caption": {
+            "auto": true,
+            "show": true,
+            "text": ""
+          },
+          "id": "98e49933-e65c-4414-8708-c50b300e4a98",
+          "legend": {
+            "channels": true,
+            "colour": false
+          },
+          "links": {
+            "cursor": true,
+            "datum": true,
+            "zoom": true
+          },
+          "rect": [0, 0, 0.6, 1],
+          "type": "track_position",
+          "version": 1,
+          "z": 0
+        },
+        {
+          "activeChannel": "Corr Speed",
+          "body": {
+            "display": {
+              "axis": {
+                "showX": true,
+                "showY": true
+              },
+              "key": {
+                "mode": "labels",
+                "pos": "left",
+                "values": true
+              },
+              "lineWidth": 1,
+              "overlapMode": "panels",
+              "showBands": true,
+              "showDeviceEvents": true,
+              "showGrid": true,
+              "traceStyle": "line"
+            },
+            "enableOverlays": false,
+            "groups": [
+              {
+                "name": "Speed",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "Corr Speed",
+                    "displayUnit": "km/h"
+                  }
+                ]
+              }
+            ]
+          },
+          "caption": {
+            "auto": true,
+            "show": true,
+            "text": ""
+          },
+          "id": "073aaac0-f699-45c8-bb7d-59db0f1fdd21",
+          "legend": {
+            "channels": true,
+            "colour": false
+          },
+          "links": {
+            "cursor": true,
+            "datum": true,
+            "zoom": true
+          },
+          "rect": [0.6, 0, 1, 0.35],
+          "type": "outing",
+          "version": 1,
+          "z": 1
+        },
+        {
+          "activeChannel": "Corr Speed",
+          "body": {
+            "display": {
+              "axis": {
+                "showX": true,
+                "showXScrollbar": true,
+                "showY": true,
+                "showYScrollbar": true
+              },
+              "bandGroup": "Outings:Laps:Track Sections:Default",
+              "bandMode": "sections",
+              "cursorSnap": true,
+              "cursorStyle": "line",
+              "key": {
+                "mode": "labels",
+                "pos": "left",
+                "stats": false,
+                "values": true
+              },
+              "lineWidth": 1,
+              "overlapMode": "panels",
+              "pointSize": 2,
+              "showBands": true,
+              "showDeviceEvents": true,
+              "showGrid": true,
+              "showMarkers": true,
+              "showStatusStrip": false,
+              "statusChannels": [],
+              "traceStyle": "line",
+              "variance": {
+                "autoScale": true,
+                "heightFrac": 0.15,
+                "max": {
+                  "unit": "s",
+                  "v": 2
+                },
+                "min": {
+                  "unit": "s",
+                  "v": -2
+                },
+                "show": false
+              }
+            },
+            "groups": [
+              {
+                "edges": [0, 0.5],
+                "hi": 0.5,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0,
+                "name": "Speed",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "Corr Speed",
+                    "displayUnit": "km/h",
+                    "dps": 1,
+                    "visible": true
+                  }
+                ]
+              },
+              {
+                "edges": [0.5, 1],
+                "hi": 1,
+                "lines": {
+                  "max": {
+                    "enabled": false
+                  },
+                  "min": {
+                    "enabled": false
+                  },
+                  "zero": {
+                    "enabled": true
+                  }
+                },
+                "lo": 0.5,
+                "name": "Pedals",
+                "scaleMode": "channel",
+                "traces": [
+                  {
+                    "channel": "THROTTLE",
+                    "displayUnit": "%",
+                    "dps": 1,
+                    "visible": true
+                  },
+                  {
+                    "channel": "BRAKE",
+                    "displayUnit": "%",
+                    "dps": 1,
+                    "visible": true
+                  }
+                ]
+              }
+            ]
+          },
+          "caption": {
+            "auto": true,
+            "show": true,
+            "text": ""
+          },
+          "id": "ee8e6767-9928-4a43-8a5f-ef84b8d8b938",
+          "legend": {
+            "channels": true,
+            "colour": false
+          },
+          "links": {
+            "cursor": true,
+            "datum": true,
+            "zoom": true
+          },
+          "rect": [0.6, 0.35, 1, 1],
+          "type": "time_distance",
+          "version": 1,
+          "z": 2
+        }
+      ],
+      "domain": "distance",
+      "grid": [100, 100],
+      "id": "96a79b56-eb84-4611-9275-c61d60165612",
+      "linkTo": "Laps",
+      "name": "Track"
     }
   ]
 }

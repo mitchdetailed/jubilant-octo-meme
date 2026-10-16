@@ -1,0 +1,10 @@
+{
+  "bad-origin.json": {
+    "pointer": "/originStyle",
+    "why": "the origin is min, zero, max or custom"
+  },
+  "bar-colour-name.json": {
+    "pointer": "/barColour",
+    "why": "a colour is #rrggbb or #rrggbbaa, or null"
+  }
+}

@@ -30,7 +30,7 @@ import sys
 import tempfile
 from typing import Any
 
-CURRENT_MILESTONE = "M1"
+CURRENT_MILESTONE = "M3"  # every M1-M3 row is implemented with its test (AC-M3-01); M4 is next
 MILESTONES = ["M1", "M2", "M3", "M4", "v1.0", "later"]
 STATUSES = {"implemented", "planned", "reserved"}
 KEYMAP = pathlib.PurePosixPath("data/keymaps/default.json")

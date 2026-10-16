@@ -4,6 +4,7 @@
 
 #include <esses/analysis/beacon_pair_rule.hpp>
 #include <esses/analysis/range_rule.hpp>
+#include <esses/analysis/track_sections_rule.hpp>
 #include <esses/analysis/whole_outing_rule.hpp>
 #include <esses/base/casefold.hpp>
 #include <esses/base/json_nlohmann.hpp>
@@ -121,10 +122,16 @@ Result<std::unique_ptr<IRangeRule>> makeRangeRule(const RuleDocument& document) 
         }
         return std::unique_ptr<IRangeRule>(std::move(rule).value());
     }
-    if (document.kind == "track-sections" || document.kind == "detail-group") {
+    if (document.kind == "track-sections") {
+        auto rule = TrackSectionsRule::fromDocument(document);
+        if (!rule) {
+            return Failure{rule.error()};
+        }
+        return std::unique_ptr<IRangeRule>(std::move(rule).value());
+    }
+    if (document.kind == "detail-group") {
         Error e{ErrorCode::Unsupported,
-                "rule kind '" + document.kind + "' (" + document.id +
-                    ") is not implemented yet (track-sections: M3; detail-group: later)",
+                "rule kind '" + document.kind + "' (" + document.id + ") is not implemented yet (later)",
                 {}};
         e.context.detail = document.kind;
         return Failure{std::move(e)};

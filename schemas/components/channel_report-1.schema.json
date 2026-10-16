@@ -1,0 +1,134 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:components/channel_report-1",
+  "title": "channel_report component body",
+  "description": "The body of a channel_report component (04 section 12 item 8): the ReportSpec (scope, ordered heading group paths, channels with statistics, options), layout, highlight, delta versus Overlay 0, time format and the splitter.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scope": {
+          "enum": ["selectedRanges", "selectedOutings", "allOutings"]
+        },
+        "headers": {
+          "description": "Range-group paths that divide the data, outermost first.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "channels": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "name": {
+                "$ref": "#/definitions/channelName"
+              },
+              "stats": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "enum": ["avg", "min", "max", "absMax", "start", "end", "change", "stdDev", "delta"]
+                }
+              }
+            }
+          }
+        },
+        "options": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "excludeOverlays": {
+              "type": "boolean"
+            },
+            "includeUntrusted": {
+              "type": "boolean"
+            },
+            "interpolateBoundaries": {
+              "type": "boolean"
+            },
+            "probeSeconds": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 60
+            },
+            "zoomLinked": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "layout": {
+      "enum": ["channelsInRows", "channelsInColumns"]
+    },
+    "highlight": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "min": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "on": {
+              "type": "boolean"
+            },
+            "colour": {
+              "$ref": "#/definitions/colour"
+            }
+          }
+        },
+        "max": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "on": {
+              "type": "boolean"
+            },
+            "colour": {
+              "$ref": "#/definitions/colour"
+            }
+          }
+        }
+      }
+    },
+    "deltaVsOverlay0": {
+      "type": "boolean"
+    },
+    "timeFormat": {
+      "enum": ["project", "s.mmm", "m:ss.mmm"]
+    },
+    "splitter": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": ["none", "horizontal", "vertical"]
+        },
+        "pos": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  },
+  "definitions": {
+    "channelName": {
+      "description": "A channel as the workbook names it (D-013: resolved through mappings, aliases, case folding and the logged name); \"\" where the member is optional means none.",
+      "type": "string"
+    },
+    "colour": {
+      "description": "A colour \"#rrggbb\" (alpha ff) or \"#rrggbbaa\"; written in lower case (Rgba, 04 section 5.1).",
+      "type": "string",
+      "pattern": "^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$"
+    }
+  }
+}

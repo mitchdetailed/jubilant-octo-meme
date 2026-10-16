@@ -1,0 +1,54 @@
+{
+    "activeChannel": "",
+    "body": {
+        "barColour": "#7e57c2",
+        "channel": "Corr Speed",
+        "customOrigin": {
+            "unit": "km/h",
+            "v": 120
+        },
+        "displayUnit": "km/h",
+        "originStyle": "custom",
+        "showScale": false
+    },
+    "caption": true,
+    "case": "bar_custom_origin_dark",
+    "colourLegend": false,
+    "cursorUs": 15000000,
+    "data": "libs/plotcore/tests/td_golden_cases.hpp (synthetic rational data, sources synthetic_a/b/c.ld); cases in libs/plotcore/tests/plots_golden_cases.hpp",
+    "datumUs": null,
+    "domain": "time",
+    "dprs": [
+        1,
+        2
+    ],
+    "focused": true,
+    "fonts": "tests/golden/fonts (Noto Sans), QtTextMetrics",
+    "pendingStripe": false,
+    "scheme": "Test Dark",
+    "sizeLogical": [
+        110,
+        240
+    ],
+    "slots": [
+        {
+            "distanceData": true,
+            "kind": "Main",
+            "lap": 0,
+            "number": 0,
+            "source": "synthetic_a.ld"
+        },
+        {
+            "distanceData": true,
+            "kind": "Overlay",
+            "lap": 0,
+            "number": 1,
+            "source": "synthetic_b.ld"
+        }
+    ],
+    "type": "gauge_bar",
+    "zoom": [
+        0,
+        60000000
+    ]
+}

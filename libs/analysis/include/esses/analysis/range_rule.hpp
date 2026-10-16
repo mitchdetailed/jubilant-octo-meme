@@ -88,8 +88,8 @@ protected:
     IRangeRule& operator=(const IRangeRule&) = default;
 };
 
-// Factory by kind: "beacon-pair" -> BeaconPairRule, "whole-outing" -> WholeOutingRule; Unsupported for the
-// kinds that arrive later ("track-sections" M3, "detail-group").
+// Factory by kind: "beacon-pair" -> BeaconPairRule, "whole-outing" -> WholeOutingRule, "track-sections" ->
+// TrackSectionsRule (phase 2); Unsupported for "detail-group".
 Result<std::unique_ptr<IRangeRule>> makeRangeRule(const RuleDocument& document);
 
 } // namespace esses::analysis

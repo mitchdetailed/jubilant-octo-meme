@@ -1,0 +1,32 @@
+{
+  "display": {
+    "traceStyle": "line",
+    "lineWidth": 1,
+    "showGrid": true,
+    "showBands": true,
+    "overlapMode": "panels",
+    "key": {
+      "mode": "labels",
+      "pos": "left",
+      "values": true
+    },
+    "showDeviceEvents": true,
+    "axis": {
+      "showX": true,
+      "showY": true
+    }
+  },
+  "groups": [
+    {
+      "name": "Speed",
+      "scaleMode": "channel",
+      "traces": [
+        {
+          "channel": "Corr Speed",
+          "displayUnit": "km/h"
+        }
+      ]
+    }
+  ],
+  "enableOverlays": false
+}

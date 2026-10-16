@@ -1,0 +1,25 @@
+{"case":"bar_horizontal_zero_fill","dpr":2,
+"static":{"w":600,"h":180,"dpr":2,"cmds":[
+{"k":"clear","c":"#ffffff"},
+{"k":"rect","c":"#f7f7f8","r":[34,44,532,80]},
+{"k":"lines","c":"#202124","w":2,"d":"solid","v":[34,136,34,142,122.67,136,122.67,142,211.33,136,211.33,142,300,136,300,142,388.67,136,388.67,142,477.33,136,477.33,142,566,136,566,142]},
+{"k":"text","t":"-1.0","x":34,"y":144,"style":"axis","anchor":"topCentre","c":"#202124"},
+{"k":"text","t":"-0.5","x":122.67,"y":144,"style":"axis","anchor":"topCentre","c":"#202124"},
+{"k":"text","t":"0.0","x":211.33,"y":144,"style":"axis","anchor":"topCentre","c":"#202124"},
+{"k":"text","t":"0.5","x":300,"y":144,"style":"axis","anchor":"topCentre","c":"#202124"},
+{"k":"text","t":"1.0","x":388.67,"y":144,"style":"axis","anchor":"topCentre","c":"#202124"},
+{"k":"text","t":"1.5","x":477.33,"y":144,"style":"axis","anchor":"topCentre","c":"#202124"},
+{"k":"text","t":"2.0","x":566,"y":144,"style":"axis","anchor":"topCentre","c":"#202124"},
+{"k":"rect","c":"#1e88e5","r":[211.33,128,177.33,8]},
+{"k":"rect","c":"#e53935","r":[388.67,128,177.33,8]},
+{"k":"polyline","c":"#a0a4a8","w":2,"d":"solid","v":[35,45,565,45,565,123,35,123,35,45]}
+]}
+,"dynamic":{"w":600,"h":180,"dpr":2,"cmds":[
+{"k":"rect","c":"#1e88e5","r":[211.33,44,127.09,80]},
+{"k":"text","t":"0.72","x":342.42,"y":84,"style":"keyValue","anchor":"middleLeft","c":"#202124","maxw":532,"bg":"#ffffff"}
+]}
+,"chrome":{"w":600,"h":180,"dpr":2,"cmds":[
+{"k":"rect","c":"#e8eaed","r":[0,0,600,36]},
+{"k":"text","t":"Ch 03","x":8,"y":18,"style":"caption","anchor":"middleLeft","c":"#202124","maxw":584}
+]}
+}

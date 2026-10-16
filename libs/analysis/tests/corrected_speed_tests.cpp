@@ -6,6 +6,7 @@
 // span; Corr Dist equals the trapezoid integral within 1e-9 relative and holds through invalid speed samples.
 #include "analysis_test_support.hpp"
 
+#include <esses/base/read_file.hpp>
 #include <esses/units/unit_registry.hpp>
 
 #include <catch2/catch_approx.hpp>
@@ -13,8 +14,6 @@
 
 #include <cmath>
 #include <filesystem>
-#include <fstream>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -298,7 +297,8 @@ TEST_CASE("corrected_speed: fallbacks, unit conversion and no speed", "[unit][AC
     CHECK(viaLogged->speedMps.values[1] == 8.0);
     CHECK(viaLogged->diagnostics.empty());
 
-    // Nothing usable: NotFound with E-CSD-NO-SPEED; gCorrection waits for M3.
+    // Nothing usable: NotFound with E-CSD-NO-SPEED; gCorrection (M3) has no fallback, so a missing wheel
+    // channel is NotFound too (corrected_speed_methods_tests.cpp covers the method).
     model::DataLayer none;
     none.addChannel(channel("Throttle Pos", tc.uniform(Rate::fromHz(10), {1})));
     auto missing = CorrectedSpeed::compute(CorrectedSpeedSettings{}, none, registry(), {});
@@ -307,7 +307,11 @@ TEST_CASE("corrected_speed: fallbacks, unit conversion and no speed", "[unit][AC
     CHECK(missing.error().context.detail == "E-CSD-NO-SPEED");
     CorrectedSpeedSettings g;
     g.method = SpeedMethod::GCorrection;
-    CHECK(CorrectedSpeed::compute(g, layer, registry(), {}).error().code == ErrorCode::Unsupported);
+    auto noWheel = CorrectedSpeed::compute(g, layer, registry(), {});
+    REQUIRE_FALSE(noWheel.ok());
+    CHECK(noWheel.error().code == ErrorCode::NotFound);
+    CHECK(noWheel.error().context.detail == "E-CSD-NO-SPEED");
+    CHECK(noWheel.error().context.channel == "Wheel Speed FL");
 
     // A timestamped speed channel is not usable yet.
     model::DataLayer stamped;
@@ -385,11 +389,10 @@ TEST_CASE("corrected_speed: settings parse the 03 section 9.1 object and its sch
         std::error_code ec;
         for (std::filesystem::directory_iterator it(examples / kind, ec), end; !ec && it != end;
              it.increment(ec)) {
-            std::ifstream in(it->path(), std::ios::binary);
-            std::stringstream text;
-            text << in.rdbuf();
             INFO(pathToUtf8(it->path()));
-            auto parsed = CorrectedSpeedSettings::fromJson(json(text.str()), registry());
+            Result<std::string> text = readWholeFile(it->path()); // the PR #2 rule (read_file.hpp)
+            REQUIRE(text.ok());
+            auto parsed = CorrectedSpeedSettings::fromJson(json(*text), registry());
             CHECK(parsed.ok() == (std::string(kind) == "valid"));
         }
     }

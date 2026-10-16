@@ -26,7 +26,9 @@
 // when a source publishes, kept for sources that are closed; applyToAllSources is the toolbar flag. A
 // lap-number filter that does not parse is refused (filterRejected(), the previous filter stays).
 // Additions: hasMain, displayedRanges, filterAccepts, selectionKeys, parseLapNumbers, lapNumbersError,
-// filterKindName/parseFilterKind, defaultFilter, session, setSelectFastestOnLoad, setSidecarCommit.
+// filterKindName/parseFilterKind, defaultFilter, session, setSelectFastestOnLoad, setSidecarCommit; M3 (the
+// time_distance completion): commitSidecar hands any sidecar edit of an open source (the marker band's
+// annotation Edit / Remove) to the same hook with its undo text (sidecarCommitText, read by the hook).
 #pragma once
 
 #include <esses/model/ids.hpp>
@@ -119,6 +121,11 @@ public:
     bool selectFastestOnLoad() const noexcept { return selectFastestOnLoad_; }
     void setSelectFastestOnLoad(bool on) { selectFastestOnLoad_ = on; }
     void setSidecarCommit(SidecarCommit commit) { sidecarCommit_ = std::move(commit); }
+    // Commits `doc` as the sidecar of the open source `source` through the SidecarCommit hook (with a
+    // session: one undoable command named `undoText`); false without a hook or when the source is not open.
+    bool commitSidecar(const model::SourceId& source, model::SidecarDocument doc, const QString& undoText);
+    // The undo text of the commit in progress (the hook reads it; "" outside a commit).
+    const QString& sidecarCommitText() const noexcept { return sidecarCommitText_; }
     // The project.json lastSelection of the current snapshot (06 section 5.5); paths are written relative to
     // `projectFolder` when they lie under it.
     project::SelectionKeys selectionKeys(const std::filesystem::path& projectFolder = {}) const;
@@ -186,6 +193,7 @@ private:
     bool applyToAllSources_ = false;
     bool selectFastestOnLoad_ = false;
     SidecarCommit sidecarCommit_;
+    QString sidecarCommitText_;
     // selectionKeys: the project.json path of a source per (source id, source path, project folder).
     mutable std::map<std::string, std::string> relativePaths_;
 };

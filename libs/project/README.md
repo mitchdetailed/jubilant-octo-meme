@@ -8,7 +8,8 @@ shipped `data/workbooks/circuit-default.workbook.json`, `data/schemes/light.sche
 `data/profiles/circuit.profile.json`. M2 (07 §5.1): the channel documents `ChannelOverrides` (`overrides-1`),
 `Aliases` (`aliases-1`), `Mappings` (`mappings-1`), `SchemaRegistry`, `Migrations` with the first real migration
 (`project-1` 1 -> 2, D-162), the write-ahead `Journal` (`journal-1`), and the load pipeline every document kind
-shares (D-163; see "M2: persistence" below). `TrackMapFile` and the configuration importers arrive later.
+shares (D-163; see "M2: persistence" below). M3: `TrackMapFile` (`trackmaps/<venue>.track.json`, below). The
+configuration importers arrive later.
 
 Namespace `esses::project`; public headers in `include/esses/project/` (umbrella `project.hpp`). Links
 `esses_base`, `esses_units`, `esses_model`, `esses_analysis`, `esses_maths` (same-layer edges, D-122);
@@ -85,7 +86,14 @@ registered in ctest; the full check needs `KEYMAP_TEST("<command.id>")` rows und
   Pedals (`THROTTLE`, `BRAKE`), Steering (`STEERANGLE`), Engine (`RPMS`), Gear (`GEAR`), next to a `values_list`
   on `[0.75, 0, 1, 1]` (`Corr Speed`, `Corr Dist` and the same channels plus `FUEL`); worksheet 1 "Driver"
   (distance domain). Channel names are the ACC-style logged names of the M1 data path (D-044), resolved
-  case-insensitively by `ChannelResolver`; missing channels draw as missing.
+  case-insensitively by `ChannelResolver`; missing channels draw as missing. M3 (07 §6.1 "Data", D-202) appends
+  worksheets 2-6: "Overview" (distance: graph, `track_position`, two `gauge_numeric`, two `gauge_bar`),
+  "Braking" (distance: graph with F3 ready, brake `histogram`, throttle-vs-brake `scatter` with a polynomial-3
+  trend), "Corners" (distance: graph, lateral-vs-longitudinal G `scatter`, `track_position`), "Reports" (time:
+  `channel_report` Venue › Driver › Lap with Δ vs Overlay 0, `time_report` of the Default sections with bands
+  0.5/1/2 % and a hidden 3 % band) and "Track" (distance: `track_position`, `outing`, graph); with M1's
+  `values_list` every MVP component type appears. The new throttle and brake traces carry `displayUnit` `%`
+  (logged percentages are stored in ratio, D-010); lateral and longitudinal G are `G Force Lat`/`G Force Long`.
 - `light.scheme.json` ("Esses Light") and `dark.scheme.json` ("Esses Dark"): every role and font role of 06 §16
   (`kSchemeRoles`, `kSchemeFontRoles`), Noto Sans throughout, 12-colour channel palettes and 9-colour overlay
   palettes per background (every entry >= 3:1 contrast with `cptBackground`), `overlayStyle` plain channel
@@ -197,3 +205,19 @@ Consumers: `esses_qtmodel` (`ProjectSession`, `undo_commands.hpp`: `ChannelOverr
 - Load order (D-163): the typed reader runs before `SchemaRegistry`, which validates the written form, where 02
   §6.1 writes "validate -> migrate -> parse"; without a schemas directory the typed reader is the only check.
 - `project-1` minor 2 (D-162) fixes the Data-window filter keys that 02 §6.2's key table calls "SourceId hex".
+
+## M3 contract (07 §6.1; `docs/milestones/M3.md` §2; D-193)
+
+- `track_map_file.hpp`, `src/track/track_map_file.cpp` (track work): `TrackMapFile`, the project document
+  `trackmaps/<venue>.track.json` (`track-1`, D-061) around `analysis::TrackMap`. As built (AC-M3-04): `parse`
+  runs the shared load pipeline (header and migrations, `TrackMap::fromJson`, then `TrackMap::validate`, so a
+  file with a section under 10 m, out of bounds or with a duplicate id is Invalid at its JSON pointer, then the
+  schema check of what `save` writes); `toJson`/`save` write the canonical text (lengths in metres, a newer
+  minor kept), `save` atomically and creating `trackmaps/` when needed; the copy of the previous file to
+  `backup/` on the Track Editor's Accept is the caller's. `fileNameFor` lower-cases ASCII letters and digits,
+  turns every other ASCII run into one `-`, keeps non-ASCII UTF-8 and suffixes `-track` to a Windows device
+  name (`con`, `lpt1`, ...). Tests: `tests/track_map_file_tests.cpp` (schema examples, byte-for-byte round
+  trip, user sections saved into a new `trackmaps/` and reloaded, the pipeline's checks, file names).
+- Schemas: `track-1` (`schemas/track-1.schema.json`, loaded by `SchemaRegistry` with the other document schemas)
+  and the component body schemas `schemas/components/<type>-1.schema.json` (fragments, not loaded by
+  `SchemaRegistry` yet; D-193 (a)).

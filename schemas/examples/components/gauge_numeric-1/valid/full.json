@@ -1,0 +1,24 @@
+{
+  "channel": "Engine RPM",
+  "displayUnit": "rpm",
+  "displayDps": 0,
+  "showUnits": true,
+  "dynamicFont": true,
+  "font": null,
+  "colourBands": [
+    {
+      "min": {
+        "v": 7000,
+        "unit": "rpm"
+      },
+      "max": {
+        "v": 0,
+        "unit": "rpm"
+      },
+      "open": "above",
+      "colour": "#ff3030",
+      "visible": true
+    }
+  ],
+  "bandMode": "text"
+}

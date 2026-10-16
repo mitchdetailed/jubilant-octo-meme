@@ -2,9 +2,15 @@
     "activeChannel": "Corr Speed",
     "body": {
         "display": {
+            "axis": {
+                "showXScrollbar": false,
+                "showYScrollbar": false
+            },
             "key": {
                 "pos": "right"
-            }
+            },
+            "showBands": false,
+            "showMarkers": false
         },
         "groups": [
             {

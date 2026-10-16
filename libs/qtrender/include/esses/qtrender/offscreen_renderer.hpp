@@ -15,8 +15,11 @@
 // esses_qtmodel or esses_maths), so render() takes an InputsProvider that turns each component spec into its
 // prepared plot::ComponentBuildInputs (esses_qtmodel's RenderService::prepareInputs in esses-render and the
 // tests). Builders are looked up by component type: setBuilders() overrides, else builtinBuilders()
-// (time_distance -> plot::TimeDistanceBuilder; every other type, and every unknown component, renders the
-// placeholder: background, frame and the type name).
+// (time_distance -> plot::TimeDistanceBuilder; since the M3 contract outing -> plot::OutingGeometry, scatter
+// -> ScatterGeometry, histogram -> HistogramGeometry, track_position -> TrackGeometry, gauge_numeric and
+// gauge_bar
+// -> GaugeGeometry; the table components values_list, channel_report and time_report, and every unknown
+// component, render the placeholder: background, frame and the type name).
 #pragma once
 
 #include <esses/base/cancel.hpp>

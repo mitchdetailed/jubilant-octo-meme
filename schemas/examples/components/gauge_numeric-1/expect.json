@@ -1,0 +1,10 @@
+{
+  "bad-band-mode.json": {
+    "pointer": "/bandMode",
+    "why": "a numeric gauge colours the text or the background"
+  },
+  "band-open-sideways.json": {
+    "pointer": "/colourBands/0/open",
+    "why": "an open band is open below or above"
+  }
+}

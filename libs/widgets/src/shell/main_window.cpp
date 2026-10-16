@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 the Esses contributors
 // SPDX-License-Identifier: MIT
 
+#include "main_window_impl.hpp"
+
 #include <esses/base/utf8.hpp>
 #include <esses/base/version.hpp>
 #include <esses/qtmodel/channel_status_model.hpp>
@@ -145,50 +147,6 @@ bool projectOption(const qt::ProjectSession& session, const char* group, const c
     return v.isBool() ? v.toBool() : fallback;
 }
 
-// Drops of application/x-esses-channels on a component that does not take drops itself: the shell adds the
-// channels through ComponentWidget::addChannel (06 section 7 item 5; CTRL at the drop = new panel).
-class ChannelDropFilter final : public QObject {
-public:
-    using QObject::QObject;
-
-protected:
-    bool eventFilter(QObject* watched, QEvent* event) override {
-        auto* component = qobject_cast<ComponentWidget*>(watched);
-        if (component == nullptr || !component->acceptsChannelDrop()) {
-            return false;
-        }
-        switch (event->type()) {
-        case QEvent::DragEnter:
-        case QEvent::DragMove: {
-            auto* e = static_cast<QDropEvent*>(event);
-            if (e->mimeData() != nullptr && ChannelsWindow::parseMime(*e->mimeData())) {
-                e->setDropAction(Qt::CopyAction);
-                e->accept();
-                return true;
-            }
-            return false;
-        }
-        case QEvent::Drop: {
-            auto* e = static_cast<QDropEvent*>(event);
-            const auto drop =
-                e->mimeData() != nullptr ? ChannelsWindow::parseMime(*e->mimeData()) : std::nullopt;
-            if (!drop) {
-                return false;
-            }
-            const bool newPanel = drop->newPanel || e->modifiers().testFlag(Qt::ControlModifier);
-            for (qsizetype i = 0; i < drop->channels.size(); ++i) {
-                component->addChannel(drop->channels[i], newPanel && i == 0);
-            }
-            e->setDropAction(Qt::CopyAction);
-            e->accept();
-            return true;
-        }
-        default:
-            return false;
-        }
-    }
-};
-
 // The window whose hook the chunk cache calls (one hook per cache; the newest window installs it). A window
 // clears the hook on destruction only while it is still the owner, so closing an older window never takes
 // the hook from a newer one. GUI thread only.
@@ -210,95 +168,24 @@ void acceptChannelDrops(const QList<ComponentWidget*>& components, QObject* filt
 
 } // namespace
 
-struct MainWindow::Impl {
-    Impl(qt::AppRuntime& rt, Paths p)
-        : runtime(rt), paths(std::move(p)), units(loadUnits(paths, unitsError)),
-          settings(std::make_unique<qt::SettingsStore>(paths.configDir() / "settings.json")),
-          session(std::make_unique<qt::ProjectSession>(paths, settings.get())),
-          selection(std::make_unique<qt::DataSelectionModel>(session.get())),
-          workspace(std::make_unique<qt::WorkspaceViewModel>()),
-          maths(std::make_unique<qt::MathsService>(rt.pool(), rt.dispatcher(), units)),
-          distance(std::make_unique<qt::DistanceService>(*maths, rt.dispatcher())),
-          render(
-              std::make_unique<qt::RenderService>(rt.pool(), rt.dispatcher(), *selection, *maths, *distance)),
-          loader(std::make_unique<qt::SourceLoader>(rt.pool(), rt.dispatcher(), units)),
-          commands(std::make_unique<qt::CommandRegistry>()),
-          keymap(std::make_unique<qt::KeymapBinder>(*commands)),
-          messages(std::make_unique<qt::MessagesModel>()),
-          channelsModel(std::make_unique<qt::ChannelsModel>(*selection, *maths)),
-          valuesModel(std::make_unique<qt::ValuesModel>(*selection, *maths)),
-          stretch(std::make_unique<qt::LapStretchService>(*loader, *distance, units, session.get())),
-          restore(std::make_unique<qt::SessionRestore>(*session, *loader, *selection)),
-          statusModel(std::make_unique<qt::ChannelStatusModel>(*maths, session.get())) {}
-
-    qt::AppRuntime& runtime;
-    Paths paths;
-    QString unitsError;
-    std::shared_ptr<const units::UnitRegistry> units;
-    std::unique_ptr<qt::SettingsStore> settings;
-    std::unique_ptr<qt::ProjectSession> session;
-    std::unique_ptr<qt::DataSelectionModel> selection;
-    std::unique_ptr<qt::WorkspaceViewModel> workspace;
-    std::unique_ptr<qt::MathsService> maths;
-    std::unique_ptr<qt::DistanceService> distance;
-    std::unique_ptr<qt::RenderService> render;
-    std::unique_ptr<qt::SourceLoader> loader;
-    std::unique_ptr<qt::CommandRegistry> commands;
-    std::unique_ptr<qt::KeymapBinder> keymap;
-    std::unique_ptr<qt::MessagesModel> messages;
-    std::unique_ptr<qt::ChannelsModel> channelsModel;
-    std::unique_ptr<qt::ValuesModel> valuesModel;
-    // M2: declared after the loader, the distance service and the selection they reference.
-    std::unique_ptr<qt::LapStretchService> stretch;
-    std::unique_ptr<qt::SessionRestore> restore;
-    std::unique_ptr<qt::ChannelStatusModel> statusModel; // behind the Channel Status dock
-    // One per worksheet of the active workbook; contexts reference the view models (declared after them, so
-    // destroyed first).
-    std::vector<std::unique_ptr<qt::WorksheetViewModel>> worksheets;
-    std::vector<std::unique_ptr<WorksheetContext>> contexts;
-    int activeWorksheet = -1;
-    Uuid shownWorkbook; // the workbook whose worksheets are the tabs (syncDocuments)
-    LayoutFile layout;
-    bool layoutSaved = false;
-    bool saveLayoutOnExit = true;
-
-    QWidget* central = nullptr;
-    QComboBox* workbookCombo = nullptr;
-    QTabBar* tabs = nullptr;
-    WorksheetCanvas* canvas = nullptr;
-    DockHost* docks = nullptr;
-    CommandActions* actions = nullptr;
-    KeyEventRouter* router = nullptr;
-    QToolBar* toolBar = nullptr;
-    DataWindow* dataWindow = nullptr;
-    ChannelsWindow* channelsWindow = nullptr;
-    ValuesWindow* valuesWindow = nullptr;
-    MessagesWindow* messagesWindow = nullptr;
-    ChannelDropFilter* dropFilter = nullptr;
-    std::map<QString, QLabel*> status;
-    QMetaObject::Connection cursorInfo;
-    QPointer<ComponentWidget> lastComponent; // view.return_focus target
-    std::shared_ptr<ILogSink> messagesSink;  // this window's Messages log sink (removed with the window)
-    // M2
-    SchemeSelector* schemeSelector = nullptr; // on the toolbar (ui.schemeSelectorOnToolbar)
-    QAction* schemeAction = nullptr;
-    QAction* schemeSeparator = nullptr;
-    QPointer<OptionsDialog> options;
-    QPointer<RecoveryDialog> recovery;
-    std::vector<std::filesystem::path> restoreLogs; // -l logs of the project being opened (SessionRestore)
-    bool restoreQueued = false;                     // SessionRestore waits for the recovery answer
-    bool recoveryDeferred = false;                  // "Later": the journal stays until the next open
-    bool opening = false;                           // inside openProject: syncDocuments waits for its rebuild
-    std::function<ExitAnswer()> exitPrompt;
-    // M2 editors: the panel and the Channel Status window live with the window, the dialogs from first use.
-    MappingPanel* mappingPanel = nullptr;
-    ChannelStatusWindow* statusWindow = nullptr;
-    ActiveChannelCommands* active = nullptr;
-    QPointer<MathsEditor> mathsEditor;
-    QPointer<ChannelEditor> channelEditor;
-    QPointer<LapEditor> lapEditor;
-    QPointer<DetailsEditor> detailsEditor;
-};
+MainWindow::Impl::Impl(qt::AppRuntime& rt, Paths p)
+    : runtime(rt), paths(std::move(p)), units(loadUnits(paths, unitsError)),
+      settings(std::make_unique<qt::SettingsStore>(paths.configDir() / "settings.json")),
+      session(std::make_unique<qt::ProjectSession>(paths, settings.get())),
+      selection(std::make_unique<qt::DataSelectionModel>(session.get())),
+      workspace(std::make_unique<qt::WorkspaceViewModel>()),
+      maths(std::make_unique<qt::MathsService>(rt.pool(), rt.dispatcher(), units)),
+      distance(std::make_unique<qt::DistanceService>(*maths, rt.dispatcher())),
+      trackMaps(std::make_unique<qt::TrackMapService>(session.get(), maths.get(), &rt.dispatcher())),
+      render(std::make_unique<qt::RenderService>(rt.pool(), rt.dispatcher(), *selection, *maths, *distance)),
+      loader(std::make_unique<qt::SourceLoader>(rt.pool(), rt.dispatcher(), units)),
+      commands(std::make_unique<qt::CommandRegistry>()),
+      keymap(std::make_unique<qt::KeymapBinder>(*commands)), messages(std::make_unique<qt::MessagesModel>()),
+      channelsModel(std::make_unique<qt::ChannelsModel>(*selection, *maths)),
+      valuesModel(std::make_unique<qt::ValuesModel>(*selection, *maths)),
+      stretch(std::make_unique<qt::LapStretchService>(*loader, *distance, units, session.get())),
+      restore(std::make_unique<qt::SessionRestore>(*session, *loader, *selection)),
+      statusModel(std::make_unique<qt::ChannelStatusModel>(*maths, session.get())) {}
 
 MainWindow::MainWindow(qt::AppRuntime& runtime, Paths paths, QWidget* parent)
     : QMainWindow(parent), impl_(std::make_unique<Impl>(runtime, std::move(paths))) {
@@ -342,8 +229,12 @@ MainWindow::MainWindow(qt::AppRuntime& runtime, Paths paths, QWidget* parent)
     qt::registerEditCommands(*d.commands, d.session->undoStack());
     qt::registerLapStretchCommand(*d.commands, *d.stretch);
     registerEditorCommands();
+    registerM3Commands(); // M3: replaces file.open_log and registers the M3 rows (main_window_m3.cpp)
     registerPlannedCommands();
     const QStringList rejected = d.keymap->setKeymap(d.session->keymap());
+    // Keys a component handles itself follow the user's keymap (D-203 (o)).
+    ComponentWidget::setKeysProvider(
+        [keymap = d.keymap.get()](const QString& commandId) { return keymap->keysFor(commandId); });
     for (const QString& line : rejected) {
         post(*impl_->messages, qt::Message::Severity::Warning, qt::Message::Origin::System,
              QStringLiteral("keymap"), line);
@@ -362,12 +253,14 @@ MainWindow::MainWindow(qt::AppRuntime& runtime, Paths paths, QWidget* parent)
         }
     }
     d.actions->populateMenuBar(*menuBar(), order, withArgs);
+    buildM3Menus(); // Data > Animation Rate (M3)
     // The Main toolbar (06 section 2.1): open, save | time/distance, overlays, single colour, lap stretch |
     // the scheme selector (when Options > Colours shows it) | undo, redo.
     d.actions->populateToolBar(
         *d.toolBar, {QStringLiteral("file.open_log"), QStringLiteral("file.save_project"), QString(),
                      QStringLiteral("data.toggle_domain"), QStringLiteral("data.overlays_toggle"),
-                     QStringLiteral("data.single_colour_main"), QStringLiteral("data.lap_stretch_toggle")});
+                     QStringLiteral("data.single_colour_main"), QStringLiteral("data.lap_stretch_toggle"),
+                     QStringLiteral("data.animate")});
     d.schemeSeparator = d.toolBar->addSeparator();
     d.schemeSelector = new SchemeSelector(*d.session, d.settings.get(), d.toolBar);
     d.schemeAction = d.toolBar->addWidget(d.schemeSelector);
@@ -420,6 +313,7 @@ MainWindow::MainWindow(qt::AppRuntime& runtime, Paths paths, QWidget* parent)
 
 MainWindow::~MainWindow() {
     Impl& d = *impl_;
+    ComponentWidget::setKeysProvider({}); // the keymap goes with the window (D-203 (o))
     if (d.saveLayoutOnExit && !d.layoutSaved) {
         saveLayout();
     }
@@ -437,6 +331,15 @@ MainWindow::~MainWindow() {
     // Widgets reference the models: tear them down before the models (impl_). The components reference the
     // worksheet contexts; the DockHost's backend goes before the dock widgets it tracks.
     disconnect(d.cursorInfo);
+    if (d.animation != nullptr) {
+        d.animation->setWorksheet(nullptr);
+    }
+    if (d.zoomBar != nullptr) {
+        d.zoomBar->setWorksheet(nullptr);
+    }
+    if (d.trackMap != nullptr) {
+        d.trackMap->setContext(nullptr);
+    }
     delete d.active; // references the session, the loader and the maths (a QObject child, not a widget)
     d.active = nullptr;
     d.canvas->clear();
@@ -645,7 +548,7 @@ void MainWindow::buildWidgets() {
         d.status.emplace(QString::fromLatin1(name), label);
     }
 
-    d.dropFilter = new ChannelDropFilter(this);
+    d.dropFilter = new shell_detail::ChannelDropFilter(this);
     // A component edit (add channel, scale, active channel) is an undoable workbook edit (06 section 1 rule
     // 4, D-032): one WorkbookCommand with the canvas's worksheet; undo and redo come back through
     // syncDocuments.
@@ -668,6 +571,34 @@ void MainWindow::buildWidgets() {
                     *i.session, wb, std::move(book), undoText.isEmpty() ? tr("Edit component") : undoText,
                     qt::UndoMergeId::None, spec.id.str()));
                 i.valuesWindow->refreshChannels();
+            });
+    // An edit of a component on a kept (hidden) worksheet: that worksheet's undoable edit (D-203 (k)).
+    connect(d.canvas, &WorksheetCanvas::keptComponentEdited, this,
+            [this](const project::WorksheetDef& sheet, const project::ComponentSpec& spec,
+                   const QString& undoText) {
+                Impl& i = *impl_;
+                const int wb = i.session->activeWorkbook();
+                const auto& books = i.session->workbooks();
+                if (wb < 0 || static_cast<std::size_t>(wb) >= books.size()) {
+                    return;
+                }
+                project::WorkbookFile book = books[static_cast<std::size_t>(wb)];
+                for (project::WorksheetDef& def : book.worksheets) {
+                    if (def.id != sheet.id) {
+                        continue;
+                    }
+                    for (project::ComponentSpec& c : def.components) {
+                        if (c.id == spec.id) {
+                            c = spec;
+                        }
+                    }
+                }
+                if (book == books[static_cast<std::size_t>(wb)]) {
+                    return;
+                }
+                i.session->undoStack().push(new qt::WorkbookCommand(
+                    *i.session, wb, std::move(book), undoText.isEmpty() ? tr("Edit component") : undoText,
+                    qt::UndoMergeId::None, spec.id.str()));
             });
     connect(d.canvas, &WorksheetCanvas::focusedComponentChanged, this, [this](ComponentWidget* component) {
         if (component != nullptr) {
@@ -692,6 +623,7 @@ void MainWindow::buildWidgets() {
         impl_->layout.setDockOption(QString::fromLatin1(ValuesWindow::kDockId), QStringLiteral("allChannels"),
                                     on);
     });
+    buildM3Widgets(d.central);
 }
 
 void MainWindow::registerShellCommands() {
@@ -1085,6 +1017,8 @@ std::string groupPathFor(const project::Profile& profile, const std::string& lin
 void MainWindow::rebuildWorksheets() {
     Impl& d = *impl_;
     disconnect(d.cursorInfo);
+    // M3 followers of the active worksheet let go of it before its view model and context go.
+    followWorksheetM3(-1);
     d.canvas->clear();
     d.valuesWindow->setWorksheet(nullptr);
     d.contexts.clear();
@@ -1189,6 +1123,7 @@ void MainWindow::selectWorksheet(int index) {
     if (focusInCanvas) {
         returnFocus();
     }
+    followWorksheetM3(index);
     d.actions->refresh();
     Q_EMIT worksheetActivated(index);
 }
@@ -1226,6 +1161,10 @@ void MainWindow::selectWorkbook(int index) {
 
 void MainWindow::returnFocus() {
     Impl& d = *impl_;
+    if (d.fullScreen) {
+        setFullScreenMode(false); // ESC leaves full screen first (06 section 4.3 item 7)
+        return;
+    }
     QWidget* focus = QApplication::focusWidget();
     const bool inCanvas = focus != nullptr && (focus == d.canvas || d.canvas->isAncestorOf(focus));
     // ESC in the worksheet first ends a gesture in progress in the focused component (the rubber band, 04
@@ -1394,6 +1333,7 @@ void MainWindow::syncDocuments() {
     if (d.opening || d.canvas == nullptr || d.workbookCombo == nullptr) {
         return;
     }
+    syncLayoutLock(); // ui.layoutLocked (06 section 4.2 item 10)
     const auto& books = d.session->workbooks();
     const int wb = d.session->activeWorkbook();
     if (wb < 0 || static_cast<std::size_t>(wb) >= books.size()) {
@@ -1407,7 +1347,50 @@ void MainWindow::syncDocuments() {
         sheets = book.worksheets[i].id != d.worksheets[i]->definition().id ||
                  QString::fromStdString(book.worksheets[i].name) != d.tabs->tabText(static_cast<int>(i));
     }
-    if (sheets) {
+    // A rename or a move inside the shown workbook keeps every view model, context and kept page (their F9
+    // domain, offset axis and component view state; D-203 (ac)): only the order and the tab texts change.
+    const auto keepAndReorder = [&]() -> bool {
+        if (book.id != d.shownWorkbook || book.worksheets.size() != d.worksheets.size()) {
+            return false;
+        }
+        std::vector<std::size_t> from(book.worksheets.size());
+        std::vector<bool> used(d.worksheets.size(), false);
+        for (std::size_t i = 0; i < book.worksheets.size(); ++i) {
+            std::size_t j = 0;
+            while (j < d.worksheets.size() &&
+                   (used[j] || d.worksheets[j]->definition().id != book.worksheets[i].id)) {
+                ++j;
+            }
+            if (j == d.worksheets.size() || book.worksheets[i].id.isNil()) {
+                return false; // added or removed: a full rebuild
+            }
+            used[j] = true;
+            from[i] = j;
+        }
+        std::vector<std::unique_ptr<qt::WorksheetViewModel>> worksheets;
+        std::vector<std::unique_ptr<WorksheetContext>> contexts;
+        int active = -1;
+        for (std::size_t i = 0; i < from.size(); ++i) {
+            worksheets.push_back(std::move(d.worksheets[from[i]]));
+            contexts.push_back(std::move(d.contexts[from[i]]));
+            if (static_cast<int>(from[i]) == d.activeWorksheet) {
+                active = static_cast<int>(i);
+            }
+        }
+        d.worksheets = std::move(worksheets);
+        d.contexts = std::move(contexts);
+        d.activeWorksheet = active;
+        const QSignalBlocker block(d.tabs);
+        for (std::size_t i = 0; i < book.worksheets.size(); ++i) {
+            const int t = static_cast<int>(i);
+            d.tabs->setTabText(t, QString::fromStdString(book.worksheets[i].name));
+            d.tabs->setTabToolTip(t, i < 10 ? tr("Worksheet %1 (key %2)").arg(i + 1).arg((i + 1) % 10)
+                                            : QString());
+        }
+        d.tabs->setCurrentIndex(active);
+        return true;
+    };
+    if (sheets && !keepAndReorder()) {
         const qt::WorksheetViewModel* vm = activeWorksheet();
         const Uuid keep = vm == nullptr ? Uuid() : vm->definition().id;
         const int old = d.activeWorksheet;
@@ -1451,6 +1434,7 @@ void MainWindow::syncDocuments() {
             if (focusInCanvas) {
                 returnFocus();
             }
+            syncLayoutLock(); // the project options of components the edit created (M3)
         }
     }
 }
@@ -1475,6 +1459,12 @@ void MainWindow::applyScheme() {
     if (d.dataWindow != nullptr) {
         d.dataWindow->setScheme(scheme);
         d.dataWindow->tree().viewport()->update();
+    }
+    if (d.zoomBar != nullptr) {
+        d.zoomBar->setScheme(scheme);
+    }
+    if (d.trackMap != nullptr) {
+        d.trackMap->applyScheme(*scheme); // the dock's track view is no worksheet's (D-203 (q))
     }
     QApplication::setPalette(SchemeSelector::palette(*scheme));
 }

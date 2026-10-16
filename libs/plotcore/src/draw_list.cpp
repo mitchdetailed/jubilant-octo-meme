@@ -409,6 +409,10 @@ std::string DrawList::toJson() const {
                     out += ",\"bg\":";
                     appendColour(out, run.background);
                 }
+                if (run.scale != 1.0F) {
+                    out += ",\"scale\":";
+                    appendFloat(out, run.scale);
+                }
             }
             out += '}';
             break;
