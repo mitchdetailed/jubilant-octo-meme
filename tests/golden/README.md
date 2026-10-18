@@ -32,15 +32,15 @@ D-127):
 - `libs/widgets/tests/components/reports_track/tst_reports_track_goldens.cpp` (M3, AC-M3-02, D-199; a widgets
   test, ctest `widgets.tst_reports_track_goldens`, because the report tables render through `QWidget::render`):
   three cases each of `channel_report`, `time_report` and `track_position` at DPR 1 and 2 into
-  `images/<type>/<case>@<dpr>x.png` with one `goldens.json` per directory (Windows renders, provisional, the
-  renders in `<build>/libs/widgets/artefacts/<type>/`); exact goldens beside them: the report tables' contents in
+  `images/<type>/<case>@<dpr>x.png` with one `goldens.json` per directory (ubuntu renders, from
+  `<build>/libs/widgets/artefacts/<type>/` of the CI artefact); exact goldens beside them: the report tables' contents in
   `tables/<type>/<case>.json` and the track map's `DrawList` JSON in
   `drawlist/track_position/widget_<case>@<dpr>x.json`.
 - `libs/widgets/tests/components/tst_values_list_goldens.cpp` (M3, AC-M3-02, D-202; ctest
   `widgets.tst_values_list_goldens`): three `values_list` cases (`main_reference`, `main_only_fixed`,
   `corr_speed_delta`) at DPR 1 and 2, painted by `QWidget::render` like the report tables, into
-  `images/values_list/<case>@<dpr>x.png` with one `goldens.json` (Windows renders, provisional, the renders in
-  `<build>/libs/widgets/artefacts/values_list/`) and exact table goldens `tables/values_list/<case>.json`
+  `images/values_list/<case>@<dpr>x.png` with one `goldens.json` (ubuntu renders, from
+  `<build>/libs/widgets/artefacts/values_list/` of the CI artefact) and exact table goldens `tables/values_list/<case>.json`
   (headers, hidden columns, cell text), with cells also computed by hand from the synthetic source.
 - M3 key colours (D-202): eleven `DrawList` goldens with overlays (the time_distance `bands_sections`,
   `dark_full_anatomy`, `offset_axis_*` and `variance_distance` cases, `scatter_overlay_trend`, `histogram_bars`,
@@ -58,4 +58,8 @@ tag, ink, two renders identical) and the pixel difference is reported, not enfor
 `<case>.json` against the case definition and runs the `DrawList` JSON goldens.
 
 Provenance (M1): the committed PNGs come from the ubuntu `qt-app` artefact of CI run 38290822661 (Qt 6.12.0, offscreen, commit dc335d6) and `goldens.json` says `"generatedOn": "linux"`, so the ubuntu job enforces them; Windows and macOS run them as render smoke tests. They replaced provisional Windows renders, which differed by about 1 % of pixels (font rasterisation). To update them: take the renders from a later ubuntu run's `golden-diffs-ubuntu-24.04` artefact.
+
+Provenance (M3): every M3 PNG (plots, report, track, values_list, zoom summary and the thirteen M3
+`time_distance` cases, plus the M1 `dark_scheme` the M3 key columns changed) comes from the ubuntu `qt-app`
+artefact of CI run 39104943947 (Qt 6.12.0, offscreen, commit 811f442); they replaced provisional Windows renders (D-203 (ae)).
 Regenerate for review only (any OS): `ESSES_UPDATE_GOLDENS=1 <build>/bin/esses_golden_tst_golden_images`.

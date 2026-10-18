@@ -1,7 +1,7 @@
 {
     "$comment": "Provenance of the PNGs in this directory (libs/widgets/tests/components/tst_values_list_goldens.cpp). Pixel goldens are authoritative on ubuntu only (D-127): replace them from the qt-app ubuntu artefact (<build>/libs/widgets/artefacts/values_list) and set generatedOn to linux.",
-    "generatedOn": "windows",
+    "generatedOn": "linux",
     "platform": "offscreen",
-    "qt": "6.7.2",
-    "source": "rendered locally: provisional"
+    "qt": "6.12.0",
+    "source": "qt-app ubuntu-24.04 artefact golden-diffs-ubuntu-24.04, CI run 39104943947 (commit 811f442)"
 }

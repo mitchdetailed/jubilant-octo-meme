@@ -4,6 +4,11 @@ All notable changes are recorded here, newest first. The project follows semanti
 
 ## Unreleased (M3)
 
+- The M3 pixel goldens are the ubuntu renders: the 86 provisional Windows PNGs (plots, reports, track,
+  values_list, zoom summary and the thirteen M3 `time_distance` cases) and the stale M1 `dark_scheme` were
+  replaced from the `golden-diffs-ubuntu-24.04` artefact of CI run 39104943947 (commit 811f442), and every
+  `goldens.json` says `"generatedOn": "linux"`, so the ubuntu `qt-app` job enforces the 0.5 % bound (D-127).
+
 - CI's `golden.tst_golden_plots` determinism failure (ubuntu: `gauge_numeric/numeric_reference_text_band@2x`
   rendered twice in one process differed in 1,213 pixels) was a Qt FreeType state leak, now worked around in
   `RasterBackend` text drawing. Qt fills a glyph larger than its glyph cache (64 device px: the numeric gauge's
