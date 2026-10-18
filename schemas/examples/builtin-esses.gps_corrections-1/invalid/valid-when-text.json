@@ -1,0 +1,3 @@
+{
+  "statusChannel": {"name": "GPS Sats Used", "validWhen": "four or more"}
+}

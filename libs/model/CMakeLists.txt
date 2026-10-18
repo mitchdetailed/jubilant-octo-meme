@@ -6,22 +6,15 @@
 # ranges and range groups, the channel resolver, the sidecar-1 and markers-1 documents and the whole-outing
 # range rule that esses-cli laps needs in M0. Links esses_base, esses_units and esses_store; nlohmann-json is a
 # private dependency of the document code (no JSON type appears in a public header).
+#
+# M2: sources and tests are globbed (CONFIGURE_DEPENDS) so parallel work adds files without editing this file:
+# src/**/*.cpp and src/**/*.hpp form the library; tests/**/*.cpp form one Catch2 executable (model.<test>).
 
+file(GLOB_RECURSE _esses_model_sources CONFIGURE_DEPENDS
+     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp"
+     "${CMAKE_CURRENT_SOURCE_DIR}/include/*.hpp")
 esses_add_library(model LAYER 1 QT_FREE
-  SOURCES
-    src/channel.cpp
-    src/detail.cpp
-    src/layer.cpp
-    src/marker.cpp
-    src/marker_json.cpp
-    src/markers_document.cpp
-    src/notes.cpp
-    src/range.cpp
-    src/resolver.cpp
-    src/sidecar.cpp
-    src/sidecar_json.cpp
-    src/source.cpp
-    src/whole_outing.cpp
+  SOURCES ${_esses_model_sources}
   DEPS
     esses::base
     esses::units
@@ -31,20 +24,10 @@ esses_add_library(model LAYER 1 QT_FREE
 
 # Unit tests of every type; the document tests read schemas/examples and validate Esses' own output against
 # schemas/sidecar-1.schema.json and schemas/markers-1.schema.json with the vendored json-schema-validator.
+file(GLOB_RECURSE _esses_model_tests CONFIGURE_DEPENDS
+     "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/tests/*.hpp")
 esses_add_test(model_tests QT_FREE
-  SOURCES
-    tests/channel_tests.cpp
-    tests/detail_tests.cpp
-    tests/ids_tests.cpp
-    tests/layer_tests.cpp
-    tests/marker_tests.cpp
-    tests/markers_document_tests.cpp
-    tests/opaque_json_tests.cpp
-    tests/range_tests.cpp
-    tests/resolver_tests.cpp
-    tests/sidecar_tests.cpp
-    tests/source_tests.cpp
-    tests/whole_outing_tests.cpp
+  SOURCES ${_esses_model_tests}
   DEPS
     esses::model
     esses::nlohmann_json

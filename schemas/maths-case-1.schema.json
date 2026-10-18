@@ -1,0 +1,404 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:maths-case-1",
+  "title": "Esses maths case file (maths-case-1)",
+  "description": "One maths evaluation case of the corpus tests/maths/cases/<id>.case.json (03 section 14.1, D-033, AC-M2-02): an expression (or the axis expression of a table2d item) evaluated over in-memory input channels of one source layer, with optional constants, details, range groups and a selection, and either the expected result (rate, values with null at invalid samples, tolerance) or the expected error code. Expected values come from an independent reference (tools/maths_ref.py), never from the code under test (D-041). Closed: the generator writes it and the case runner reads it.",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "id", "expression", "provenance", "inputs", "expected"],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072). The urn:esses: form is written; the bare esses: form of earlier drafts and the later https form are accepted on load (02 section 6.6 rule 1).",
+      "type": "string",
+      "pattern": "^(urn:esses:maths-case-1|esses:maths-case-1|https://[^/\\s]+(/[^/\\s]+)*/maths-case-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "id": {
+      "description": "Unique case id, also the file stem; docs/maths-compat.md names cases by it.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_]*$"
+    },
+    "expression": {
+      "description": "The expression in the maths language (03 section 2); for a table2d item its axis expression.",
+      "type": "string",
+      "minLength": 1
+    },
+    "item": {
+      "$ref": "#/definitions/caseTable"
+    },
+    "provenance": {
+      "description": "Where the expected semantics come from (the CLEANROOM.md source): kind, the help page or design section, and what the case shows.",
+      "type": "object",
+      "required": ["kind", "ref"],
+      "properties": {
+        "kind": {
+          "enum": ["help", "release-notes", "derived", "oracle", "public-maths"]
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "rate": {
+      "description": "The item's rate: \"auto\" (the highest input rate, 03 section 6.4) or an explicit rate.",
+      "oneOf": [
+        {
+          "const": "auto"
+        },
+        {
+          "$ref": "#/definitions/rational"
+        }
+      ]
+    },
+    "compat": {
+      "description": "MathsCompat switches (03 section 2.3).",
+      "type": "object",
+      "properties": {
+        "unaryMinusAbovePower": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "precision": {
+      "description": "The item's precision (03 section 6.5).",
+      "enum": ["single", "double"]
+    },
+    "resultUnit": {
+      "description": "The item's declared result unit; the values are then stored in the base unit of its quantity (03 section 6.1).",
+      "$ref": "#/definitions/unitSymbolOrEmpty"
+    },
+    "durationUs": {
+      "description": "The layer extent [0, durationUs) in microseconds; the result has every sample of the result rate inside it.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "inputs": {
+      "description": "Logged channels of the layer by name, uniform from t = 0.",
+      "type": "object",
+      "patternProperties": {
+        "^[^']+$": {
+          "$ref": "#/definitions/caseInput"
+        }
+      },
+      "additionalProperties": false
+    },
+    "constants": {
+      "description": "Constants of the item's module by name.",
+      "type": "object",
+      "patternProperties": {
+        "^[^']+$": {
+          "$ref": "#/definitions/unitValue"
+        }
+      },
+      "additionalProperties": false
+    },
+    "details": {
+      "description": "Details of the source by name: a number with its unit, or a text.",
+      "type": "object",
+      "patternProperties": {
+        "^[^']+$": {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/unitValue"
+            },
+            {
+              "type": "object",
+              "required": ["text"],
+              "properties": {
+                "text": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ranges": {
+      "description": "Range groups of the layer by group path (\"Outings:Laps\"), each a list of enabled ranges; the parents of a path are listed too.",
+      "type": "object",
+      "patternProperties": {
+        "^.+$": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/caseRange"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "selection": {
+      "description": "The Main range and the reference overlay (03 section 7.5): \"<group path>/<1-based index in ranges>\", optionally with alignment offsets and stretch. Without main the math window is the layer extent.",
+      "type": "object",
+      "properties": {
+        "main": {
+          "$ref": "#/definitions/caseSelection"
+        },
+        "reference": {
+          "$ref": "#/definitions/caseSelection"
+        }
+      },
+      "additionalProperties": false
+    },
+    "expected": {
+      "$ref": "#/definitions/caseExpected"
+    },
+    "x-esses-legacy": {
+      "$ref": "#/definitions/legacyBag"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "rational": {
+      "description": "An exact rate num/den Hz.",
+      "type": "object",
+      "required": ["num", "den"],
+      "properties": {
+        "num": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "den": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "unitSymbolOrEmpty": {
+      "description": "A unit symbol or alias of the unit registry (units-1), or \"\" for the unitless unit; no leading or trailing white space.",
+      "type": "string",
+      "pattern": "^(\\S(.*\\S)?)?$"
+    },
+    "unitValue": {
+      "description": "A persisted number with its unit (D-010): {\"v\": number, \"unit\": symbol}, \"\" for a unitless value. The value is in the unit as written; readers convert, writers keep the written unit.",
+      "type": "object",
+      "required": ["v", "unit"],
+      "properties": {
+        "v": {
+          "type": "number"
+        },
+        "unit": {
+          "$ref": "#/definitions/unitSymbolOrEmpty"
+        }
+      },
+      "additionalProperties": false
+    },
+    "legacyBag": {
+      "description": "Fields removed by a migration, kept verbatim (02 section 6.6 rule 3).",
+      "type": "object"
+    },
+    "caseInput": {
+      "description": "A uniform logged channel: its rate, its unit (a base unit, as channels are stored, D-010), the values (as logged; F32 inputs are rounded to F32), optional validity flags, interpolation and dtype.",
+      "type": "object",
+      "required": ["rate", "unit", "values"],
+      "properties": {
+        "rate": {
+          "$ref": "#/definitions/rational"
+        },
+        "unit": {
+          "$ref": "#/definitions/unitSymbolOrEmpty"
+        },
+        "values": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number"
+          }
+        },
+        "valid": {
+          "type": "array",
+          "items": {
+            "enum": [0, 1]
+          }
+        },
+        "interp": {
+          "enum": ["linear", "previous", "next", "closest"]
+        },
+        "dtype": {
+          "enum": ["f32", "f64", "i32"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "caseRange": {
+      "description": "One enabled range [startUs, endUs).",
+      "type": "object",
+      "required": ["startUs", "endUs"],
+      "properties": {
+        "startUs": {
+          "type": "integer"
+        },
+        "endUs": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "caseSelection": {
+      "description": "A selected range: \"<group path>/<n>\", or the same as range with its alignment offsets and stretch.",
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^.+/[1-9][0-9]*$"
+        },
+        {
+          "type": "object",
+          "required": ["range"],
+          "properties": {
+            "range": {
+              "type": "string",
+              "pattern": "^.+/[1-9][0-9]*$"
+            },
+            "offsetUs": {
+              "type": "integer"
+            },
+            "offsetM": {
+              "type": "number"
+            },
+            "stretch": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "caseTable": {
+      "description": "A table2d item (03 section 4.4) whose axis expression is the case's expression.",
+      "type": "object",
+      "required": ["kind", "axis", "values"],
+      "properties": {
+        "kind": {
+          "const": "table2d"
+        },
+        "axis": {
+          "type": "object",
+          "required": ["unit", "breakpoints"],
+          "properties": {
+            "unit": {
+              "$ref": "#/definitions/unitSymbolOrEmpty"
+            },
+            "breakpoints": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "values": {
+          "type": "object",
+          "required": ["unit", "data"],
+          "properties": {
+            "unit": {
+              "$ref": "#/definitions/unitSymbolOrEmpty"
+            },
+            "data": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "interpolation": {
+          "enum": ["linear", "next", "previous"]
+        },
+        "outOfRange": {
+          "enum": ["clamp", "invalid"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "caseExpected": {
+      "description": "The expected result: the result rate and values (null = invalid sample) compared within |got - want| <= abs + rel * |want|, or the code of the expected failure (a compile or evaluation error); diagnostics list codes with the number of times each must be reported.",
+      "type": "object",
+      "properties": {
+        "rate": {
+          "$ref": "#/definitions/rational"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": ["number", "null"]
+          }
+        },
+        "valid": {
+          "type": "array",
+          "items": {
+            "enum": [0, 1]
+          }
+        },
+        "tolerance": {
+          "type": "object",
+          "required": ["abs", "rel"],
+          "properties": {
+            "abs": {
+              "type": "number",
+              "minimum": 0
+            },
+            "rel": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "error": {
+          "type": "object",
+          "required": ["code"],
+          "properties": {
+            "code": {
+              "type": "string",
+              "pattern": "^E-[A-Z0-9-]+$"
+            }
+          },
+          "additionalProperties": false
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["code", "count"],
+            "properties": {
+              "code": {
+                "type": "string",
+                "pattern": "^[EWIS]-[A-Z0-9-]+$"
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "anyOf": [
+        {
+          "required": ["rate", "values", "tolerance"]
+        },
+        {
+          "required": ["error"]
+        }
+      ],
+      "additionalProperties": false
+    }
+  }
+}

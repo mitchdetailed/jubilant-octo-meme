@@ -1,0 +1,36 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "filter_lp_constant_no_transient",
+  "expression": "filter_lp('X', 3, 2)",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): filter_lp",
+    "note": "primed with the first valid sample: a constant passes unchanged (iir.priming)"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 300000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 100,
+        "den": 1
+      },
+      "unit": "",
+      "values": [4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 100,
+      "den": 1
+    },
+    "values": [4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5, 4.5],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

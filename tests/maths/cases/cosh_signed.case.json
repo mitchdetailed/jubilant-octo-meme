@@ -1,0 +1,36 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "cosh_signed",
+  "expression": "cosh('X')",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): cosh",
+    "note": "hyperbolic"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 800000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5, -3.75, 3.75]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [6.13228947966, 2.35240961524, 1.12762596521, 1.12762596521, 2.35240961524, 6.13228947966, 21.272299873, 21.272299873],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

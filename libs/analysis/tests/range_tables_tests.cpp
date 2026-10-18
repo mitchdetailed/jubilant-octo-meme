@@ -6,6 +6,10 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <string>
+#include <vector>
+
 using namespace esses;
 using namespace esses::analysis;
 using namespace esses::analysis::test;
@@ -49,7 +53,18 @@ TEST_CASE("range tables: intervals per group path with versions", "[unit]") {
     CHECK(tables->find("Outings:Laps", -1) == nullptr);
     CHECK(tables->find("Nope", 0) == nullptr);
 
+    // contains/paths (M2, the maths range functions' E-RANGE-UNKNOWN): every group path, even an empty one.
+    CHECK(tables->contains("Outings:Laps"));
+    CHECK(tables->contains("Outings"));
+    CHECK_FALSE(tables->contains("Nope"));
+    CHECK_FALSE(tables->contains("outings:laps")); // exact match
+    const std::vector<std::string> paths = tables->paths();
+    CHECK(std::is_sorted(paths.begin(), paths.end()));
+    CHECK(std::find(paths.begin(), paths.end(), "Outings:Laps") != paths.end());
+
     const auto empty = RangeTables::build(model::DataLayer{});
     REQUIRE(empty != nullptr);
     CHECK(empty->group("Outings").empty());
+    CHECK_FALSE(empty->contains("Outings"));
+    CHECK(empty->paths().empty());
 }

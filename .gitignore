@@ -20,6 +20,11 @@ conv_samples/
 # expectations are committed (05 section 9.1)
 fixtures/motec.ld/synthetic-*/input.ld
 fixtures/motec.ld/synthetic-*/input.ldx
+# M2 (AC-M2-01, D-005, D-038): the user's real maths modules pasted as maths-1 documents, oracle cases built from
+# private fixtures, and detailed reports derived from them stay local; only aggregate counts are committed
+tests/maths/user_modules/
+tests/maths/oracle/
+*.private.json
 
 # Texts withheld from the published repository until there is a working model (D-192); restore before release
 docs/unpublished/

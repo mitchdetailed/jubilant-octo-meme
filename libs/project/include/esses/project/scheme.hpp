@@ -99,6 +99,9 @@ struct Scheme {
     std::map<std::string, FontSpec, std::less<>> fonts;
     JsonDoc print;   // print overrides of roles/palettes
     JsonDoc unknown; // unrecognised top-level members, preserved
+    // The minor written on save: the newest this build writes, or the newer minor the document was read with
+    // (R-38: never downgraded).
+    int schemaVersion = 1;
 
     // The colour of a role; `fallback` when the scheme does not define it.
     Rgba role(std::string_view roleName, Rgba fallback = 0xFF00FFFF) const;

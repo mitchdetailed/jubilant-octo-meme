@@ -1,0 +1,44 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "derivative_wrt_channel_wide",
+  "expression": "derivative('X', 'Y', 11)",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): derivative",
+    "note": "a wide window (the kernel's sliding sums)"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 1200000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [3, 1.5, 4.25, 1, 5.5, 9, 2.75, 6.5, 5.25, 3.5, 5, 8.75]
+    },
+    "Y": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [0, 1, 3, 4, 4, 6, 9, 10, 12, 12, 15, 16]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [0.895833333333, 0.270833333333, 0.330725462304, 0.264477977162, 0.178816466552, 0.15206185567, 0.23488045007, 0.170186023127, 0.176128349788, 0.00104166666667, -0.027390438247, 0.486607142857],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

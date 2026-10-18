@@ -1,0 +1,44 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "flip_flop_latch",
+  "expression": "flip_flop('S', 'R')",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): flip_flop",
+    "note": "set on a rising edge of set, cleared on a rising edge of reset"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 1200000,
+  "inputs": {
+    "S": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0]
+    },
+    "R": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [0, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

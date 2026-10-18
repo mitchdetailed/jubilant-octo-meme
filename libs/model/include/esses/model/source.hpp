@@ -19,11 +19,12 @@
 #pragma once
 
 #include <esses/base/hash.hpp>
+#include <esses/base/json_doc.hpp>
 #include <esses/model/detail.hpp>
 #include <esses/model/ids.hpp>
 #include <esses/model/layer.hpp>
 #include <esses/model/notes.hpp>
-#include <esses/model/opaque_json.hpp>
+#include <esses/model/opaque_json.hpp> // compatibility: model::OpaqueJson names JsonDoc
 #include <esses/model/sidecar.hpp>
 
 #include <cstddef>
@@ -49,7 +50,7 @@ struct SourceProvenance { // 02 section 4.2 Provenance_Source
     std::optional<Hash128> contentHash; // full xxh3-128, filled by a Background task
     std::int64_t mtimeUnixUs = 0;
     std::vector<std::string> dialectFlags;
-    OpaqueJson probe;                 // probe_json (probe-1): sniff/probe/open entries only
+    JsonDoc probe;                    // probe_json (probe-1): sniff/probe/open entries only
     std::vector<std::byte> rawHeader; // the importer's verbatim header bytes for a writer round trip (.ld:
                                       // 0x5DE..0x5E1 held as 0, D-143); never serialised
 };

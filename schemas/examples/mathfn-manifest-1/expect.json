@@ -1,0 +1,34 @@
+{
+  "upper-case-name.json": {
+    "pointer": "/name",
+    "why": "names are canonical lower case"
+  },
+  "unknown-arg-kind.json": {
+    "pointer": "/args/0/kind",
+    "why": "argument kinds are those of ArgSpec"
+  },
+  "arity-not-integer.json": {
+    "pointer": "/arities/1",
+    "why": "arities are whole numbers"
+  },
+  "missing-returns.json": {
+    "pointer": "",
+    "why": "a manifest states its result"
+  },
+  "bad-unit-rule.json": {
+    "pointer": "/returns/unitRule",
+    "why": "unit rules use the vocabulary of 03 section 3.2 rule 9"
+  },
+  "unknown-class.json": {
+    "pointer": "/class",
+    "why": "kernel classes are those of 03 section 6.1"
+  },
+  "unknown-member.json": {
+    "pointer": "",
+    "why": "mathfn-manifest-1 is closed"
+  },
+  "wrong-schema-id.json": {
+    "pointer": "/$schema",
+    "why": "the $schema id names another schema"
+  }
+}

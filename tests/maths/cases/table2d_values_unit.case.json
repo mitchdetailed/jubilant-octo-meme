@@ -1,0 +1,49 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "table2d_values_unit",
+  "expression": "'P'[m]",
+  "item": {
+    "kind": "table2d",
+    "axis": {
+      "unit": "m",
+      "breakpoints": [0, 10, 20, 40]
+    },
+    "values": {
+      "unit": "km/h",
+      "data": [0, 36, 72, 144]
+    },
+    "interpolation": "linear",
+    "outOfRange": "clamp"
+  },
+  "provenance": {
+    "kind": "derived",
+    "ref": "03_MATHS_ENGINE.md 4.4",
+    "note": "the values are stored in their quantity's base unit (km/h -> m/s)"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 1200000,
+  "inputs": {
+    "P": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "m",
+      "values": [-5, 0, 5, 10, 15, 20, 27.5, 30, 35, 40, 45, 12]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [0, 0, 5, 10, 15, 20, 27.5, 30, 35, 40, 40, 12],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

@@ -6,6 +6,7 @@
 #include <esses/base/hash.hpp>
 #include <esses/project/workbook_file.hpp>
 
+#include <algorithm>
 #include <set>
 #include <string>
 #include <utility>
@@ -13,6 +14,8 @@
 namespace esses::project {
 
 namespace {
+
+constexpr detail::DocKind kKind{"workbook", 1};
 
 using detail::json;
 using jsonio::asString;
@@ -99,7 +102,7 @@ json worksheetToJson(const WorksheetDef& w) {
 }
 
 json workbookToJson(const WorkbookFile& wb) {
-    json root = detail::newDocument("workbook");
+    json root = detail::newDocument("workbook", std::max(wb.schemaVersion, kKind.current));
     root["id"] = wb.id.str();
     root["name"] = wb.name;
     root["profile"] = wb.profile;
@@ -132,54 +135,60 @@ std::string stemOf(std::string_view fileName) {
 
 Result<WorkbookFile> WorkbookFile::parse(std::string_view json, std::string_view fileName,
                                          std::vector<std::string>& log) {
-    return detail::parseDocument<WorkbookFile>(json, [&](const detail::json& root) -> Result<WorkbookFile> {
-        ObjectReader r(root, "");
-        detail::readSchemaHeader(r, "workbook", log);
-        WorkbookFile wb;
-        if (const detail::json* idJson = r.optional("id")) {
-            wb.id = jsonio::asUuid(*idJson, r.child("id"));
-        } else {
-            wb.id = uuidFromHash(hash128({"workbook", fileName}));
-            wb.dirty = true;
-            log.push_back("workbook '" + std::string(fileName) + "' had no id; derived " + wb.id.str() +
-                          " from the file name");
-        }
-        if (const detail::json* n = r.optional("name")) {
-            wb.name = asString(*n, r.child("name"));
-        } else {
-            wb.name = stemOf(fileName);
-            wb.dirty = true;
-            log.push_back("workbook '" + std::string(fileName) + "' had no name; named '" + wb.name + "'");
-        }
-        wb.profile = detail::optString(r, "profile", "circuit");
-        if (const detail::json* a = r.optional("activeWorksheet")) {
-            wb.activeWorksheet = asString(*a, r.child("activeWorksheet"));
-        }
-        const detail::json& sheets = r.required("worksheets");
-        const std::string sp = r.child("worksheets");
-        if (!sheets.is_array() || sheets.empty()) {
-            violate(sp, "worksheets is a non-empty array");
-        }
-        std::set<std::string, std::less<>> names;
-        for (std::size_t i = 0; i < sheets.size(); ++i) {
-            bool derived = false;
-            WorksheetDef w = readWorksheet(sheets[i], jsonio::pointerIndex(sp, i), wb.id, i, derived, log);
-            wb.dirty = wb.dirty || derived;
-            if (!names.insert(w.name).second) {
-                violate(jsonio::pointerIndex(sp, i), "worksheet name '" + w.name + "' is used twice");
+    return detail::readDocument<WorkbookFile>(
+        json, kKind, log,
+        [&](const detail::json& root, const detail::DocVersion& version) -> Result<WorkbookFile> {
+            ObjectReader r(root, "");
+            detail::markSchemaHeader(r);
+            WorkbookFile wb;
+            wb.schemaVersion = version.write;
+            if (const detail::json* idJson = r.optional("id")) {
+                wb.id = jsonio::asUuid(*idJson, r.child("id"));
+            } else {
+                wb.id = uuidFromHash(hash128({"workbook", fileName}));
+                wb.dirty = true;
+                log.push_back("workbook '" + std::string(fileName) + "' had no id; derived " + wb.id.str() +
+                              " from the file name");
             }
-            wb.worksheets.push_back(std::move(w));
-        }
-        if (wb.activeWorksheet && names.find(*wb.activeWorksheet) == names.end()) {
-            log.push_back("activeWorksheet '" + *wb.activeWorksheet +
-                          "' names no worksheet; ignored on open");
-        }
-        if (const detail::json* x = r.optional("x-i2")) {
-            wb.xI2 = detail::objectDoc(*x, r.child("x-i2"));
-        }
-        wb.unknown = detail::unknownMembers(r);
-        return wb;
-    });
+            if (const detail::json* n = r.optional("name")) {
+                wb.name = asString(*n, r.child("name"));
+            } else {
+                wb.name = stemOf(fileName);
+                wb.dirty = true;
+                log.push_back("workbook '" + std::string(fileName) + "' had no name; named '" + wb.name +
+                              "'");
+            }
+            wb.profile = detail::optString(r, "profile", "circuit");
+            if (const detail::json* a = r.optional("activeWorksheet")) {
+                wb.activeWorksheet = asString(*a, r.child("activeWorksheet"));
+            }
+            const detail::json& sheets = r.required("worksheets");
+            const std::string sp = r.child("worksheets");
+            if (!sheets.is_array() || sheets.empty()) {
+                violate(sp, "worksheets is a non-empty array");
+            }
+            std::set<std::string, std::less<>> names;
+            for (std::size_t i = 0; i < sheets.size(); ++i) {
+                bool derived = false;
+                WorksheetDef w =
+                    readWorksheet(sheets[i], jsonio::pointerIndex(sp, i), wb.id, i, derived, log);
+                wb.dirty = wb.dirty || derived;
+                if (!names.insert(w.name).second) {
+                    violate(jsonio::pointerIndex(sp, i), "worksheet name '" + w.name + "' is used twice");
+                }
+                wb.worksheets.push_back(std::move(w));
+            }
+            if (wb.activeWorksheet && names.find(*wb.activeWorksheet) == names.end()) {
+                log.push_back("activeWorksheet '" + *wb.activeWorksheet +
+                              "' names no worksheet; ignored on open");
+            }
+            if (const detail::json* x = r.optional("x-i2")) {
+                wb.xI2 = detail::objectDoc(*x, r.child("x-i2"));
+            }
+            wb.unknown = detail::unknownMembers(r);
+            return wb;
+        },
+        workbookToJson);
 }
 
 Result<WorkbookFile> WorkbookFile::load(const std::filesystem::path& path, std::vector<std::string>& log) {

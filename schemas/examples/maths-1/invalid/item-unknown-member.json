@@ -1,0 +1,13 @@
+{
+  "$schema": "urn:esses:maths-1",
+  "schemaVersion": 1,
+  "id": "user",
+  "items": [
+    {
+      "colour": 3,
+      "expr": "1",
+      "kind": "expression",
+      "name": "A"
+    }
+  ]
+}

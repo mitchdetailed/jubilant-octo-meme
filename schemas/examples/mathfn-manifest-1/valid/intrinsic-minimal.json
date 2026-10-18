@@ -1,0 +1,23 @@
+{
+  "$schema": "urn:esses:mathfn-manifest-1",
+  "schemaVersion": 1,
+  "name": "derivative",
+  "args": [
+    {
+      "name": "x",
+      "kind": "Series"
+    },
+    {
+      "name": "n",
+      "kind": "Series",
+      "optional": true
+    }
+  ],
+  "arities": [1, 2, 3],
+  "returns": {
+    "kind": "Series",
+    "unitRule": "per_time:x"
+  },
+  "class": "Windowed",
+  "provenance": "intrinsic"
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "urn:esses:aliases-1",
+  "schemaVersion": 1,
+  "aliases": [
+    {
+      "candidates": ["Wheel Speed FL", "Wheel Speed FR", "Ground Speed"],
+      "colourIndex": 4,
+      "dps": 1,
+      "enabled": [true, true, false],
+      "name": "Wheel Speed"
+    },
+    {
+      "candidates": ["Speed", "Wheel Speed"],
+      "enabled": [true, true],
+      "name": "Speed"
+    }
+  ]
+}

@@ -2,72 +2,51 @@
 // SPDX-License-Identifier: MIT
 //
 // MathsService (03 section 1, 06 section 10; D-016, D-022, D-139; AC-M1-10): one maths::MathGraph per
-// (source, layer) with the built-in module esses.corrected_speed_distance, prefetched at Background on
-// registration. The graphs are mutated on the GUI thread only: every completion is posted through the
-// Dispatcher and applied with MathGraph::applyCompletion (01 section 5.3 rule 10).
+// (source, layer) with the built-in modules esses.corrected_speed_distance and esses.gps_corrections and the
+// project's maths, prefetched at Background on registration. The graphs are mutated on the GUI thread only:
+// every completion is posted through the Dispatcher and applied with MathGraph::applyCompletion (01 section
+// 5.3 rule 10). The M2 members (modules, compat, resolver tables, local and transient modules, selection,
+// invalidation, status rows, live checks) are in src/maths/maths_service_m2.cpp.
 
+#include "maths/maths_service_impl.hpp"
 #include "range_lookup.hpp"
 
 #include <esses/base/casefold.hpp>
 #include <esses/base/taskpool.hpp>
-#include <esses/maths/corrected_speed_distance.hpp>
-#include <esses/maths/math_graph.hpp>
 #include <esses/qtmodel/dispatcher.hpp>
 #include <esses/qtmodel/maths_service.hpp>
 
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QPointer>
+#include <algorithm>
 #include <map>
 #include <set>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace esses::qt {
 
 namespace {
 
-using GraphKey = std::pair<model::SourceId, std::string>; // (source, canonical layer)
-
-struct InflightKey {
-    maths::ChannelKey key;
-    maths::Version version;
-    friend bool operator<(const InflightKey& a, const InflightKey& b) {
-        if (a.key.src != b.key.src) {
-            return a.key.src < b.key.src;
-        }
-        if (a.key.layer != b.key.layer) {
-            return a.key.layer < b.key.layer;
-        }
-        if (a.key.nameCf != b.key.nameCf) {
-            return a.key.nameCf < b.key.nameCf;
-        }
-        return a.version < b.version;
-    }
-};
-
 bool isDone(maths::MathState s) noexcept {
     return s == maths::MathState::Ok || s == maths::MathState::Warning;
 }
 
+// The latitude and longitude channels the GPS corrections read (their default settings, 03 section 9.2) are
+// both logged in `layer` (by name or logged name).
+bool hasGpsInputs(const maths::GpsCorrectionsModule& gps, const model::DataLayer& layer) {
+    const QJsonObject s =
+        QJsonDocument::fromJson(QByteArray::fromStdString(gps.defaultSettings().compact())).object();
+    const auto logged = [&layer](const QJsonValue& v) {
+        const std::string name = v.toString().toStdString();
+        return !name.empty() && (layer.find(name) != nullptr || layer.findLogged(name) != nullptr);
+    };
+    return logged(s.value(QStringLiteral("latitude"))) && logged(s.value(QStringLiteral("longitude")));
+}
+
 } // namespace
-
-struct MathsService::Impl {
-    maths::CorrectedSpeedDistanceModule module;
-    model::OpaqueJson settings; // null: the module defaults
-    bool enabled = true;
-    std::map<model::SourceId, std::shared_ptr<const model::DataSource>> sources;
-    std::map<GraphKey, std::unique_ptr<maths::MathGraph>> graphs;
-    std::set<InflightKey> inflight;
-    std::set<InflightKey> reported; // errors already sent to Messages (once per version)
-
-    maths::MathGraph* graph(const model::SourceId& src, std::string_view layer) {
-        const auto it = graphs.find(GraphKey{src, std::string(model::canonicalLayerName(layer))});
-        return it == graphs.end() ? nullptr : it->second.get();
-    }
-    const maths::MathGraph* graph(const model::SourceId& src, std::string_view layer) const {
-        const auto it = graphs.find(GraphKey{src, std::string(model::canonicalLayerName(layer))});
-        return it == graphs.end() ? nullptr : it->second.get();
-    }
-};
 
 MathsService::MathsService(TaskPool& pool, Dispatcher& dispatcher,
                            std::shared_ptr<const units::UnitRegistry> units, QObject* parent)
@@ -87,7 +66,10 @@ Result<void> MathsService::loadSettingsSchema(const std::filesystem::path& dataD
     if (dir.empty()) {
         return fail(ErrorCode::NotFound, "the corrected speed/distance settings schema was not found");
     }
-    return impl_->module.loadSchema(dir);
+    if (Result<void> r = impl_->module.loadSchema(dir); !r) {
+        return r;
+    }
+    return impl_->gps.loadSchema(dir);
 }
 
 Result<void> MathsService::validateCorrectedSpeedSettings(const model::OpaqueJson& settings) const {
@@ -96,6 +78,10 @@ Result<void> MathsService::validateCorrectedSpeedSettings(const model::OpaqueJso
 
 const maths::CorrectedSpeedDistanceModule& MathsService::correctedSpeedModule() const {
     return impl_->module;
+}
+
+const maths::GpsCorrectionsModule& MathsService::gpsCorrectionsModule() const {
+    return impl_->gps;
 }
 
 void MathsService::setCorrectedSpeedSettings(model::OpaqueJson settings) {
@@ -117,43 +103,56 @@ void MathsService::setCorrectedSpeedEnabled(bool enabled) {
     }
     impl_->enabled = enabled;
     for (auto& [gk, graph] : impl_->graphs) {
-        for (const maths::ChannelKey& key :
-             graph->setModuleEnabled(maths::CorrectedSpeedDistanceModule::kId, enabled)) {
-            Q_EMIT statusChanged(key);
-        }
+        emitChanged(graph->setModuleEnabled(maths::CorrectedSpeedDistanceModule::kId, enabled));
     }
     for (const auto& entry : impl_->sources) {
         prefetchSource(entry.first);
     }
 }
 
+void MathsService::emitChanged(const std::vector<maths::ChannelKey>& keys) {
+    for (const maths::ChannelKey& key : keys) {
+        Q_EMIT statusChanged(key);
+    }
+}
+
 void MathsService::registerSource(const std::shared_ptr<const model::DataSource>& source) {
     for (const model::DataLayer& layer : source->layers) {
         const std::string name(model::canonicalLayerName(layer.name));
-        auto& slot = impl_->graphs[GraphKey{source->id, name}];
+        auto& slot = impl_->graphs[mathsdetail::GraphKey{source->id, name}];
         if (slot == nullptr) {
-            slot = std::make_unique<maths::MathGraph>(source, name, units_, maths::MathsCompat{}, &pool_);
+            slot = std::make_unique<maths::MathGraph>(source, name, units_, impl_->compat, &pool_);
+            // The project's names (mappings, aliases) before any definition resolves against them.
+            static_cast<void>(slot->setResolverTables(impl_->mappings, impl_->aliases));
         }
-        maths::Diagnostics diags;
-        Result<std::vector<maths::ChannelKey>> keys =
-            slot->defineBuiltin(impl_->module, impl_->settings, diags);
-        if (!keys) {
-            const maths::Diagnostic* first = diags.empty() ? nullptr : &diags.front();
-            Q_EMIT moduleMessage(
-                source->id, QString::fromStdString(first != nullptr ? first->code : "E-EVAL"),
-                QString::fromStdString(
-                    first != nullptr
-                        ? first->message + (first->hint.empty() ? std::string() : " (" + first->hint + ")")
-                        : keys.error().message));
-            continue;
+        // The built-in modules first in every shadowing chain (D-171): corrected speed and distance, then the
+        // GPS corrections' zero-fix step (always on from M2, 03 section 9.2) for a layer that logs both GPS
+        // inputs (a layer without them would only list two Disabled outputs).
+        std::vector<std::pair<const maths::IBuiltinModule*, model::OpaqueJson>> builtins{
+            {&impl_->module, impl_->settings}};
+        if (hasGpsInputs(impl_->gps, layer)) {
+            builtins.emplace_back(&impl_->gps, model::OpaqueJson{});
         }
-        if (!impl_->enabled) {
-            slot->setModuleEnabled(maths::CorrectedSpeedDistanceModule::kId, false);
-        }
-        for (const maths::ChannelKey& key : *keys) {
-            Q_EMIT statusChanged(key);
+        for (const auto& [module, settings] : builtins) {
+            maths::Diagnostics diags;
+            Result<std::vector<maths::ChannelKey>> keys = slot->defineBuiltin(*module, settings, diags);
+            if (!keys) {
+                const maths::Diagnostic* first = diags.empty() ? nullptr : &diags.front();
+                Q_EMIT moduleMessage(
+                    source->id, QString::fromStdString(first != nullptr ? first->code : "E-EVAL"),
+                    QString::fromStdString(
+                        first != nullptr ? first->message + (first->hint.empty() ? std::string()
+                                                                                 : " (" + first->hint + ")")
+                                         : keys.error().message));
+                continue;
+            }
+            if (module == &impl_->module && !impl_->enabled) {
+                slot->setModuleEnabled(maths::CorrectedSpeedDistanceModule::kId, false);
+            }
+            emitChanged(*keys);
         }
     }
+    applyModules(source->id);
 }
 
 void MathsService::prefetchSource(const model::SourceId& source) {
@@ -176,6 +175,7 @@ void MathsService::addSource(std::shared_ptr<const model::DataSource> source) {
         return;
     }
     impl_->sources[source->id] = source;
+    impl_->order.push_back(source->id);
     registerSource(source);
     prefetchSource(source->id);
 }
@@ -194,10 +194,9 @@ void MathsService::replaceSource(std::shared_ptr<const model::DataSource> source
         if (gk.first != source->id) {
             continue;
         }
-        for (const maths::ChannelKey& key : graph->setSource(source)) {
-            Q_EMIT statusChanged(key); // re-versioned (03 section 7.2): Pending again
-        }
+        emitChanged(graph->setSource(source)); // re-versioned (03 section 7.2): Pending again
     }
+    applyModules(source->id); // the sidecar's local maths may have changed with the snapshot
     prefetchSource(source->id);
 }
 
@@ -205,22 +204,27 @@ void MathsService::removeSource(const model::SourceId& source) {
     if (impl_->sources.erase(source) == 0) {
         return;
     }
+    impl_->order.erase(std::remove(impl_->order.begin(), impl_->order.end(), source), impl_->order.end());
+    impl_->localOverride.erase(source);
+    impl_->transient.erase(source); // a transient module is dropped on close (03 section 4.2)
     pool_.cancelAll(maths::MathGraph::taskKeyPrefix(source));
     for (auto it = impl_->graphs.begin(); it != impl_->graphs.end();) {
         it = it->first.first == source ? impl_->graphs.erase(it) : std::next(it);
     }
+    for (auto it = impl_->local.begin(); it != impl_->local.end();) {
+        it = it->first.first == source ? impl_->local.erase(it) : std::next(it);
+    }
     for (auto it = impl_->inflight.begin(); it != impl_->inflight.end();) {
         it = it->key.src == source ? impl_->inflight.erase(it) : std::next(it);
     }
-}
-
-void MathsService::setSelection(const plot::SelectionSnapshot&) {
-    // No SelectionDependent node exists in M1 (03 section 7.5 arrives with the language in M2).
+    for (auto it = impl_->announced.begin(); it != impl_->announced.end();) {
+        it = it->key.src == source ? impl_->announced.erase(it) : std::next(it);
+    }
 }
 
 void MathsService::watch(const maths::ChannelKey& key, const maths::Version& version,
                          Future<maths::ColumnHandle> future) {
-    if (!future.valid() || !impl_->inflight.insert(InflightKey{key, version}).second) {
+    if (!future.valid() || !impl_->inflight.insert(mathsdetail::InflightKey{key, version}).second) {
         return; // one posted completion per (key, version)
     }
     // The Dispatcher is runtime-owned and outlives every pool task (01 section 5.3 rule 11), so it is the
@@ -239,20 +243,38 @@ void MathsService::watch(const maths::ChannelKey& key, const maths::Version& ver
 
 void MathsService::complete(const maths::ChannelKey& key, const maths::Version& version,
                             const Result<maths::ColumnHandle>& result) {
-    impl_->inflight.erase(InflightKey{key, version});
-    maths::MathGraph* graph = impl_->graph(key.src, key.layer);
-    if (graph == nullptr) {
-        return;
+    impl_->inflight.erase(mathsdetail::InflightKey{key, version});
+    if (maths::MathGraph* graph = impl_->graph(key.src, key.layer)) {
+        applyResult(*graph, key, version, result);
     }
-    graph->applyCompletion(key, version, result);
-    const maths::MathStatus st = graph->status(key);
+}
+
+void MathsService::applyResult(maths::MathGraph& graph, const maths::ChannelKey& key,
+                               const maths::Version& version, const Result<maths::ColumnHandle>& result) {
+    graph.applyCompletion(key, version, result);
+    // The upstream nodes this evaluation required finished before it: their states move on too (no node is
+    // left showing Evaluating after its column is sealed).
+    std::vector<maths::ChannelKey> upstream = graph.applyReadyCompletions();
+    upstream.erase(std::remove(upstream.begin(), upstream.end(), key), upstream.end());
+    const maths::MathStatus st = graph.status(key);
     Q_EMIT statusChanged(key);
+    emitChanged(upstream);
+    // channelReady once per (output, version), whichever completion applied it first.
+    const auto announce = [this, &graph](const maths::ChannelKey& k) {
+        if (isDone(graph.status(k).state) &&
+            impl_->announced.insert(mathsdetail::InflightKey{k, graph.version(k)}).second) {
+            Q_EMIT channelReady(k);
+        }
+    };
     if (isDone(st.state)) {
-        Q_EMIT channelReady(key);
+        announce(key);
     } else if (st.state == maths::MathState::Error &&
-               impl_->reported.insert(InflightKey{key, version}).second) {
+               impl_->reported.insert(mathsdetail::InflightKey{key, version}).second) {
         const std::string code = st.diags.empty() ? std::string("E-EVAL") : st.diags.front().code;
         Q_EMIT moduleMessage(key.src, QString::fromStdString(code), QString::fromStdString(st.summary));
+    }
+    for (const maths::ChannelKey& k : upstream) {
+        announce(k);
     }
 }
 
@@ -271,14 +293,18 @@ std::optional<maths::ColumnHandle> MathsService::require(const maths::ChannelKey
         std::optional<Result<maths::ColumnHandle>> r = future.tryGet();
         if (r && r->ok()) {
             if (!isDone(before.state)) {
-                // Evaluated but not applied yet: apply now; the posted completion (if any) is then a repeat.
-                graph->applyCompletion(key, version, *r);
+                // Evaluated but not applied yet (an idle worker can finish before this check): apply now,
+                // with the upstream nodes it read; the posted completion (if any) is then a repeat.
+                applyResult(*graph, key, version, *r);
             }
             return std::move(*r).value();
         }
         if (before.state == maths::MathState::Error) {
             return std::nullopt; // a memoised failure, already applied (03 section 7.3)
         }
+    }
+    if (graph->status(key).state != before.state) {
+        Q_EMIT statusChanged(key); // Pending -> Evaluating (03 section 7.3)
     }
     watch(key, version, std::move(future));
     return std::nullopt;
@@ -318,6 +344,10 @@ std::vector<maths::ChannelKey> MathsService::outputs(const model::SourceId& sour
 std::shared_ptr<const model::DataSource> MathsService::source(const model::SourceId& id) const {
     const auto it = impl_->sources.find(id);
     return it == impl_->sources.end() ? nullptr : it->second;
+}
+
+std::vector<model::SourceId> MathsService::sources() const {
+    return impl_->order;
 }
 
 } // namespace esses::qt

@@ -21,6 +21,11 @@ if(ESSES_ENABLE_CLANG_TIDY)
   find_program(CLANG_TIDY_EXE NAMES clang-tidy REQUIRED)
 endif()
 
+# The environment of every Qt Test executable under ctest. QT_FORCE_STDERR_LOGGING=1: on Windows Qt Test's plain
+# logger writes to OutputDebugString instead of stdout whenever the process has no console window (ctest from CI,
+# an IDE or a service), so the ctest log would hold no line of a failing Qt test; forced, it writes to the pipe.
+set(ESSES_QT_TEST_ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_FORCE_STDERR_LOGGING=1")
+
 # 01 section 2.2 rule 1 and 08 section 2 rule 3: pairs that are forbidden regardless of layer numbers.
 # analysis>project closes the same-layer cycle project -> analysis; plotcore>maths is D-048 as amended by D-122
 # (maths outputs reach the plot as Columns through the ChunkCache, never through a link).
@@ -201,8 +206,9 @@ endfunction()
 # ---- Qt Test executables (08 section 6.2: Qt Test for the Qt layers; run offscreen) ------------------------
 # esses_add_qt_test(<name> SOURCES ... DEPS ... [TEST_NAME <ctest name>] [LABELS ...] [TIMEOUT <s>])
 # One executable ${ESSES_PREFIX}_<name> (AUTOMOC on, linked with Qt6::Test) = one ctest entry (default name
-# <name> with the first '_' turned into '.'). The test runs with QT_QPA_PLATFORM=offscreen and the Qt kit's bin
-# directory prepended to PATH, so it needs no deployment. Only with ESSES_BUILD_QT and ESSES_BUILD_TESTS.
+# <name> with the first '_' turned into '.'). The test runs with ESSES_QT_TEST_ENVIRONMENT (offscreen, Qt Test
+# output on stdout on every OS) and the Qt kit's bin directory prepended to PATH, so it needs no deployment. Only
+# with ESSES_BUILD_QT and ESSES_BUILD_TESTS.
 function(esses_add_qt_test name)
   if(NOT ESSES_BUILD_TESTS OR NOT ESSES_BUILD_QT)
     return()
@@ -224,7 +230,7 @@ function(esses_add_qt_test name)
   set_target_properties(${t} PROPERTIES AUTOMOC ON FOLDER "tests" ESSES_DEPS "${A_DEPS}")
   add_test(NAME ${A_TEST_NAME} COMMAND ${t})
   set_tests_properties(${A_TEST_NAME} PROPERTIES
-                       ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+                       ENVIRONMENT "${ESSES_QT_TEST_ENVIRONMENT}"
                        ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
                        LABELS "qt;${A_LABELS}" TIMEOUT ${A_TIMEOUT})
   _esses_register(${t} test "")
@@ -321,8 +327,24 @@ function(_esses_write_targets_manifest)
   _esses_json_string(jprefix "${ESSES_PREFIX}")
   _esses_json_string(jns "${ESSES_NAMESPACE}")
   _esses_json_array(jforbidden ${ESSES_FORBIDDEN_EDGES})
+  # D-161: the Qt Gui header directories (QtGui, or the framework's Headers on macOS), so check_layering.py can
+  # refuse every Qt Gui header in esses_qtmodel except the undo framework's.
+  set(gui_dirs "")
+  foreach(qt_gui Qt6::Gui Qt::Gui)
+    if(TARGET ${qt_gui})
+      get_target_property(dirs ${qt_gui} INTERFACE_INCLUDE_DIRECTORIES)
+      foreach(d IN LISTS dirs)
+        if(NOT d MATCHES "^\\$<" AND IS_DIRECTORY "${d}" AND d MATCHES "(QtGui|QtGui[.]framework/Headers)/?$")
+          list(APPEND gui_dirs "${d}")
+        endif()
+      endforeach()
+    endif()
+  endforeach()
+  list(REMOVE_DUPLICATES gui_dirs)
+  _esses_json_array(jguidirs ${gui_dirs})
   file(WRITE "${CMAKE_BINARY_DIR}/esses_targets.json"
        "{\n  \"prefix\": ${jprefix},\n  \"namespace\": ${jns},\n  \"forbiddenEdges\": ${jforbidden},\n"
+       "  \"qtGuiHeaderDirs\": ${jguidirs},\n"
        "  \"targets\": [\n${body}\n  ]\n}\n")
 endfunction()
 cmake_language(DEFER DIRECTORY "${CMAKE_SOURCE_DIR}" CALL _esses_write_targets_manifest)

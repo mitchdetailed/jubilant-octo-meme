@@ -1,0 +1,16 @@
+{
+  "$schema": "urn:esses:maths-1",
+  "schemaVersion": 1,
+  "enumerations": [
+    {
+      "entries": [
+        {
+          "name": "A",
+          "value": 0.5
+        }
+      ],
+      "name": "E"
+    }
+  ],
+  "id": "user"
+}

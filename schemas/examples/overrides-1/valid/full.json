@@ -1,0 +1,59 @@
+{
+  "$schema": "urn:esses:overrides-1",
+  "schemaVersion": 1,
+  "channels": {
+    "Engine RPM": {
+      "autoScale": false,
+      "colourIndex": 2,
+      "displayUnit": "rpm",
+      "dps": 0,
+      "fault": {
+        "max": {
+          "unit": "rpm",
+          "v": 8200
+        }
+      },
+      "interp": "Linear",
+      "scaleMax": {
+        "unit": "rpm",
+        "v": 8000
+      },
+      "scaleMin": {
+        "unit": "rpm",
+        "v": 0
+      },
+      "warn": {
+        "max": {
+          "unit": "rpm",
+          "v": 7800
+        }
+      }
+    },
+    "Gear": {
+      "dps": 0,
+      "interp": "Previous",
+      "scaleMin": {
+        "unit": "",
+        "v": 0
+      }
+    },
+    "Oil Temp": {
+      "displayUnit": "degC",
+      "laterOption": {
+        "kept": true
+      }
+    },
+    "Throttle Pos": {
+      "displayUnit": "%",
+      "dps": 1,
+      "scaleMax": {
+        "unit": "%",
+        "v": 100
+      },
+      "scaleMin": {
+        "unit": "%",
+        "v": 0
+      }
+    }
+  }
+}

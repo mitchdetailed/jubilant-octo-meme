@@ -117,7 +117,8 @@ public:
     // without it loads the shipped table alone.
     static Result<UnitRegistry> load(std::string_view unitsJson, std::string_view userJson = {});
     // The same from files: unitsFile must exist (Io otherwise); userFile is skipped when empty or absent.
-    // Errors carry context.path of the file at fault.
+    // Either one that exists but is not a regular file (a directory) is Io. Errors carry context.path of the
+    // file at fault.
     static Result<UnitRegistry> loadFiles(const std::filesystem::path& unitsFile,
                                           const std::filesystem::path& userFile = {});
 

@@ -104,7 +104,27 @@ public:
 
 private:
     friend class ChunkCache;
+    friend class WeakColumn;
     std::shared_ptr<detail::ColumnCore> core_;
+};
+
+// A non-owning reference to a Column's shared state (05 section 7.1): a text importer's slab decoder names
+// the sibling columns of one sweep for ChunkCache::insertGroup through it, without keeping them (and so the
+// provider that owns the decoder) alive.
+class WeakColumn {
+public:
+    WeakColumn() noexcept = default;
+    explicit WeakColumn(const Column& column) noexcept : core_(column.core_) {}
+    // The column while any handle on it lives; the empty column (valid() == false) afterwards.
+    Column lock() const noexcept {
+        Column c;
+        c.core_ = core_.lock();
+        return c;
+    }
+    bool expired() const noexcept { return core_.expired(); }
+
+private:
+    std::weak_ptr<detail::ColumnCore> core_;
 };
 
 } // namespace esses::store

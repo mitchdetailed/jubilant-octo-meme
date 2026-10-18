@@ -1,0 +1,192 @@
+{
+  "$schema": "urn:esses:probe-1",
+  "schemaVersion": 1,
+  "companions": [],
+  "details": [],
+  "dialect": "",
+  "enumTables": [],
+  "importerId": "text.profile:generic.csv",
+  "importerVersion": "1.0.0",
+  "layers": [
+    {
+      "channels": [
+        {
+          "dps": 2,
+          "dtype": "F32",
+          "flags": 0,
+          "index": 0,
+          "kind": "Real",
+          "loggedName": "Speed",
+          "sampleCount": 4000,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 100
+            }
+          },
+          "vendorDtype": "text",
+          "vendorUnit": "km/h"
+        },
+        {
+          "dps": 6,
+          "dtype": "F64",
+          "flags": 0,
+          "index": 1,
+          "kind": "Real",
+          "loggedName": "GPS Lat",
+          "sampleCount": 400,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "timestamped": true
+          },
+          "vendorDtype": "text",
+          "vendorUnit": "deg"
+        },
+        {
+          "dps": 6,
+          "dtype": "F64",
+          "flags": 0,
+          "index": 2,
+          "kind": "Real",
+          "loggedName": "GPS Lon",
+          "sampleCount": 400,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "timestamped": true
+          },
+          "vendorDtype": "text",
+          "vendorUnit": "deg"
+        },
+        {
+          "dps": 0,
+          "dtype": "F32",
+          "flags": 0,
+          "index": 3,
+          "kind": "Integer",
+          "loggedName": "Lap",
+          "sampleCount": 4000,
+          "shortName": "",
+          "t0Us": 0,
+          "timing": {
+            "rate": {
+              "den": 1,
+              "num": 100
+            }
+          },
+          "vendorDtype": "text",
+          "vendorUnit": ""
+        }
+      ],
+      "durationUs": 40000000,
+      "markers": [
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 0,
+          "group": "Beacons",
+          "name": "",
+          "ordinal": 0,
+          "tUs": 15000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "flags": 0,
+          "group": "Beacons",
+          "name": "",
+          "ordinal": 0,
+          "tUs": 30000000
+        }
+      ],
+      "name": "Normal"
+    }
+  ],
+  "warnings": [
+    {
+      "code": "text.auto_decimal",
+      "ctx": {
+        "detail": "."
+      },
+      "level": "Info",
+      "message": "decimal separator detected"
+    },
+    {
+      "code": "text.auto_delimiter",
+      "ctx": {
+        "detail": "comma"
+      },
+      "level": "Info",
+      "message": "delimiter detected"
+    },
+    {
+      "code": "text.auto_preamble",
+      "ctx": {
+        "detail": "0"
+      },
+      "level": "Info",
+      "message": "preamble detected"
+    },
+    {
+      "code": "text.auto_time_column",
+      "ctx": {
+        "detail": "Time"
+      },
+      "level": "Info",
+      "message": "time column detected"
+    },
+    {
+      "code": "text.auto_time_unit",
+      "ctx": {
+        "detail": "s"
+      },
+      "level": "Info",
+      "message": "time unit detected"
+    },
+    {
+      "code": "text.auto_units_row",
+      "ctx": {
+        "detail": "yes"
+      },
+      "level": "Info",
+      "message": "units row found"
+    },
+    {
+      "code": "text.lap_source",
+      "ctx": {
+        "detail": "lap_counter_edge:Lap"
+      },
+      "level": "Info",
+      "message": "laps from the changes of a lap counter column"
+    },
+    {
+      "code": "text.rate_inferred",
+      "ctx": {
+        "detail": "100 Hz"
+      },
+      "level": "Info",
+      "message": "sample rate inferred from the time column"
+    },
+    {
+      "code": "text.sparse_column",
+      "ctx": {
+        "channel": "GPS Lat",
+        "detail": "GPS Lat"
+      },
+      "level": "Info",
+      "message": "a column with empty cells keeps only its own samples (timestamped)"
+    },
+    {
+      "code": "text.sparse_column",
+      "ctx": {
+        "channel": "GPS Lon",
+        "detail": "GPS Lon"
+      },
+      "level": "Info",
+      "message": "a column with empty cells keeps only its own samples (timestamped)"
+    }
+  ]
+}

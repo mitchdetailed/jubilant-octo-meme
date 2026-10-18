@@ -80,16 +80,16 @@ SidecarDocument richDocument() {
                                                   "Turn 3", std::nullopt, std::nullopt, -1.5});
 
     SidecarLayer& n = doc.layer("Normal");
-    n.localMaths = *OpaqueJson::parse(R"({"$schema": "urn:esses:maths-1", "schemaVersion": 1, "id": "local",
+    n.localMaths = *JsonDoc::parse(R"({"$schema": "urn:esses:maths-1", "schemaVersion": 1, "id": "local",
         "items": [{"kind": "scale_offset", "name": "Brake Pres F", "scale": 1.02}]})");
     n.annotations.push_back(Annotation{Uuid::parse("0d9e8f7a-6b5c-4d3e-8f1a-0b9c8d7e6f5a"), 456'000'000,
                                        "Wheel lock T4", std::string("Brake Pres F")});
     n.annotations.push_back(
         Annotation{Uuid::parse("c1a2b3c4-d5e6-4f70-8a9b-0c1d2e3f4a5b"), -5'000, "early", {}});
     n.videoLinks.push_back(VideoLink{"cam1.mp4", "Driver", -1'250'000, {{0, 1'250'000}, {10, 20}}});
-    n.runs = *OpaqueJson::parse("[]");
-    n.stages = *OpaqueJson::parse("[]");
-    doc.unknown.emplace("x-esses-legacy", *OpaqueJson::parse(R"({"oldField": 1})"));
+    n.runs = *JsonDoc::parse("[]");
+    n.stages = *JsonDoc::parse("[]");
+    doc.unknown.emplace("x-esses-legacy", *JsonDoc::parse(R"({"oldField": 1})"));
     return doc;
 }
 
@@ -108,6 +108,17 @@ TEST_CASE("sidecar: a missing file is an empty document", "[unit]") {
     CHECK(r->empty());
     CHECK(r->layers().empty());
     CHECK(r->layer("Normal").empty());
+}
+
+TEST_CASE("sidecar: a directory where the sidecar belongs is an Io error, never an exception", "[unit]") {
+    const auto dir = test::scratchDir("sidecar-directory");
+    const fs::path path = dir / "log.ld.sidecar.json";
+    fs::create_directories(path);
+    Result<SidecarDocument> r = fail(ErrorCode::Internal, "not called");
+    REQUIRE_NOTHROW(r = SidecarDocument::load(path)); // libstdc++ throws reading a directory POSIX opened
+    REQUIRE_FALSE(r.ok());
+    CHECK(r.error().code == ErrorCode::Io);
+    CHECK(r.error().context.path == path);
 }
 
 TEST_CASE("sidecar: the schema's valid examples load and round-trip canonically", "[unit][schema]") {
@@ -251,8 +262,8 @@ TEST_CASE("sidecar: a document nested deeper than the limit is refused, not a st
     // Ten levels are an ordinary unknown member, kept as it was.
     const SidecarDocument shallow = parseOk(withUnknown(10));
     CHECK(jsonOk(shallow).find("\"x-future\"") != std::string::npos);
-    // OpaqueJson::parse shares the limit.
-    CHECK(OpaqueJson::parse(std::string(300, '[') + std::string(300, ']')).error().code == ErrorCode::Format);
+    // JsonDoc::parse shares the limit.
+    CHECK(JsonDoc::parse(std::string(300, '[') + std::string(300, ']')).error().code == ErrorCode::Format);
 }
 
 TEST_CASE("sidecar: schema ids, versions and syntax errors", "[unit]") {

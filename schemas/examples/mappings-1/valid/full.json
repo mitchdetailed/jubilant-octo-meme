@@ -1,0 +1,16 @@
+{
+  "$schema": "urn:esses:mappings-1",
+  "schemaVersion": 1,
+  "mappings": [
+    {
+      "from": "WheelSP_FL",
+      "to": "Wheel Speed FL",
+      "unit": "km/h",
+      "unitlessOnly": true
+    },
+    {
+      "from": "GPS Latitudine",
+      "to": "GPS Latitude"
+    }
+  ]
+}

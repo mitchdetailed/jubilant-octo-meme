@@ -6,8 +6,10 @@ Claude Code reads `CLAUDE.md`, which imports this file. It summarises `docs/desi
 the design documents win (section 2), and the disagreement is a bug in this file.
 
 Esses is a clean-room, MIT-licensed reimplementation of a motorsport data-analysis workflow: a Qt 6 Widgets
-application over a Qt-free C++20 core. Status: M0 (foundations) is complete; M1 (walking skeleton) is in
-progress. See `docs/milestones/` for what each milestone actually built and where it departs from the design.
+application over a Qt-free C++20 core. Status: M0 (foundations) is complete, M1 (walking skeleton) passed its
+acceptance run, and M2 (channels, maths, persistence) is built and in review, waiting on the maintainer's
+decisions listed in `docs/milestones/M2.md`. See `docs/milestones/` for what each milestone actually built and
+where it departs from the design.
 
 ## 1. Ground rules
 
@@ -75,7 +77,7 @@ Layers (01 §2, outline §1). An arrow means "may depend on"; no layer depends u
 ```
 5  esses (app) -> esses_widgets -> { esses_qtmodel, esses_qtrender }            Qt Widgets + ADS (shared)
 4  esses-render -> { esses_qtmodel, esses_qtrender }                            Qt Gui, offscreen
-   esses_qtmodel -> every Qt-free library                                     Qt Core only
+   esses_qtmodel -> every Qt-free library                Qt Core (+ Qt Gui's QUndoStack/QUndoCommand, D-161)
    esses_qtrender -> esses_plotcore                                           Qt Gui only
 ------------------------------------ Qt-free line --------------------------------------------------------
 3  esses-cli -> every Qt-free library;  esses_plotcore -> base, store, model, analysis, project
@@ -93,8 +95,9 @@ Layers (01 §2, outline §1). An arrow means "may depend on"; no layer depends u
 - **Qt-free line:** layers 0-3 contain no `#include <Q...>`, no Qt type and link no `Qt6::` target
   (`cmake/qt-free-check.cmake` fails the configure). With `ESSES_BUILD_QT=OFF` they build and test with no Qt
   installed, on all three OSes. Strings there are UTF-8 `std::string`; `QString` appears only in layers 4-5.
-  Qt modules per layer: `qtmodel` Core; `qtrender` and `esses-render` Gui; `widgets` and `esses` Widgets (plus
-  Svg, PrintSupport, OpenGL). Never Qt Sql, Qt Concurrent, QML or a GPL-only module (D-006, D-031).
+  Qt modules per layer: `qtmodel` Core, plus Qt Gui for `QUndoStack`/`QUndoCommand` only (D-161, enforced by
+  `tools/check_layering.py`); `qtrender` and `esses-render` Gui; `widgets` and `esses` Widgets (plus Svg,
+  PrintSupport, OpenGL). Never Qt Sql, Qt Concurrent, QML or a GPL-only module (D-006, D-031).
 - **Namespaces as built:** `esses` (base), `esses::units`, `esses::store`, `esses::model`, `esses::formats`,
   `esses::analysis`, `esses::maths`, `esses::project`, `esses::plot` (plotcore), `esses::qt` (qtmodel,
   qtrender), `esses::widgets`. Qt targets compile with `QT_NO_KEYWORDS`: write `Q_SIGNALS`, `Q_SLOTS`, `Q_EMIT`.

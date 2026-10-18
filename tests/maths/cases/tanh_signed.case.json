@@ -1,0 +1,36 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "tanh_signed",
+  "expression": "tanh('X')",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): tanh",
+    "note": "hyperbolic"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 800000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5, -3.75, 3.75]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [-0.986614298151, -0.905148253645, -0.46211715726, 0.46211715726, 0.905148253645, 0.986614298151, -0.998894442726, 0.998894442726],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

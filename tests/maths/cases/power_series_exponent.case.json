@@ -1,0 +1,44 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "power_series_exponent",
+  "expression": "power('X', 'Y')",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): power",
+    "note": "y may be a channel (release note 1.0.21)"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 800000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [2, 3, 4, 5, 2, 9, 0.5, 10]
+    },
+    "Y": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [2, 2, 0.5, -1, 10, 0.5, 3, 0]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [4, 9, 2, 0.2, 1024, 3, 0.125, 1],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

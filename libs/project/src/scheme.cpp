@@ -4,12 +4,15 @@
 
 #include <esses/project/scheme.hpp>
 
+#include <algorithm>
 #include <string>
 #include <utility>
 
 namespace esses::project {
 
 namespace {
+
+constexpr detail::DocKind kKind{"scheme", 1};
 
 using detail::json;
 using jsonio::asString;
@@ -87,7 +90,7 @@ json paletteToJson(const std::vector<Rgba>& palette) {
 }
 
 json schemeToJson(const Scheme& s) {
-    json root = detail::newDocument("scheme");
+    json root = detail::newDocument("scheme", std::max(s.schemaVersion, kKind.current));
     root["name"] = s.name;
     root["background"] = s.background;
     if (!s.roles.empty()) {
@@ -187,77 +190,82 @@ std::vector<std::string> Scheme::fillMissingFrom(const Scheme& shipped) {
 }
 
 Result<Scheme> Scheme::parse(std::string_view json, std::vector<std::string>& log) {
-    return detail::parseDocument<Scheme>(json, [&](const detail::json& root) -> Result<Scheme> {
-        ObjectReader r(root, "");
-        detail::readSchemaHeader(r, "scheme", log);
-        Scheme s;
-        s.name = asString(r.required("name"), r.child("name"));
-        if (s.name.empty()) {
-            violate(r.child("name"), "a scheme name is not empty");
-        }
-        s.background = detail::enumString(r.required("background"), r.child("background"), {"light", "dark"});
-        if (const detail::json* rolesJson = r.optional("roles")) {
-            ObjectReader rr(*rolesJson, r.child("roles"));
-            for (auto it = rolesJson->begin(); it != rolesJson->end(); ++it) {
-                if (!isRoleName(it.key())) {
-                    violate(rr.child(it.key()), "role names are camelCase identifiers");
-                }
-                s.roles.emplace(it.key(), readColour(it.value(), rr.child(it.key())));
+    return detail::readDocument<Scheme>(
+        json, kKind, log,
+        [&](const detail::json& root, const detail::DocVersion& version) -> Result<Scheme> {
+            ObjectReader r(root, "");
+            detail::markSchemaHeader(r);
+            Scheme s;
+            s.schemaVersion = version.write;
+            s.name = asString(r.required("name"), r.child("name"));
+            if (s.name.empty()) {
+                violate(r.child("name"), "a scheme name is not empty");
             }
-        }
-        if (const detail::json* p = r.optional("channelPalette")) {
-            s.channelPalette = readPalette(*p, r.child("channelPalette"));
-            if (s.channelPalette.size() < 10) {
-                violate(r.child("channelPalette"),
-                        "channelPalette has at least 10 colours (06 section 16 rule 2)");
-            }
-        }
-        if (const detail::json* p = r.optional("overlayPalette")) {
-            s.overlayPalette = readPalette(*p, r.child("overlayPalette"));
-            if (s.overlayPalette.size() != 9) {
-                violate(r.child("overlayPalette"),
-                        "overlayPalette has exactly 9 colours (06 section 16 rule 3)");
-            }
-        }
-        if (const detail::json* o = r.optional("overlayStyle")) {
-            ObjectReader orr(*o, r.child("overlayStyle"));
-            if (const detail::json* v = orr.optional("colourSource")) {
-                s.overlayStyle.colourSource =
-                    detail::enumString(*v, orr.child("colourSource"), {"channel", "overlayPalette"});
-            }
-            if (const detail::json* v = orr.optional("dash")) {
-                s.overlayStyle.dash =
-                    detail::enumString(*v, orr.child("dash"), {"solid", "dash", "dot", "dashDot"});
-            }
-            if (const detail::json* v = orr.optional("lightness")) {
-                s.overlayStyle.lightness = jsonio::asNumber(*v, orr.child("lightness"));
-                if (s.overlayStyle.lightness < -1.0 || s.overlayStyle.lightness > 1.0) {
-                    violate(orr.child("lightness"), "lightness lies in -1..1");
+            s.background =
+                detail::enumString(r.required("background"), r.child("background"), {"light", "dark"});
+            if (const detail::json* rolesJson = r.optional("roles")) {
+                ObjectReader rr(*rolesJson, r.child("roles"));
+                for (auto it = rolesJson->begin(); it != rolesJson->end(); ++it) {
+                    if (!isRoleName(it.key())) {
+                        violate(rr.child(it.key()), "role names are camelCase identifiers");
+                    }
+                    s.roles.emplace(it.key(), readColour(it.value(), rr.child(it.key())));
                 }
             }
-            if (const detail::json* v = orr.optional("widthScale")) {
-                s.overlayStyle.widthScale = jsonio::asNumber(*v, orr.child("widthScale"));
-                if (s.overlayStyle.widthScale <= 0.0 || s.overlayStyle.widthScale > 10.0) {
-                    violate(orr.child("widthScale"), "widthScale lies in (0, 10]");
+            if (const detail::json* p = r.optional("channelPalette")) {
+                s.channelPalette = readPalette(*p, r.child("channelPalette"));
+                if (s.channelPalette.size() < 10) {
+                    violate(r.child("channelPalette"),
+                            "channelPalette has at least 10 colours (06 section 16 rule 2)");
                 }
             }
-            orr.closed();
-        }
-        if (const detail::json* fontsJson = r.optional("fonts")) {
-            ObjectReader fr(*fontsJson, r.child("fonts"));
-            for (auto it = fontsJson->begin(); it != fontsJson->end(); ++it) {
-                if (!isRoleName(it.key())) {
-                    violate(fr.child(it.key()), "font role names are camelCase identifiers");
+            if (const detail::json* p = r.optional("overlayPalette")) {
+                s.overlayPalette = readPalette(*p, r.child("overlayPalette"));
+                if (s.overlayPalette.size() != 9) {
+                    violate(r.child("overlayPalette"),
+                            "overlayPalette has exactly 9 colours (06 section 16 rule 3)");
                 }
-                s.fonts.emplace(it.key(), readFont(it.value(), fr.child(it.key())));
             }
-        }
-        if (const detail::json* p = r.optional("print")) {
-            s.print = detail::objectDoc(*p, r.child("print"));
-        }
-        s.unknown = detail::unknownMembers(r);
-        return s;
-    });
+            if (const detail::json* o = r.optional("overlayStyle")) {
+                ObjectReader orr(*o, r.child("overlayStyle"));
+                if (const detail::json* v = orr.optional("colourSource")) {
+                    s.overlayStyle.colourSource =
+                        detail::enumString(*v, orr.child("colourSource"), {"channel", "overlayPalette"});
+                }
+                if (const detail::json* v = orr.optional("dash")) {
+                    s.overlayStyle.dash =
+                        detail::enumString(*v, orr.child("dash"), {"solid", "dash", "dot", "dashDot"});
+                }
+                if (const detail::json* v = orr.optional("lightness")) {
+                    s.overlayStyle.lightness = jsonio::asNumber(*v, orr.child("lightness"));
+                    if (s.overlayStyle.lightness < -1.0 || s.overlayStyle.lightness > 1.0) {
+                        violate(orr.child("lightness"), "lightness lies in -1..1");
+                    }
+                }
+                if (const detail::json* v = orr.optional("widthScale")) {
+                    s.overlayStyle.widthScale = jsonio::asNumber(*v, orr.child("widthScale"));
+                    if (s.overlayStyle.widthScale <= 0.0 || s.overlayStyle.widthScale > 10.0) {
+                        violate(orr.child("widthScale"), "widthScale lies in (0, 10]");
+                    }
+                }
+                orr.closed();
+            }
+            if (const detail::json* fontsJson = r.optional("fonts")) {
+                ObjectReader fr(*fontsJson, r.child("fonts"));
+                for (auto it = fontsJson->begin(); it != fontsJson->end(); ++it) {
+                    if (!isRoleName(it.key())) {
+                        violate(fr.child(it.key()), "font role names are camelCase identifiers");
+                    }
+                    s.fonts.emplace(it.key(), readFont(it.value(), fr.child(it.key())));
+                }
+            }
+            if (const detail::json* p = r.optional("print")) {
+                s.print = detail::objectDoc(*p, r.child("print"));
+            }
+            s.unknown = detail::unknownMembers(r);
+            return s;
+        },
+        schemeToJson);
 }
 
 Result<Scheme> Scheme::load(const std::filesystem::path& path, std::vector<std::string>& log) {

@@ -1,0 +1,58 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "range_is_gate_for_stat",
+  "expression": "stat_max('X', range_is(\"Outings:Laps\"))",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): range_is",
+    "note": "range_is as a gate"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 1200000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [3, 1.5, 4.25, 1, 5.5, 9, 2.75, 6.5, 5.25, 3.5, 5, 8.75]
+    }
+  },
+  "ranges": {
+    "Outings": [
+      {
+        "startUs": 0,
+        "endUs": 1200000
+      }
+    ],
+    "Outings:Laps": [
+      {
+        "startUs": 100000,
+        "endUs": 300000
+      },
+      {
+        "startUs": 500000,
+        "endUs": 600000
+      },
+      {
+        "startUs": 900000,
+        "endUs": 1100000
+      }
+    ]
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

@@ -6,6 +6,7 @@
 // file.
 #include "spelling.hpp"
 
+#include <esses/base/read_file.hpp>
 #include <esses/units/unit_registry.hpp>
 
 #include <nlohmann/json.hpp>
@@ -17,9 +18,7 @@
 #include <cstdint>
 #include <exception>
 #include <filesystem>
-#include <fstream>
 #include <initializer_list>
-#include <iterator>
 #include <limits>
 #include <new>
 #include <optional>
@@ -704,22 +703,6 @@ private:
 
 namespace {
 
-Result<std::string> readText(const std::filesystem::path& path) {
-    std::ifstream in(path, std::ios::binary);
-    if (!in) {
-        ErrorContext ctx;
-        ctx.path = path;
-        return fail(ErrorCode::Io, "cannot open the unit table", std::move(ctx));
-    }
-    std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    if (in.bad()) {
-        ErrorContext ctx;
-        ctx.path = path;
-        return fail(ErrorCode::Io, "cannot read the unit table", std::move(ctx));
-    }
-    return text;
-}
-
 Result<UnitRegistry> build(std::string_view unitsJson, const std::filesystem::path* unitsPath,
                            std::string_view userJson, const std::filesystem::path* userPath) {
     try {
@@ -749,7 +732,7 @@ Result<UnitRegistry> UnitRegistry::load(std::string_view unitsJson, std::string_
 
 Result<UnitRegistry> UnitRegistry::loadFiles(const std::filesystem::path& unitsFile,
                                              const std::filesystem::path& userFile) {
-    auto units = readText(unitsFile);
+    auto units = readWholeFile(unitsFile, "the unit table");
     if (!units) {
         return Failure{units.error()};
     }
@@ -757,7 +740,7 @@ Result<UnitRegistry> UnitRegistry::loadFiles(const std::filesystem::path& unitsF
     if (!userFile.empty()) {
         std::error_code ec;
         if (std::filesystem::exists(userFile, ec)) {
-            auto text = readText(userFile);
+            auto text = readWholeFile(userFile, "the unit table");
             if (!text) {
                 return Failure{text.error()};
             }

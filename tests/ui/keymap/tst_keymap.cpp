@@ -6,9 +6,17 @@
 // with two synthetic circuit logs opened through the SourceLoader), arranges the command's precondition, puts
 // the focus where the row's context lives (global / worksheet / graph: the time_distance component of the
 // active worksheet; data_window: the Data dock's tree), sends the key with QTest (through the KeyEventRouter
-// and the KeymapBinder) and checks the documented post-condition. Every command id with an implemented row
-// has a KEYMAP_TEST entry naming it below: a row without one fails here, and tools/check_keymap_coverage.py
-// checks the same at lint time (08 section 6.5).
+// and the KeymapBinder) and checks the documented post-condition. A menu-only row (no key, 06 section 14.3)
+// is run through its shared QAction, as the menu or the toolbar triggers it. Every command id with an
+// implemented row has a KEYMAP_TEST entry naming it below: a row without one fails here, and
+// tools/check_keymap_coverage.py checks the same at lint time (08 section 6.5). M2 adds edit.undo / edit.redo
+// (the session's undo stack, with a document edit arranged first), tools.options, data.lap_stretch_toggle,
+// view.messages_window and view.reset_docks, then the editors' rows of the shell's M2 wiring:
+// tools.maths_editor, tools.channel_status, view.channel_status, tools.channel_editor, tools.aliases,
+// tools.mappings, tools.details, tools.lap_editor, data.filter_all_sources, cursor.insert_marker (SHIFT+F7)
+// and the nine channel.* rows, and the workbook rows view.workbook_n (CTRL+1..CTRL+0), view.prev_workbook and
+// view.next_workbook (a second workbook added first). Rows that edit a document undo back to the state of
+// reset() afterwards.
 
 #include "../../../libs/qtmodel/tests/qtmodel_test_support.hpp"
 
@@ -18,26 +26,44 @@
 #include <esses/qtmodel/data_selection_model.hpp>
 #include <esses/qtmodel/data_window_model.hpp>
 #include <esses/qtmodel/distance_service.hpp>
+#include <esses/qtmodel/lap_stretch_service.hpp>
+#include <esses/qtmodel/maths_service.hpp>
 #include <esses/qtmodel/project_session.hpp>
+#include <esses/qtmodel/undo_commands.hpp>
 #include <esses/qtmodel/worksheet_view_model.hpp>
 #include <esses/qtmodel/workspace_view_model.hpp>
 #include <esses/widgets/components/component_widget.hpp>
 #include <esses/widgets/docks/channels_window.hpp>
 #include <esses/widgets/docks/data_window.hpp>
+#include <esses/widgets/editors_data/channel_editor.hpp>
+#include <esses/widgets/editors_data/details_editor.hpp>
+#include <esses/widgets/editors_data/lap_editor.hpp>
+#include <esses/widgets/editors_maths/active_channel_commands.hpp>
+#include <esses/widgets/editors_maths/channel_documents_dialogs.hpp>
+#include <esses/widgets/editors_maths/channel_status_window.hpp>
+#include <esses/widgets/editors_maths/maths_editor.hpp>
+#include <esses/widgets/editors_options/options_dialog.hpp>
+#include <esses/widgets/shell/command_actions.hpp>
 #include <esses/widgets/shell/dock_host.hpp>
 #include <esses/widgets/shell/main_window.hpp>
 #include <esses/widgets/shell/worksheet_canvas.hpp>
 
+#include <QAction>
 #include <QApplication>
+#include <QComboBox>
+#include <QDialog>
 #include <QIdentityProxyModel>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QKeySequence>
 #include <QLineEdit>
 #include <QSet>
+#include <QTableView>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTreeView>
+#include <QUndoStack>
 #include <cmath>
 #include <functional>
 #include <map>
@@ -57,6 +83,7 @@ namespace {
 constexpr Micros kSec = 1'000'000;
 const QString kData = QStringLiteral("data");
 const QString kValues = QStringLiteral("values");
+const QString kStatus = QStringLiteral("channelstatus");
 
 struct Fixture;
 
@@ -65,6 +92,11 @@ struct Before {
     plot::ViewState view;
     int sheet = 0;
     bool valuesVisible = false;
+    bool messagesVisible = false;
+    bool stretch = false;
+    int undoIndex = 0;
+    std::string activeChannel;                       // the focused graph's active channel
+    std::optional<project::ComponentSpec> graphSpec; // and its spec
 };
 
 struct Case {
@@ -87,6 +119,8 @@ struct Fixture {
     model::SourceId b;
     std::vector<model::RangeRef> lapsA; // displayed order: out lap, 50 s, 48 s, 49 s, in lap
     std::vector<model::RangeRef> lapsB;
+    int undoMark = 0;   // the undo index of reset(): rows that edit documents undo back to it
+    int bookBefore = 0; // the workbook rows: the active workbook before the key
 
     qt::WorksheetViewModel& ws() const { return *w->activeWorksheet(); }
     qt::DataSelectionModel& sel() const { return w->selection(); }
@@ -149,6 +183,58 @@ bool near(double a, double b) {
 // A zoom and a cursor inside the Main lap that differ from the reset state (N/P must keep both).
 void zoomInsideMain(Fixture& f);
 
+// edit.undo / edit.redo: one document edit on the session's stack (options.reports.probeSec = kProbe).
+constexpr double kProbe = 42.0;
+void pushProbeEdit(Fixture& f);
+double probeSec(const Fixture& f);
+
+// The M2 editors' rows: back to the reset state.
+void undoToMark(Fixture& f) {
+    QUndoStack& stack = f.w->session().undoStack();
+    while (stack.index() > f.undoMark && stack.canUndo()) {
+        stack.undo();
+    }
+}
+// The active channel's value at the cursor is available: a logged channel always, a maths channel once its
+// head is evaluated (the earlier rows re-version it: a transient filter, local maths undone).
+void waitActiveChannelReady(Fixture& f) {
+    const std::optional<QString> name = f.w->activeChannelCommands().activeChannel();
+    QVERIFY(name.has_value());
+    const std::string n = name->toStdString();
+    if (!f.w->maths().isMathsChannel(f.a, "Normal", n)) {
+        return;
+    }
+    const maths::ChannelKey key = maths::ChannelKey::make(f.a, "Normal", n);
+    QTRY_VERIFY_WITH_TIMEOUT(f.w->maths().status(key).state == maths::MathState::Ok ||
+                                 f.w->maths().status(key).state == maths::MathState::Warning,
+                             30000);
+}
+void closeEditor(Fixture& f, QDialog& dialog) {
+    dialog.close();
+    f.w->activateWindow();
+    QVERIFY(QTest::qWaitForWindowActive(f.w.get()));
+}
+// The workbook rows: a second workbook (an undoable edit) and the active one chosen before the key.
+void addSecondWorkbook(Fixture& f, int active) {
+    qt::ProjectSession& s = f.w->session();
+    if (s.workbooks().size() < 2) {
+        project::WorkbookFile book = s.workbooks().front();
+        book.id = {};
+        book.name = "Second";
+        s.undoStack().push(new qt::AddWorkbookCommand(s, book));
+    }
+    QCOMPARE(s.workbooks().size(), std::size_t{2});
+    f.w->selectWorkbook(active);
+    QCOMPARE(s.activeWorkbook(), active);
+    f.bookBefore = active;
+}
+void backToFirstWorkbook(Fixture& f) {
+    f.w->selectWorkbook(0);
+    undoToMark(f);
+    QCOMPARE(f.w->session().workbooks().size(), std::size_t{1});
+    QCOMPARE(f.w->activeWorksheetIndex(), 0);
+}
+
 const std::map<QString, Case>& cases() {
     using F = Fixture;
     static const std::map<QString, Case> table{
@@ -198,7 +284,271 @@ const std::map<QString, Case>& cases() {
               QCOMPARE(f.w->activeWorksheetIndex(), (b.sheet + 1) % f.w->worksheetCount());
           },
           {}}},
+        {KEYMAP_TEST("view.workbook_n"),
+         {[](F& f, int n) { addSecondWorkbook(f, n == 1 ? 1 : 0); },
+          {},
+          [](F& f, const Before&, int n) {
+              const int count = static_cast<int>(f.w->session().workbooks().size());
+              QCOMPARE(f.w->session().activeWorkbook(), n <= count ? n - 1 : f.bookBefore);
+              QCOMPARE(f.w->workbookSelector().currentIndex(), f.w->session().activeWorkbook());
+          },
+          [](F& f) { backToFirstWorkbook(f); }}},
+        {KEYMAP_TEST("view.prev_workbook"),
+         {[](F& f, int) { addSecondWorkbook(f, 0); },
+          {},
+          [](F& f, const Before&, int) { QCOMPARE(f.w->session().activeWorkbook(), 1); }, // wraps
+          [](F& f) { backToFirstWorkbook(f); }}},
+        {KEYMAP_TEST("view.next_workbook"),
+         {[](F& f, int) { addSecondWorkbook(f, 1); },
+          {},
+          [](F& f, const Before&, int) { QCOMPARE(f.w->session().activeWorkbook(), 0); }, // wraps
+          [](F& f) { backToFirstWorkbook(f); }}},
+        {KEYMAP_TEST("view.messages_window"), // menu only
+         {{},
+          {},
+          [](F& f, const Before& b, int) {
+              QCOMPARE(f.w->docks().isVisible(QStringLiteral("messages")), !b.messagesVisible);
+          },
+          {}}},
+        {KEYMAP_TEST("view.reset_docks"), // menu only
+         {[](F& f, int) {
+              f.w->docks().setState(kValues, DockState::Closed);
+              f.w->docks().setState(kData, DockState::Floating);
+          },
+          {},
+          [](F& f, const Before&, int) {
+              QCOMPARE(f.w->docks().state(kValues), f.w->docks().defaultState(kValues));
+              QCOMPARE(f.w->docks().state(kData), f.w->docks().defaultState(kData));
+          },
+          [](F& f) {
+              f.w->activateWindow();
+              QVERIFY(QTest::qWaitForWindowActive(f.w.get()));
+          }}},
+        // ---- edit (M2: the session's undo stack, D-032) ----
+        {KEYMAP_TEST("edit.undo"),
+         {[](F& f, int) { pushProbeEdit(f); },
+          {},
+          [](F& f, const Before& b, int) {
+              QCOMPARE(f.w->session().undoStack().index(), b.undoIndex - 1);
+              QVERIFY(probeSec(f) != kProbe);
+              QVERIFY(f.w->session().undoStack().canRedo());
+          },
+          [](F& f) { f.w->session().undoStack().clear(); }}},
+        {KEYMAP_TEST("edit.redo"),
+         {[](F& f, int) {
+              pushProbeEdit(f);
+              f.w->session().undoStack().undo();
+          },
+          {},
+          [](F& f, const Before& b, int) {
+              QCOMPARE(f.w->session().undoStack().index(), b.undoIndex + 1);
+              QCOMPARE(probeSec(f), kProbe);
+          },
+          [](F& f) {
+              f.w->session().undoStack().undo(); // back to the original options
+              f.w->session().undoStack().clear();
+          }}},
+        // ---- tools ----
+        {KEYMAP_TEST("tools.options"), // menu only
+         {{},
+          {},
+          [](F& f, const Before&, int) {
+              QVERIFY(f.w->optionsDialog().isVisible());
+              QCOMPARE(QApplication::activeModalWidget(), &f.w->optionsDialog());
+          },
+          [](F& f) {
+              f.w->optionsDialog().reject();
+              f.w->activateWindow();
+              QVERIFY(QTest::qWaitForWindowActive(f.w.get()));
+          }}},
+        // ---- M2 editors (the shell's wiring, 06 sections 10, 13 and 14.4) ----
+        {KEYMAP_TEST("tools.maths_editor"),
+         {{},
+          {},
+          [](F& f, const Before&, int) { QVERIFY(f.w->mathsEditor().isVisible()); },
+          [](F& f) { closeEditor(f, f.w->mathsEditor()); }}},
+        {KEYMAP_TEST("tools.channel_status"),
+         {{},
+          {},
+          [](F& f, const Before&, int) {
+              QCOMPARE(f.w->docks().focusedDockId(), kStatus);
+              // The built-in outputs of both open logs at least (corrected speed and distance).
+              QVERIFY(f.w->channelStatusWindow().table().model()->rowCount() >= 4);
+          },
+          {}}},
+        {KEYMAP_TEST("view.channel_status"), // menu only: an alias of tools.channel_status
+         {{},
+          {},
+          [](F& f, const Before&, int) {
+              QVERIFY(f.w->docks().isVisible(kStatus));
+              QCOMPARE(f.w->docks().focusedDockId(), kStatus);
+          },
+          {}}},
+        {KEYMAP_TEST("tools.channel_editor"),
+         {{},
+          {},
+          [](F& f, const Before&, int) {
+              QVERIFY(f.w->channelEditor().isVisible());
+              QVERIFY(f.w->channelEditor().channelModel().rowCount() > 0); // the channels of both logs
+          },
+          [](F& f) { closeEditor(f, f.w->channelEditor()); }}},
+        {KEYMAP_TEST("tools.aliases"), // menu only
+         {{},
+          {},
+          [](F& f, const Before&, int) {
+              QVERIFY(f.w->channelEditor().aliasesDialog() != nullptr);
+              QVERIFY(f.w->channelEditor().aliasesDialog()->isVisible());
+          },
+          [](F& f) { closeEditor(f, *f.w->channelEditor().aliasesDialog()); }}},
+        {KEYMAP_TEST("tools.mappings"), // menu only
+         {{},
+          {},
+          [](F& f, const Before&, int) {
+              QVERIFY(f.w->channelEditor().mappingsDialog() != nullptr);
+              QVERIFY(f.w->channelEditor().mappingsDialog()->isVisible());
+          },
+          [](F& f) { closeEditor(f, *f.w->channelEditor().mappingsDialog()); }}},
+        {KEYMAP_TEST("tools.details"),
+         {{},
+          {},
+          [](F& f, const Before&, int) { QVERIFY(f.w->detailsEditor().isVisible()); },
+          [](F& f) { closeEditor(f, f.w->detailsEditor()); }}},
+        {KEYMAP_TEST("tools.lap_editor"), // menu only
+         {{},
+          {},
+          [](F& f, const Before&, int) {
+              QVERIFY(f.w->lapEditor().isVisible());
+              QVERIFY(f.w->lapEditor().source() == f.a);        // follows the Main source
+              QVERIFY(f.w->lapEditor().rowOf(f.lapsA[2]) >= 0); // its laps are listed
+          },
+          [](F& f) { closeEditor(f, f.w->lapEditor()); }}},
+        {KEYMAP_TEST("data.filter_all_sources"), // menu only
+         {[](F& f, int) {
+              qt::FilterSpec fastest;
+              fastest.kind = qt::FilterSpec::Kind::Fastest;
+              f.sel().setFilter(f.a, fastest);
+          },
+          {},
+          [](F& f, const Before&, int) {
+              QVERIFY(f.sel().filter(f.b).kind == qt::FilterSpec::Kind::Fastest);
+          },
+          [](F& f) {
+              f.sel().setFilter(f.a, qt::FilterSpec{});
+              f.sel().setFilter(f.b, qt::FilterSpec{});
+          }}},
+        // SHIFT+F7: a user beacon at the main cursor; the laps rebuild at once (AC-M2-05); one undo step.
+        {KEYMAP_TEST("cursor.insert_marker"),
+         {{},
+          {},
+          [](F& f, const Before& b, int) {
+              QCOMPARE(f.w->session().undoStack().index(), b.undoIndex + 1);
+              QCOMPARE(f.sel().displayedRanges(f.a).size(), f.lapsA.size() + 1);
+          },
+          [](F& f) {
+              undoToMark(f);
+              QCOMPARE(f.sel().displayedRanges(f.a).size(), f.lapsA.size());
+              f.lapsA = f.sel().displayedRanges(f.a);
+          }}},
+        // ---- active channel (ActiveChannelCommands over the focused graph) ----
+        {KEYMAP_TEST("channel.next_active"),
+         {{},
+          {},
+          [](F& f, const Before& b, int) {
+              QVERIFY(!f.graph()->spec().activeChannel.empty());
+              QVERIFY(f.graph()->spec().activeChannel != b.activeChannel);
+          },
+          [](F& f) { undoToMark(f); }}},
+        {KEYMAP_TEST("channel.prev_active"),
+         {{},
+          {},
+          [](F& f, const Before& b, int) {
+              QVERIFY(!f.graph()->spec().activeChannel.empty());
+              QVERIFY(f.graph()->spec().activeChannel != b.activeChannel);
+          },
+          [](F& f) { undoToMark(f); }}},
+        {KEYMAP_TEST("channel.hide"),
+         {{},
+          {},
+          [](F& f, const Before& b, int) {
+              QCOMPARE(f.w->session().undoStack().index(), b.undoIndex + 1); // a workbook edit
+              QVERIFY(b.graphSpec.has_value() && !(f.graph()->spec() == *b.graphSpec));
+          },
+          [](F& f) { undoToMark(f); }}},
+        {KEYMAP_TEST("channel.remove"),
+         {{},
+          {},
+          [](F& f, const Before& b, int) {
+              QCOMPARE(f.w->session().undoStack().index(), b.undoIndex + 1);
+              QVERIFY(b.graphSpec.has_value() && !(f.graph()->spec() == *b.graphSpec));
+          },
+          [](F& f) { undoToMark(f); }}},
+        // A logged channel has no maths item: a status-bar hint, nothing opens (06 section 14.4).
+        {KEYMAP_TEST("channel.edit_maths"),
+         {{},
+          {},
+          [](F& f, const Before& b, int) {
+              QVERIFY(!f.w->activeChannelCommands().lastHint().isEmpty());
+              QCOMPARE(f.w->session().undoStack().index(), b.undoIndex);
+          },
+          {}}},
+        {KEYMAP_TEST("channel.status"),
+         {{},
+          {},
+          [](F& f, const Before&, int) {
+              QVERIFY(!f.w->activeChannelCommands().lastHint().isEmpty() ||
+                      f.w->docks().focusedDockId() == kStatus);
+          },
+          {}}},
+        // CTRL+SHIFT+F: a transient filter of the Main source, never a document edit.
+        {KEYMAP_TEST("channel.filter"),
+         {[](F& f, int) {
+              f.w->activeChannelCommands().setFilterPrompt(
+                  [](const QString&) -> std::optional<ActiveChannelCommands::FilterChoice> {
+                      ActiveChannelCommands::FilterChoice c;
+                      c.points = 5;
+                      return c;
+                  });
+          },
+          {},
+          [](F& f, const Before& b, int) {
+              const std::optional<maths::MathModule> t = f.w->activeChannelCommands().transientModule(f.a);
+              QVERIFY(t.has_value());
+              QCOMPARE(t->items.size(), std::size_t{1});
+              QCOMPARE(f.w->session().undoStack().index(), b.undoIndex);
+          },
+          {}}},
+        // CTRL+SHIFT+O / CTRL+SHIFT+Z: a scale_offset item in the Main source's local maths, one undo step.
+        {KEYMAP_TEST("channel.scale_offset"),
+         {[](F& f, int) {
+              f.w->activeChannelCommands().setScaleOffsetPrompt(
+                  [](const QString&,
+                     const QString&) -> std::optional<ActiveChannelCommands::ScaleOffsetChoice> {
+                      ActiveChannelCommands::ScaleOffsetChoice c;
+                      c.scale = 2.0;
+                      return c;
+                  });
+          },
+          {},
+          [](F& f, const Before& b, int) { QCOMPARE(f.w->session().undoStack().index(), b.undoIndex + 1); },
+          [](F& f) { undoToMark(f); }}},
+        {KEYMAP_TEST("channel.zero_at_cursor"),
+         {[](F& f, int) { waitActiveChannelReady(f); },
+          {},
+          [](F& f, const Before& b, int) {
+              QVERIFY2(f.w->session().undoStack().index() == b.undoIndex + 1,
+                       qPrintable(f.w->activeChannelCommands().lastHint()));
+          },
+          [](F& f) { undoToMark(f); }}},
         // ---- data ----
+        {KEYMAP_TEST("data.lap_stretch_toggle"), // menu only (and the toolbar)
+         {{},
+          {},
+          [](F& f, const Before& b, int) {
+              QCOMPARE(f.w->lapStretch().enabled(), !b.stretch);
+              QCOMPARE(f.w->session().lapStretchSettings().enabled, !b.stretch);
+              QCOMPARE(f.w->session().undoStack().index(), b.undoIndex); // view state (D-174)
+          },
+          [](F& f) { f.w->lapStretch().toggle(); }}},
         {KEYMAP_TEST("data.toggle_domain"),
          {{},
           {},
@@ -483,6 +833,24 @@ void zoomInsideMain(Fixture& f) {
     f.ws().setCursor(7 * kSec, qt::CursorSource::Programmatic);
 }
 
+double probeSec(const Fixture& f) {
+    const QJsonObject o =
+        QJsonDocument::fromJson(QByteArray::fromStdString(f.w->session().projectFile().options.compact()))
+            .object();
+    return o.value(QStringLiteral("reports")).toObject().value(QStringLiteral("probeSec")).toDouble();
+}
+
+void pushProbeEdit(Fixture& f) {
+    qt::ProjectSession& s = f.w->session();
+    project::ProjectFile next = s.projectFile();
+    QJsonObject o = QJsonDocument::fromJson(QByteArray::fromStdString(next.options.compact())).object();
+    QJsonObject reports = o.value(QStringLiteral("reports")).toObject();
+    reports.insert(QStringLiteral("probeSec"), kProbe);
+    o.insert(QStringLiteral("reports"), reports);
+    next.options = JsonDoc::parse(QJsonDocument(o).toJson(QJsonDocument::Compact).toStdString()).value();
+    s.undoStack().push(new qt::SetProjectOptionsCommand(s, std::move(next), QStringLiteral("Probe")));
+}
+
 // The common state every row starts from: worksheet 1 in time, Main = lap 2 of a (48 s, 90 s into the
 // outing), no overlays, zoom = the Main range, cursor at 10 s, no datum, the docks at their defaults.
 void reset(Fixture& f) {
@@ -504,6 +872,7 @@ void reset(Fixture& f) {
             f.w->docks().setState(id, f.w->docks().defaultState(id));
         }
     }
+    f.undoMark = f.w->session().undoStack().index();
 }
 
 } // namespace
@@ -582,6 +951,13 @@ private Q_SLOTS:
                     QJsonDocument::fromJson(QByteArray::fromStdString(row.args.compact())).array();
                 arg = args.isEmpty() ? 0 : args.first().toInt();
             }
+            if (row.keys.empty()) { // a menu-only row: its QAction, as the menu or the toolbar triggers it
+                const QString command = QString::fromStdString(row.command);
+                const QString name =
+                    command + QStringLiteral(" (menu) ") + QString::fromStdString(row.context);
+                QTest::newRow(name.toUtf8().constData())
+                    << command << QString::fromStdString(row.context) << QString() << arg << false;
+            }
             for (const std::string& key : row.keys) {
                 const QString command = QString::fromStdString(row.command);
                 const QString name = command + QLatin1Char(' ') + QString::fromStdString(key) +
@@ -628,9 +1004,22 @@ private Q_SLOTS:
         before.view = f.ws().state();
         before.sheet = f.w->activeWorksheetIndex();
         before.valuesVisible = f.w->docks().isVisible(kValues);
+        before.messagesVisible = f.w->docks().isVisible(QStringLiteral("messages"));
+        before.stretch = f.w->lapStretch().enabled();
+        before.undoIndex = f.w->session().undoStack().index();
+        if (const ComponentWidget* g = f.graph()) {
+            before.activeChannel = g->spec().activeChannel;
+            before.graphSpec = g->spec();
+        }
 
-        const auto [k, mods] = parseKey(key);
-        QTest::keyClick(QApplication::focusWidget(), k, mods);
+        if (key.isEmpty()) {
+            QAction* action = f.w->actions().action(command);
+            QVERIFY(action != nullptr && action->isEnabled());
+            action->trigger();
+        } else {
+            const auto [k, mods] = parseKey(key);
+            QTest::keyClick(QApplication::focusWidget(), k, mods);
+        }
         c.verify(f, before, arg);
         if (c.after) {
             c.after(f);

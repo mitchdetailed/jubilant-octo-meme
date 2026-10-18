@@ -1,0 +1,29 @@
+{
+  "$schema": "urn:esses:fixture-1",
+  "schemaVersion": 1,
+  "channelsCompared": "all",
+  "dialect": "",
+  "format": "motec.csv",
+  "input": {
+    "bytes": 88149,
+    "file": "input.csv",
+    "sha256": "0ccd024fa4a54dc7cd7e2a21e02e7c14688e22053d0d02dcb9f417841b2ae369"
+  },
+  "licence": "CC0-1.0",
+  "name": "dialect-basic",
+  "notes": "05 section 6 layout facts reproduced with self-authored values; 20.48 Hz from the details",
+  "oracle": {
+    "kind": "generator",
+    "ref": "tools/gen_text_fixtures.py 1.0.0 (MIT)",
+    "tolerance": {
+      "F32": "1ulp",
+      "F64": "1ulp",
+      "I32": "exact",
+      "timesUs": "exact"
+    },
+    "validity": "strict"
+  },
+  "private": false,
+  "provenance": "synthetic",
+  "source": "synthetic: tools/gen_text_fixtures.py, the legacy CSV export skeleton with invented values"
+}

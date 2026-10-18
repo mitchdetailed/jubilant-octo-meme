@@ -1,0 +1,36 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "sinh_signed",
+  "expression": "sinh('X')",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): sinh",
+    "note": "hyperbolic"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 800000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5, -3.75, 3.75]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [-6.05020448104, -2.12927945509, -0.521095305494, 0.521095305494, 2.12927945509, 6.05020448104, -21.2487821271, 21.2487821271],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

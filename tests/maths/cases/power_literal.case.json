@@ -1,0 +1,36 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "power_literal",
+  "expression": "power('X', 3)",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): power",
+    "note": "integer literal exponent"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 800000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [0.25, 0.5, 1, 2, 4, 9, 16, 100]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [0.015625, 0.125, 1, 8, 64, 729, 4096, 1000000],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

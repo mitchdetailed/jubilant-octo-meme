@@ -10,9 +10,13 @@
 #include <esses/widgets/shell/key_event_router.hpp>
 #include <esses/widgets/shell/worksheet_canvas.hpp>
 
+#include <QAbstractSpinBox>
 #include <QApplication>
 #include <QKeyEvent>
 #include <QKeySequence>
+#include <QLineEdit>
+#include <QPlainTextEdit>
+#include <QTextEdit>
 #include <QVariant>
 
 namespace esses::widgets {
@@ -32,6 +36,33 @@ bool isAncestorOrSelf(const QWidget* ancestor, const QWidget* widget) {
 
 bool isTextEntry(const QWidget* widget) {
     return widget != nullptr && widget->property("esses.textEntry").toBool();
+}
+
+// A field the user types into (06 section 13.2 item 6: CTRL+Z inside a text field is text undo).
+bool isEditableText(const QWidget* widget) {
+    if (isTextEntry(widget)) {
+        return true;
+    }
+    if (const auto* e = qobject_cast<const QLineEdit*>(widget)) {
+        return !e->isReadOnly();
+    }
+    if (const auto* e = qobject_cast<const QPlainTextEdit*>(widget)) {
+        return !e->isReadOnly();
+    }
+    if (const auto* e = qobject_cast<const QTextEdit*>(widget)) {
+        return !e->isReadOnly();
+    }
+    if (const auto* e = qobject_cast<const QAbstractSpinBox*>(widget)) {
+        return !e->isReadOnly();
+    }
+    return false;
+}
+
+// The platform's text-editing chords (undo, redo, cut, copy, paste, select all).
+bool isTextEditChord(const QKeyEvent& event) {
+    return event.matches(QKeySequence::Undo) || event.matches(QKeySequence::Redo) ||
+           event.matches(QKeySequence::Cut) || event.matches(QKeySequence::Copy) ||
+           event.matches(QKeySequence::Paste) || event.matches(QKeySequence::SelectAll);
 }
 
 } // namespace
@@ -192,7 +223,10 @@ bool KeyEventRouter::eventFilter(QObject* watched, QEvent* event) {
     if (text.isEmpty()) {
         return false;
     }
-    const bool plain = widgetFirst(*key);
+    // A text-editing chord in an editable field is the field's own, like a plain key (06 section 13.2 item 6:
+    // CTRL+Z there is text undo, not project undo).
+    const bool editChord = isTextEditChord(*key) && isEditableText(receiver);
+    const bool plain = widgetFirst(*key) || editChord;
     if (!inScope(receiver)) {
         // Another window (a modeless dialog): its own widgets keep plain keys; function keys and chords act
         // globally (06 section 14.2 item 6).
@@ -204,7 +238,7 @@ bool KeyEventRouter::eventFilter(QObject* watched, QEvent* event) {
     }
     const QList<CommandContext> chain = chainFor(receiver);
     const bool inDock = !dockOf(receiver).isEmpty();
-    if (plain && (inDock || isTextEntry(receiver))) {
+    if (plain && (inDock || isTextEntry(receiver) || editChord)) {
         if (inDock) {
             offered_ = event;
             offeredTo_ = receiver;

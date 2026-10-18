@@ -1,0 +1,46 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "op_band_vs_equality",
+  "expression": "'I' & 'J' == 'J'",
+  "provenance": {
+    "kind": "derived",
+    "ref": "03_MATHS_ENGINE.md 2.3",
+    "note": "a & b == c parses as a & (b == c)"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 800000,
+  "inputs": {
+    "I": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [12, 10, 255, 6, 0, 7, 3, 5],
+      "dtype": "i32"
+    },
+    "J": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [10, 6, 15, 3, 9, 7, 2, 4],
+      "dtype": "i32"
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [0, 0, 1, 0, 0, 1, 1, 1],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

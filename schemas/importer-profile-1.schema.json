@@ -1,0 +1,396 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:importer-profile-1",
+  "title": "Esses text importer profile (importer-profile-1)",
+  "description": "A declarative description of a delimited text format that the TextEngine reads (05 section 7.2, D-029, D-102): data/profiles-text/<id>.json (shipped) and <config>/profiles-text/<id>.json (user). The profile registers as importer text.profile:<id>; only shipped profiles may set importerId, and only to a built-in id (motec.csv). With preamble.keyValueColumns, preamble.capture maps a key of the file to a detail id or an @input of the engine; without, it maps a detail id or @input to a regular expression with one group. Regular expressions are ECMAScript. Unknown top-level members are allowed and preserved; every nested object is closed. The blocks layout (sectioned files, D-102) is accepted here and not yet read by the engine.",
+  "type": "object",
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "id",
+    "name",
+    "version"
+  ],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072). The urn:esses: form is written; the bare esses: form of earlier drafts and the later https form are accepted on load and normalised on save (02 section 6.6 rule 1).",
+      "type": "string",
+      "pattern": "^(urn:esses:importer-profile-1|esses:importer-profile-1|https://[^/\\s]+(/[^/\\s]+)*/importer-profile-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "id": {
+      "description": "Profile id, also the file stem (\"generic.csv\").",
+      "type": "string",
+      "pattern": "^[a-z0-9]+([._-][a-z0-9]+)*$"
+    },
+    "importerId": {
+      "description": "Shipped profiles only: the D-028 built-in id the profile registers under (\"motec.csv\"); absent: text.profile:<id>.",
+      "$ref": "#/definitions/importerId"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "description": "The profile's content version; it enters the column cache key (05 section 2).",
+      "type": "string",
+      "minLength": 1
+    },
+    "sniff": {
+      "type": "object",
+      "properties": {
+        "preambleRegex": {
+          "description": "Searched in the first lines of the file; ^ anchors at the start of the file.",
+          "type": "string"
+        },
+        "extensions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^\\.[a-z0-9]+$"
+          }
+        },
+        "confidence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        }
+      },
+      "additionalProperties": false
+    },
+    "encoding": {
+      "enum": [
+        "auto",
+        "utf-8",
+        "utf-16le",
+        "utf-16be",
+        "cp1252"
+      ]
+    },
+    "delimiter": {
+      "enum": [
+        ",",
+        ";",
+        "\t",
+        "|",
+        " ",
+        "auto"
+      ]
+    },
+    "decimal": {
+      "enum": [
+        ".",
+        ",",
+        "auto"
+      ]
+    },
+    "quote": {
+      "description": "One character, or null for no quoting.",
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "maxLength": 1
+    },
+    "trim": {
+      "type": "boolean"
+    },
+    "trailingDelimiter": {
+      "type": "boolean"
+    },
+    "layout": {
+      "enum": [
+        "table",
+        "blocks"
+      ]
+    },
+    "preamble": {
+      "type": "object",
+      "properties": {
+        "lines": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "untilRegex": {
+          "description": "The names row is the first line matching it; \"@auto\" for the generic rule (05 section 7.3).",
+          "type": "string",
+          "minLength": 1
+        },
+        "untilBlank": {
+          "type": "boolean"
+        },
+        "capture": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "keyValueColumns": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 3,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000
+            }
+          }
+        },
+        "unmatchedTo": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "header": {
+      "type": "object",
+      "properties": {
+        "skipBlank": {
+          "type": "boolean"
+        },
+        "namesRow": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unitsRow": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            },
+            {
+              "const": "@auto"
+            }
+          ]
+        },
+        "dataRow": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "const": "auto"
+            }
+          ]
+        },
+        "unitInName": {
+          "description": "A regular expression with one group: the unit inside a name (\"Name (unit)\").",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ignoreEmptyNames": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "time": {
+      "type": "object",
+      "properties": {
+        "column": {
+          "description": "The time column's name, or \"@auto\".",
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "enum": [
+            "s",
+            "ms",
+            "us",
+            "hhmmss",
+            "epoch_s",
+            "epoch_ms",
+            "@auto"
+          ]
+        },
+        "rate": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^(infer|fromDetail:@?[A-Za-z][A-Za-z0-9_]*)$"
+            },
+            {
+              "type": "object",
+              "required": [
+                "num",
+                "den"
+              ],
+              "properties": {
+                "num": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "den": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "origin": {
+          "enum": [
+            "first",
+            "zero"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "sentinels": {
+      "description": "Cell texts that mean an invalid sample, matched after trimming, case-sensitive.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "sparse": {
+      "enum": [
+        "timestamped",
+        "hold"
+      ]
+    },
+    "duplicateNames": {
+      "enum": [
+        "suffix",
+        "error"
+      ]
+    },
+    "columns": {
+      "description": "Per-column overrides by the file's column name, applied before the dictionary.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/textColumn"
+      }
+    },
+    "lapSource": {
+      "$ref": "#/definitions/textLapSource"
+    },
+    "blocks": {
+      "description": "Layout blocks only (05 section 7.3).",
+      "type": "object"
+    },
+    "x-esses-legacy": {
+      "$ref": "#/definitions/legacyBag"
+    }
+  },
+  "definitions": {
+    "importerId": {
+      "description": "Importer id (D-028): \"motec.ld\", \"motec.csv\", \"text.profile:generic.csv\", ...",
+      "type": "string",
+      "pattern": "^[a-z0-9]+([._:-][a-z0-9]+)*$"
+    },
+    "legacyBag": {
+      "description": "Fields removed by a migration, kept verbatim (02 section 6.6 rule 3).",
+      "type": "object"
+    },
+    "textColumn": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quantity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string"
+        },
+        "dtype": {
+          "enum": [
+            "F32",
+            "F64",
+            "I32"
+          ]
+        },
+        "kind": {
+          "enum": [
+            "Real",
+            "Integer",
+            "Enum",
+            "Text"
+          ]
+        },
+        "interp": {
+          "enum": [
+            "Linear",
+            "Closest",
+            "Previous",
+            "Next"
+          ]
+        },
+        "dps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15
+        },
+        "sentinels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "textLapSource": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "none",
+            "lap_counter_edge",
+            "beacon_event",
+            "lap_table"
+          ]
+        },
+        "column": {
+          "description": "A column name, or \"@auto:<regular expression>\" matched case-insensitively against the names.",
+          "type": "string",
+          "minLength": 1
+        },
+        "section": {
+          "type": "string",
+          "minLength": 1
+        },
+        "match": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "detailsKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "optional": {
+          "type": "boolean"
+        },
+        "fallback": {
+          "$ref": "#/definitions/textLapSource"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

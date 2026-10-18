@@ -1,0 +1,36 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "acosh_domain",
+  "expression": "acosh('X')",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): acosh",
+    "note": "x < 1 invalid"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 800000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [0.5, 1, 1.5, 2, 4, -1, 10, 0.99]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [null, 0, 0.962423650119, 1.31695789692, 2.0634370689, null, 2.99322284613, null],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

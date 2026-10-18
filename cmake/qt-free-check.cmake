@@ -10,10 +10,12 @@
 # It also checks (M1, 01 section 2.2 rules 3-4):
 #   (3) every target of ESSES_QT_FREE_REQUIRED that exists is marked QT_FREE, so a library cannot leave the Qt-free
 #       set by dropping the flag;
-#   (4) the Qt layers link only their allowed Qt modules: esses_qtmodel no Qt Gui/Widgets (Qt Core only),
-#       esses_qtrender and esses-render no Qt Widgets and no docking library anywhere in their link closure,
-#       no target Qt Concurrent or Qt Sql (D-031, 01 section 2.1), and nothing but esses_widgets and esses_app
-#       links the docking library (esses::qtads, LGPL, D-026) directly; tests are not registered here.
+#   (4) the Qt layers link only their allowed Qt modules: esses_qtmodel Qt Core and Qt Gui (D-161: Qt Gui only
+#       for QUndoStack/QUndoCommand, which tools/check_layering.py enforces per header) and no Qt Widgets,
+#       OpenGL, Svg or PrintSupport, esses_qtrender and esses-render no Qt Widgets and no docking library
+#       anywhere in their link closure, no target Qt Concurrent or Qt Sql (D-031, 01 section 2.1), and nothing
+#       but esses_widgets and esses_app links the docking library (esses::qtads, LGPL, D-026) directly; tests are
+#       not registered here.
 include_guard(GLOBAL)
 
 # Short names (without ${ESSES_PREFIX}_) of the targets that must stay Qt-free whenever they are defined.
@@ -22,7 +24,7 @@ set(ESSES_QT_FREE_REQUIRED base units store model formats analysis maths project
 set(ESSES_DOCKING_LIBRARY_REGEX "ads::.*|${ESSES_NAMESPACE}::qtads|${ESSES_NAMESPACE}::ads|qt[0-9]*advanceddocking.*")
 # <short name>|<regex of forbidden link-closure entries> (01 section 2.2 rule 4).
 set(ESSES_QT_FORBIDDEN_LINKS
-    "qtmodel|^(Qt[0-9]*::(Gui|Widgets|OpenGL|OpenGLWidgets|Svg|SvgWidgets|PrintSupport)|${ESSES_DOCKING_LIBRARY_REGEX})$"
+    "qtmodel|^(Qt[0-9]*::(Widgets|OpenGL|OpenGLWidgets|Svg|SvgWidgets|PrintSupport)|${ESSES_DOCKING_LIBRARY_REGEX})$"
     "qtrender|^(Qt[0-9]*::(Widgets|OpenGLWidgets|SvgWidgets|PrintSupport)|${ESSES_DOCKING_LIBRARY_REGEX})$"
     "render|^(Qt[0-9]*::(Widgets|OpenGLWidgets|SvgWidgets|PrintSupport)|${ESSES_DOCKING_LIBRARY_REGEX})$"
     "*|^Qt[0-9]*::(Concurrent|Sql)$")

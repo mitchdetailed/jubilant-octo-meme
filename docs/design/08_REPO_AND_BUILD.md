@@ -107,7 +107,7 @@ libs/<name>/
 Rules enforced by the layer check in `esses_add_library()` (configure, §3.4), `tools/check_layering.py` (lint job) and `cmake/qt-free-check.cmake` (configure):
 
 1. `#include <esses/<other>/…>` is allowed only for `<other>` in the target's declared `DEPS`; the script parses `compile_commands.json` and include lines.
-2. Layers 0–3 (`base, units, store, model, formats, analysis, maths, project, plotcore, cli, capi, script`) carry the `ESSES_QT_FREE` target property; `qtmodel` may use `Qt6::Core` only; `qtrender` `Qt6::Gui`; `widgets`/`app` `Qt6::Widgets` + ADS (D-007).
+2. Layers 0–3 (`base, units, store, model, formats, analysis, maths, project, plotcore, cli, capi, script`) carry the `ESSES_QT_FREE` target property; `qtmodel` may use `Qt6::Core`, plus `Qt6::Gui` for `QUndoStack`/`QUndoCommand` only (D-161, `tools/check_layering.py` rule 6); `qtrender` `Qt6::Gui`; `widgets`/`app` `Qt6::Widgets` + ADS (D-007).
 3. `formats` never depends on `maths`, `analysis` or `project`; `analysis` never depends on `maths`; `maths` never depends on `project` or `formats`; `qtrender` never depends on `qtmodel` (outline §1.2). Same-layer edges allowed: `maths → analysis`, `project → analysis`, `project → maths` (01 §2.2).
 4. Strings below layer 4 are UTF-8 `std::string`; `QString` only in `qtmodel` and above (checked by the same grep as the Qt-free check).
 

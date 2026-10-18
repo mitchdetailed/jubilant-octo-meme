@@ -1,0 +1,49 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "table2d_nonuniform",
+  "expression": "'P'[m]",
+  "item": {
+    "kind": "table2d",
+    "axis": {
+      "unit": "m",
+      "breakpoints": [0, 5, 12, 30, 45]
+    },
+    "values": {
+      "unit": "",
+      "data": [1, 2, 4, 3, 10]
+    },
+    "interpolation": "linear",
+    "outOfRange": "clamp"
+  },
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Tables (Pro)",
+    "note": "breakpoints need not be evenly spaced"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 1200000,
+  "inputs": {
+    "P": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "m",
+      "values": [-5, 0, 5, 10, 15, 20, 27.5, 30, 35, 40, 45, 12]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [1, 1, 2, 3.42857142857, 3.83333333333, 3.55555555556, 3.13888888889, 3, 5.33333333333, 7.66666666667, 10, 4],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

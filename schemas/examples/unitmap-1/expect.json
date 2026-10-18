@@ -1,0 +1,18 @@
+{
+  "name-only-without-name.json": {
+    "pointer": "/rules/0",
+    "why": "a nameOnly rule names the channel"
+  },
+  "bad-match.json": {
+    "pointer": "/rules/0/match",
+    "why": "match is nameOnly, unitOnly or nameAndUnit"
+  },
+  "missing-rules.json": {
+    "pointer": "",
+    "why": "a unit map has rules"
+  },
+  "wrong-schema-id.json": {
+    "pointer": "/$schema",
+    "why": "the $schema id names another schema"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "err_unknown_function",
+  "expression": "smoth('X', 3)",
+  "provenance": {
+    "kind": "derived",
+    "ref": "03_MATHS_ENGINE.md 2.5",
+    "note": "E-UNKNOWN-FUNCTION with the nearest name"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 800000,
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [0, 1, 2, 3, 4, 5, 6, 7]
+    }
+  },
+  "expected": {
+    "error": {
+      "code": "E-UNKNOWN-FUNCTION"
+    }
+  }
+}

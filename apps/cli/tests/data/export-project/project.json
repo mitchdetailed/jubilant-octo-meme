@@ -1,0 +1,13 @@
+{
+  "$schema": "urn:esses:project-1",
+  "schemaVersion": 2,
+  "mathsOrder": ["user"],
+  "name": "Export",
+  "options": {
+    "maths": {
+      "compat": {
+        "unaryMinusAbovePower": false
+      }
+    }
+  }
+}

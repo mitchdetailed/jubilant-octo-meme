@@ -132,7 +132,8 @@ TEST_CASE("lookup: pressures, absolute by default, gauge and differential as Pre
         INFO(s);
         CHECK(reg.quantityOf(id(reg, s)) == abs);
     }
-    for (const char* s : {"kPa g", "kPag", "dKPA", "dkPa", "dbar", "dMPa", "psi g", "psig", "bar g"}) {
+    for (const char* s :
+         {"kPa g", "kPag", "dKPA", "dkPa", "dbar", "dMPa", "psi g", "psig", "bar g", "PSI (sg)"}) {
         INFO(s);
         CHECK(reg.quantityOf(id(reg, s)) == delta);
     }
@@ -179,6 +180,9 @@ TEST_CASE("lookup: conversions between units of one family", "[unit][lookup]") {
     CHECK(conv("Ah", "A.s")(1.0) == 3600.0);
     CHECK(conv("kWh", "MJ")(1.0) == Catch::Approx(3.6).epsilon(1e-15));
     CHECK(conv("km/l", "m/m3")(1.0) == Catch::Approx(1e6).epsilon(1e-15));
+    // Fuel consumption is the reciprocal of fuel economy, a quantity of its own (AC-M2-01 user maths).
+    CHECK(conv("L/100km", "m3/m")(5.0) == Catch::Approx(5e-8).epsilon(1e-15));
+    CHECK_FALSE(reg.converter(id(reg, "l/100km"), id(reg, "km/l")).ok());
     CHECK(conv("kg/l", "kg/m3")(0.75) == Catch::Approx(750.0).epsilon(1e-15));
     // Identity is exact.
     CHECK(conv("deg C", "deg C").identity());

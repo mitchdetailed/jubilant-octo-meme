@@ -46,7 +46,13 @@ WorksheetCanvas::WorksheetCanvas(QWidget* parent) : QWidget(parent), layoutTimer
     }
 }
 
-WorksheetCanvas::~WorksheetCanvas() = default;
+WorksheetCanvas::~WorksheetCanvas() {
+    // ~QWidget clears the focus of a canvas that has it and QApplication::focusChanged follows: by then this
+    // object is only a QWidget, so the slot must not run any more.
+    if (qApp != nullptr) {
+        disconnect(qApp, &QApplication::focusChanged, this, &WorksheetCanvas::onApplicationFocusChanged);
+    }
+}
 
 QRect WorksheetCanvas::placement(const project::Rect& f, const QRect& r) {
     const int x0 = r.x() + static_cast<int>(std::lround(f.l * r.width()));

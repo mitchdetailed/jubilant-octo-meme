@@ -1,0 +1,36 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "unit_tag_affine",
+  "expression": "'T'[deg C] * 2",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Expressions (Pro)",
+    "note": "affine conversion of an absolute temperature"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 400000,
+  "inputs": {
+    "T": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "K",
+      "values": [273.15, 283.15, 300, 373.15]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [-1.22070312045e-05, 19.999987793, 53.7, 199.999987793],
+    "tolerance": {
+      "abs": 0.0001,
+      "rel": 1e-06
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "bad-precision.json": {
+    "pointer": "/precision",
+    "why": "precision is single or double"
+  },
+  "constant-without-unit.json": {
+    "pointer": "/constants/0/value",
+    "why": "every persisted number carries its unit"
+  },
+  "enum-entry-not-integer.json": {
+    "pointer": "/enumerations/0/entries/0/value",
+    "why": "enumeration values are integers"
+  },
+  "expression-without-expr.json": {
+    "pointer": "/items/0",
+    "why": "an expression item has its expression"
+  },
+  "filter-without-window.json": {
+    "pointer": "/items/0",
+    "why": "a filter item has its window"
+  },
+  "item-unknown-member.json": {
+    "pointer": "/items/0",
+    "why": "items are closed (imported extras go to x-i2)"
+  },
+  "missing-id.json": {
+    "pointer": "",
+    "why": "a module has an id"
+  },
+  "name-with-quote.json": {
+    "pointer": "/items/0/name",
+    "why": "a channel name cannot contain a single quote"
+  },
+  "short-axis.json": {
+    "pointer": "/items/0/axis/breakpoints",
+    "why": "a table axis has at least two breakpoints"
+  },
+  "unknown-kind.json": {
+    "pointer": "/items/0/kind",
+    "why": "item kinds are the eight of 03 section 4.1"
+  },
+  "wrong-schema-id.json": {
+    "pointer": "/$schema",
+    "why": "the $schema id names another schema"
+  }
+}

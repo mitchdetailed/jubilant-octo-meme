@@ -25,6 +25,29 @@
 // the destructor). The document is <project>/.local/layout.json, or <config>/layout.json without a project.
 // A perspective that cannot be restored resets the docks with an info row in Messages.
 //
+// M2 wiring (libs/qtmodel/README.md "Wiring a workspace"; 06 sections 1, 2.1-2.2, 13.7, 16, 18): the
+// session's documents reach MathsService and SourceLoader (connectProjectSession), the selection reaches the
+// maths (connectMathsSelection), the user's text profiles are registered, a LapStretchService serves the
+// toolbar's data.lap_stretch_toggle, edit.undo / edit.redo (Edit menu and toolbar, "Undo <text>") act on the
+// session's QUndoStack, component edits from the canvas are WorkbookCommands and every document change (undo,
+// redo, recovery) re-syncs the workbook selector, the worksheet tabs and the shown worksheet; tools.options
+// opens the OptionsDialog (window-modal, geometry kept in layout.json); the SchemeSelector sits on the
+// toolbar when Options > Colours turns it on, a scheme change repaints every worksheet and restyles the
+// application palette, and "follow OS light/dark" follows QStyleHints. Opening a project with a journal shows
+// the RecoveryDialog (AC-M2-06) and only then starts SessionRestore (the -l logs, else the previous data,
+// then the selection; 06 section 18 steps 3-6). Leaving a project (exit, another project) saves it when it is
+// dirty and options.general.saveOnExit is on, else asks Save / Discard / Cancel (setExitPrompt replaces the
+// question); an exit with only view-state changes writes them (the last selection, the Data-window filters).
+// The M2 editors (06 sections 10 and 13; libs/widgets/README.md "M2 maths editors" and "M2 data editors"):
+// the MappingPanel sits above the worksheet area and shows itself while an open waits for it (the loader's
+// Mapping-panel hand-off is on, AC-M2-11); the Channel Status dock (tools.channel_status CTRL+U,
+// view.channel_status); the Maths Editor (tools.maths_editor CTRL+M, [module, item] opens it at the item),
+// the Channel Editor (tools.channel_editor CTRL+E) with its Aliases and Mappings editors (tools.aliases
+// [alias], tools.mappings [logged name]), the Details editor (tools.details CTRL+D) and the Lap Editor
+// (tools.lap_editor), each a modeless dialog created on first use with its geometry in layout.json;
+// cursor.insert_marker (SHIFT+F7, a beacon at the main cursor) and the nine channel.* rows of
+// ActiveChannelCommands (hints to the status bar; the editors' messages to Messages, origin Maths).
+//
 // Placement note: 01 section 2.1 and the outline put MainWindow in esses_app; 06 section 1 splits it
 // ("MainWindow building blocks" in esses_widgets, the assembly in esses_app) and 07 section 4.1 lists it
 // under esses_widgets. The class lives here so the tests/ui walkthrough can construct it; apps/app only
@@ -36,9 +59,12 @@
 #include <QMainWindow>
 #include <QString>
 #include <filesystem>
+#include <functional>
 #include <memory>
+#include <vector>
 
 class QComboBox;
+class QDialog;
 class QLabel;
 class QTabBar;
 class QToolBar;
@@ -49,10 +75,12 @@ class CommandRegistry;
 class DataSelectionModel;
 class DistanceService;
 class KeymapBinder;
+class LapStretchService;
 class MathsService;
 class MessagesModel;
 class ProjectSession;
 class RenderService;
+class SessionRestore;
 class SettingsStore;
 class SourceLoader;
 class WorksheetViewModel;
@@ -61,12 +89,22 @@ class WorkspaceViewModel;
 
 namespace esses::widgets {
 
+class ActiveChannelCommands;
+class ChannelEditor;
+class ChannelStatusWindow;
 class ChannelsWindow;
 class CommandActions;
 class DataWindow;
+class DetailsEditor;
 class DockHost;
 class KeyEventRouter;
+class LapEditor;
+class MappingPanel;
+class MathsEditor;
 class MessagesWindow;
+class OptionsDialog;
+class RecoveryDialog;
+class SchemeSelector;
 class ValuesWindow;
 class WorksheetCanvas;
 
@@ -80,8 +118,17 @@ public:
     // against the current directory.
     void openLog(const std::filesystem::path& path);
     // -w <project>: the project folder or its project.json. False (and an Error row in Messages) when it
-    // cannot be opened; the previous state stays.
-    bool openProject(const std::filesystem::path& folder);
+    // cannot be opened, or when leaving the open project was cancelled; the previous state stays. Once any
+    // recovery prompt is answered, `logs` (the -l arguments) are opened, else the project's previous data
+    // when options.general.loadPreviousData is on, and the last selection is restored (SessionRestore).
+    bool openProject(const std::filesystem::path& folder, std::vector<std::filesystem::path> logs = {});
+
+    // The answer to "Save changes to the project?" when a dirty project is left (exit or another project)
+    // with options.general.saveOnExit off (or its save failed). The default asks with a QMessageBox.
+    enum class ExitAnswer : int { Save, Discard, Cancel };
+    void setExitPrompt(std::function<ExitAnswer()> prompt);
+    // Saves or asks as above; false when the user cancelled (the project stays open).
+    bool confirmLeaveProject();
 
     // Session restore of the layout document (constructor and openProject call it).
     void restoreLayout();
@@ -125,6 +172,22 @@ public:
     QTabBar& worksheetTabs();
     QComboBox& workbookSelector();
     QToolBar& mainToolBar();
+    // M2: the lap-stretch service, the toolbar's scheme selector, the Options dialog (created on first use),
+    // the recovery prompt while it is open (else nullptr) and the session restore of steps 5-6.
+    qt::LapStretchService& lapStretch();
+    SchemeSelector& schemeSelector();
+    OptionsDialog& optionsDialog();
+    RecoveryDialog* recoveryDialog() const;
+    qt::SessionRestore& sessionRestore();
+    // M2 editors: the Mapping panel and the Channel Status window exist with the window; the dialogs are
+    // created on first use (by their command or by these accessors) and stay until the window closes.
+    MappingPanel& mappingPanel();
+    ChannelStatusWindow& channelStatusWindow();
+    MathsEditor& mathsEditor();
+    ChannelEditor& channelEditor();
+    LapEditor& lapEditor();
+    DetailsEditor& detailsEditor();
+    ActiveChannelCommands& activeChannelCommands();
     // Status-bar fields "t", "d", "lap", "dt", "dd".
     QLabel* statusField(const QString& name) const;
 
@@ -144,6 +207,15 @@ private:
     void rebuildWorksheets();
     void refreshWorkbookSelector();
     void updateTitle();
+    // M2
+    void syncDocuments();
+    void applyScheme();
+    void updateEditCommands();
+    void showRecoveryPrompt();
+    void startSessionRestore();
+    void showOptions();
+    void registerEditorCommands();
+    void showEditor(QDialog& dialog, const char* geometryKey);
     std::unique_ptr<Impl> impl_;
 };
 

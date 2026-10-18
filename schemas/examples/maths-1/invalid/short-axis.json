@@ -1,0 +1,20 @@
+{
+  "$schema": "urn:esses:maths-1",
+  "schemaVersion": 1,
+  "id": "user",
+  "items": [
+    {
+      "axis": {
+        "breakpoints": [0],
+        "expr": "'X'",
+        "unit": ""
+      },
+      "kind": "table2d",
+      "name": "T",
+      "values": {
+        "data": [1],
+        "unit": ""
+      }
+    }
+  ]
+}

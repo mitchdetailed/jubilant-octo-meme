@@ -1,12 +1,14 @@
 # esses_qtmodel
 
-Layer 4, Qt Core only (01 §2.1, 06 §1; D-017, D-018, D-030, D-031, D-123). The observable application model:
-the worker -> GUI bridge, the runtime, selection, view models, services and the item models of the M1 docks. All
-`QObject`s live on the GUI thread. Built only with `ESSES_BUILD_QT=ON`.
+Layer 4, Qt Core, plus Qt Gui for `QUndoStack`/`QUndoCommand` only (01 §2.1, 06 §1; D-017, D-018, D-030, D-031,
+D-123, D-161). The observable application model: the worker -> GUI bridge, the runtime, selection, view models,
+services, the item models of the docks, and (M2) the undo stack and its commands, the project's persistence and
+journal, the full `MathsService` with Channel Status, the Mapping-panel hand-off and lap stretching. All `QObject`s
+live on the GUI thread. Built only with `ESSES_BUILD_QT=ON`.
 
 Namespace `esses::qt` (01 §1); public headers in `include/esses/qtmodel/` (umbrella `qtmodel.hpp`). Links every
-Qt-free library and Qt Core; never Qt Gui or Qt Widgets (`cmake/qt-free-check.cmake` rule 4,
-`tools/check_layering.py`). Compiled with `QT_NO_KEYWORDS` (PUBLIC): write `Q_SIGNALS`, `Q_SLOTS`, `Q_EMIT`.
+Qt-free library, Qt Core and Qt Gui for `<QUndoStack>`/`<QUndoCommand>` only; never another Qt Gui header and
+never Qt Widgets (`cmake/qt-free-check.cmake` rule 4, `tools/check_layering.py` rule 6; D-161). Compiled with `QT_NO_KEYWORDS` (PUBLIC): write `Q_SIGNALS`, `Q_SLOTS`, `Q_EMIT`.
 Sources (`src/**`, `include/**`) are globbed with AUTOMOC; every `tests/**/tst_<name>.cpp` is one Qt Test
 executable (`ctest -R qtmodel.tst_`), run offscreen.
 
@@ -14,21 +16,26 @@ executable (`ctest -R qtmodel.tst_`), run offscreen.
 |---|---|---|
 | `dispatcher.hpp` | `Dispatcher` (`post(context, fn)`, `close`, `drain`, `assertGuiThread`) | 01 §5.3 rule 3 |
 | `app_runtime.hpp` | `AppRuntimeOptions`, `AppRuntime` (pool, cache, dispatcher, sinks; `shutdown`) | 01 §5.3 rule 11 |
-| `data_selection_model.hpp` | `FilterSpec`, `DataSelectionModel` (all D-017 slots, `Changes` flags, displayed order, filters, `selectionKeys`/`restore`) | 06 §5 |
+| `data_selection_model.hpp` | `FilterSpec`, `filterKindName`/`parseFilterKind`, `DataSelectionModel` (all D-017 slots, `Changes` flags, displayed order, filters persisted in project.json `dataWindow`, `lapNumbersError`, `filterRejected`, `selectionKeys`/`restore`) | 06 §5 |
 | `workspace_view_model.hpp` | `ZoomFraction`, `WorkspaceViewModel` (shared zoom/zoomDomain/zoomFrac, cursor, datum with visibility, active worksheet) | 04 §2.1, D-133 |
 | `worksheet_view_model.hpp` | `CursorSource`, `WorksheetViewModel` (`setDomain` F9 rules, `activate`, zoom/pan/cursor/datum/offsets/animation) | 06 §4.5, 04 §3.4, §8.5-8.6 |
 | `distance_service.hpp` | `DistanceState`, `DistanceService` (`index`, `chain`, `prefetch`, `forgetSource`) | 06 §4.5, D-134, D-140 (added) |
 | `render_service.hpp` | `ChannelRequest`, `componentChannels`, `RenderService` (`submitBuild` replace keys, `cancelPending`, `prepareInputs`) | 04 §6.3, 01 §5.4 |
-| `project_session.hpp` | `ProjectSession` (shipped defaults, project new/open/save with backups; no undo in M1) | 06 §1, 02 §6 |
-| `source_loader.hpp` | `SourceLoader` (async open pipeline, RuleRunner, built-in maths and distance registration, phase-2 annotations, `commitSidecar`), `connectSourceLoader` | 01 §4.1 |
-| `maths_service.hpp` | `MathsService` (built-in module per source, Background prefetch, `require`, settings schema) | 03 §1, D-016 |
+| `project_session.hpp` | `WorkbookSet`, `ProjectSession` (shipped defaults; every project document loaded, saved with D-070 backups and retired files; `undoStack()`, the channel documents, unit maps, maths modules, document setters, view state written without the stack, journal autosave and recovery) | 06 §1, 02 §6, D-172 |
+| `undo_commands.hpp` | the commands of every D-032 edit (workbooks, worksheets, components with the clipboard payload, channel documents, unit maps, modules, options, sidecar edits), `applyMappingDecision` | D-032, 02 §7, D-172 |
+| `source_loader.hpp` | `SourceLoader` (async open pipeline, RuleRunner, built-in maths and distance registration, phase-2 annotations, `commitSidecar`; M2: the Mapping-panel hand-off, step-4 channel documents, user text profiles, `setRangeStretch`), `connectSourceLoader` | 01 §4.1, 05 §2, §8.1 |
+| `maths_service.hpp` | `MathsService` (built-in modules per layer, the project's modules, local and transient maths, compat, resolver tables, selection, `require`, status per item, `invalidate`, `statusRows`, `check`), `connectMathsSelection` | 03 §1, §7, §11, D-016, D-173 |
+| `channel_status_model.hpp` | `ChannelStatusModel` (Channel Status rows, roles, coalesced refresh, `rowOf`) | 06 §10, D-173 |
+| `live_diagnostics.hpp` | `LiveDiagnostics` (the Maths Editor's 150 ms debounced check) | 03 §11 item 2 |
+| `lap_stretch_service.hpp` | `LapStretchService` (toggle, track length, per-lap factors, report) | D-016, D-174 |
+| `session_restore.hpp` | `connectProjectSession`, `SessionRestore` (previous data and the selection after a project opens) | 06 §18 steps 5-6 |
 | `command_registry.hpp` | `CommandContext`, `CommandSpec`, `CommandRegistry` (`setHandler`, `dumpJson`) | 06 §14.1 |
-| `builtin_commands.hpp` | `registerSelectionCommands`, `registerViewCommands` (data/zoom/pan/cursor/datum rows of hotkey batch 1) | 06 §14.4 (added) |
+| `builtin_commands.hpp` | `registerSelectionCommands`, `registerViewCommands` (data/zoom/pan/cursor/datum rows of hotkey batch 1), `registerEditCommands` (edit.undo/redo), `registerLapStretchCommand` | 06 §14.4 (added) |
 | `keymap_binder.hpp` | `KeyResolution`, `KeymapBinder` (`setKeymap`, `resolve`, `dispatch`, `keysFor`, `normalise`) | 06 §14.2 |
 | `settings_store.hpp` | `SettingsStore` (settings-1, dotted keys, coalesced atomic write, MRU) | 06 §18, 02 §6.9 |
 | `messages_model.hpp` | `Message`, `MessagesModel` (5,000-row cap, `appendImportLog`), `makeMessagesLogSink` | 06 §11, 01 §8.3 |
 | `data_window_model.hpp` | `DataWindowModel` (M, O, 1, Name, Time, Δ Fastest, Offset, Trusted, Local maths) | 06 §6 |
-| `channels_model.hpp` | `ChannelsModel` (source > category > channel, `filterAccepts`, `channelsMime`) | 06 §7 |
+| `channels_model.hpp` | `ChannelsModel` (source > category > channel with Alias and Project/Constants, the word-prefix search `filterAccepts`/`searchWords`, `channelsMime`) | 06 §7, D-175 |
 | `values_model.hpp` | `ValuesModel` (values at the cursor for Main and the reference overlay, `refresh`, `cellText`) | 06 §8, 04 §3.2 |
 
 ## Wiring a workspace
@@ -41,6 +48,15 @@ executable (`ctest -R qtmodel.tst_`), run offscreen.
 worksheet over the shared `WorkspaceViewModel` (call `activate()` on a worksheet switch);
 `registerSelectionCommands`/`registerViewCommands` on the `CommandRegistry`, then
 `keymap.setKeymap(session.keymap())`; `runtime.addSink(makeMessagesLogSink(messages, runtime.dispatcher()))`.
+M2 adds: `connectProjectSession(session, &maths, &loader)` (modules, compat, mappings, aliases, unit maps and the
+corrected-speed settings follow every document change; the session shares the maths unit table);
+`connectMathsSelection(selection, maths, &distance)`; `loader.setMappingHandOff(true)` with the `MappingPanel`
+on `mappingRequired` (it answers through `applyMappingDecision`); `loader.registerTextProfiles(dataDir,
+configDir)` before the first open; a `LapStretchService(loader, distance, units, &session)` with
+`registerLapStretchCommand`; `registerEditCommands(registry, session.undoStack())`; the recovery prompt through
+`session.setRecoveryPrompt` or `recoveryAvailable()`; after a project opens, `SessionRestore(session, loader,
+selection).start(logArguments)`. `connectSourceLoader` makes the Data window's trust edits undoable when the
+selection was built with the session.
 
 ## Threading
 
@@ -61,26 +77,35 @@ on a `ThreadRole::NoBlock` thread with a recording assertion handler (AC-M1-12).
 | `tst_dataselection` | every 06 §5.2 row with its `changed()` bits, compact renumbering, D-109, N/P without wrap in the filtered order, the TT 2485 candidate rule (out/in never), CTRL+ALT+F tolerance, trust through the sidecar, `sourceReplaced` (by id, by lap number, dropped), close, restore keys, filters, lap-number syntax, invariants over 2,000 random operations |
 | `tst_worksheetviewmodel` | F9 through the Main lap's DistanceIndex and back within one sample, the fraction rule and the banner without Corr Dist (AC-M1-09), N/P zoom and cursor in both domains, W, Z, F2, zoom limits, pan clamping, cursor steps and edges, datum, animation (Cursor-only), the shared view across worksheets, offsets |
 | `tst_maths_distance` | Background prefetch observed in the pool's band (AC-M1-10), the settings schema examples, E-CSD-SETTINGS, no speed -> NoDistance, versions kept across a sidecar snapshot (D-140), enable/disable, the per-lap index (AC-M1-08 through the service), outing chains, the no-blocking path |
-| `tst_source_loader` | open/publish of a written .ld + .ldx, Import Log, maths and distance without a request, phase-2 stint annotation, a second open, failures to Messages, trust through `commitSidecar` read back on reopen, close, the no-blocking path, and the public ACC stand-in when its input is generated |
+| `tst_source_loader` | open/publish of a written .ld + .ldx, Import Log, maths and distance without a request, phase-2 stint annotation, a second open, failures to Messages, trust through `commitSidecar` read back on reopen, close, the no-blocking path, and the public ACC stand-in when its input is generated; D-190: sidecar writes coalesced on a Background task and flushed on close, `closeAll()` cancelling an open in flight |
 | `tst_project_session` | shipped defaults, user keymap and scheme, the new-project layout, save/reopen with D-070 backups, skipped workbooks, recent sources, the options the selection reads |
 | `tst_settings_messages` | settings-1 defaults, dotted keys, coalesced write, unknown members, MRU caps, load errors; the Messages cap, first error, Import Log rows, the Log sink |
 | `tst_commands_keymap` | registry semantics, the shipped keymap without conflicts, focus-chain resolution, normalisation, rejected rows, facade commands equal to their keymap rows, every qtmodel-bound batch-1 key driving its post-condition |
 | `tst_render_items` | replace-key delivery and `cancelPending`, `componentChannels`, `prepareInputs` feeding `TimeDistanceBuilder::buildStatic`, the Data window tree, the Channels tree, the Values rows of Main and Overlay 1 in both domains |
 
+| `tst_undo_contract` | `QUndoStack` under `QCoreApplication`, document commands, merge, worksheet move (the M2 contract) |
+| `tst_undo_property` | AC-M2-09: 30 randomised sequences (seed `ESSES_TEST_SEED`) of every command kind, undo and redo, equal to an independent replay after every step; undo-all and redo-all; view-state operations (selection, zoom, cursor, F9, filters, the stretch toggle) never on the stack; file open/close not on the stack |
+| `tst_project_recovery` | every document saved and reopened, renamed/removed files retired, unreadable files kept, autosave writing only changed documents and never project files, the kill-and-recover path of AC-M2-06, the prompt's three answers, the timer, the selection, single-colour state and filters restored through `SessionRestore`; D-187 and D-190: a failed or killed save recovers without false conflicts, a journal holding only saved content is not offered, a failed backup copy keeps the save, the prompt's replay is the one recovered, `saveMathsModules` leaves other edits unsaved |
+| `tst_maths_service` | modules defined with only the edited cone re-versioned (AC-M2-04 through the service), every 03 §7.3 state, Recalculate, compat, mappings, local maths (explicit and from the sidecar), transient maths, GPS corrections, the live check and `LiveDiagnostics`, `connectProjectSession`, Channel Status rows with every trace kind and "(missing)" references (AC-M2-12) |
+| `tst_mapping_handoff` | AC-M2-11 at the model level: two unknown units wait for the panel, the decision as an undoable macro, the saved unit map applied silently to the next file, Cancel, Open anyway, headless opens, user text profiles; D-190: a project change cancels the opens in flight and those waiting for the panel |
+| `tst_filters_search` | the lap-number syntax and its messages, filters persisted by source hash with the default and the apply-to-all flag, the word-prefix search, the Channels tree's Alias and Constants |
+| `tst_lap_stretch` | factors within the tolerance published and cleared by the toggle (view state), the tolerance as an undoable options edit, `Venue Length` as the track length, the report, `edit.undo`/`edit.redo` |
+
 `tests/qtmodel_test_support.*` builds synthetic circuit sources in memory (out lap, flying laps, in lap; wheel
-speeds whose integral is exactly the track length) and writes them as .ld + .ldx through the motec.ld writer.
+speeds whose integral is exactly the track length, optionally scaled per lap; optional GPS channels, a renamed
+throttle, a `Venue Length` detail) and writes them as .ld + .ldx through the motec.ld writer.
 
 ## Deviations from the design text and open issues
 
 - `CommandSpec::defaultKeys` is a `QStringList` of portable key text and `CommandRegistry::action(id)` lives in
   `esses_widgets` (`widgets::CommandActions`): `QKeySequence` and `QAction` are Qt Gui types in Qt 6 and this
-  library links Qt Core only (01 §2.2 rule 4). Likewise `KeymapBinder` holds the table and resolution; the
+  library uses no Qt Gui class but the undo framework (01 §2.2 rule 4, D-161). Likewise `KeymapBinder` holds the table and resolution; the
   `QKeyEvent` filter is `widgets::KeyEventRouter`.
 - `DataSelectionModel` takes a nullable `ProjectSession*` (06: `ProjectSession&`) for testability; with a
   session it reads `options.fastLapTolerancePct` and `options.general.selectFastestOnLoad` and keeps
-  `lastSelection` current. `setTrusted` hands the edited sidecar to a `SidecarCommit` hook
-  (`SourceLoader::commitSidecar`); no undo before M2. Data-window filters are per session in M1 (persisted in
-  `project.json` `dataWindow` with the M2 filter UI).
+  `lastSelection` current. `setTrusted` hands the edited sidecar to a `SidecarCommit` hook; `connectSourceLoader`
+  makes it an undoable `SidecarCommand` on the session's stack (M2, D-172). Data-window filters are persisted in
+  `project.json` `dataWindow` (M2; per session in M1).
 - One shared view per workspace (D-133): only the active worksheet converts the shared cursor and datum on a
   Main change and the shared zoom on F9; an inactive worksheet shows the shared zoom converted on the fly. N/P
   keep the zoom span (relative to the range start) and recompute `zoomFrac` for the new Main extent.
@@ -109,8 +134,9 @@ speeds whose integral is exactly the track length) and writes them as .ld + .ldx
   `ValuesModel` recomputes every row on refresh and retries every 50 ms while a cell waits for data.
 - `DistanceService` is declared here: 06 §4.5 names it as a `WorksheetViewModel` constructor argument without
   declaring it.
-- Open issue for M2: `ProjectSession`'s `QUndoStack` (D-032) is a Qt Gui class in Qt 6, so it cannot live in this
-  Qt-Core-only library as 06 §1 places it; M2 must either move the undo stack to `esses_widgets` or use a small
+- Resolved in M2 by D-161: `ProjectSession`'s `QUndoStack` (D-032) is a Qt Gui class in Qt 6; this library now
+  links Qt Gui and may include `<QUndoStack>`/`<QUndoCommand>` and no other Qt Gui header (`tools/check_layering.py`
+  rule 6). The M1 note read: M2 must either move the undo stack to `esses_widgets` or use a small
   Qt-Core command stack here.
 - `AppRuntime` restores the constructing thread's previous `ThreadRole` on `shutdown()` (several runtimes in one
   test process) and adds `removeSink` (a window removes its Messages sink when it closes). The Messages log sink
@@ -137,3 +163,75 @@ speeds whose integral is exactly the track length) and writes them as .ld + .ldx
   default channel lists named, so it had no Corr Speed and distance mode showed the banner. The module's
   default `alternateList` now ends with `"Speed"` (case-insensitive: `SPEED`), see `libs/maths/README.md`;
   `tst_source_loader` asserts the distance state Ready on that file.
+
+## M2 as built (07 §5.1; `docs/milestones/M2.md`; D-161, D-172 to D-175)
+
+Qt modules: Qt Core, plus Qt Gui for `QUndoStack`/`QUndoCommand` only (D-161). The M2 work lives in three source
+roots beside the M1 files it extends (`project_session.cpp`, `maths_service.cpp`, `source_loader.cpp`,
+`data_selection_model.cpp`, `channels_model.cpp`, `distance_service.cpp`, `builtin_commands.cpp`):
+
+| Root | Contents | Design |
+|---|---|---|
+| `src/undo/` | the commands and `applyMappingDecision` (`undo_commands.cpp`); `ProjectSession`'s setters, view-state writes, journal, recovery and autosave timer (`project_session_m2.cpp`) | D-032, 02 §6.8, §7, D-172 |
+| `src/maths/` | `MathsService::Impl` (`maths_service_impl.hpp`), the M2 members and the live-check scope (`maths_service_m2.cpp`), `ChannelStatusModel`, `LiveDiagnostics` | 03 §4.2-4.3, §7, §11, 06 §10, D-173 |
+| `src/loader/` | the Mapping-panel hand-off, text profiles and `setRangeStretch` (`source_loader_m2.cpp`), `LapStretchService`, `connectProjectSession` and `SessionRestore` | 05 §2, §8.1, 06 §13.8, §18, D-174 |
+
+No `M2-STUB` is left in this library.
+
+### Deviations of M2 from the design text
+
+- Undo and persistence (D-172): commands hold whole documents; undone options edits keep the view state
+  (`lastSelection`, `recentSources`, `dataWindow`, `options.lapStretch.enabled`) and the members other documents own
+  (`workbooks`, `mathsOrder`); the F9 domain stays view state (D-032 over 02 §7); the workbook list is a document
+  (`WorkbookSet`); the Data window's trust edits are `SidecarCommand`s pushed by `connectSourceLoader`'s hook; a
+  Mapping-panel decision is one "Resolve mapping" macro; `isDirty()` follows the stack's clean index except after a
+  recovery or a migration. Save writes changed documents only, retires files the project no longer names to
+  `backup/` (never a file a case-only rename writes again), never writes over an unreadable document, journals
+  what it is about to write first and clears this session's journal only after every write succeeded; autosave
+  writes nothing for an unchanged set, journals this session's edits beside a deferred recovery (Later), and
+  Recover adopts the replayed journal as this session's own (D-187); `discardSessionJournal` drops this session's
+  journal when the project is left without saving. Track-map
+  section edits (M3) and scheme edits (v1.0) get their commands with their documents.
+- `MathsService` (D-173): `esses.gps_corrections` is registered for a layer that logs both GPS inputs; local maths
+  is the sidecar's `localMaths`, re-read on every snapshot (`setLocalModule` overrides it); the live check resolves
+  the Main source's maths outputs, logged channels through the project's mappings and aliases, details and the
+  global constants; `channelReady` fires once per (output, version), also for upstream nodes applied with a
+  completion; `require()` announces Pending -> Evaluating. Additions: `setResolverTables`, `setSelectionDistances`,
+  `mathSelection`, `modules`, `compat`, `sources`, `gpsCorrectionsModule`.
+- Channel Status (D-173): kinds beyond 06 §10 for the other item kinds and "Reference" for missing workbook
+  references; mappings no open source uses are one "Project" row; refreshes keep the rows (`dataChanged`) when
+  their identities hold.
+- Lap stretching (D-174): `LapStretchService` (an addition) publishes `Range::stretch` from the laps' unstretched
+  indexes and the source's track length (explicit, else `Venue Length`); `DistanceService` copies an index whose key
+  differs only by the stretch; the toggle is view state.
+- Search (D-175): the query is split like the names; loose matching is a substring test per word, still in order.
+- Data-window filters are view state persisted in `project.json` `dataWindow` (D-162 keys) and restored when a
+  project opens and when a source publishes; a lap-number filter that does not parse is refused with
+  `filterRejected` (the previous one stays).
+- The hand-off's registry and unit table are kept alive by the continuation until the result reaches the GUI
+  thread (task A and the skeleton borrow them); Import Log rows `open.mapping_resolved` and `open.mapping_cancelled`
+  record the panel's outcome; `registerTextProfiles` registers the user's profiles (the shipped ones are built in,
+  D-168) and refuses to touch the registry while an open is in flight.
+- `SessionRestore` waits for the opens and for any pending Mapping panel, then calls `DataSelectionModel::restore`
+  with the `lastSelection` captured at `start()` (every selection change rewrites it).
+- D-190: `ProjectSession::saveMathsModules` (the Maths Editor's save on close: modules and their order only, the other
+  edits stay unsaved and journalled); Save writes `project.json` only after every other document; the open's
+  journal replay is reused by the prompt and Recover, and a journal holding only saved content is deleted at open;
+  autosave builds entries only for a changed set (its write stays on the GUI thread: open issue). `SourceLoader`
+  cancels opens (`cancelOpens()`, called by `closeAll()` and, through `connectProjectSession`, on a project change;
+  `open.cancelled`, `open.mapping_cancelled`) and writes sidecars from a Background task 500 ms after the first
+  edit (a per-source generation keeps the newest; flushed on close and destruction; `sidecar.write_failed`), so
+  `commitSidecar` no longer returns Io.
+
+### Open issues
+
+- The shell adopts the M2 wiring above (`libs/widgets/README.md`, D-178) except the Mapping-panel hand-off, which
+  stays off until the shell has the `MappingPanel` (unknown units then open unitless).
+- `RenderService` resolves channels through the source's own `ChannelResolver` without the project's mappings and
+  aliases (its M1 note); the Channels tree and Channel Status use them.
+- The keymap rows `edit.undo`, `edit.redo` and `data.lap_stretch_toggle` are `implemented` with their
+  `KEYMAP_TEST` rows (rows of the milestone in progress may be, `tools/check_keymap_coverage.py`, D-178).
+- The Channels tree has no Details or Mapped category yet; enumerated maths outputs show numbers (maths open
+  issue 11).
+- Autosave and save serialise and write on the GUI thread (D-190 (d)): a background journal writer needs an
+  asynchronous save first, since the save's write-ahead must land before its writes.

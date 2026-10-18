@@ -6,6 +6,7 @@
 #include <esses/base/json_depth.hpp>
 #include <esses/base/json_doc.hpp>
 #include <esses/base/json_nlohmann.hpp>
+#include <esses/base/read_file.hpp>
 #include <esses/base/utf8.hpp>
 
 #include <nlohmann/json.hpp>
@@ -16,9 +17,6 @@
 #include <cmath>
 #include <cstdint>
 #include <exception>
-#include <fstream>
-#include <ios>
-#include <iterator>
 #include <limits>
 #include <new>
 #include <string>
@@ -323,22 +321,7 @@ Result<json> parseJson(std::string_view text) {
 }
 
 Result<std::string> readFile(const std::filesystem::path& path) {
-    ErrorContext ctx;
-    ctx.path = path;
-    std::ifstream in(path, std::ios::binary);
-    if (!in) {
-        return fail(ErrorCode::Io, "cannot open '" + path.generic_string() + "'", std::move(ctx));
-    }
-    try {
-        std::string text{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-        if (in.bad()) {
-            return fail(ErrorCode::Io, "cannot read '" + path.generic_string() + "'", std::move(ctx));
-        }
-        return text;
-    } catch (const std::bad_alloc&) {
-        return fail(ErrorCode::OutOfMemory, "out of memory reading '" + path.generic_string() + "'",
-                    std::move(ctx));
-    }
+    return readWholeFile(path);
 }
 
 Result<JsonDoc> toDoc(const json& value) {

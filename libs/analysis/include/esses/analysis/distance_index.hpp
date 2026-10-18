@@ -77,6 +77,9 @@ public:
     SampleIdx indexAt(double d, Rate rate) const noexcept; // sample index from the lap start
     double lengthM() const noexcept { return lengthM_; }   // the maximum distance reached in the lap
     double stretch() const noexcept { return key_.stretch; }
+    // Sets the lap-stretch scalar (LapStretch::apply). It is part of the key (D-140) and scales nothing here:
+    // distAt/timeAt stay unstretched and DistanceChain multiplies. Only before the index is published.
+    void setStretch(double value) noexcept { key_.stretch = value; }
     Micros lapStart() const noexcept { return key_.start; }
     Micros lapEnd() const noexcept { return key_.end; }
     std::size_t steps() const noexcept { return tAtD_.size(); }

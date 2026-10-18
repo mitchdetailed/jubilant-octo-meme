@@ -7,7 +7,8 @@
 #   MSVC   preset win-msvc-fuzz (VS 2022, x64): /fsanitize=fuzzer on the targets, the /fsanitize-coverage
 #          instrumentation on everything else, ASan.
 # Seeds: tools/fuzz_seeds.py builds them from the synthetic fixture inputs (and the user's files when present);
-# the .ldx target has a dictionary of the format's tags and attributes.
+# the .ldx target has a dictionary of the format's tags and attributes; the text targets one of delimiters,
+# sentinels and header words.
 
 function(_esses_add_fuzz_target name)
   cmake_parse_arguments(A "" "" "SOURCES;DEPS;INCLUDES" ${ARGN})
@@ -32,3 +33,15 @@ _esses_add_fuzz_target(fuzz_ld_header SOURCES fuzz_ld_header.cpp DEPS ${ESSES_NA
 _esses_add_fuzz_target(fuzz_ldx SOURCES fuzz_ldx.cpp DEPS ${ESSES_NAMESPACE}::formats
                        INCLUDES "${CMAKE_SOURCE_DIR}/libs/formats/src")
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/ldx.dict" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/fuzz_ldx.dict" COPYONLY)
+# M2 text importers (05 section 9.3 text_sniff and text_profile, AC-M2-13): the shipped profiles through the public
+# API; seeds are the committed text fixtures (tools/fuzz_seeds.py --text-fixtures), the dictionary their tokens.
+_esses_add_fuzz_target(fuzz_csv_sniff SOURCES fuzz_csv_sniff.cpp DEPS ${ESSES_NAMESPACE}::formats)
+_esses_add_fuzz_target(fuzz_text_profile SOURCES fuzz_text_profile.cpp DEPS ${ESSES_NAMESPACE}::formats)
+foreach(_t fuzz_csv_sniff fuzz_text_profile)
+  configure_file("${CMAKE_CURRENT_SOURCE_DIR}/text.dict" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${_t}.dict" COPYONLY)
+endforeach()
+
+# The maths language (03 section 14.3): Parser::parse, print round trip, TypeChecker and compile().
+_esses_add_fuzz_target(fuzz_maths_parser SOURCES fuzz_maths_parser.cpp DEPS ${ESSES_NAMESPACE}::maths)
+target_compile_definitions(fuzz_maths_parser PRIVATE "ESSES_FUZZ_UNITS_JSON=\"${CMAKE_SOURCE_DIR}/data/units.json\"")
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/maths.dict" "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/fuzz_maths_parser.dict" COPYONLY)

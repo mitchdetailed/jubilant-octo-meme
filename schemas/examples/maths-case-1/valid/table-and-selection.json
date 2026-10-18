@@ -1,0 +1,99 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "table_with_selection",
+  "expression": "'P'[m]",
+  "item": {
+    "kind": "table2d",
+    "axis": {
+      "unit": "m",
+      "breakpoints": [0, 10, 20]
+    },
+    "values": {
+      "unit": "N",
+      "data": [0, 5, 7]
+    },
+    "interpolation": "previous",
+    "outOfRange": "invalid"
+  },
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Tables (Pro)",
+    "note": "previous lookup"
+  },
+  "rate": {
+    "num": 10,
+    "den": 1
+  },
+  "compat": {
+    "unaryMinusAbovePower": true
+  },
+  "precision": "double",
+  "resultUnit": "N",
+  "durationUs": 400000,
+  "inputs": {
+    "P": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "m",
+      "values": [-1, 5, 10, 25],
+      "interp": "previous",
+      "dtype": "f64"
+    }
+  },
+  "constants": {
+    "Gain": {
+      "v": 2,
+      "unit": ""
+    }
+  },
+  "details": {
+    "Driver": {
+      "text": "Joe"
+    },
+    "Vehicle Wheelbase": {
+      "v": 2.7,
+      "unit": "m"
+    }
+  },
+  "ranges": {
+    "Outings": [
+      {
+        "startUs": 0,
+        "endUs": 400000
+      }
+    ],
+    "Outings:Laps": [
+      {
+        "startUs": 0,
+        "endUs": 200000
+      },
+      {
+        "startUs": 200000,
+        "endUs": 400000
+      }
+    ]
+  },
+  "selection": {
+    "main": {
+      "range": "Outings:Laps/2",
+      "offsetUs": 1000,
+      "offsetM": 0.5,
+      "stretch": 1.01
+    },
+    "reference": "Outings:Laps/1"
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [null, 0, 5, null],
+    "tolerance": {
+      "abs": 0,
+      "rel": 1e-09
+    }
+  }
+}

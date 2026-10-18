@@ -2,6 +2,345 @@
 
 All notable changes are recorded here, newest first. The project follows semantic versioning from 0.1.
 
+## Unreleased (M2)
+
+- The task-pool tests declare their `Gate`s and the other locals their tasks reference before the `TaskPool`,
+  so the pool joins its workers before those locals go out of scope, and `Gate::open()` notifies under its lock
+  (ASan stack-use-after-scope in `base.taskpool: tryRunInline runs a queued task on the caller` on the Linux
+  ASan job; test-only).
+
+- Task-pool, test-output and source-loader fixes (pull request 2). A share-key `TaskPool::submit` no longer joins a
+  task whose `Future` is already ready: the worker drops the key a moment after it publishes the result, and a
+  submit in that moment got the old result without a run (MathGraph's Recalculate re-evaluation, and timed runs
+  of the maths bench that skipped evaluations); it now starts a task of its own (01 §5.4 rule 1). A requester
+  that registers just after a share task latched its cancellation gets a task of its own too, instead of a
+  Cancelled result. Qt tests run with `QT_FORCE_STDERR_LOGGING=1` (`ESSES_QT_TEST_ENVIRONMENT`), so their output
+  reaches ctest on Windows, where Qt Test otherwise writes to `OutputDebugString` when the process has no
+  console. `SourceLoader` emits `sourcePublished()` before the distance prefetch, so `channelReady()` never
+  precedes the source it belongs to (a trust edit made in reply was dropped); regression test
+  `qtmodel.tst_source_loader` `noChannelIsAnnouncedBeforeItsSource`, and `tst_source_loader` waits on conditions
+  instead of fixed times. Test: `base.taskpool: a share key submitted once the task's Future is ready starts a
+  new task`.
+
+- Reads are no longer refused while `AtomicFile` replaces the file (Windows). `readWholeFile` read through a
+  `std::ifstream`, which does not share delete access, and `AtomicFile` renamed its temporary into place
+  through its writing handle (write access, no sharing), closed a moment after the rename: a read in that moment
+  failed with a sharing violation (about one in ten reads while another thread replaced the file in a loop),
+  and an open stream made the rename itself fail. `readWholeFile` and the new `readFileHead(path, maxBytes,
+  what)` now open with `CreateFileW` sharing read, write and delete access and read with `ReadFile` (the POSIX
+  path and every error are unchanged). `AtomicFile` writes through a handle that shares read and delete access
+  and renames through a second handle with delete access only, so `MappedFile` (which never shares write
+  access) is not refused either; a rename refused with `ERROR_ACCESS_DENIED` or `ERROR_SHARING_VIOLATION`
+  (a few in a thousand while other threads open the target) is retried for up to 500 ms before the `MoveFileExW`
+  fallback. While the rename is under way the target's name can be missing (gaps of about 10 ms measured, and
+  renames of up to 200 ms on a loaded machine), so `readWholeFile`, `readFileHead` and `MappedFile::open` look
+  again for up to 500 ms when a file is not found or is being deleted; a sharing violation is still reported at
+  once. `ImporterRegistry::sniff(path)` reads its 64 KiB head through `readFileHead`, and `tst_source_loader`
+  reads the sidecar through `readWholeFile`. Regression tests, each holding the handle states of the moment
+  after the rename still and then replacing the file again and again, with no failed read or open allowed:
+  `base.read file: a document that AtomicFile replaces reads whole at every instant` (also an open reader that
+  does not keep a replacement out; 500 reads straight after a write, then at least 2000 reads against a writer
+  thread), `base.atomic file: a mapped reader opens the file at every instant of a replacement` (at least 2000
+  opens against a writer thread) and `formats.registry: sniff reads a log through the handles of an atomic
+  replacement` (200 sniffs straight after a write); the first fails against the previous reader and against the
+  previous writer, the second against the previous writer, the third against the previous sniff.
+
+- One whole-file reader for documents (pull request 2, the macOS `core` job). The four directory regression tests
+  of the previous entry failed on macOS: libc++ opens a directory as a stream and reads it as an empty file, with
+  no error and no exception (libstdc++ throws `std::ios_base::failure` with EISDIR, MSVC refuses the open), so
+  the readers returned empty text and the failure surfaced later as Format, or, in `saveWithBackup`, an empty
+  "previous version" was copied to `backup/` before the replacement failed. `esses_base` gains
+  `readWholeFile(path, what)` and `requireRegularFile(path, what)` (`read_file.hpp`): the file type is checked
+  with `std::filesystem::status` before anything is opened (a directory, device, FIFO or socket is Io "... is
+  not a regular file", a missing file Io "cannot open ..."), the file is read in binary mode through
+  `istream::read`, which turns a failed read into badbit instead of letting it escape, and no exception leaves
+  the call. The seven copies of the old read (`jsonio::readFile`, the settings schemas of the two built-in maths
+  modules, the sidecar, the unit table, the project session's document reads, `esses-cli`'s `readFile`) now
+  call it with their own names in the messages, and `saveWithBackup` refuses a target that exists but is not a
+  regular file before it creates `backup/`. The two other reads of document input that met the same platform
+  difference check the type too: `esses-cli`'s `sha256File` (fixture verification hashed a directory as an
+  empty file on macOS) and `ImporterRegistry::sniff(path)` (a directory read as an empty head on POSIX and was
+  offered to the importers by its extension; Io on Windows). Tests: `base.read file: ...` (regular, empty,
+  missing, directory, and a file that cannot be opened: held without sharing on Windows, without read
+  permission on POSIX) and a directory case in `formats.registry: sniff confidence bands and companions`; the
+  four regression tests are unchanged.
+
+- Fixes for the first CI run of the public repository (pull request 2). `bench.maths_bench.smoke` aborted on
+  Linux with "ChunkCache destroyed while Columns still use it": the readiness block of `esses-maths-bench` (and
+  its `--digest` mode) declared the `TaskPool` before the `ChunkCache`, so the cache was destroyed first, while a
+  worker could still hold the shared state of the task it had just run, and through it the result's `Column`
+  (a worker publishes a result, wakes the requester, then runs the continuations and completes the task). The
+  cache is now declared before the pool, which joins its workers before the cache goes; the other benchmarks,
+  the tests' runtimes and `AppRuntime` already had that order. Linux's scheduler tends to run the woken
+  requester at once and preempt the worker inside that window; Windows usually wakes it on another processor,
+  but the abort reproduces there with the benchmark pinned to one logical processor. The same pinned runs
+  showed a second race: a timed run's fresh graph could join the warm-up run's still-completing task of the
+  same key and skip an evaluation ("expected one evaluation per output"); each run now starts once the pool
+  has completed every task. Regression test `maths.math graph teardown: ...` holds a worker inside the window
+  and checks that the cache keeps the result's chunks until the pool has joined. A save over a directory
+  standing where a document belongs (`qtmodel.tst_project_recovery`) threw `std::ios_base::failure` on Linux:
+  libstdc++'s file buffer throws a failed read (POSIX opens a directory, the read fails with EISDIR) whatever
+  the stream's exception mask, and `istreambuf_iterator` lets it through. `jsonio::readFile` (the save, backup
+  and journal path) returns Io instead, as do the other whole-file readers (sidecar, unit table, the settings
+  schemas of the built-in maths modules, the project session's document reads, `esses-cli`); regression tests
+  in `base`, `project`, `model` and `units`. `SchemeSelector::applySystemScheme(Qt::ColorScheme)` applies the
+  scheme the OS reports, and the shell passes the one `QStyleHints::colorSchemeChanged` carries;
+  `widgets.tst_scheme_selector` drives light, dark and Unknown through it on every Qt version, and checks a
+  Qt 6.8 `QStyleHints::setColorScheme()` request against what the platform theme then reports (the old check
+  expected the request to take effect, which the offscreen platform of Qt 6.12 does not do; on Qt 6.7 it was
+  compiled out). clang-tidy 19 (the `lint` job): the 25 findings are fixed without NOLINT (unchecked
+  `std::optional` access in the maths graph, compiler and kernels and in the text importer, a `std::string`
+  parameter taken by value, two optional-to-value-to-optional conversions), and the run over every Qt-free
+  translation unit is clean.
+
+- Review fixes in `esses-cli` (AC-M2-01, AC-M2-08, AC-M2-14; D-008). `eval --rate` and `export --rate` are exact:
+  each of `<Hz>`, `<num>` and `<den>` is an unsigned decimal with an optional fraction and exponent, converted
+  exactly and reduced (`20.5/1` is 41/2 Hz, which was truncated to 20 Hz; `33.3333` is 333333/10000, which was
+  rounded to thousandths); a sign, a zero, a non-number or a num or den beyond 32 bits once reduced is exit 2 with
+  the reason, and `export` checks its `--rate` before opening the log. `maths check` reports a module's condition
+  as a row of its own whatever the module holds (with the graph's `E-CONDITION` when it refuses the condition) and
+  counts it: its codes and parse errors in the summary, a condition in error as a module error and exit 1 (a
+  module with only a built-in item and a broken condition checked as 0 errors, exit 0); a built-in module that
+  fails to register is a module error too, and the text summary ends with the module errors. `validate` reads a
+  `$schema` major without `std::stoi`: a major beyond the integer range made the whole batch stop with "internal
+  error: stoi" and is now that document's newer-major error; the newer-major search lists the schema folder once
+  instead of probing every number below the major (`project-2147483647` took billions of file checks); a
+  `schemaVersion` beyond the integer range is newer than any instead of wrapping round. The other `std::stoi`
+  calls on document input are gone: `SchemaRegistry::schemaOf` and the text importer's header rows
+  (`TextProfile::toJson` and the analysis return Invalid for a row that is not a number instead of throwing).
+
+- Fixes from the verification of D-190 (AC-M2-06): a save that fails part-way no longer moves the files of
+  renamed or removed workbooks, unit maps and modules to `backup/` (until a save succeeds, `project.json` on disk
+  still names them); an autosave whose journal file another instance deleted (a Discard on its recovery prompt)
+  writes it again instead of skipping its unchanged edits (`Journal::ownFileExists`); clearing the journal deletes
+  only the files it listed, never one another session writes meanwhile. Tests: the guarded-lines text-scan test,
+  the maths module save test and the CLI `maths check` tests used fixed folders under the system temporary
+  directory and failed when several processes ran them at once; each now creates a folder of its own. D-190 is
+  listed in the Addendum A index of `DECISIONS.md`.
+
+- Maths evaluation speed (D-191; AC-M2-10): the 20 maths channels of the RW-2 readiness set are ready in 28-29 ms
+  instead of 113-127 ms on this machine (the two-frame budget, 33.3 ms, is met; D-183 is no longer needed), with
+  every result unchanged bit for bit. The evaluator streams each plan through the extent in pieces of 16,384
+  samples instead of whole-extent buffers, an expression channel's chunks are written and sealed as they are
+  produced, and idle workers seal a channel's later chunks, so one channel alone is ready several times sooner
+  (`derivative(smooth(...))` over 1.8 M samples: 64 ms before, about 3 ms now). Smooth, the two-point derivative,
+  the RC filters, the elementwise loads and the chunk writes lost their per-sample overheads;
+  `filter_lp(x, 5, -2)` over 21.6 M samples takes 225-234 ms instead of about 400 ms. `esses-maths-bench` adds
+  `--digest` (a fingerprint of every result, to check that an evaluation change leaves results unchanged) and
+  `--workers N`. CI: the `lint` job may run 45 minutes (its clang-tidy build was cancelled at 20).
+
+- M2 review fixes, the last fourteen findings (D-190; AC-M2-06, AC-M2-11, AC-M2-13): a save that fails or is
+  killed part-way no longer reports false conflicts at recovery (an entry whose file already holds it is not
+  replayed, and a journal holding nothing else is deleted without a prompt), `project.json` is written only after
+  every other document, clearing the whole journal is one folder rename and partial clears delete oldest first,
+  journal files carry their session (`<seq>-<tag>.json`) so two sessions never replace each other's file, and the
+  backup copy of a document is made before the document is replaced (a failed copy is reported, the save stands).
+  Closing the Maths Editor saves the maths modules and their order only, leaving the project's other edits unsaved,
+  undoable and journalled. Text files: a first line over 1 MiB is a Format error at once and rows are split only
+  into the cells they can use (a hostile line no longer costs a cell per delimiter); sparse timestamped columns
+  agree between the probe and the decode when rows are ragged (a missing cell is an invalid sample in both passes);
+  both passes read a file through the page-fault guard in windows and a file changed on disk fails its next chunk
+  instead of the process; a header-only CSV opens with no samples; a UTF-16 file of odd length no longer gains a
+  row; a quoted field holding a line break is reported (`text.quoted_newline`); profiles and dictionaries refuse
+  nested-quantifier patterns, dictionary patterns compile once and the sniff regex sees the first 16 lines. Opens
+  are cancellable: closing the files or changing the project cancels the opens in flight and those waiting for
+  the Mapping panel (`ImportOptions::cancel`, `SourceLoader::cancelOpens`). Sidecar edits are written by a
+  Background task 500 ms after the first edit (coalesced, newest wins) and at once when the source closes.
+  Autosave builds no journal entry when its set is unchanged, and the recovery prompt replays the journal once.
+
+- M2 review fixes (D-185 to D-189; AC-M2-01, AC-M2-02, AC-M2-05, AC-M2-06): the maths engine evaluates a channel
+  read only by a statistic at that channel's rate (statistics over the samples as logged); integer results are I32
+  only when they provably fit, every other integer result F64 (no saturation), and an integer or Bool result with a
+  declared non-base unit is stored as a real value (`choose(c, 50, 0)` declared `%` reads 50 %, not 0 %); infinite
+  results are invalid samples; a literal factor (`/ 3.6`, `/ 9.81`) no longer suggests a wrong result unit; a
+  table axis is checked against its unit; flipping the `-2^2` switch recomputes only the expressions it changes;
+  Filter and Scale & Offset items carry no `W-UNIT-MISSING`, accept 0 and 1 points (a window of 2) and, for a
+  temperature, scale in the offset's unit (80 °C × 1.02 = 81.6 °C; D-186); per-lap statistics step between laps;
+  `previous_sample` of an item's own name is `E-CYCLE`; a marker edit that moves the math window's lap
+  re-evaluates the statistics over it; variance against another source's lap reports `E-REF-SOURCE` instead of
+  silent invalid values; timestamped channels get a whole-Hz rate. `esses-cli maths check` reports what
+  `MathGraph` finds (cycles, synthesis and compile errors, the shadowing order; D-188); `esses-cli export` reports a
+  failing maths input instead of "Calculating". The journal keeps one snapshot per session: an undone edit is not
+  replayed, Save journals first so a failed save loses nothing, "Later" keeps autosaving this session's edits
+  without deleting the deferred journal, Recover adopts the journal, and a workbook renamed only in letter case
+  keeps its file (D-187). The workbook keys CTRL+1..CTRL+0 and CTRL+F11/F12 work; seven file and Units List keymap
+  rows move to M3 (D-189). The case corpus grows to 256 files (every function and arity, the overflow cases, a
+  symmetric zero-phase pulse long enough for the end effect to decay); the corpus runner prints its count; the
+  60-lap marker rebuild (AC-M2-05) is a Release bench row (`analysis.marker_rebuild_60lap`, 5 ms). Fixed for CI:
+  a clang-tidy finding in `ProjectFile::autosaveMinutes`, a clang-format violation, the `store.column` concurrency
+  test and the Qt test scratch directories made deterministic under a parallel ctest, `maths_corpus_check.py` with
+  a relative `--cli` on Windows, and the round-trip tests no longer skip on a stub.
+
+- M2 integration (07 §5; AC-M2-01, AC-M2-05, AC-M2-09, AC-M2-10, AC-M2-11, AC-M2-13, AC-M2-14; D-180 to D-184): the shell
+  wires the M2 editors (the Mapping panel above the worksheet area with the loader's hand-off on, so unknown units
+  stop at it; the Channel Status dock behind CTRL+U and View > Channel Status; the Maths Editor CTRL+M, Channel Editor
+  CTRL+E with its Aliases and Mappings editors, Details CTRL+D and the Lap Editor as modeless dialogs; SHIFT+F7 inserts
+  a beacon at the cursor; the nine active-channel keys), and 19 keymap rows become implemented with their tests.
+  `esses-cli export [<project>] <log>` writes logged and maths channels as CSV with the project's maths, mappings,
+  unit maps and display units (`--channels`, `--range`, `--format csv|motec.csv`, `--rate`, `--units`);
+  `esses-cli fixture diff` explains where a fixture differs (per channel the first differing sample and the largest
+  ulp distance, JSON Pointers into the probe, markers and laps expectations). The maths check of the maintainer's own
+  maths (private, counts only) reports 0 errors: a unitless channel read in `[ratio]` no longer warns, and the unit
+  table gains `l/100km` (Fuel Consumption) and `psi (sg)`. New shell walkthroughs `ui.tst_lap_editor` and
+  `ui.tst_mapping_panel`, ctests `cli.export.project` and `cli.fixture_diff.explains`, two more seeds of the undo
+  property test, and CI steps for the maths case corpus (core) and the private corpus counts (lint). Fixed: a
+  `WorksheetCanvas` destroyed while it had the focus could run a slot after its destructor.
+
+- Data editors and dock work for M2 (`esses_widgets`, `src/editors_data/` and `src/docks/`; 07 §5.1; AC-M2-05,
+  AC-M2-11; D-179): the `MappingPanel` (follows the loader's pending opens with a queue; rows with sample values,
+  combo-box editors for quantity, unit and rule; Scan, Resolve as one undoable "Resolve mapping" step with the
+  ticked rows saved to the project's unit map and analysis names as mappings, Save, Open Anyway, Cancel); the
+  `LapEditor` (laps and ignored beacons, provenance, Stretch column and report, inserts by session time, by lap
+  time and at the cursor, per-beacon offsets, the beacon offset by distance, trust, Restore Logged Laps; SHIFT+F7
+  as `cursor.insert_marker` and the toolbar's lap-stretch toggle kept in step); the `DetailsEditor` (typed cells
+  with units, the original kept, Restore Original, sort, Copy as TSV); Data-window filters in the context menu with
+  the lap-number editor and filter icons; the Channels-window word-prefix search with loose matching from the
+  project. Five new Qt Tests.
+
+- Maths editors (`esses_widgets` `src/editors_maths/`; 07 §5.1; AC-M2-12 in the window; D-177): `MathsEditor` (CTRL+M)
+  with the modules, items and item panes of 03 §11 (global modules with enable, condition, add, delete, move,
+  import and export; local maths per open source; transient maths listed; Expression, Constant, Filter and Scale &
+  Offset pages), the live diagnostics line 150 ms after a keystroke (Errors red, Warnings amber, Info grey, spans
+  underlined, the full list), the `[unit]` popup with the quantity's units, Insert Range and Insert Channel, hover
+  help with the precedence rule and the `unaryMinusAbovePower` setting, Apply and item switch as one undo step,
+  close and ESC refused on an Error with Revert, multi-select cut/copy/paste keeping names, Recalculate, the status
+  column from `MathsService`, and the auto-save on close through the project's save; `ChannelStatusWindow` (CTRL+U)
+  with the filter box, "Errors only", Copy Table, sorting, the resolution trace in a detail pane and the
+  double-click to the Maths Editor, Alias or Mapping editor; `ChannelEditor` (CTRL+E, one channel at a time) with
+  unit, limits, DPS, colour and interpolation overrides as undoable commands, the unit rule across open files and
+  the Corr Dist unit, and the `AliasesDialog` and `MappingsDialog` editors (cycles refused); `ActiveChannelCommands`
+  for the nine M2 `channel.*` rows (next/previous active channel, hide, remove, edit maths, status, transient
+  filter, scale and offset, zero at cursor in the display unit with the decimals kept). New Qt Tests
+  `widgets.tst_maths_editor`, `widgets.tst_channel_status_window`, `widgets.tst_channel_editor` and
+  `widgets.tst_active_channel`.
+
+- Options, schemes and the shell's M2 wiring (`esses_widgets`; 07 §5.1; AC-M2-06 in the shell, AC-M1-06 rows for
+  the new commands; D-178): `OptionsDialog` (Tools > Options) with the General, Analysis, Colours, Fonts and Keys tabs
+  of 06 §13.7 (only the changed project options written, as one undoable "Change options"; user settings for the
+  language, the toolbar scheme selector and following the OS; invalid fields refuse Apply and OK; read-only Fonts and
+  Keys with keymap Import/Export/Reveal); `SchemeSelector` (shipped and user schemes, live switch, follow OS
+  light/dark, Duplicate/Import/Export, the application palette from the scheme); the `RecoveryDialog` ("Recover
+  unsaved changes?" with Recover, Discard and Later) before the session restore of the previous data and selection;
+  the shell adopts the qtmodel wiring (`connectProjectSession`, `connectMathsSelection`, user text profiles,
+  `LapStretchService` with the toolbar and Data-menu toggle, `SessionRestore`), Edit > Undo/Redo and toolbar buttons
+  on the session's undo stack with component edits as undoable commands, CTRL+Z in text fields kept as text undo,
+  save-or-ask when leaving a dirty project (exit or another project) and the view state written on exit; `esses -w`
+  hands its `-l` logs to the session restore. Keymap rows `edit.undo`, `edit.redo`, `tools.options`,
+  `data.lap_stretch_toggle`, `view.messages_window` and `view.reset_docks` implemented with their `KEYMAP_TEST`
+  rows (menu-only rows through their action); `check_keymap_coverage.py` accepts implemented rows of the milestone
+  in progress. New Qt Tests `widgets.tst_options_dialog`, `widgets.tst_scheme_selector`, `widgets.tst_shell_m2` and
+  `ui.tst_project_recovery` (AC-M2-06).
+
+- Application model for M2 (`esses_qtmodel`; 07 §5.1; AC-M2-09, AC-M2-06/11/12 at the model level; D-032, D-161,
+  D-172 to D-175): undo commands for every D-032 edit of 0.1 (workbook list, worksheets, component paste and delete
+  with a clipboard payload, merged resizes, channel documents, unit maps, maths modules, options, every sidecar edit,
+  the Data window's trust through the selection, the Mapping panel's decision as one macro) with the AC-M2-09
+  property test (30 randomised sequences equal to an independent replay; view state never on the stack);
+  `ProjectSession` loads and saves every project document (unchanged files not rewritten, retired files backed up,
+  unreadable files never overwritten), the journal autosave on a timer and the recovery flow (prompt hook or
+  `recoveryAvailable()`, replay, discard, later), dirty state from the stack's clean index; the full `MathsService`
+  (project modules with only the edited cone re-versioned, compat switches, mappings and aliases, local maths from
+  the sidecar, transient modules, `esses.gps_corrections` where GPS is logged, the selection and distance indexes
+  for `SelectionDependent` nodes, the 03 §7.3 status per item, Recalculate, Channel Status rows, the live check) with
+  `LiveDiagnostics`; `ChannelStatusModel` (items, built-ins, constants, aliases, mappings, missing references, every
+  trace kind); the Mapping-panel hand-off in `SourceLoader` (task A ends at the panel, task B with the decision,
+  Cancel, Open anyway, user text profiles); Data-window filters persisted in `project.json` with the lap-number
+  editor messages; the word-prefix channel search with loose matching and the Alias and Constants categories;
+  `LapStretchService` and the stretch toggle; `SessionRestore` and `connectProjectSession`; `edit.undo`/`edit.redo`
+  and `data.lap_stretch_toggle` command handlers. Six new Qt Tests.
+
+- Maths graph (07 §5.1; AC-M2-03, AC-M2-04, AC-M2-10 bench; D-022, D-139, D-140, D-171): `MathGraph::define`,
+  `remove`, `setEnabled`, `setModules` (global modules in project order, local and transient maths),
+  `setResolverTables`, `setCompat`, `setSelection`, `setDistanceIndexes`, `invalidate`, `trace`, `nodes()` and
+  `status(NodeId)`: one shadowing chain per name (built-in outputs, local, global, transient), the first definition
+  per module winning (`W-DUP-IGNORED`), disabled elements skipped, self-maths reading the element before it, module
+  conditions over details (`E-CONDITION`), the Scope order of 03 §3.3 with mappings, aliases (`W-ALIAS-FALLBACK`)
+  and constants across modules (`W-CONST-AMBIGUOUS`, `W-CONST-SHADOWED`), cycles with the path on every node
+  (`E-CYCLE`), item kinds expression, filter, scale_offset (offset as a delta), table2d and `builtin` (a per-source
+  settings override), versions that hash exactly what a node reads (an edit re-evaluates only its cone), and
+  `SelectionDependent` keys with a column per selection. Evaluation through `MathsScheduler` (one task per node,
+  share key `.../all`), tasks that compile a fresh plan from a frozen scope, sealed into the `ChunkCache` by
+  `PlanProvider` (now with a vectorised path for chunks without invalid samples). `esses.gps_corrections` v1 with its
+  zero-fix step always on (`Disabled (no GPS channels)` without both channels) and the settings schema
+  `builtin-esses.gps_corrections-1` with examples. `bench/maths_bench` gains the AC-M2-10 row over RW-2 (the 20
+  expressions of `bench/workloads.md`, logical processors and workers recorded) and the recorded `filter_lp` order -2
+  row over 21.6 M samples; `--nodes` prints the time of each output.
+
+- Maths kernels and functions (07 §5.1; AC-M2-02; D-022, D-080 to D-082, D-169, D-170): every intrinsic of 03 §5
+  registered with a `FunctionManifest` (arguments and arities from the language's signature table, unit rules,
+  descriptions) and a kernel for every non-elementwise class: `smooth` and `derivative` (points or seconds, odd and
+  even windows, truncated edges, the with-respect-to form), the RC and Chebyshev/Butterworth filters with every
+  order including zero phase, designed in-tree without Iir1 (D-169), `integrate`, `integrate_dist` (Corr Dist as a
+  plan input), `stat_*` per segment or over the math window, `running_min/max`, `flip_flop`, `edge_delay`,
+  `time_valid`, `time_shift`, `pulse_width`, `previous_sample`, `range_is`, `range_change`, `variance_time/dist`
+  and the `table2d` Table kernel. `Kernel::status` reports failures known only at evaluation (`E-ARG-VALUE` at or
+  above half the rate, `E-RANGE-UNKNOWN` naming the paths; `RangeTables::contains`/`paths`). The case corpus: 238
+  `tests/maths/cases/*.case.json` (schema `maths-case-1`) generated by the independent reference
+  `tools/maths_ref.py` and run by the Catch2 case runner; schema `mathfn-manifest-1`; property tests of the windows
+  and filters; `docs/maths-compat.md` gains a row with its case ids for every kernel reading.
+
+- CSV import (07 §5.1; AC-M2-13, AC-M2-11 at the registry level; D-028, D-029, D-044, D-167, D-168): the
+  `TextEngine` of 05 §7 (pass 1: encodings with BOMs, UTF-16 and cp1252, LF/CRLF/CR lines, delimiter, decimal comma,
+  preamble rules and captures, header and units rows, units in names, time column and unit, rate from the details
+  or inferred, uniform or timestamped rows with the last-wins time rule, sparse `hold` and `timestamped` columns,
+  text columns as enumerations, lap-counter and beacon-row lap sources; pass 2: one sweep per slab for every column
+  of a source, siblings sealed with `ChunkCache::insertGroup` through the new `store::WeakColumn`), the shipped
+  profiles `motec.csv` and `generic.csv` with their dictionaries (registered by `ImporterRegistry::withBuiltins`),
+  `TextProfile`, `Dictionary` and `UnitMappingProfile` read and written canonically (schemas `importer-profile-1`,
+  `dictionary-1`, `unitmap-1` with examples), the open pipeline's step 4 (column hints and dictionary, unit maps,
+  load-time mappings), timestamped channels in the pipeline, `addProfile`, `load(…, MappingHook)` and `resume` (the
+  Mapping-panel hand-off), and the `motec.csv` and `csv` writers. Four self-authored CSV fixtures
+  (`tools/gen_text_fixtures.py`, oracle kind `generator` in fixture-1), `fixture verify` for timestamped channels,
+  the fuzz targets `fuzz_csv_sniff` and `fuzz_text_profile` (seeds and dictionary in CI), `bench/formats_bench`
+  (300 MB, 100 channels: probe and first data), `docs/formats/text.md` with every `text.*` Import Log code
+  (`tools/check_importlog_codes.py` reads it). The vendor-mark allow-list gains the CSV format-name literal (class c).
+
+- Maths language (07 §5.1; AC-M2-14, the language parts of AC-M2-01 and AC-M2-02; D-164, D-165, D-166): the
+  `Lexer` and the Pratt `Parser` of 03 §2 (quoted names with `[unit]`, word operators, integer vs decimal
+  literals, comments, `-2^2 = -4` with `MathsCompat::unaryMinusAbovePower` and `I-COMPAT-POW`, error recovery,
+  a nesting limit), `print` (canonical form) and `Ast::sourceHash`; the `TypeChecker` of 03 §3 (kinds, units,
+  dimension vectors and scales, constant folding, every diagnostic code of 03 §2.5 and §3.2, warnings never
+  blocking); `compile` into plans (fused elementwise `EwKernel` stages, intrinsic stages through
+  `makeIntrinsicKernel`, the result unit to base conversion, inputs, dtype, `defHash`) and the 0.1 whole-node
+  `evaluateWhole` with `MathInputGatherer::fill`; `MathModuleIo` (maths-1 read and written canonically).
+  `esses-cli eval` (`--json` with rate, unit and values; `--csv`; `--range`; `--unit`; `--compat`),
+  `maths check --json` (per-item status and counts) and `maths functions`; `tools/maths_corpus_check.py`
+  (AC-M2-01 counts); `fuzz_maths_parser` with its dictionary and seeds in CI; `docs/maths-compat.md` with the
+  language readings and the known gaps.
+
+- Persistence (07 §5.1; AC-M2-05 core, AC-M2-07, AC-M2-08): `overrides-1`, `aliases-1` and `mappings-1` read and
+  written canonically (`ChannelOverrides`, `Aliases` with the resolver's alias-cycle rule, `Mappings`);
+  `SchemaRegistry` over every schema (JSON pointer of every error, three `$schema` forms); `Migrations` with the
+  first real step, `project-1` 1 -> 2 (Data-window filter keys are `default` or `xxh3:<hex>`, D-162); the
+  write-ahead `Journal` (`journal-1` entry files written atomically, replay of the newest entry per path across
+  sessions with `baseHash` conflicts, damaged files skipped, the recovery hook `Journal::recover`); every project
+  document loads through one pipeline (header, migrations, typed reader, `SchemaRegistry` over the written form;
+  D-163) and keeps a newer minor's `schemaVersion` or refuses it as `Unsupported` (R-38). New schemas
+  `overrides-1`, `aliases-1`, `mappings-1`, `journal-1`, `maths-1` (03 §4.1) with canonical examples;
+  `project-1` minor 2. `LapStretch::apply` sets the index's stretch (`DistanceIndex::setStretch`), with
+  `LapStretchSettings` and the per-lap report. `esses-cli validate` migrates older minors first and prints the
+  steps, refuses a newer major at `/$schema`, and gains `--all`/`--root`/`--exclude`; the `lint` job runs
+  `validate --all`. `esses_model` and `esses_analysis` spell `JsonDoc` where M1 wrote `model::OpaqueJson`.
+
+- M2 contracts (07 §5.1; `docs/milestones/M2.md` §2): public headers and types of every M2 class with stubs marked
+  `// M2-STUB` (maths language, kernels and graph; text importers, dictionaries, unit maps and the Mapping-panel
+  hand-off; overrides/aliases/mappings, `SchemaRegistry`, `Migrations`, `Journal`; `LapStretch`; the undo commands,
+  the full `MathsService`, `ChannelStatusModel`; the Maths, Channel Status, Channel, Mapping, Details, Lap and
+  Options editors and the scheme selector), each library's `README.md` listing the stubs to replace. Final parts
+  with tests: the intrinsic names and kernel classes, `FunctionRegistry`, the data-less `Scope`, `ArenaView`, the
+  sidecar annotation/local-maths/restore-logged edits, `ChannelOverrides` editing, `Mappings::toTable`,
+  `LapStretch::factor`, the undo command bases and the named document/sidecar commands.
+- `esses_qtmodel` links Qt Gui for `QUndoStack`/`QUndoCommand` only (D-161, proposed): `tools/check_layering.py`
+  rule 6 refuses every other Qt Gui header there (the configure step records Qt Gui's header directory in
+  `esses_targets.json`); the configure negative test now refuses Qt Widgets in `esses_qtmodel`
+  (`lint.configure_check.qt_module_qtmodel_widgets`) and accepts Qt Gui (`qt_module_qtmodel_gui`).
+- Build: `esses_formats` and `esses_model` glob their sources (and `esses_model` its tests); the text importers get
+  their own test executable (`formats_text.*`); `esses_widgets` gains the glob roots `editors_maths`, `editors_data`
+  and `editors_options`. `MathItem::module` is spelled `moduleId` (03 §4.1) and `DisplayDefaults`, `MathRangeGeom`
+  and `MathSelection` moved to `math_item.hpp` and `math_selection.hpp`.
+- Private material: `tests/maths/user_modules/`, `tests/maths/oracle/` and `*.private.json` are git-ignored and
+  refused by the `lint` job's forbidden-paths step.
+
 ## Unreleased (M1)
 
 - Test fix: the AC-M0-11 priority-order test uses one worker, so a worker pre-empted between claiming an Interactive

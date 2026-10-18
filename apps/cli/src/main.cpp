@@ -2,12 +2,16 @@
 // SPDX-License-Identifier: MIT
 //
 // esses-cli (05 section 9.2; 07 section 3.1, M0 command set): info, channels, laps, validate, fixture add,
-// fixture verify. Every --json output is canonical JSON (02 section 6.5 rule 1). Exit status: 0 success,
-// 1 a check failed (invalid document, fixture mismatch, unreadable log), 2 usage or environment error.
+// fixture verify; M2 (03 section 13): eval, maths check, maths functions, export, fixture diff. Every --json
+// output is canonical JSON (02 section 6.5 rule 1). Exit status: 0 success, 1 a check failed (invalid
+// document, fixture mismatch, unreadable log, an expression or maths item with an error), 2 usage or
+// environment error.
 #include "app_context.hpp"
 #include "cli_common.hpp"
+#include "export.hpp"
 #include "fixture.hpp"
 #include "inspect.hpp"
+#include "maths_cli.hpp"
 #include "validate.hpp"
 
 #include <esses/base/config.hpp>
@@ -73,10 +77,78 @@ int run(const std::vector<std::string>& args) {
     std::string validateSchema;
     CLI::App* val =
         app.add_subcommand("validate", "validate JSON documents against the schema their $schema names");
-    val->add_option("paths", validatePaths, "files or directories (walked for *.json)")->required();
+    std::string validateRoot;
+    std::vector<std::string> validateExclude;
+    val->add_option("paths", validatePaths, "files or directories (walked for *.json)");
     val->add_option("--schema", validateSchema, "validate against this schema file instead");
     val->add_flag("--json", validate.json, "canonical JSON report");
     val->add_flag("--verbose", validate.verbose, "list valid files too");
+    val->add_flag("--all", validate.all,
+                  "data/, fixtures/, tests/maths/ and schemas/ under --root, without the private checkouts");
+    val->add_option("--root", validateRoot, "the repository root for --all (default: the current directory)");
+    val->add_option("--exclude", validateExclude, "a directory to leave out of the walks (repeatable)");
+
+    // eval (03 section 13, AC-M2-14)
+    EvalOptions eval;
+    std::vector<std::string> evalFiles;
+    std::string evalOutput;
+    CLI::App* evalCmd = app.add_subcommand("eval", "evaluate a maths expression over logs (03 section 13)");
+    evalCmd->add_option("expression", eval.expression, "the expression, e.g. \"'Ground Speed'[km/h] * 2\"")
+        ->required();
+    evalCmd->add_option("files", evalFiles, "the logs")->required();
+    evalCmd->add_option("--layer", eval.layer, "the layer (default Normal)");
+    evalCmd->add_option("--rate", eval.rate,
+                        "auto (the highest input rate), a number of Hz or num/den, exact (20.5 = 41/2 Hz)");
+    evalCmd->add_option("--unit", eval.unit, "the result unit the values are reported in");
+    evalCmd->add_option("--range", eval.range, "report only the samples of a range, e.g. \"Outings:Laps/3\"");
+    evalCmd->add_option("--compat", eval.compat, "unaryMinusAbovePower=1, alias:<spelling>=<function>");
+    evalCmd->add_option("--precision", eval.precision, "single or double");
+    evalCmd->add_flag("--json", eval.json, "canonical JSON: rate, unit, diagnostics and values");
+    evalCmd->add_flag("--csv", eval.csv, "t_us,value,valid rows");
+    evalCmd->add_option("-o,--output", evalOutput, "write to this file");
+    evalCmd->add_option("--importer", eval.importerId, "importer id; skips sniffing");
+    evalCmd->add_option("--options", eval.optionsJson, "importer options as JSON");
+    evalCmd->add_flag("--no-sidecar", eval.noSidecar, "ignore <log>.sidecar.json");
+    evalCmd->add_flag("--timing", eval.timing, "compile and evaluation times on stderr");
+
+    // export (05 section 9.2; 07 section 5.1: project-aware CSV with maths)
+    ExportOptions exportOptions;
+    std::vector<std::string> exportInputs;
+    std::string exportChannels, exportOutput, exportUnits;
+    CLI::App* exportCmd = app.add_subcommand(
+        "export", "write logged and maths channels as CSV, with a project's maths, mappings and unit maps");
+    exportCmd->add_option("inputs", exportInputs, "[<project folder or project.json>] <log>")->required();
+    exportCmd->add_option("--channels", exportChannels, "comma-separated channel names (default: all)");
+    exportCmd->add_option("--range", exportOptions.range, "write one range, e.g. \"Outings:Laps/3\"");
+    exportCmd->add_option("--format", exportOptions.format, "csv (default) or motec.csv");
+    exportCmd->add_option("--rate", exportOptions.rate,
+                          "the CSV grid, Hz or num/den, at most 1 MHz (default: the highest rate, <= 1 kHz)");
+    exportCmd->add_option("--units", exportUnits, "display units, e.g. \"Corr Speed=km/h,Oil Temp=deg C\"");
+    exportCmd->add_option("--layer", exportOptions.layer, "the layer (default Normal)");
+    exportCmd->add_option("-o,--output", exportOutput, "the CSV file")->required();
+    exportCmd->add_option("--importer", exportOptions.importerId, "importer id; skips sniffing");
+    exportCmd->add_option("--options", exportOptions.optionsJson, "importer options as JSON");
+    exportCmd->add_flag("--no-sidecar", exportOptions.noSidecar, "ignore <log>.sidecar.json");
+    exportCmd->add_flag("--json", exportOptions.json, "a canonical JSON report");
+
+    // maths check / functions (AC-M2-01, 03 section 13)
+    CLI::App* mathsCmd = app.add_subcommand("maths", "maths modules and functions");
+    mathsCmd->require_subcommand(1);
+    MathsCheckOptions check;
+    std::vector<std::string> checkModules;
+    std::string checkLog;
+    CLI::App* checkCmd =
+        mathsCmd->add_subcommand("check", "parse and check every item of maths-1 modules (per-item status)");
+    checkCmd->add_option("modules", checkModules, "maths-1 files or directories of *.maths.json")->required();
+    checkCmd->add_option("--log", checkLog, "resolve names against this log (else without data)");
+    checkCmd->add_option("--layer", check.layer, "the layer of --log (default Normal)");
+    checkCmd->add_option("--compat", check.compat, "unaryMinusAbovePower=1, alias:<spelling>=<function>");
+    checkCmd->add_option("--importer", check.importerId, "importer id of --log; skips sniffing");
+    checkCmd->add_flag("--no-sidecar", check.noSidecar, "ignore the sidecar of --log");
+    checkCmd->add_flag("--json", check.json, "canonical JSON report with summary counts");
+    bool functionsJson = false;
+    CLI::App* functionsCmd = mathsCmd->add_subcommand("functions", "the function registry's manifests");
+    functionsCmd->add_flag("--json", functionsJson, "canonical JSON");
 
     // fixture add / verify
     CLI::App* fixture = app.add_subcommand("fixture", "maintain the fixture corpus (05 section 9.1)");
@@ -127,6 +199,14 @@ int run(const std::vector<std::string>& args) {
     verifyCmd->add_flag("--json", verify.json, "canonical JSON report");
     verifyCmd->add_flag("--verbose", verify.verbose, "print notes");
 
+    FixtureDiffOptions diff;
+    std::vector<std::string> diffDirs;
+    CLI::App* diffCmd =
+        fixture->add_subcommand("diff", "explain where a fixture differs from its expectations");
+    diffCmd->add_option("dirs", diffDirs, "fixture directories or trees (default fixtures)");
+    diffCmd->add_option("--channel", diff.channel, "only this channel");
+    diffCmd->add_flag("--json", diff.json, "canonical JSON report");
+
     std::vector<const char*> argv;
     argv.reserve(args.size());
     for (const std::string& a : args) {
@@ -166,7 +246,45 @@ int run(const std::vector<std::string>& args) {
         if (!validateSchema.empty()) {
             validate.schemaFile = p8(validateSchema);
         }
+        if (validatePaths.empty() && !validate.all) {
+            std::cerr << "esses-cli: validate needs paths or --all\n";
+            return 2;
+        }
+        validate.root = p8(validateRoot);
+        for (const std::string& e : validateExclude) {
+            validate.exclude.push_back(p8(e));
+        }
         return runValidate(ctx, validate, std::cout, std::cerr);
+    }
+    if (evalCmd->parsed()) {
+        for (const std::string& f : evalFiles) {
+            eval.files.push_back(p8(f));
+        }
+        if (!evalOutput.empty()) {
+            eval.output = p8(evalOutput);
+        }
+        return runEval(ctx, eval, std::cout, std::cerr);
+    }
+    if (exportCmd->parsed()) {
+        for (const std::string& f : exportInputs) {
+            exportOptions.inputs.push_back(p8(f));
+        }
+        exportOptions.channels = splitList(exportChannels);
+        exportOptions.units = splitList(exportUnits);
+        exportOptions.output = p8(exportOutput);
+        return runExport(ctx, exportOptions, std::cout, std::cerr);
+    }
+    if (checkCmd->parsed()) {
+        for (const std::string& f : checkModules) {
+            check.modules.push_back(p8(f));
+        }
+        if (!checkLog.empty()) {
+            check.log = p8(checkLog);
+        }
+        return runMathsCheck(ctx, check, std::cout, std::cerr);
+    }
+    if (functionsCmd->parsed()) {
+        return runMathsFunctions(ctx, functionsJson, std::cout, std::cerr);
     }
     if (addCmd->parsed()) {
         add.input = p8(addInput);
@@ -179,6 +297,15 @@ int run(const std::vector<std::string>& args) {
             add.refDecode = p8(addRefDecode);
         }
         return runFixtureAdd(ctx, add, std::cout, std::cerr);
+    }
+    if (diffCmd->parsed()) {
+        for (const std::string& d : diffDirs) {
+            diff.dirs.push_back(p8(d));
+        }
+        if (diff.dirs.empty()) {
+            diff.dirs.push_back(p8("fixtures"));
+        }
+        return runFixtureDiff(ctx, diff, std::cout, std::cerr);
     }
     if (verifyCmd->parsed()) {
         for (const std::string& r : verifyRoots) {

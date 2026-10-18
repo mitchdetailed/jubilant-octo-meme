@@ -8,6 +8,7 @@
 #include <esses/analysis/corrected_speed.hpp>
 #include <esses/analysis/distance_index.hpp>
 #include <esses/analysis/fastest_lap.hpp>
+#include <esses/analysis/lap_stretch.hpp>
 #include <esses/analysis/range_rule.hpp>
 #include <esses/analysis/range_tables.hpp>
 #include <esses/analysis/rule_runner.hpp>

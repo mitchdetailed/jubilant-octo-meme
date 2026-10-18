@@ -1,0 +1,26 @@
+{
+  "empty-unit.json": {
+    "pointer": "/mappings/0/unit",
+    "why": "a stamped unit is a symbol"
+  },
+  "flag-not-boolean.json": {
+    "pointer": "/mappings/0/unitlessOnly",
+    "why": "unitlessOnly is a boolean"
+  },
+  "missing-mappings.json": {
+    "pointer": "",
+    "why": "the mappings array is required"
+  },
+  "missing-to.json": {
+    "pointer": "/mappings/0",
+    "why": "a mapping names its target"
+  },
+  "unknown-member.json": {
+    "pointer": "/mappings/0",
+    "why": "mapping records are closed"
+  },
+  "wrong-schema-id.json": {
+    "pointer": "/$schema",
+    "why": "the $schema id names another schema"
+  }
+}

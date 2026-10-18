@@ -1,0 +1,61 @@
+{
+  "$schema": "urn:esses:importer-profile-1",
+  "schemaVersion": 1,
+  "id": "logger-semicolon",
+  "name": "Semicolon logger export",
+  "version": "1.0.0",
+  "sniff": {
+    "preambleRegex": "^Logger export",
+    "extensions": [
+      ".csv"
+    ],
+    "confidence": 80
+  },
+  "encoding": "auto",
+  "delimiter": ";",
+  "decimal": ",",
+  "quote": null,
+  "trim": true,
+  "layout": "table",
+  "preamble": {
+    "lines": 2,
+    "capture": {
+      "Driver": "^Driver: (.*)$",
+      "@rate": "^Rate: ([0-9.]+)"
+    }
+  },
+  "header": {
+    "namesRow": 0,
+    "unitsRow": "@auto",
+    "dataRow": "auto",
+    "unitInName": "\\[([^\\]]*)\\]$"
+  },
+  "time": {
+    "column": "Time",
+    "unit": "s",
+    "rate": "fromDetail:@rate",
+    "origin": "first"
+  },
+  "sentinels": [
+    "",
+    "---"
+  ],
+  "sparse": "hold",
+  "duplicateNames": "suffix",
+  "columns": {
+    "Gear": {
+      "kind": "Integer",
+      "interp": "Previous",
+      "dps": 0
+    }
+  },
+  "lapSource": {
+    "kind": "lap_counter_edge",
+    "column": "Lap",
+    "optional": true,
+    "fallback": {
+      "kind": "none"
+    }
+  },
+  "x-note": "unknown top-level members are kept"
+}

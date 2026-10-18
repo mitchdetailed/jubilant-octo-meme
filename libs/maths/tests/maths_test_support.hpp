@@ -1,15 +1,16 @@
 // SPDX-FileCopyrightText: 2026 the Esses contributors
 // SPDX-License-Identifier: MIT
 //
-// Shared helpers for the esses_maths tests: the shipped unit table, a private ChunkCache and TaskPool per
-// test (declared in that order so the pool joins before the cache goes), synthetic sources with in-memory
-// uniform channels, a worker gate for priority tests, and FakeModule: a built-in module whose outputs
-// exercise the graph without esses_analysis (Fake Speed = gain x "Speed In" in m/s, Fake Dist = the rectangle
-// integral of Fake Speed as stored, Fake Other = "Other In").
+// Shared helpers for the esses_maths tests: the shipped unit table, a temporary directory of the test's own,
+// a private ChunkCache and TaskPool per test (declared in that order so the pool joins before the cache
+// goes), synthetic sources with in-memory uniform channels, a worker gate for priority tests, and FakeModule:
+// a built-in module whose outputs exercise the graph without esses_analysis (Fake Speed = gain x "Speed In"
+// in m/s, Fake Dist = the rectangle integral of Fake Speed as stored, Fake Other = "Other In").
 #pragma once
 
 #include <esses/base/hash.hpp>
 #include <esses/base/taskpool.hpp>
+#include <esses/base/utf8.hpp>
 #include <esses/maths/maths.hpp>
 #include <esses/model/layer.hpp>
 #include <esses/model/source.hpp>
@@ -21,13 +22,16 @@
 #include <nlohmann/json.hpp>
 
 #include <atomic>
+#include <chrono>
 #include <filesystem>
 #include <future>
 #include <latch>
 #include <memory>
 #include <optional>
+#include <random>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -36,6 +40,40 @@ namespace esses::maths::test {
 inline std::filesystem::path repoRoot() {
     return std::filesystem::path(ESSES_TEST_REPO_ROOT);
 }
+
+// A fresh, empty directory under the system temporary directory, removed on destruction. The constructor
+// creates it (create_directory) and never takes a name that exists, so test processes running at once, in one
+// build tree or in several, never share one.
+class TempDir {
+public:
+    explicit TempDir(const std::string& tag) {
+        static std::atomic<unsigned> counter{0};
+        static const unsigned salt = std::random_device{}();
+        const std::filesystem::path base = std::filesystem::temp_directory_path();
+        for (;;) {
+            const auto now = std::chrono::steady_clock::now().time_since_epoch().count();
+            path_ = base / pathFromUtf8("esses-maths-" + tag + "-" + std::to_string(salt) + "-" +
+                                        std::to_string(now) + "-" + std::to_string(++counter));
+            std::error_code ec;
+            if (std::filesystem::create_directory(path_, ec)) {
+                break;
+            }
+            if (ec) {
+                throw std::runtime_error("cannot create " + pathToUtf8(path_) + ": " + ec.message());
+            }
+        }
+    }
+    ~TempDir() {
+        std::error_code ec;
+        std::filesystem::remove_all(path_, ec);
+    }
+    TempDir(const TempDir&) = delete;
+    TempDir& operator=(const TempDir&) = delete;
+    const std::filesystem::path& path() const { return path_; }
+
+private:
+    std::filesystem::path path_;
+};
 
 inline std::shared_ptr<const units::UnitRegistry> shippedUnits() {
     static const std::shared_ptr<const units::UnitRegistry> registry = [] {

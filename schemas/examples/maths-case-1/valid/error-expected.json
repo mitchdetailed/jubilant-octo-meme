@@ -1,0 +1,25 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "filter_lp_nyquist",
+  "expression": "filter_lp('X', 50)",
+  "provenance": {
+    "kind": "derived",
+    "ref": "03_MATHS_ENGINE.md 5.3"
+  },
+  "inputs": {
+    "X": {
+      "rate": {
+        "num": 100,
+        "den": 1
+      },
+      "unit": "m/s",
+      "values": [1, 2, 3]
+    }
+  },
+  "expected": {
+    "error": {
+      "code": "E-ARG-VALUE"
+    }
+  }
+}

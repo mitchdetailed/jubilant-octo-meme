@@ -1,0 +1,127 @@
+{
+  "$schema": "urn:esses:laps-1",
+  "schemaVersion": 1,
+  "layers": {
+    "Normal": {
+      "durationUs": 40000000,
+      "groups": [
+        {
+          "children": [
+            {
+              "children": [],
+              "name": "Laps",
+              "path": "Outings:Laps",
+              "ranges": [
+                {
+                  "abbrev": "Out",
+                  "enabled": true,
+                  "endMarker": "4e53d113-b9c4-51ee-b582-f55583d43f01",
+                  "endUs": 15000000,
+                  "id": "b1cca993-a885-5807-9e5c-73dd7fa1a7e9",
+                  "kind": "Lap",
+                  "lapClass": "Out",
+                  "name": "Out Lap",
+                  "number": 0,
+                  "startMarker": "4a220465-0e86-5534-8b34-1cae5de4ee3b",
+                  "startUs": 0,
+                  "stint": 1,
+                  "trusted": false
+                },
+                {
+                  "abbrev": "L1",
+                  "enabled": true,
+                  "endMarker": "3b4755ac-b37c-5986-924b-ce704f9ae809",
+                  "endUs": 30000000,
+                  "id": "aa541ab1-0333-58b5-89bc-cbc57a0f5fc2",
+                  "kind": "Lap",
+                  "lapClass": "Flying",
+                  "name": "Lap 1",
+                  "number": 1,
+                  "startMarker": "4e53d113-b9c4-51ee-b582-f55583d43f01",
+                  "startUs": 15000000,
+                  "stint": 1,
+                  "trusted": true
+                },
+                {
+                  "abbrev": "In",
+                  "enabled": true,
+                  "endMarker": "2ccbb856-d52e-56a9-9a2e-3c98acec1460",
+                  "endUs": 40000000,
+                  "id": "2cf1b02f-aa1d-52ca-8de4-43dc02ef1880",
+                  "kind": "Lap",
+                  "lapClass": "In",
+                  "name": "In Lap",
+                  "number": 2,
+                  "startMarker": "3b4755ac-b37c-5986-924b-ce704f9ae809",
+                  "startUs": 30000000,
+                  "stint": 1,
+                  "trusted": false
+                }
+              ],
+              "supportsReporting": true,
+              "supportsTrackGeneration": true
+            }
+          ],
+          "name": "Outings",
+          "path": "Outings",
+          "ranges": [
+            {
+              "abbrev": "1",
+              "enabled": true,
+              "endMarker": "2ccbb856-d52e-56a9-9a2e-3c98acec1460",
+              "endUs": 40000000,
+              "id": "16845ead-b6ef-5c0c-8fb6-003722a0c028",
+              "kind": "Outing",
+              "lapClass": "None",
+              "name": "input.csv",
+              "number": 1,
+              "startMarker": "4a220465-0e86-5534-8b34-1cae5de4ee3b",
+              "startUs": 0,
+              "trusted": true
+            }
+          ],
+          "supportsReporting": true,
+          "supportsTrackGeneration": false
+        }
+      ],
+      "markers": [
+        {
+          "class": "SOL",
+          "comment": "",
+          "group": "",
+          "id": "4a220465-0e86-5534-8b34-1cae5de4ee3b",
+          "name": "",
+          "prov": "Derived",
+          "tUs": 0
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "group": "Beacons",
+          "id": "4e53d113-b9c4-51ee-b582-f55583d43f01",
+          "name": "",
+          "prov": "Logged",
+          "tUs": 15000000
+        },
+        {
+          "class": "BCN",
+          "comment": "",
+          "group": "Beacons",
+          "id": "3b4755ac-b37c-5986-924b-ce704f9ae809",
+          "name": "",
+          "prov": "Logged",
+          "tUs": 30000000
+        },
+        {
+          "class": "EOL",
+          "comment": "",
+          "group": "",
+          "id": "2ccbb856-d52e-56a9-9a2e-3c98acec1460",
+          "name": "",
+          "prov": "Derived",
+          "tUs": 40000000
+        }
+      ]
+    }
+  }
+}

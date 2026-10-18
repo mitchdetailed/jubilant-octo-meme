@@ -1,0 +1,29 @@
+{
+  "$schema": "urn:esses:fixture-1",
+  "schemaVersion": 1,
+  "channelsCompared": "all",
+  "dialect": "semicolon,decimal-comma",
+  "format": "text.profile:generic.csv",
+  "input": {
+    "bytes": 38342,
+    "file": "input.csv",
+    "sha256": "e7ed200de9b8342b83ead2b2b5f3111ce2fadfc4c9cade86a013a47662b590fa"
+  },
+  "licence": "CC0-1.0",
+  "name": "semicolon-decimal-comma",
+  "notes": "decimal comma, units in names, a text column, 50 Hz inferred",
+  "oracle": {
+    "kind": "generator",
+    "ref": "tools/gen_text_fixtures.py 1.0.0 (MIT)",
+    "tolerance": {
+      "F32": "1ulp",
+      "F64": "1ulp",
+      "I32": "exact",
+      "timesUs": "exact"
+    },
+    "validity": "strict"
+  },
+  "private": false,
+  "provenance": "synthetic",
+  "source": "synthetic: tools/gen_text_fixtures.py, a semicolon and decimal-comma table with a free-text preamble"
+}

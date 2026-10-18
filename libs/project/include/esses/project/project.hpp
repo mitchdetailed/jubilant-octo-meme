@@ -5,11 +5,17 @@
 // section 4.1.
 #pragma once
 
+#include <esses/project/aliases.hpp>
+#include <esses/project/channel_overrides.hpp>
 #include <esses/project/component_spec.hpp>
+#include <esses/project/journal.hpp>
 #include <esses/project/keymap.hpp>
+#include <esses/project/mappings.hpp>
+#include <esses/project/migrations.hpp>
 #include <esses/project/profile.hpp>
 #include <esses/project/project_file.hpp>
 #include <esses/project/rgba.hpp>
+#include <esses/project/schema_registry.hpp>
 #include <esses/project/scheme.hpp>
 #include <esses/project/shipped_data.hpp>
 #include <esses/project/workbook_file.hpp>

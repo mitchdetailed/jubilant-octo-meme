@@ -126,14 +126,6 @@ if(ESSES_BUILD_QT)
       endif()
     endif()
   endforeach()
-  # bench/: the M1 budget benchmarks (07 section 4.2 AC-M1-02/03), Qt executables built with the Qt layers; with
-  # ESSES_BUILD_BENCH they are also ctest entries labelled `bench` (the bench presets build without tests).
-  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/bench/CMakeLists.txt" AND TARGET ${ESSES_PREFIX}_widgets)
-    if(ESSES_BUILD_BENCH AND NOT ESSES_BUILD_TESTS)
-      enable_testing()
-    endif()
-    add_subdirectory(bench)
-  endif()
   # Qt Test suites that span the Qt layers (07 section 4.2: tests/ui walkthrough, F9, render parity; tests/golden
   # pixel goldens). Added after every library and application so their targets exist.
   if(ESSES_BUILD_TESTS)
@@ -143,6 +135,16 @@ if(ESSES_BUILD_QT)
       endif()
     endforeach()
   endif()
+endif()
+
+# bench/: the budget benchmarks (07 section 12): the Qt ones of M1 (plot_bench, open_bench, AC-M1-02/03) with the
+# Qt layers, the Qt-free ones (M2: formats_bench, AC-M2-13) with the core. With ESSES_BUILD_BENCH they are ctest
+# entries labelled `bench` (the bench presets build without tests).
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/bench/CMakeLists.txt" AND TARGET ${ESSES_PREFIX}_formats AND NOT ESSES_BUILD_FUZZ)
+  if(ESSES_BUILD_BENCH AND NOT ESSES_BUILD_TESTS)
+    enable_testing()
+  endif()
+  add_subdirectory(bench)
 endif()
 if(ESSES_BUILD_FUZZ AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/fuzz/CMakeLists.txt")
   add_subdirectory(tests/fuzz)

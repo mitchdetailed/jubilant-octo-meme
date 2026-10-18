@@ -8,7 +8,8 @@ Widgets and, privately, `esses::qtads` (the Qt Advanced Docking System, a shared
 only with `ESSES_DOCK_BACKEND=ads`, the default; `cmake/qtads.cmake`). No other library may link ADS. Compiled with `QT_NO_KEYWORDS` (PUBLIC): write `Q_SIGNALS`, `Q_SLOTS`, `Q_EMIT`. Never calls `TaskPool`
 directly: builds go through `qt::RenderService` (06 §1).
 
-Three independent glob roots (AUTOMOC on), so two agents can work here without touching a shared file:
+Independent glob roots (AUTOMOC on), so parallel agents can work here without touching a shared file (the
+three M2 editor roots are listed under "M2 contract" below):
 
 | Root | Headers | Contents |
 |---|---|---|
@@ -96,8 +97,10 @@ None left in `src/`. `tests/tst_widgets_contract.cpp` is replaced by the real te
   the slots from the scheme with text tool tips), tree drawn in the Name column, commands
   `data.select_main`/`toggle_overlay0`/`toggle_overlay`/`close_file` on the highlighted row (close = the
   shell's `SourceLoader::close`), clicks in M/O/1, double-click = Main, Trusted checkbox, context menu from
-  the shared actions, highlight follows Main. `ChannelsWindow`: plain filter proxy (recursive), first match
-  highlighted, ENTER/CTRL+ENTER/double-click -> `addChannelRequested`, DOWN/TAB into the list, drag source.
+  the shared actions, highlight follows Main; M2: the Filters submenu, Apply Filter To All Sources and the
+  `LapFilterEditor` (below). `ChannelsWindow`: filter proxy (recursive) over `ChannelsModel::filterAccepts` (M2:
+  word prefixes, loose matching from the project), first match highlighted, ENTER/CTRL+ENTER/double-click ->
+  `addChannelRequested`, DOWN/TAB into the list, drag source.
   `ValuesWindow`: follows the focused component and the active worksheet, "All channels" (persisted), Copy
   Value/Row. `MessagesWindow`: severity buttons with counts, text filter, Clear, Copy, Save As, action rows
   run on double-click/ENTER; auto-shown on the first Error unless settings `ui.doNotAutoShowMessages`.
@@ -109,6 +112,8 @@ None left in `src/`. `tests/tst_widgets_contract.cpp` is replaced by the real te
 | `tests/docks/tst_data_window` | ENTER / keypad ENTER, CTRL+ENTER, ALT+ENTER (compact renumbering), DELETE on source vs range rows, arrows and letters stay in the tree, CTRL+F from the dock with the highlight following Main and N/P, M/O/1 clicks and double-click, Trusted checkbox (italic), slot colours and tool tips |
 | `tests/docks/tst_values_window` | rows follow the focused component (kept when none), Main and Overlay 1 cells update on a cursor move, time vs distance alignment when the active worksheet changes, "All channels", Copy Row |
 | `tests/docks/tst_channels_messages` | Channels filter, first match, ENTER/CTRL+ENTER/DOWN/double-click, drag MIME and parser; Messages severity filters and counts, text filter on text/source, log text and Save As, action rows, Clear |
+| `tests/docks/tst_data_window_filters` | (M2) the Filters submenu of a source (every kind, checked, per source), slots kept with the filter icon and tool tip, the filtered source row's icon and name; the lap-number editor (error while typing, Apply refused with the previous filter kept, prefilled on reopen, descending ranges, one editor per window); Apply Filter To All Sources (local action and the shared `data.filter_all_sources`) and its flag; filters in `project.json` `dataWindow`, never on the undo stack |
+| `tests/docks/tst_channels_search` | (M2, D-175) word-prefix search through the box (`W S FL`, `temp (ecu)`, `pres front` over `_` and bracket separators, `oil-pres`), order and distinct words, the "no match" note, loose matching re-filtering at once and following `options.general.looseChannelSearch` through an options edit and its undo |
 
 The shell and dock tests compile `libs/qtmodel/tests/qtmodel_test_support.cpp` into their own executable
 (`#include`), so no helper is added to the shared `tests/` glob. AC-M1-06 (one Qt Test per implemented keymap
@@ -217,3 +222,231 @@ speeds and throttle, component specs and a `World` with the qtmodel services of 
   `QUndoCommand`; the undo stack arrives in M2, see `libs/qtmodel/README.md`). Move/resize/snap,
   multi-select, splitters, the clipboard and layout lock are M3 (06 §4.3 items 2-5, 8-11).
 - `ValuesList`: no datum column (`ValuesModel` has none; `columns.datum` is preserved but not shown).
+
+## M2 contract (07 §5.1; `docs/milestones/M2.md` §2)
+
+| Root | Headers (`include/esses/widgets/<root>/`) | Contents | Design |
+|---|---|---|---|
+| `src/editors_maths/` | `maths_editor.hpp`, `channel_status_window.hpp`, `active_channel_commands.hpp`, `channel_documents_dialogs.hpp` (and `editors_data/channel_editor.hpp`) | `MathsEditor` (CTRL+M), `ChannelStatusWindow` (CTRL+U, dock `channelstatus`), `ActiveChannelCommands` (the `channel.*` rows), `ChannelEditor` (CTRL+E) with `AliasesDialog`/`MappingsDialog` | 03 §11, 06 §10, §13.1, §13.2, §14.4 |
+| `src/editors_data/` | `channel_editor.hpp`, `mapping_panel.hpp`, `details_editor.hpp`, `lap_editor.hpp` | `ChannelEditor` (CTRL+E, with the Aliases/Mappings sub-editors), `MappingPanel`, `DetailsEditor` (CTRL+D), `LapEditor` | 06 §13.1, §13.3, §13.4, §13.8 |
+| `src/editors_options/` | `options_dialog.hpp`, `scheme_selector.hpp` | `OptionsDialog` (Tools > Options), `SchemeSelector` | 06 §13.7, §16 |
+
+Tests: one Qt Test per root under `tests/<root>/` (`widgets.tst_maths_editors_contract`,
+`tst_data_editors_contract`, `tst_options_editors_contract`: construction over the real services offscreen),
+replaced by their owners' behaviour tests (03 §11 rows, 06 §13, AC-M2-05, -11, -12). The shell work of 07 §5.1
+(Edit-menu undo/redo, the lap-stretch toolbar toggle, active-channel hotkeys, the Data-window filters and the
+Channels-window search, both in `src/docks/`) is not part of these roots.
+
+### M2-STUB items the implementing agents must replace
+
+- `src/editors_maths/editors_maths_stubs.cpp` (removed): `MathsEditor` and `ChannelStatusWindow` are implemented in
+  `maths_editor.cpp` and `channel_status_window.cpp`, `ChannelEditor` in `channel_editor.cpp` (see "M2 maths editors"
+  below); `tst_maths_editors_contract` stays as the construction smoke test.
+- `src/editors_data/editors_data_stubs.cpp` (removed): `ChannelEditor` moved to `src/editors_maths/` (see its
+  header); `MappingPanel`, `DetailsEditor` and `LapEditor` are implemented (see "M2 data editors and dock work"
+  below).
+- `src/editors_options/editors_options_stubs.cpp` (removed): `OptionsDialog` and `SchemeSelector` are implemented
+  in `options_dialog.cpp` and `scheme_selector.cpp` (see "M2 options editors and the shell's M2 wiring" below);
+  `tst_options_editors_contract` is replaced by `tst_options_dialog` and `tst_scheme_selector`.
+
+Contract rules (all M2 libraries): an `M2-STUB` is replaced in place (or moved into the owner's root) by
+its implementation and the marker removed; `grep -rn "M2-STUB" libs` lists what is left. A signature that another
+library already consumes (the shell, `apps/app`) changes only together with that consumer; the owner may
+reshape the others. Tests of a stub's behaviour belong to its owner; the `*contract*` tests cover what is final.
+
+### Deviations of the M2 contract from the design text
+
+- `SchemeSelector` is a new public name for 07 §5.1's "scheme selector" (06 §2.1 toolbar combo, §13.7 Colours tab).
+- The Aliases and Mappings dialogs of 06 §13.1 item 7 are `AliasesDialog` and `MappingsDialog`
+  (`editors_maths/channel_documents_dialogs.hpp`, public so that `tools.aliases`/`tools.mappings` and the tests reach
+  them), opened by `ChannelEditor::openAliases`/`openMappings`.
+
+## M2 maths editors (`src/editors_maths/`; 07 §5.1, AC-M2-12, D-177)
+
+Each header states the behaviour as built; D-177 (proposed) records where it departs from 03 §11 and 06 §10,
+§13.1, §13.2 and §14.4.
+
+- **MathsEditor** (03 §11, 06 §13.2). Modules pane (global modules in project order with enable boxes, Add /
+  Delete / Up / Down / Import / Export and the condition line; "Local maths" with one node per open source;
+  "Transient" per source with filters from a channel label, read-only), items table (enable box, kind, name, rate,
+  unit, status for the Main source at 10 Hz, comment; Add Expression / Constant / Filter / Scale & Offset, Delete,
+  Cut, Copy, Paste keeping names, Recalculate) and the item page (Expression, Constant, Filter, Scale & Offset;
+  other kinds shown and preserved). The expression field is checked by `qt::LiveDiagnostics` 150 ms after a
+  keystroke against the Main source (`setMainSource`; else the first open source; data-less: `I-UNRESOLVED`);
+  the line under it shows the most severe diagnostic (Errors red, Warnings amber, Info grey; property
+  `esses.level`), every span is underlined and the full list is below. The `[unit]` popup (a list over the dialog
+  that never takes the focus) offers the units of the referenced channel's, constant's or item's quantity
+  (compat units left out), filters while typing, ENTER/TAB insert the symbol and close the bracket, ESC closes it
+  only. Insert Range (the Main source's group paths, double-quoted) and Insert Channel (`'Name'[unit]`, the
+  override's display unit else the stored unit). The tooltip over an operator is the precedence table with the
+  current `unaryMinusAbovePower` reading of `-2^2`; over a function, its signature, arities and description.
+  Apply, or leaving the item (another row, module, `openAt`, a structural edit), writes the item as one
+  `EditMathModulesCommand` (global) or `SetLocalMathsCommand` (local); an Error refuses it, and close/ESC are
+  refused while the unapplied item has one, with the reason and Revert in a bar. A new item or constant exists
+  only once applied (its page starts dirty). Closing applies a valid page and, when this dialog edited a global
+  module and a project is open, saves the maths modules and their order (`ProjectSession::saveMathsModules`; the
+  project's other edits stay unsaved, D-190; `message()` on failure).
+- **ChannelStatusWindow** (06 §10, AC-M2-12). The model through a filter proxy (word prefix on the channel or a
+  substring of Source / Kind / Status / Resolved to; "Errors only" on `ErrorRole`), sortable (Rate by value),
+  error rows red, warnings amber, pending italic; the detail pane shows the row with its module, status,
+  "Resolved to" and every trace step; the current row survives the model's resets by row id. Copy Table (TSV with a
+  header line). Double-click or ENTER: `openItemRequested("maths"|"alias"|"mapping", ...)` and, when registered and
+  enabled, `tools.maths_editor [module, item]`, `tools.aliases [alias]`, `tools.mappings [logged name]` (the
+  mapping's logged name from its "Resolved to"); built-in outputs and missing references open nothing.
+  `focusChannel` (channel.status) clears a filter that hides the row.
+- **ChannelEditor** (06 §13.1). Rows: every channel of every open source and, with a `MathsService`, the maths
+  outputs that are not self-maths of a logged channel (Category "Maths"; Corr Dist's unit is editable). The cells
+  show the override where it applies (a display unit of another family than that file's channel is not applied
+  there). Unit (combo delegate of the quantity's units), Min/Max (numbers in the display unit, stored as
+  `{v, unit}`), DPS, Colour (-1 = automatic) and Interp edit one channel at a time through `SetOverrideCommand`;
+  "Clear override" is a `ClearOverrideCommand`; a unit that another open file's channel cannot take is refused
+  with that file's name (`editRefused`, `lastRefusal`), as are unknown units, interpolations and non-numbers.
+  Sort by value (`Qt::UserRole`), filter with `ChannelsModel::filterAccepts` (loose with the project option).
+- **AliasesDialog / MappingsDialog** (06 §13.1 item 7). Modeless editors on a copy of the document (reloaded while
+  clean); Apply refuses empty or repeated names, empty candidates, circular aliases (`Aliases::cycleThrough`),
+  mapped-twice logged names and unknown unit stamps, else pushes one `EditAliasesCommand` / `EditMappingsCommand`.
+- **ActiveChannelCommands** (06 §14.4 "Active channel", 03 §11 item 10). `registerCommands` adds
+  `channel.next_active`, `prev_active`, `hide`, `remove`, `edit_maths`, `status`, `filter`, `scale_offset` and
+  `zero_at_cursor` (Component context, the keys of `data/keymaps/default.json`), enabled while the focused component
+  has an active channel (the first visible trace when it names none; hide/remove on a `time_distance` graph). Spec
+  edits go out as the component's `specEditRequested`; CTRL+SHIFT+F builds the Main source's transient module
+  (`setTransientModule`, dropped on `sourceClosed`); CTRL+SHIFT+O and CTRL+SHIFT+Z write a `scale_offset` item of the
+  Main source's local maths (`SetLocalMathsCommand`, the channel's DPS kept); zero at cursor takes the value
+  displayed at the cursor through `qt::ValuesModel` (the single conversion rule of 04 §3.2) in the trace's display
+  unit, as a delta. `hint()` carries the status-bar texts (a logged or built-in channel, a value not available yet).
+
+Wiring (the shell, not done here): one `MathsEditor(session, maths, &loader)` per workspace behind
+`tools.maths_editor` (with `setMainSource` from the selection's Main and `openAt(args)` when the command carries
+`[module, item]`), the `channelstatus` dock with a `ChannelStatusWindow` over a `ChannelStatusModel(maths,
+&session)` behind `tools.channel_status`/`view.channel_status`, a `ChannelEditor(session, loader, &maths)` behind
+`tools.channel_editor` (and its dialogs behind `tools.aliases`/`tools.mappings`), and an `ActiveChannelCommands`
+with a `Host` of the canvas's focused component, the active worksheet and those two windows, its `hint()` to the
+status bar. The `channel.*` keymap rows stay `planned` until that wiring and their `KEYMAP_TEST` rows exist.
+
+| Test | Covers |
+|---|---|
+| `tests/editors_maths/tst_maths_editor` | the live diagnostics after the debounce with level colours and underlines; W-UNIT-MISSING amber and "warning does not block Apply"; Apply as one undo step and undo reloading the page; "cannot close with error" (close and ESC), no apply and no switch while invalid, Revert; an item switch applying the edit, the quote refused in names, E-NAME-EMPTY; editing without data (I-UNRESOLVED); "[unit] popup lists quantity units" (filtering, ENTER/arrows, existing brackets, a constant, ESC closing the popup only, compat units hidden); "Insert Range inserts quoted path" (also from its menu) and Insert Channel; hover help with the compat switch, a function's help, the tooltip event; module add (reserved and repeated ids refused) / enable / condition / move / delete / import / export and item add / constant (unknown unit refused) / filter / copy / paste with names kept / cut / enable / delete, one step each, undo to the start; local maths in the sidecar and undo; transient maths listed read-only; the status column and Recalculate; auto-save on close only after a module edit, and of the modules only (`closeSavesOnlyTheModules`, D-190) |
+| `tests/editors_maths/tst_channel_status_window` | AC-M2-12: the mapping, alias, case-fold, missing and logged-name steps in the detail pane, "(missing)" alias and workbook references kept; error colour and the trace tool tip; the filter (word prefix and other columns), errors only, Copy Table, sorting, the current row across a reset, status updates in the detail pane; `focusChannel` through a filter; double-click and ENTER on a maths item, a constant, an alias and a mapping (signal and command), nothing for built-ins and references |
+| `tests/editors_maths/tst_channel_editor` | rows of two files and the maths outputs, the search, sorting by value, `focusChannel` through a filter; unit / min / max / DPS / colour / interp edits as one `SetOverrideCommand` each with the display conversions and refused input, Clear override and undo; the unit rule with the conflicting file named and lifted when it closes; the Corr Dist unit; the Aliases (cycles and repeats refused, enable boxes) and Mappings (unknown units and repeats refused) editors as one step each |
+| `tests/editors_maths/tst_active_channel` | the nine keymap rows resolving to the commands in the graph's chain and PgDown dispatched; disabled without a focused component; next/previous wrapping and skipping hidden traces, hide and remove (an emptied group goes); CTRL+SHIFT+M at the item and hints for logged and built-in channels; CTRL+SHIFT+S on a maths item and an alias, a hint for a logged channel; CTRL+SHIFT+F transient (never a document or sidecar edit, replaced, gone after close and reopen); CTRL+SHIFT+O local maths with the DPS kept and an unknown unit refused; CTRL+SHIFT+Z on a deg C channel stored in K reading 0 at the cursor, twice |
+| `tests/editors_maths/tst_maths_editors_contract` | construction over the real services offscreen |
+
+## M2 data editors and dock work (`src/editors_data/`, `src/docks/`; 07 §5.1, AC-M2-05, AC-M2-11)
+
+`MappingPanel`, `DetailsEditor` and `LapEditor` live in `src/editors_data/{mapping_panel,details_editor,lap_editor}.cpp`
+(their M2-STUBs are gone; `ChannelEditor` moved to `src/editors_maths/`). Each header states the behaviour as
+built; D-179 (proposed) records where it departs from 05 §8.1 and 06 §5.4, §6, §7, §13.3, §13.4 and §13.8.
+
+- **MappingPanel** (05 §8.1, 06 §13.8, D-168). Follows `SourceLoader::mappingRequired()` itself and queues further
+  pending opens behind the one it shows (`showPending` is the same entry; a shown or queued id is ignored). The
+  bar names the file and how many channels wait. Rows: Vendor name, Vendor unit, Sample values, Analysis name,
+  Quantity, Unit, Rule, Apply to future files, Status; Quantity, Unit and Rule edit through combo boxes whose
+  choices are the cell's `ChoicesRole` (units of the row's quantity as canonical symbols, compat units left out;
+  a unit picked first sets the quantity, a unit of another quantity is refused). Proposals: the project's unit
+  map of the importer, else the units table, else the importer's inferred quantity (Scan re-runs them). Resolve
+  refuses while a row has no quantity and unit; otherwise one "Resolve mapping" step: the ticked rows into
+  `channels/unitmaps/<importerStem>.json` (`SetUnitMapCommand`), the analysis names as project Mappings
+  (`qt::applyMappingDecision`), then task B with every row. Save pushes the complete rows into the unit map
+  ("Save unit map", written to disk by the project's save and the journal) and leaves the open pending until
+  Resolve or Open Anyway. Open Anyway opens with the complete rows and the rest unitless; Cancel drops the open
+  (Import Log `open.mapping_cancelled`). `pendingChanged(bool)` tells the shell when to show it.
+- **LapEditor** (06 §13.3, D-014, D-016). Rows: the laps of the profile's primary group in time order and the
+  ignored beacons of its marker group (greyed, class "Ignored"); columns Number (header from the profile's
+  `terms.range`), Class, Start (session time `m:ss.fff`), Duration, Trusted, Stretch (`LapStretchService`; blank
+  outside the tolerance, grey while stretching is off), Provenance (Logged, Companion, User, Derived, Edited).
+  Follows the Main source until a source is picked in the combo. Insert by session time, by lap time after the
+  highlighted lap, or at the main cursor (one `InsertMarkerCommand`; the laps rebuild before the call returns);
+  per-beacon time offset of the highlighted lap's start beacon (a marker edit for a logged beacon, a move for a
+  user beacon); beacon offset by distance with Apply (`MarkerEditCommand` `offsetDistance` in metres; shown
+  "pending": no resolver moves the beacons yet, `docs/milestones/M2.md` open issues); Trusted through
+  `DataSelectionModel::setTrusted`; Restore Logged Laps (one command); the "Lap distance stretching" check box and
+  the Stretch Report. Free functions for the shell: `insertBeaconAtCursor`, `registerInsertBeaconCommand`
+  (`cursor.insert_marker`, Graph, Shift+F7) and `connectLapStretchToggle` (the toolbar's `data.lap_stretch_toggle`
+  action follows the service whoever toggles it).
+- **DetailsEditor** (06 §13.4, D-015). Columns: Detail, then one per open source; rows: the profile's details,
+  then the other ids of the open sources except the derived ones (File, Statistics). A cell edits as text (empty
+  allowed), `<number> [unit]` (the profile's unit when none is typed; a unit of another quantity or an unknown one
+  is refused; the decimals as typed are kept) or an ISO 8601 date-time, through one `SetDetailCommand`; an edited
+  cell shows a dot and its original in the tool tip; Restore Original (button and context menu); sort by any
+  column, Profile Order; Copy as TSV (`tableText`, `copyAsTsv`). A Venue edit emits `venueRenamed` (the
+  track-map prompt arrives with track maps, M3).
+- **DataWindow filters** (06 §5.4, §6). The context menu is built by `contextMenu(index)` (also without
+  `CommandActions`): Filters (checkable All, Selected, Fastest, Fastest 3, Within 1 % of Fastest, Lap
+  Numbers...), Apply Filter To All Sources (the shared `data.filter_all_sources` action, else a local one),
+  Trusted, Lap Editor... and Details... when the shell has registered `tools.lap_editor`/`tools.details`, Close
+  File. `LapFilterEditor` is non-modal: the parse error shows as you type, ENTER or Apply sets the filter or
+  keeps the previous one and the editor open with the error. Ranges kept only by their slot and filtered
+  source rows carry a filter icon (and say so in the tool tip).
+- **ChannelsWindow search** (06 §7 item 3, D-175). `ChannelsModel::filterAccepts` with `setLooseMatch`;
+  `followSession` follows `options.general.looseChannelSearch` (on open and every document change); a query that
+  matches nothing shows a note under the box; the box's tool tip explains the syntax.
+
+| Test | Covers |
+|---|---|
+| `tests/editors_data/tst_mapping_panel` | AC-M2-11 over the real open pipeline: the panel appears by itself, publication blocked (no worker waits), Resolve refused while incomplete, edits through the model (units filtered by quantity, unit-first, refusals), one "Resolve mapping" step (ticked rows into the unit map, the analysis name as a Mapping), the units on the published source, `channels/unitmaps/generic.csv.json` written by the project's save, the next file asking only for what the map lacks, Save completing the map without opening, a third file opening silently, undo; the combo-box editors; Scan over a map saved meanwhile; queued opens, Cancel (Import Log) and Open Anyway |
+| `tests/editors_data/tst_lap_editor` | the time text; rows, terms and provenance; AC-M2-05 in the editor (inserts by session time, by lap time, through the controls, synchronous rebuild, one command each, a later lap keeping its trust flag and offset); the cursor insert and `cursor.insert_marker`; per-beacon offsets (logged and user beacons), the offset by distance (pending, 0 removes it), Restore Logged Laps deleting the op; ignored beacons and a Partial lap after a reset; the source combo and following Main; the Stretch column, report and toggle shared with the toolbar action (no undo command) |
+| `tests/editors_data/tst_details_editor` | typed parsing; profile-first rows without derived details; edits through the model as SetDetailCommands with provenance User, the dot and the original; empty strings; numbers kept as typed (also on reopen) and refused units; Restore Original, undo and redo; the Venue signal; Copy as TSV; sort and Profile Order; a closed source leaving the grid |
+
+## M2 options editors and the shell's M2 wiring (`src/editors_options/`, `src/shell/`; 07 §5.1, AC-M2-06, D-178)
+
+- **OptionsDialog** (06 §13.7, 02 §6.2). Tabs General, Analysis, Colours, Fonts, Keys (the two read-only tabs are
+  built, not slipped). Every field's object name is its option key (`general.autosaveMinutes`,
+  `maths.compat.unaryMinusAbovePower`, ...; user settings by their settings key) and shows the project option, or
+  the 02 §6.2 default when the member is absent. Apply/OK write only the members the user changed as one
+  `SetProjectOptionsCommand` "Change options" (nothing for no change; the view state in `project.json` is never
+  touched) and the user settings (`language`, `ui.schemeSelectorOnToolbar`, `scheme.followOs`); an invalid field
+  (a spin box holding no number) refuses both with the reason under the tabs. Shown again it re-reads the options;
+  after an undo or redo it follows them unless edits are pending. Additions to 06: the lap-distance stretching
+  tolerance on the Analysis tab (`lapStretch.tolerancePct`, D-174), and the Keys tab's import (checked for conflicts
+  against the shipped keymap, written to `<config>/keymap.json`, applied at the next start), export (the effective
+  keymap) and reveal (`setRevealHandler` replaces the file manager in tests).
+- **SchemeSelector** (06 §2.1, §13.7, §16). The shipped light and dark schemes, then `<config>/schemes/*.scheme.json`
+  by name (a file that does not load or repeats a name is left out with a `logMessage`; a partial one is filled
+  from the shipped scheme of its background, one message per item). A choice calls `ProjectSession::setScheme`
+  (live, `scheme.active`) and turns `scheme.followOs` off; `applySystemScheme` follows `QStyleHints::colorScheme()`
+  while that is on; `restoreActive` brings back a user scheme at start-up; Duplicate ("<name> copy", selected),
+  Import (a new name only) and Export; `palette()` maps a scheme to the application palette (06 §16 rule 6).
+- **RecoveryDialog** (`src/shell/recovery_dialog.cpp`; 06 §18 step 3, AC-M2-06). "Recover unsaved changes?" with the
+  journalled documents (a file changed on disk since is marked) and the replay's log; Recover, Discard, Later
+  (closing it is Later); window-modal, opened with `open()`, never a nested event loop.
+- **MainWindow (M2).** Adopts the qtmodel wiring: `connectProjectSession`, `connectMathsSelection`,
+  `registerTextProfiles` (messages as Import warnings), a `LapStretchService` with `registerLapStretchCommand` (Data
+  menu and toolbar), `registerEditCommands` (Edit menu and toolbar, the undo/redo text in the tool tips) and a
+  `SessionRestore`. A component edit from the canvas is a `WorkbookCommand`; every `documentsChanged()` re-syncs the
+  workbook selector, the worksheet tabs (rebuilt when worksheets were added, removed, renamed or moved, keeping the
+  shown one by id) and the shown worksheet's components. `tools.options` opens the dialog window-modal with its
+  geometry from `layout.json` (`LayoutFile::dialogGeometry`). The toolbar is open, save | F9, overlays, single
+  colour, lap stretch | the scheme selector (shown by `ui.schemeSelectorOnToolbar`) | undo, redo. A scheme change
+  updates every worksheet context, repaints the canvas and the Data window and sets the application palette;
+  `QStyleHints::colorSchemeChanged` reaches the selector. `openProject(folder, logs)`: leaving a project first
+  (`confirmLeaveProject`), the recovery prompt when a journal is pending, then `SessionRestore` with the logs (after
+  the answer, so a recovered selection is the one restored). Leaving with edits saves (`options.general.saveOnExit`)
+  or asks Save/Discard/Cancel (`setExitPrompt` in tests; Discard deletes the journal); leaving with view-state
+  changes only writes them, unless a journal was put off with Later. The title marks a dirty project with "*". The
+  Messages dock auto-shows on the first error only while `options.general.autoShowMessagesOnError` is on (and the
+  user's `ui.doNotAutoShowMessages` is off).
+- **KeyEventRouter (M2).** The platform's text-editing chords (undo, redo, cut, copy, paste, select all) in an
+  editable `QLineEdit`, `QPlainTextEdit`, `QTextEdit`, spin box or `esses.textEntry` widget go to the field first,
+  like plain keys, in docks, the canvas and other windows (06 §13.2 item 6).
+- **The M2 editors in the shell** (D-180): the `MappingPanel` sits between the workbook/worksheet bar and the canvas,
+  hidden until its `pendingChanged(true)`, with the loader's hand-off on (unknown units stop at it); the
+  `channelstatus` dock (Bottom, Closed) holds a `ChannelStatusWindow` over the window's `ChannelStatusModel`
+  (`tools.channel_status` CTRL+U with an optional channel argument, and `view.channel_status`, both show, focus and
+  refresh it); the Maths Editor (`tools.maths_editor` CTRL+M, `[module, item]`; Main source from the selection),
+  Channel Editor (`tools.channel_editor` CTRL+E, `[channel]`) with its Aliases (`tools.aliases [alias]`) and Mappings
+  (`tools.mappings [logged name]`) editors, Details (`tools.details` CTRL+D) and Lap Editor (`tools.lap_editor`, with
+  the lap-stretch service) are modeless dialogs created on first use (accessors `mathsEditor()`, `channelEditor()`,
+  `lapEditor()`, `detailsEditor()`), shown, raised and activated by their command, their geometry kept in
+  `layout.json` `dialogs.<key>` when they close; `registerInsertBeaconCommand` (SHIFT+F7) and an
+  `ActiveChannelCommands` (`activeChannelCommands()`, rows under Component/Active Channel) are registered; editor
+  messages go to Messages, hints and refusals to the status bar. The canvas has the focus when the window comes up.
+
+| Test | Covers |
+|---|---|
+| `tests/editors_options/tst_options_dialog` | the five tabs; defaults for absent members; Apply as one undoable command with only the changed members, undo/redo shown in the fields, the view state untouched, no command without a change; user settings and a setting changed elsewhere; an invalid field refusing Apply and OK; Cancel dropping edits; the Fonts tab following a scheme change; the Keys tab (user keys vs defaults, import with the conflict check, export, reveal); Duplicate revealing the user folder |
+| `tests/editors_options/tst_scheme_selector` | shipped then user schemes, skipped and filled files with their messages; a choice live in the session and every selector, `scheme.active`, follow OS turned off, never on the undo stack; `restoreActive`; follow OS (Qt 6.8+: a dark OS picks the dark scheme); Duplicate, Import, Export; the palette mapping |
+| `tests/shell/tst_shell_m2` | Edit, Tools and Data menu items and the toolbar; component edits undone and redone by CTRL+Z/CTRL+Y (worksheet and Data window) and the toolbar with the canvas following; CTRL+Z in the Channels search box as text undo; the lap-stretch toggle as view state; Options window-modal (keys paused), its geometry in `layout.json`, an applied option on the stack; a scheme switch reaching the graph, the hidden worksheet and the palette, kept per user; save on exit, Save/Discard/Cancel when leaving for exit or another project, the view state written on exit; auto-show Messages; the RecoveryDialog's list and answers |
+| `tests/ui/tst_lap_editor` | AC-M2-05 in the shell on a 60-lap outing: Tools > Lap Editor, SHIFT+F7 in the graph rebuilding the laps before the key returns as one step, a later lap's trust flag and offsets following its start marker, CTRL+Z/CTRL+Y, a beacon time offset, Restore Logged Laps as one step |
+| `tests/ui/tst_mapping_panel` | AC-M2-11 in the shell: a CSV with unknown units beside an `.ld`, the panel above the worksheet area, publication blocked, Resolve as one step with CTRL+Z/CTRL+Y, CTRL+S writing the unit map, a silent next open; Save then Open Anyway, a later file asking only for what the map lacks |
+| `tests/ui/tst_project_recovery` | AC-M2-06 in the shell: a reopen restores the previous data, selection, single colour, filter and worksheet; a kill after the autosave leaves the files intact and the next open prompts, waits, recovers (options, the graph's channel, the journalled selection) and saves with CTRL+S; Later and Discard |
+| `tests/ui/keymap/tst_keymap` (M2 rows) | `edit.undo`, `edit.redo` (keys, also from the Data window), `tools.options`, `data.lap_stretch_toggle`, `view.messages_window`, `view.reset_docks` (menu-only rows through their action); the editors' rows (D-180): `tools.maths_editor`, `tools.channel_status`, `view.channel_status`, `tools.channel_editor`, `tools.aliases`, `tools.mappings`, `tools.details`, `tools.lap_editor`, `data.filter_all_sources`, `cursor.insert_marker` and the nine `channel.*` keys over the focused graph |

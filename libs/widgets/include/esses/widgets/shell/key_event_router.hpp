@@ -17,6 +17,9 @@
 //   focus elsewhere in the scope window -> [Global] (the worksheet tab bar, the workbook selector, the tool
 //                                          bar); no focus widget at all -> [Worksheet, Global]
 //   focus in another window             -> function keys and chords only, [Global]
+// Anywhere, the platform's text-editing chords (undo, redo, cut, copy, paste, select all) in an editable text
+// field (a QLineEdit, QPlainTextEdit, QTextEdit or spin box that is not read-only, or an "esses.textEntry"
+// widget) go to the field first, as plain keys do (06 section 13.2 item 6: CTRL+Z there is text undo; M2).
 // The first context with a binding wins; when its command runs the event is accepted. Split from
 // KeymapBinder because key events are Qt Gui types (see qt::KeymapBinder).
 #pragma once

@@ -1,0 +1,6 @@
+{
+  "$schema": "urn:esses:unitmap-1",
+  "schemaVersion": 1,
+  "importer": "text.profile:logger-semicolon",
+  "version": "1.0.0"
+}

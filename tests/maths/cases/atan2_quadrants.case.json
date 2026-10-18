@@ -1,0 +1,44 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "atan2_quadrants",
+  "expression": "atan2('Y', 'X')",
+  "provenance": {
+    "kind": "derived",
+    "ref": "Maths Functions (Pro): atan2",
+    "note": "four-quadrant (release note 1.0.20)"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 800000,
+  "inputs": {
+    "Y": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [1, 1, -1, -1, 0, 2, 0, -3]
+    },
+    "X": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [1, -1, -1, 1, -2, 0, 3, 0]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [0.785398163397, 2.35619449019, -2.35619449019, -0.785398163397, 3.14159265359, 1.57079632679, 0, -1.57079632679],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

@@ -3,6 +3,8 @@
 #include "doc_io.hpp"
 
 #include <esses/base/atomic_file.hpp>
+#include <esses/project/migrations.hpp>
+#include <esses/project/schema_registry.hpp>
 
 #include <algorithm>
 #include <string>
@@ -13,31 +15,86 @@ using jsonio::asInt;
 using jsonio::asString;
 using jsonio::violate;
 
-void readSchemaHeader(jsonio::ObjectReader& r, std::string_view name, std::vector<std::string>& log) {
-    const std::string id = std::string(name) + "-1";
-    if (r.optional("$schema") == nullptr) {
-        log.push_back("no \"$schema\": read as " + id + " (02 section 6.6 rule 4)");
-    } else {
-        jsonio::checkSchemaId(r.value(), name, 1, r.pointer());
+DocVersion prepareDocument(json& root, const DocKind& kind, std::vector<std::string>& log) {
+    const std::string id = kind.id();
+    if (!root.is_object()) {
+        violate("", "a " + id + " document is a JSON object");
     }
-    if (const json* v = r.optional("schemaVersion")) {
-        const std::int64_t version = asInt(*v, r.child("schemaVersion"));
-        if (version < 1) {
-            violate(r.child("schemaVersion"), "schemaVersion must be at least 1");
+    if (root.contains("$schema") && !root["$schema"].is_null()) {
+        jsonio::checkSchemaId(root, kind.name, 1, "");
+    } else {
+        log.push_back("no \"$schema\": read as " + id + " (02 section 6.6 rule 4)");
+    }
+    DocVersion v;
+    if (root.contains("schemaVersion") && !root["schemaVersion"].is_null()) {
+        const std::int64_t read = asInt(root["schemaVersion"], "/schemaVersion");
+        if (read < 1) {
+            violate("/schemaVersion", "schemaVersion must be at least 1");
         }
-        if (version > 1) {
-            log.push_back(id + " schemaVersion " + std::to_string(version) +
-                          " is newer than this build's 1; read as 1, unknown members preserved");
-        }
+        v.read = read > 1'000'000 ? 1'000'000 : static_cast<int>(read);
     } else {
         log.push_back("no \"schemaVersion\": read as " + id + " version 1");
     }
+    // Read leniently (rule 4): from here the root carries the header it is read as (and migrated from).
+    root["$schema"] = "urn:esses:" + id;
+    root["schemaVersion"] = v.read;
+    v.write = std::max(v.read, kind.current);
+    if (v.read > kind.current) {
+        log.push_back(id + " schemaVersion " + std::to_string(v.read) + " is newer than this build's " +
+                      std::to_string(kind.current) + "; read as it is, its version kept on save");
+        return v;
+    }
+    if (v.read < kind.current) {
+        auto doc = jsonio::toDoc(root);
+        if (!doc) {
+            violate("", doc.error().message);
+        }
+        auto upgraded = Migrations::instance().upgrade(std::move(doc).value(), id, kind.current, log);
+        if (!upgraded) {
+            const Error& e = upgraded.error();
+            violate(e.context.detail.value_or(std::string()), e.message, e.code,
+                    e.context.schemaId.value_or(std::string()));
+        }
+        root = jsonio::fromDoc(*upgraded);
+        v.migrated = true;
+    }
+    return v;
 }
 
-json newDocument(std::string_view name) {
+void validateDocument(const json& doc, const DocKind& kind) {
+    auto value = jsonio::toDoc(doc);
+    if (!value) {
+        violate("", value.error().message);
+    }
+    auto valid = SchemaRegistry::instance().validate(*value, kind.id());
+    if (!valid && valid.error().code != ErrorCode::NotFound) {
+        const Error& e = valid.error();
+        violate(e.context.detail.value_or(std::string()), e.message);
+    }
+}
+
+Error newerMinorError(Error e, const DocKind& kind, const DocVersion& version) {
+    if (version.read <= kind.current || e.code != ErrorCode::Invalid) {
+        return e;
+    }
+    e.code = ErrorCode::Unsupported;
+    e.message =
+        kind.id() + " schemaVersion " + std::to_string(version.read) + " was written by a newer build (" +
+        "this one reads up to " + std::to_string(kind.current) +
+        ") and holds content this build does not understand; the file is left untouched: " + e.message;
+    e.context.schemaId = "urn:esses:" + kind.id();
+    return e;
+}
+
+void markSchemaHeader(jsonio::ObjectReader& r) {
+    r.skip("$schema");
+    r.skip("schemaVersion");
+}
+
+json newDocument(std::string_view name, int version) {
     json root = json::object();
     root["$schema"] = "urn:esses:" + std::string(name) + "-1";
-    root["schemaVersion"] = 1;
+    root["schemaVersion"] = version;
     return root;
 }
 

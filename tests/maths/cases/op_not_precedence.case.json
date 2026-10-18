@@ -1,0 +1,36 @@
+{
+  "$schema": "urn:esses:maths-case-1",
+  "schemaVersion": 1,
+  "id": "op_not_precedence",
+  "expression": "(NOT 'Z' GTE 1) + (!'Z' + 1) * 2",
+  "provenance": {
+    "kind": "derived",
+    "ref": "03_MATHS_ENGINE.md 2.3",
+    "note": "NOT and ! bind tighter than the relational operators: NOT 'Z' GTE 1 is (NOT 'Z') GTE 1 (2.3)"
+  },
+  "rate": "auto",
+  "compat": {},
+  "precision": "single",
+  "durationUs": 800000,
+  "inputs": {
+    "Z": {
+      "rate": {
+        "num": 10,
+        "den": 1
+      },
+      "unit": "",
+      "values": [0, 1, 0, 2, -1, 0, 0.5, 3]
+    }
+  },
+  "expected": {
+    "rate": {
+      "num": 10,
+      "den": 1
+    },
+    "values": [5, 2, 5, 2, 2, 5, 2, 2],
+    "tolerance": {
+      "abs": 1e-06,
+      "rel": 1e-06
+    }
+  }
+}

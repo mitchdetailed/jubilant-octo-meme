@@ -8,13 +8,24 @@
 #include <esses/widgets/shell/command_actions.hpp>
 
 #include <QAction>
+#include <QActionGroup>
+#include <QApplication>
 #include <QColor>
+#include <QDialogButtonBox>
 #include <QFont>
 #include <QHeaderView>
+#include <QIcon>
 #include <QIdentityProxyModel>
+#include <QLabel>
+#include <QLineEdit>
 #include <QMenu>
+#include <QPainter>
+#include <QPixmap>
+#include <QPolygonF>
+#include <QPushButton>
 #include <QTreeView>
 #include <QVBoxLayout>
+#include <memory>
 #include <utility>
 
 namespace esses::widgets {
@@ -27,15 +38,87 @@ QColor toColor(project::Rgba c) {
     return QColor(project::red(c), project::green(c), project::blue(c), project::alpha(c));
 }
 
+// The filter icon of 06 section 6 (a funnel in the text colour), drawn once.
+QIcon filterIcon() {
+    static const QIcon icon = [] {
+        QPixmap pm(12, 12);
+        pm.fill(Qt::transparent);
+        QPainter p(&pm);
+        p.setRenderHint(QPainter::Antialiasing);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QApplication::palette().color(QPalette::Text));
+        const QPolygonF funnel({QPointF(1.0, 1.5), QPointF(11.0, 1.5), QPointF(7.0, 6.0), QPointF(7.0, 11.0),
+                                QPointF(5.0, 10.0), QPointF(5.0, 6.0)});
+        p.drawPolygon(funnel);
+        p.end();
+        return QIcon(pm);
+    }();
+    return icon;
+}
+
+QString filterTitle(qt::FilterSpec::Kind kind) {
+    using K = qt::FilterSpec::Kind;
+    switch (kind) {
+    case K::All:
+        return QObject::tr("All");
+    case K::Selected:
+        return QObject::tr("Selected");
+    case K::Fastest:
+        return QObject::tr("Fastest");
+    case K::Fastest3:
+        return QObject::tr("Fastest 3");
+    case K::WithinOnePercent:
+        return QObject::tr("Within 1 % of Fastest");
+    case K::LapNumbers:
+        break;
+    }
+    return QObject::tr("Lap Numbers");
+}
+
 // The Qt-Core-only model carries slots and trust as roles; this proxy turns them into fonts, colours,
 // alignment and tool tips (06 sections 5.3, 6 and 20).
 class SlotStyleProxy final : public QIdentityProxyModel {
 public:
     using QIdentityProxyModel::QIdentityProxyModel;
     std::shared_ptr<const project::Scheme> scheme;
+    const qt::DataSelectionModel* selection = nullptr;
+    const qt::DataWindowModel* rows = nullptr;
+
+    // The filter of a source row (index.parent() invalid) that hides ranges, else nullopt.
+    std::optional<qt::FilterSpec> sourceFilter(const QModelIndex& index) const {
+        if (selection == nullptr || rows == nullptr || index.parent().isValid()) {
+            return std::nullopt;
+        }
+        const auto src = rows->sourceAt(mapToSource(index));
+        if (!src) {
+            return std::nullopt;
+        }
+        const qt::FilterSpec f = selection->filter(*src);
+        return f.kind == qt::FilterSpec::Kind::All ? std::nullopt : std::optional<qt::FilterSpec>(f);
+    }
 
     QVariant data(const QModelIndex& index, int role) const override {
         using M = qt::DataWindowModel;
+        if (index.column() == M::NameCol && (role == Qt::DecorationRole || role == Qt::ToolTipRole)) {
+            // Filters (06 section 5.4): a row kept only by its slot, and a filtered source, carry the icon.
+            if (QIdentityProxyModel::data(index, M::FilteredInRole).toBool()) {
+                return role == Qt::DecorationRole
+                           ? QVariant(filterIcon())
+                           : QVariant(
+                                 QObject::tr("Shown because it holds a selection slot; the filter hides it"));
+            }
+            if (const auto f = sourceFilter(index)) {
+                if (role == Qt::DecorationRole) {
+                    return filterIcon();
+                }
+                const QString own = QIdentityProxyModel::data(index, role).toString();
+                QString text = QObject::tr("Filter: %1").arg(filterTitle(f->kind));
+                if (f->kind == qt::FilterSpec::Kind::LapNumbers) {
+                    text += QStringLiteral(" (%1)").arg(QString::fromStdString(f->laps));
+                }
+                return own.isEmpty() ? text : own + QLatin1Char('\n') + text;
+            }
+        }
         switch (role) {
         case Qt::FontRole: {
             if (QIdentityProxyModel::data(index, M::UntrustedRole).toBool()) {
@@ -116,7 +199,10 @@ public:
 DataWindow::DataWindow(qt::DataSelectionModel& selection, qt::CommandRegistry& commands, QWidget* parent)
     : QWidget(parent), selection_(selection), commands_(commands) {
     model_ = new qt::DataWindowModel(selection_, this);
-    proxy_ = new SlotStyleProxy(this);
+    auto* styled = new SlotStyleProxy(this);
+    styled->selection = &selection_;
+    styled->rows = model_;
+    proxy_ = styled;
     proxy_->setSourceModel(model_);
     tree_ = new QTreeView(this);
     tree_->setObjectName(QStringLiteral("dataTree"));
@@ -300,33 +386,163 @@ void DataWindow::onClicked(const QModelIndex& index) {
 
 void DataWindow::showContextMenu(const QPoint& pos) {
     const QModelIndex index = tree_->indexAt(pos);
-    if (!index.isValid() || actions_.isNull()) {
-        return;
+    if (const std::unique_ptr<QMenu> menu = contextMenu(index)) {
+        menu->exec(tree_->viewport()->mapToGlobal(pos));
+    }
+}
+
+std::unique_ptr<QMenu> DataWindow::contextMenu(const QModelIndex& index) {
+    if (!index.isValid()) {
+        return nullptr;
     }
     tree_->setCurrentIndex(index);
-    QMenu menu(this);
+    auto menu = std::make_unique<QMenu>(this);
+    const auto shared = [this](const char* id) -> QAction* {
+        return actions_.isNull() ? nullptr : actions_->action(QString::fromLatin1(id));
+    };
     for (const char* id : {"data.select_main", "data.toggle_overlay0", "data.toggle_overlay"}) {
-        if (QAction* a = actions_->action(QString::fromLatin1(id))) {
-            menu.addAction(a);
+        if (QAction* a = shared(id)) {
+            menu->addAction(a);
         }
     }
-    menu.addSeparator();
+    if (!menu->isEmpty()) {
+        menu->addSeparator();
+    }
+    if (const auto src = highlightedSource()) {
+        menu->addMenu(filterMenu(*src, menu.get()));
+        if (QAction* all = shared("data.filter_all_sources")) {
+            menu->addAction(all);
+        } else {
+            connect(menu->addAction(tr("Apply Filter To All Sources")), &QAction::triggered, this,
+                    [this] { selection_.applyFilterToAllSources(); });
+        }
+        menu->addSeparator();
+    }
     const QModelIndex trust = index.siblingAtColumn(qt::DataWindowModel::TrustedCol);
     const QVariant checked = proxy_->data(trust, Qt::CheckStateRole);
     if (checked.isValid()) {
-        QAction* trusted = menu.addAction(tr("Trusted"));
+        QAction* trusted = menu->addAction(tr("Trusted"));
         trusted->setCheckable(true);
         trusted->setChecked(checked.toInt() == Qt::Checked);
         connect(trusted, &QAction::toggled, this, [this, trust](bool on) {
             proxy_->setData(trust, on ? Qt::Checked : Qt::Unchecked, Qt::CheckStateRole);
         });
-        menu.addSeparator();
+        menu->addSeparator();
     }
-    if (QAction* a = actions_->action(QStringLiteral("data.close_file"))) {
-        menu.addAction(a);
+    if (!actions_.isNull()) {
+        actions_->refresh();
     }
-    actions_->refresh();
-    menu.exec(tree_->viewport()->mapToGlobal(pos));
+    bool tools = false;
+    for (const char* id : {"tools.lap_editor", "tools.details"}) {
+        if (QAction* a = shared(id); a != nullptr && a->isEnabled()) {
+            menu->addAction(a);
+            tools = true;
+        }
+    }
+    if (tools) {
+        menu->addSeparator();
+    }
+    if (QAction* a = shared("data.close_file")) {
+        menu->addAction(a);
+    }
+    return menu;
+}
+
+QMenu* DataWindow::filterMenu(const model::SourceId& source, QWidget* parent) {
+    using K = qt::FilterSpec::Kind;
+    auto* menu = new QMenu(tr("Filters"), parent);
+    menu->setObjectName(QStringLiteral("dataFilters"));
+    auto* group = new QActionGroup(menu);
+    group->setExclusive(true);
+    const qt::FilterSpec current = selection_.filter(source);
+    for (const K kind : {K::All, K::Selected, K::Fastest, K::Fastest3, K::WithinOnePercent, K::LapNumbers}) {
+        QAction* a = menu->addAction(kind == K::LapNumbers ? tr("Lap Numbers...") : filterTitle(kind));
+        a->setCheckable(true);
+        a->setChecked(current.kind == kind);
+        const std::string_view name = qt::filterKindName(kind);
+        a->setData(QString::fromUtf8(name.data(), static_cast<qsizetype>(name.size())));
+        group->addAction(a);
+        if (kind == K::LapNumbers) {
+            connect(a, &QAction::triggered, this, [this, source] { editLapNumbers(source); });
+        } else {
+            connect(a, &QAction::triggered, this,
+                    [this, source, kind] { selection_.setFilter(source, qt::FilterSpec{kind, {}}); });
+        }
+    }
+    return menu;
+}
+
+LapFilterEditor* DataWindow::editLapNumbers(const model::SourceId& source) {
+    if (!lapEditor_.isNull() && lapEditor_->source() != source) {
+        lapEditor_->close();
+        lapEditor_ = nullptr;
+    }
+    if (lapEditor_.isNull()) {
+        lapEditor_ = new LapFilterEditor(selection_, source, this);
+        lapEditor_->setAttribute(Qt::WA_DeleteOnClose);
+    }
+    lapEditor_->show();
+    lapEditor_->raise();
+    lapEditor_->activateWindow();
+    return lapEditor_.data();
+}
+
+// ---- LapFilterEditor ------------------------------------------------------------------------------------
+
+LapFilterEditor::LapFilterEditor(qt::DataSelectionModel& selection, model::SourceId source, QWidget* parent)
+    : QDialog(parent), selection_(selection), source_(source) {
+    setModal(false);
+    setObjectName(QStringLiteral("lapFilterEditor"));
+    setWindowTitle(tr("Lap Number Filter"));
+    auto* help = new QLabel(tr("Lap numbers and ranges, for example 3, 5-7"), this);
+    text_ = new QLineEdit(this);
+    text_->setObjectName(QStringLiteral("lapNumbers"));
+    text_->setAccessibleName(tr("Lap numbers"));
+    const qt::FilterSpec current = selection_.filter(source_);
+    if (current.kind == qt::FilterSpec::Kind::LapNumbers) {
+        text_->setText(QString::fromStdString(current.laps));
+    }
+    error_ = new QLabel(this);
+    error_->setObjectName(QStringLiteral("lapNumbersError"));
+    error_->setWordWrap(true);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Apply | QDialogButtonBox::Cancel, this);
+    auto* layout = new QVBoxLayout(this);
+    layout->addWidget(help);
+    layout->addWidget(text_);
+    layout->addWidget(error_);
+    layout->addWidget(buttons);
+    connect(text_, &QLineEdit::textChanged, this, [this](const QString& t) {
+        error_->setText(QString::fromStdString(qt::DataSelectionModel::lapNumbersError(t.toStdString())));
+    });
+    // ENTER in the text presses Apply (the default button), never Cancel.
+    QPushButton* applyButton = buttons->button(QDialogButtonBox::Apply);
+    applyButton->setDefault(true);
+    buttons->button(QDialogButtonBox::Cancel)->setAutoDefault(false);
+    connect(applyButton, &QPushButton::clicked, this, [this] { static_cast<void>(apply()); });
+    connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
+    // The model refuses text that does not parse (06 section 5.4): the previous filter stays, the error
+    // shows.
+    connect(&selection_, &qt::DataSelectionModel::filterRejected, this,
+            [this](const model::SourceId& id, const QString& message) {
+                if (id == source_) {
+                    rejected_ = true;
+                    error_->setText(message);
+                }
+            });
+}
+
+LapFilterEditor::~LapFilterEditor() = default;
+
+bool LapFilterEditor::apply() {
+    rejected_ = false;
+    selection_.setFilter(source_,
+                         qt::FilterSpec{qt::FilterSpec::Kind::LapNumbers, text_->text().toStdString()});
+    if (rejected_) {
+        return false;
+    }
+    error_->clear();
+    accept();
+    return true;
 }
 
 } // namespace esses::widgets

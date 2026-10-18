@@ -36,8 +36,91 @@ Limit 200 ms (D-042). The measured median is recorded in `docs/milestones/M0.md`
 
 ## Maths readiness set (M2)
 
-The 20 maths expressions of AC-M2-10 (a fixed mix of Elementwise, Windowed, IIR, Stateful and Range kernels on
-RW-2) are defined here when `bench/maths_bench` lands in M2.
+AC-M2-10 (07 §12: "20 maths channels of `bench/workloads.md` on RW-2 ready after request <= 2 frames"; D-042,
+D-139). `bench/maths_bench.cpp` builds RW-2 in memory: 30 min, 8 channels at 1 kHz (`Wheel Speed FL/FR/RL/RR` in
+m/s, `Damper Pos FL/FR/RL/RR` in mm), 32 at 500 Hz (`Engine RPM`, `Throttle Pos`, `Brake Pres Front`, `Brake Pres
+Rear`, `Steered Angle`, `G Force Lat/Long/Vert` and 24 `Ch500 <n>`), 60 at 100 Hz (`Gear`, `Ground Speed` in m/s,
+`Oil Temp`, `Water Temp` and 56 `Ch100 <n>`) and 100 at 20 Hz (`Ch20 <n>`), smooth periodic F32 signals with a little
+ripple, one outing and 90 s laps (`Outings:Laps`). The 20 expressions are one global module of a fresh `MathGraph`:
+
+| Class | Output | Expression |
+|---|---|---|
+| Elementwise | Wheel Speed Front | `('Wheel Speed FL' + 'Wheel Speed FR') / 2` |
+| Elementwise | Brake Bias | `'Brake Pres Front' / max('Brake Pres Front' + 'Brake Pres Rear', 1) * 100` |
+| Elementwise | Combined G | `hypot('G Force Lat', 'G Force Long')` |
+| Elementwise | Full Throttle | `choose('Throttle Pos' > 95, 1, 0)` |
+| Elementwise | Rear Slip | `('Wheel Speed RL' + 'Wheel Speed RR') / max('Wheel Speed FL' + 'Wheel Speed FR', 1) - 1` |
+| Windowed | Damper Vel FL | `derivative(smooth('Damper Pos FL', 5))` |
+| Windowed | Ground Speed Smooth | `smooth('Ground Speed', 0.5)` |
+| Windowed | Engine RPM Smooth | `smooth('Engine RPM', 25)` |
+| Windowed | Steer Rate | `derivative('Steered Angle')` |
+| IIR | G Lat Filtered | `filter_lp('G Force Lat', 10, 2)` |
+| IIR | G Long Zero Phase | `filter_lp('G Force Long', 5, -2)` |
+| IIR | Damper FR HP | `filter_hp('Damper Pos FR', 1, 2)` |
+| IIR | G Vert Cheby | `filter_cheby_lp('G Force Vert', 20, 4, 0.5)` |
+| Stateful | Distance | `integrate('Ground Speed')` |
+| Stateful | Lap Max Oil Temp | `running_max('Oil Temp', 'Gear' > 0, range_change("Outings:Laps"))` |
+| Stateful | Brake Latch | `flip_flop('Brake Pres Front' > 20, 'Brake Pres Front' < 2)` |
+| Stateful | Throttle Shifted | `time_shift('Throttle Pos', 0.1)` |
+| Stateful | Lap Max Speed | `stat_max('Ground Speed', 'Gear' > 0, range_change("Outings:Laps"))` |
+| Range | On Lap | `range_is("Outings:Laps")` |
+| Range | Lap Number | `range_change("Outings:Laps")` |
+
+Rows of `esses-maths-bench` (one untimed run first, so RW-2's columns are resident as after an open; then `--runs`
+runs, each on a fresh graph):
+
+| Row | Measures | Measured | Limit |
+|---|---|---|---|
+| `maths.rw2_20_ready` | from the first `require()` of the 20 outputs to the last `Future` ready, on the default `TaskPool` (one task per node, parallel across nodes, D-139; each node streams its plan and idle workers seal its later chunks, D-191); the logical processor count and the workers are part of the row | **28.3 ms** (16 logical processors on 8 cores, 15 workers) | 33.3 ms (2 frames at 60 Hz): met (D-191) |
+| `maths.rw2_20_define` | `setModules()` of the 20 items (parse, resolve, type check, compile; owning thread) | 0.60 ms | recorded |
+| `maths.filter_lp_zero_phase_21600k` | `evaluateWhole` of `filter_lp('X', 5, -2)` over 21.6 M samples (6 h at 1 kHz), one core | 224.8 ms | recorded (150 ms from v1.0) |
+| `analysis.marker_rebuild_60lap` | AC-M2-05: `DataSource::withSidecar` with the circuit rules after a user beacon inserted in lap 10 and after an offset edit of beacon 20, on a 60-lap outing of 200 channels, one core (both rebuilds per run) | 0.11 ms | 5 ms |
+
+Measured on the reference machine above (2026-10-13, `win-msvc-bench` Release, after D-191), median of 15 (5 for
+the filter, 30 rebuilds), with the maintainer's desktop applications open: three batches of 15 gave medians of
+28.3, 28.5 and 29.0 ms for `maths.rw2_20_ready` (26.9-32.0 ms over all 45 runs; 25.3-26.6 ms in earlier batches with
+less background load), against 124.4 and 127.0 ms for the build before D-191 run alternately with it (113-120 ms
+when it was measured first). `--nodes` prints each output's time when required alone: 0.7-13.1 ms, 79.7 ms in all
+(402 ms before D-191), the slowest `filter_hp('Damper Pos FR', 1, 2)` over 1.8 M samples (its two RC passes are one
+sequential recursion each); `--workers 1` gives the serial cost of the set, 175 ms, so the set runs 6.2 times faster
+on 15 workers of 8 cores. Where the serial time goes (per kernel, the store's seal of the output chunks, the chunk
+writes): `docs/milestones/M2.md` §6 open issue 5. `--digest` prints a fingerprint of every result instead of timing
+(two builds that compute the same results print the same lines).
+
+```
+build\<bench dir>\bin\esses-maths-bench --runs 7 --gate --json maths.json
+build\<bench dir>\bin\esses-maths-bench --runs 1 --nodes
+build\<bench dir>\bin\esses-maths-bench --runs 7 --workers 1
+build\<bench dir>\bin\esses-maths-bench --digest > digest.txt
+```
+
+## M2 text-import rows (AC-M2-13)
+
+`bench/formats_bench.cpp` (executable `esses-formats-bench`, Qt-free, `std::chrono`) writes on first use, into
+`<build>/bench-data/`, two deterministic 300 MB files of 100 channels at 100 Hz (two decimals, smooth signals,
+units from a fixed list): one in the legacy CSV layout (`motec.csv` profile: quoted key/value preamble, names and
+units rows, every field quoted, CRLF; 335,362 rows) and one plain table (generic profile: names and units rows,
+LF). Each run has a fresh chunk cache and task pool (all logical processors); the files are warm after an untimed
+first run. `--smoke` uses 2 MB files and one run (ctest `bench.formats_bench.smoke`, label `bench-smoke`);
+`--gate` exits 1 above a limit; `ESSES_BENCH_REPETITIONS` and `ESSES_BENCH_OUT` as for the other benches.
+
+| Row | Workload | Measured | Limit |
+|---|---|---|---|
+| `formats.csv_probe_300mb_100col` | `ImporterRegistry::probe` of the legacy file (pass 1: sniff, preamble, header, row scan, classification, rate) | **166 ms** | 2,000 ms (05 §1.3 rule 2) |
+| `formats.csv_first_data_300mb_100col` | `ImporterRegistry::open` (units to base, whole-outing ranges) of the legacy file, then every chunk of 8 channels resident: all their chunks prefetched at Visible, as a graph's first build asks, then waited for | **1,553 ms** | 10,000 ms (07 §12, first paint) |
+| `formats.csv_generic_first_data_300mb_100col` | the same through the generic profile on the plain table (pass 1 includes the full scan of sparse "timestamped") | **2,429 ms** | 10,000 ms |
+
+Measured on the reference machine (2026-10-12, `win-msvc-core-rel`, 16 logical processors, median of 5): the
+legacy open takes about 110 ms, the generic open about 860 ms; the rest is the slab decode of all 100 columns (6
+slabs decoded in parallel, siblings sealed in the same sweep). "First data" is the formats share of the 07 §12
+first-paint budget; the graph's build and raster of eight traces adds about 90 ms (`open.first_paint_100mb_8ch`
+below, 8 x 3 M samples). With one worker the legacy first data takes 3.8 s (about 80 MB/s of quoted text per
+thread).
+
+Since D-190 (2026-10-13, `win-msvc-bench`, the same machine, median of 5) both passes read the file through guarded
+4 MiB copies instead of the mapping itself (a file truncated under the mapping fails a chunk instead of the process)
+and keep copies of the sampled rows: probe **230.5 ms**, first data **1,648.9 ms** legacy and **2,756.3 ms** generic
+(legacy open about 175 ms, generic open about 1,180 ms), all within their limits.
 
 ## M1 budget rows (AC-M1-02, AC-M1-03)
 

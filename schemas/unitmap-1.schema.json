@@ -1,0 +1,133 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:unitmap-1",
+  "title": "Esses unit-mapping profile (unitmap-1)",
+  "description": "The user's answers to the Mapping panel for one importer (05 section 8.2, 02 section 6.3, D-028, D-029): <Project>/channels/unitmaps/<importer file stem>.json. A rule maps a logged name and/or the file's unit spelling to a quantity and a unit symbol, and optionally to an analysis name, which becomes a project Mapping. Rules are tried most specific first (nameAndUnit, nameOnly, unitOnly); names compare case-folded. Unknown top-level members are allowed and preserved; rules are closed.",
+  "type": "object",
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "importer",
+    "rules"
+  ],
+  "properties": {
+    "$schema": {
+      "description": "Schema id (D-072). The urn:esses: form is written; the bare esses: form of earlier drafts and the later https form are accepted on load and normalised on save (02 section 6.6 rule 1).",
+      "type": "string",
+      "pattern": "^(urn:esses:unitmap-1|esses:unitmap-1|https://[^/\\s]+(/[^/\\s]+)*/unitmap-1(\\.schema)?\\.json)$"
+    },
+    "schemaVersion": {
+      "description": "Minor version within major 1 (02 section 6.6 rule 1).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "importer": {
+      "$ref": "#/definitions/importerId"
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/unitMapRule"
+      }
+    },
+    "x-esses-legacy": {
+      "$ref": "#/definitions/legacyBag"
+    }
+  },
+  "definitions": {
+    "importerId": {
+      "description": "Importer id (D-028): \"motec.ld\", \"motec.csv\", \"text.profile:generic.csv\", ...",
+      "type": "string",
+      "pattern": "^[a-z0-9]+([._:-][a-z0-9]+)*$"
+    },
+    "legacyBag": {
+      "description": "Fields removed by a migration, kept verbatim (02 section 6.6 rule 3).",
+      "type": "object"
+    },
+    "unitMapRule": {
+      "type": "object",
+      "required": [
+        "match",
+        "quantity",
+        "unit"
+      ],
+      "properties": {
+        "match": {
+          "enum": [
+            "nameOnly",
+            "unitOnly",
+            "nameAndUnit"
+          ]
+        },
+        "name": {
+          "description": "The logged name (nameOnly, nameAndUnit).",
+          "type": "string",
+          "minLength": 1
+        },
+        "vendorUnit": {
+          "description": "The unit as the file spells it (unitOnly, nameAndUnit).",
+          "type": "string",
+          "minLength": 1
+        },
+        "quantity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "description": "The target unit symbol of the quantity.",
+          "type": "string"
+        },
+        "analysisName": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "match": {
+                "const": "nameOnly"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "name"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "match": {
+                "const": "unitOnly"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "vendorUnit"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "match": {
+                "const": "nameAndUnit"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "name",
+              "vendorUnit"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
