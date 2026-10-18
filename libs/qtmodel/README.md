@@ -256,22 +256,35 @@ No `M2-STUB` is left in this library.
   `setHighlight`, `setTimeFormat`, `setProjectTimeFormat`, `setDistanceService`, `busy`, `deliveries`,
   `lastError`, `quoteField`, `channelTable`, `timeTable`.
 - `TrackMapService` and `TrackMapCommand` (`track_map_service.hpp`, `src/track/`): the workspace's track maps by
-  venue (`trackmaps/<slug>.track.json`, read on first use and cached; written at once by `setMap`, the previous
-  file to `backup/` on Accept, a removal moved to `backup/<stem>.<stamp>.removed.json`; in memory without a
-  project; a project change drops the cache) and the one undo command of every track-map edit (02 §7).
+  venue (`trackmaps/<slug>-<hash>.track.json`, `project::TrackMapFile::fileNameFor`, D-205; read on first use
+  through `TrackMapFile::loadFor`, so never a file that holds another venue, and cached; written at once by
+  `setMap` at `TrackMapFile::claimFor`'s file, which moves an earlier build's slug-only file of the venue and
+  refuses a name that holds another venue's map; the previous file to `backup/` on Accept, a removal moved to
+  `backup/<stem>.<stamp>.removed.json`; in memory without a project; a project change drops the cache) and the
+  one undo command of every track-map edit (02 §7).
   `generate(TrackGenerationRequest, context, onGui)` is the generation path of 06 §13.5 item 1 (the inputs
   resolved here through `MathsService`, `analysis::TrackGenerator` on a worker, `geom/track/<source>/<lap>`).
 - `RenderService`: `pool()`, `dispatcher()`, `statCache()` (the workspace's `StatCache`), `setTrackMaps()`;
   `prepareInputs` fills `ComponentBuildInputs::trackMap` from the Main source's venue.
 - `SourceLoader::setTrackMaps`: phase 2 builds the Track Sections groups (open issue 4 of the milestone note):
-  the `RuleRunner` overload with the venue's map and the lap indexes ready now; `distanceReady` and `mapChanged`
-  run it again; the key gains `/t<map generation>/i<indexed laps>`.
+  the `RuleRunner` overload with the venue's map and the lap indexes ready now; `distanceReady`, `mapChanged`
+  and a `setRangeStretch` that publishes new factors run it again (D-204). The key gains
+  `/t<map generation>/i<indexed laps>-<digest>`; the digest (xxh3-128, laps in `RangeId` order) covers each
+  indexed lap's id, its index's D-140 key (Corr Dist version, bounding markers and times, stretch) and its
+  beacon flags, so a replaced index (a new stretch, a newer Corr Dist) changes the key at the same count. A
+  request is deduplicated against its layer's latest run only (running or done, per `ranges/<src>/<layer>/`);
+  each start has a serial, so a finished run that is no longer its layer's latest publishes nothing, a latest
+  run that was cancelled or failed is forgotten (a later request runs it again), and `close` forgets the
+  source's runs.
 - Wiring a workspace (M3): one `TrackMapService(&session, &maths, &runtime.dispatcher())`, then
   `render.setTrackMaps(&maps)` and `loader.setTrackMaps(&maps)` (MainWindow does, `main_window_m3.cpp`).
 - Tests: `tests/reports/tst_report_model` (every display rule against hand-computed cells), `tests/track/
   tst_track_map_service` (load, cache, write, backup, remove, undo/redo, the `RenderService` binding, GPS
   generation within 2 m RMS of the AC-M3-04 synthetic circuit's true centreline, Speed+LatG, pending inputs,
-  and `SourceLoader` building the Track Sections of an opened `.ld` at the hand-computed times).
+  and `SourceLoader` building the Track Sections of an opened `.ld` at the hand-computed times),
+  `tests/track/tst_track_sections_pass` (D-204: a lap stretch published at the same index count moves the
+  out lap's Turn 1 to its stretched time and leaves a flying lap's in place, clearing it brings the
+  unstretched time back; a file closed and opened again is annotated).
 
 ### M3: the time_distance completion (D-201)
 

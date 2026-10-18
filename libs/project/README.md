@@ -214,10 +214,16 @@ Consumers: `esses_qtmodel` (`ProjectSession`, `undo_commands.hpp`: `ChannelOverr
   file with a section under 10 m, out of bounds or with a duplicate id is Invalid at its JSON pointer, then the
   schema check of what `save` writes); `toJson`/`save` write the canonical text (lengths in metres, a newer
   minor kept), `save` atomically and creating `trackmaps/` when needed; the copy of the previous file to
-  `backup/` on the Track Editor's Accept is the caller's. `fileNameFor` lower-cases ASCII letters and digits,
-  turns every other ASCII run into one `-`, keeps non-ASCII UTF-8 and suffixes `-track` to a Windows device
-  name (`con`, `lpt1`, ...). Tests: `tests/track_map_file_tests.cpp` (schema examples, byte-for-byte round
-  trip, user sections saved into a new `trackmaps/` and reloaded, the pipeline's checks, file names).
+  `backup/` on the Track Editor's Accept is the caller's. A venue's file (D-205, PR #4 review): `fileNameFor`
+  is `<slug>-<hash>.track.json`, the slug readable (ASCII letters and digits lower-cased, every run of other
+  ASCII, spaces, format characters or invalid UTF-8 one `-`, other UTF-8 kept, at most `kMaxSlugBytes` = 48
+  bytes, `track` when empty) and the hash the first 16 hex digits of xxh3-128 of the exact venue, so distinct
+  venues never share a name; `loadFor(folder, venue)` reads that file, else `legacyFileNameFor` (the slug-only
+  name of the builds before D-205), each only when its `venue` member is exactly the venue (NotFound when
+  none); `claimFor(folder, venue)` is the file to write or remove, after renaming the venue's legacy file to
+  it, and refuses (Io) a file that holds another venue's map. Tests: `tests/track_map_file_tests.cpp` (schema
+  examples, byte-for-byte round trip, user sections saved into a new `trackmaps/` and reloaded, the
+  pipeline's checks, file names, distinct venues, a map never loaded for another venue, the legacy files).
 - Schemas: `track-1` (`schemas/track-1.schema.json`, loaded by `SchemaRegistry` with the other document schemas)
   and the component body schemas `schemas/components/<type>-1.schema.json` (fragments, not loaded by
   `SchemaRegistry` yet; D-193 (a)).

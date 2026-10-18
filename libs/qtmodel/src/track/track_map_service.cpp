@@ -108,21 +108,24 @@ std::shared_ptr<const analysis::TrackMap> TrackMapService::map(const std::string
         return it->second;
     }
     std::shared_ptr<const analysis::TrackMap> out;
-    const std::filesystem::path path = pathFor(venue);
-    std::error_code ec;
-    if (!path.empty() && std::filesystem::exists(path, ec)) {
-        ++fileReads_;
+    if (const std::optional<std::filesystem::path> project = folder()) {
+        // The venue's own file only (D-205): its hashed name, else the name of an earlier build, each when
+        // the file's "venue" is exactly this venue, so a venue never shows another venue's map.
         std::vector<std::string> log;
-        Result<project::TrackMapFile> file = project::TrackMapFile::load(path, log);
+        Result<project::TrackMapFile> file = project::TrackMapFile::loadFor(
+            *project / std::string(project::TrackMapFile::kDirectory), venue, log);
         for (const std::string& line : log) {
             Q_EMIT logMessage(fromUtf8(line));
         }
         if (file) {
+            ++fileReads_;
             out = std::make_shared<const analysis::TrackMap>(std::move(file->map));
-        } else {
+        } else if (file.error().code != ErrorCode::NotFound) {
+            ++fileReads_;
+            const std::filesystem::path where = file.error().context.path.value_or(pathFor(venue));
             Q_EMIT logMessage(
                 tr("The track map %1 could not be read: %2")
-                    .arg(QString::fromStdWString(path.wstring()), fromUtf8(file.error().toString())));
+                    .arg(QString::fromStdWString(where.wstring()), fromUtf8(file.error().toString())));
         }
     }
     cache_.emplace(venue, out); // an absent map is cached too (setMap or reload changes it)
@@ -139,9 +142,22 @@ Result<void> TrackMapService::setMap(const std::string& venue, std::shared_ptr<c
         if (Result<void> valid = map->validate(); !valid) {
             return valid;
         }
+        if (map->venue != venue) {
+            // The file binds the venue it is stored under; loadFor() reads it for that venue only (D-205).
+            auto bound = std::make_shared<analysis::TrackMap>(*map);
+            bound->venue = venue;
+            map = std::move(bound);
+        }
     }
     if (const std::optional<std::filesystem::path> project = folder()) {
-        const std::filesystem::path path = pathFor(venue);
+        // The venue's own file: its hashed name (an earlier build's file of the venue renamed to it first);
+        // refused when that name holds another venue's map, which is never overwritten (D-205).
+        Result<std::filesystem::path> claimed =
+            project::TrackMapFile::claimFor(*project / std::string(project::TrackMapFile::kDirectory), venue);
+        if (!claimed) {
+            return Failure{claimed.error()};
+        }
+        const std::filesystem::path path = std::move(claimed).value();
         std::error_code ec;
         if (map == nullptr) {
             if (std::filesystem::exists(path, ec)) {
@@ -179,6 +195,7 @@ QStringList TrackMapService::venues() {
     }
     if (const std::optional<std::filesystem::path> project = folder()) {
         const std::filesystem::path dir = *project / std::string(project::TrackMapFile::kDirectory);
+        std::set<std::string> named; // the venues the folder's track files name
         std::error_code ec;
         if (std::filesystem::is_directory(dir, ec)) {
             for (const std::filesystem::directory_entry& e : std::filesystem::directory_iterator(dir, ec)) {
@@ -188,14 +205,17 @@ QStringList TrackMapService::venues() {
                 }
                 std::vector<std::string> log;
                 if (Result<project::TrackMapFile> f = project::TrackMapFile::load(e.path(), log)) {
-                    // A file whose venue does not slug to its own name is not this venue's map.
-                    if (project::TrackMapFile::fileNameFor(f->map.venue) == name) {
-                        const auto it = cache_.find(f->map.venue);
-                        if (it == cache_.end() || it->second != nullptr) {
-                            names.insert(f->map.venue);
-                        }
-                    }
+                    named.insert(f->map.venue);
                 }
+            }
+        }
+        // A venue counts when map() would find its map: the cache decides for a cached venue (above), the
+        // rule of TrackMapFile::loadFor for the others (a file under another venue's name is not this venue's
+        // map, D-205).
+        for (const std::string& venue : named) {
+            std::vector<std::string> log;
+            if (!cache_.contains(venue) && project::TrackMapFile::loadFor(dir, venue, log)) {
+                names.insert(venue);
             }
         }
     }

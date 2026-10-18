@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "urn:esses:track-1",
   "title": "Esses track map (track-1)",
-  "description": "A venue's track map: trackmaps/<venue>.track.json in a project (02 section 6.9, D-027), owned by esses_analysis TrackMap and wrapped by esses_project TrackMapFile. The centreline is ENU metres about origin, rows [x, y, cumDist]; optional inner and outer lines; named sections at least 10 m long in section sets (Default for the generated Turns/Straights), each with a category (corner, straight or a user category). Unknown top-level members are preserved.",
+  "description": "A venue's track map: trackmaps/<venue>.track.json in a project (02 section 6.9, D-027), owned by esses_analysis TrackMap and wrapped by esses_project TrackMapFile; the file name is a slug of the venue and a hash of its exact text (TrackMapFile::fileNameFor, D-205). The centreline is ENU metres about origin, rows [x, y, cumDist]; optional inner and outer lines; named sections at least 10 m long in section sets (Default for the generated Turns/Straights), each with a category (corner, straight or a user category). Unknown top-level members are preserved.",
   "type": "object",
   "required": ["$schema", "schemaVersion", "lines"],
   "properties": {
@@ -19,7 +19,7 @@
       "type": "string"
     },
     "venue": {
-      "description": "The Venue detail the map binds to.",
+      "description": "The Venue detail the map binds to, exactly (\"\" when absent). A file is read as a venue's map only when this is that venue (D-205).",
       "type": "string"
     },
     "origin": {

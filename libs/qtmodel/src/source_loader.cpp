@@ -8,6 +8,7 @@
 #include "range_lookup.hpp"
 
 #include <esses/base/casefold.hpp>
+#include <esses/base/hash.hpp>
 #include <esses/base/taskpool.hpp>
 #include <esses/base/utf8.hpp>
 #include <esses/formats/registry.hpp>
@@ -26,8 +27,10 @@
 #include <QPointer>
 #include <QTimer>
 #include <algorithm>
+#include <bit>
 #include <chrono>
 #include <mutex>
+#include <string_view>
 #include <utility>
 
 namespace esses::qt {
@@ -72,6 +75,35 @@ formats::ImportLogEntry logEntry(formats::ImportLogEntry::Level level, std::stri
 
 // Coalesced sidecar writes (02 section 4 sidecar rule 4): 500 ms after the first edit that is not on disk.
 constexpr int kSidecarCoalesceMs = 500;
+
+// The phase-2 task keys of one layer start with this (02 section 4.4 rule 13).
+std::string phase2Prefix(const model::SourceId& id, std::string_view canonical) {
+    return "ranges/" + detail::sourceHex(id) + "/" + std::string(canonical) + "/";
+}
+
+// The identity of the lap indexes a Track Sections run reads (D-204): per indexed lap its id, its index's
+// D-140 key (Corr Dist version, bounding markers and times, stretch) and whether it starts and ends at a
+// beacon. A replaced index (rebuilt from a newer Corr Dist, or copied with a new stretch by
+// LapStretchService) changes it although the number of indexed laps stays; equal digests read equal indexes.
+std::string lapIndexesDigest(const std::map<model::RangeId, analysis::LapIndex>& indexes) {
+    Hash128Stream h;
+    h.updatePart("esses.phase2-lapindexes-1");
+    for (const auto& [lap, entry] : indexes) {
+        if (entry.index == nullptr) {
+            continue;
+        }
+        const analysis::DistanceIndexKey& key = entry.index->key();
+        h.updatePart(lap.str());
+        h.updateU64(key.corrDistVersion);
+        h.updatePart(key.startMarker.str());
+        h.updatePart(key.endMarker.str());
+        h.updateU64(static_cast<std::uint64_t>(key.start));
+        h.updateU64(static_cast<std::uint64_t>(key.end));
+        h.updateU64(std::bit_cast<std::uint64_t>(key.stretch));
+        h.updateU64((entry.startsAtBeacon ? 1U : 0U) | (entry.endsAtBeacon ? 2U : 0U));
+    }
+    return h.digest().hex();
+}
 
 } // namespace
 
@@ -406,19 +438,26 @@ void SourceLoader::startPhase2(const model::SourceId& id, const std::string& lay
             }
         }
     }
-    // One run per (layer, marker set, Corr Speed version[, map generation, indexed laps]): the task key and
+    // One run per (layer, marker set, Corr Speed version[, map generation, lap indexes]): the task key and
     // the dedupe key are the same, so a newer Corr Speed, marker set, map or index never joins an older run.
-    const std::string prefix = "ranges/" + detail::sourceHex(id) + "/" + canonical + "/";
-    std::string run = prefix + markers + "/" + speed->version.hex();
+    // The indexes count by identity, not number (D-204): a stretch or a rebuilt index changes the key.
+    const std::string prefix = phase2Prefix(id, canonical);
+    std::string key = prefix + markers + "/" + speed->version.hex();
     if (sectionsPass) {
-        run += "/t" + std::to_string(trackGeneration_) + "/i" + std::to_string(indexes->size());
+        key += "/t" + std::to_string(trackGeneration_) + "/i" + std::to_string(indexes->size()) + "-" +
+               lapIndexesDigest(*indexes);
     }
-    if (!phase2_.insert(run).second) {
-        return; // this marker set was annotated (or is being annotated) with this Corr Speed already
+    // Deduplicated against the layer's latest run only: other inputs supersede it, and inputs that come back
+    // to an earlier run's (a stretch cleared again) run again, because a newer run has published in between.
+    Phase2Run& latest = phase2_[prefix];
+    if (latest.key == key) {
+        return; // this layer was annotated (or is being annotated) with these inputs already
     }
+    latest = Phase2Run{key, ++phase2Serial_};
+    const std::uint64_t run = latest.serial; // this start
     pool_.cancelAll(prefix); // 02 section 4.4 rule 13: older ranges/<src>/<layer>/ runs are cancelled first
     Future<model::RangeGroupTree> future = pool_.submit(
-        Priority::Interactive, TaskKey{run}, CancelToken{},
+        Priority::Interactive, TaskKey{key}, CancelToken{},
         [rules = rules_, src, canonical, series = speed->series, sectionsPass, map,
          indexes](const CancelToken& cancel) {
             if (!sectionsPass) {
@@ -448,24 +487,32 @@ void SourceLoader::startPhase2(const model::SourceId& id, const std::string& lay
 }
 
 void SourceLoader::phase2Finished(const std::shared_ptr<const model::DataSource>& annotated,
-                                  const std::string& canonical, const std::string& markers,
-                                  const std::string& run, std::optional<model::RangeGroupTree> tree) {
+                                  const std::string& canonical, const std::string& markers, std::uint64_t run,
+                                  std::optional<model::RangeGroupTree> tree) {
+    const auto latest = phase2_.find(phase2Prefix(annotated->id, canonical));
+    if (latest == phase2_.end() || latest->second.serial != run) {
+        // A newer run of the layer started since (its inputs changed; D-204) or the source closed: a run that
+        // finished before it saw its cancellation must not publish over the newer one.
+        return;
+    }
     const auto current = source(annotated->id);
     if (current == nullptr) {
         return; // closed
     }
     const model::DataLayer* l = detail::layerOf(*current, canonical);
     if (l == nullptr) {
+        phase2_.erase(latest);
         return;
     }
     if (!tree) {
-        phase2_.erase(run); // cancelled or failed: a later request may run it again; the phase-1 tree stays
+        // Cancelled or failed: a later request may run it again; the phase-1 tree stays.
+        phase2_.erase(latest);
         return;
     }
     if (model::markerSetHash(l->markers).hex() != markers) {
         // The laps were rebuilt from another marker set since the run started: its annotations do not apply.
-        // Annotate the current snapshot instead (its own run dedupes against one already started).
-        phase2_.erase(run);
+        // Annotate the current snapshot instead.
+        phase2_.erase(latest);
         startPhase2(current->id, canonical);
         return;
     }
@@ -671,7 +718,12 @@ void SourceLoader::close(const model::SourceId& id) {
     const std::string hex = detail::sourceHex(id);
     pool_.cancelAll("chunk/" + hex);
     pool_.cancelAll("summary/" + hex);
-    pool_.cancelAll("ranges/" + hex + "/");
+    const std::string ranges = "ranges/" + hex + "/";
+    pool_.cancelAll(ranges);
+    // The file opened again (the same SourceId) is annotated afresh: these runs were the closed source's.
+    for (auto run = phase2_.lower_bound(ranges); run != phase2_.end() && run->first.starts_with(ranges);) {
+        run = phase2_.erase(run);
+    }
     if (distance_ != nullptr) {
         distance_->forgetSource(id);
     }

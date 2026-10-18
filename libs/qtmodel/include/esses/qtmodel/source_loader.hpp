@@ -30,8 +30,11 @@
 // (RuleRunner::runPhase2 with the source's venue map and the laps' DistanceIndexes from the DistanceService,
 // each lap measured forward from a BCN start or backwards from its end beacon) and merges them into the
 // newest snapshot with the same marker set; it runs again when the venue's map changes
-// (TrackMapService::mapChanged) and when more lap indexes are ready (DistanceService::distanceReady). Its
-// task key gains /t<map generation>/i<indexed laps> while a map is bound.
+// (TrackMapService::mapChanged), when more lap indexes are ready (DistanceService::distanceReady) and when
+// setRangeStretch publishes new lap-stretch factors. Its task key gains /t<map generation>/i<indexed
+// laps>-<digest of the indexes' D-140 keys> while a map is bound, so a replaced index (a new stretch, a newer
+// Corr Dist) changes it at the same count. A layer's request is deduplicated against its latest run only, and
+// only the latest run publishes (D-204).
 //
 // M2 (07 section 5.1, 05 sections 2 and 8.1, 06 section 13.8): the MappingPanel hand-off. With the hand-off
 // on, open() submits task A through ImporterRegistry::load with a MappingHook; an open whose step 4 leaves
@@ -70,7 +73,6 @@
 #include <map>
 #include <memory>
 #include <optional>
-#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -161,7 +163,8 @@ public:
 
     // Publishes the lap-stretch factors of one layer (LapStretchService, D-016): every range of the layer's
     // "Outings:Laps" group gets Range::stretch = the factor of its id, or none when absent or 1. Returns
-    // whether a new snapshot was published (sourceReplaced(); nothing when the factors are already in place).
+    // whether a new snapshot was published (sourceReplaced(); nothing when the factors are already in place);
+    // a new one starts phase 2 for the layer, so its Track Sections follow the stretched indexes (D-204).
     bool setRangeStretch(const model::SourceId& source, std::string_view layer,
                          const std::map<model::RangeId, double>& stretch);
 
@@ -200,7 +203,7 @@ private:
     void restartPhase2(const std::optional<std::string>& venue);
     bool hasTrackSectionsRule() const;
     void phase2Finished(const std::shared_ptr<const model::DataSource>& annotated,
-                        const std::string& canonical, const std::string& markers, const std::string& run,
+                        const std::string& canonical, const std::string& markers, std::uint64_t run,
                         std::optional<model::RangeGroupTree> tree);
     void publishReplacement(std::shared_ptr<const model::DataSource> next);
     // The due sidecar documents: written by Background tasks (the timer), or here and now (a closing source,
@@ -221,8 +224,15 @@ private:
     bool useSidecars_ = true;
     int pending_ = 0;
     std::vector<std::shared_ptr<const model::DataSource>> open_; // open order
-    std::set<std::string>
-        phase2_; // phase-2 runs started or done: ranges/<src>/<layer>/<markers>/<speed version>
+    // Per layer (ranges/<src>/<layer>/), its latest phase-2 run, running or done (D-204): the task key, which
+    // names the run's inputs, and the serial of that start. A request with the same key is deduplicated, and
+    // only the latest run of a layer publishes. close() drops the source's entries.
+    struct Phase2Run {
+        std::string key;
+        std::uint64_t serial = 0;
+    };
+    std::map<std::string, Phase2Run, std::less<>> phase2_;
+    std::uint64_t phase2Serial_ = 0;
     // M2: step 4 inputs and the MappingPanel hand-off
     model::MappingTable mappings_;
     model::AliasTable aliases_;

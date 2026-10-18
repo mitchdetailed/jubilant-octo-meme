@@ -358,7 +358,8 @@ Registered under the §10 rule when the M3 headers were laid down (`docs/milesto
   `SectionDetectorOptions::minTurnDeg`, `TrackSectionsSettings::supportsTrackGeneration`/`supportsReporting` and
   the `RuleRunner::runPhase2` overload that takes a track map and a `LapIndexLookup` (D-195); the trailing
   `store::Interp` parameter of `ReportEngine::statistic` (D-197).
-- `esses_project`: `TrackMapFile` members (`parse`, `load`, `toJson`, `save`, `fileNameFor`).
+- `esses_project`: `TrackMapFile` members (`parse`, `load`, `toJson`, `save`, `fileNameFor`); `legacyFileNameFor`,
+  `loadFor`, `claimFor` and `kMaxSlugBytes` (D-205).
 - `esses_plotcore`: `HitKind` values `GroupHeading` … `Caption`, `HandleKind`, `PointPx`, `HitResult::handleKind`
   /`point`/`bin`/`section`/`cell`, `HitTester::hitAll`/`addPoints`/`nearestPoint`; `KeyMeasurement`, `KeyColumns`,
   `KeyCell`, the column-aware `KeyLayout::layout`, `emitDatumValues`, `emitMeasurements`; `BandCell`,

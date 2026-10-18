@@ -836,6 +836,8 @@ Rewritten on 2026-10-10 after the review. The list is deduplicated across this d
 | D-201 | The time_distance completion as built: widget-local state and a build report beside the build inputs, override limits on the resolved channel, the datum's key columns in the Static layer, the M3 bands and panels, per-source offset steps and held drags, annotation edits through the selection, the key's label floor, per-case golden provenance (refines D-023, D-027, D-193, D-196; amends 04 §2.2, §8.1-§8.11, §8.13, 06 §14.4, outline §4) | no | M3 time_distance, AC-M3-02, AC-M3-05, AC-M3-09 |
 | D-202 | The M3 acceptance as built: the completed circuit workbook, the range key colour of 06 §5.3 item 3 restored in the M3 builders, the F3 bench row, M3 as the keymap checker's milestone with the generic row, O zeroing as one undo step, the values_list goldens, the offscreen demo and the reports' project time format (refines D-198, D-199, D-200, D-201; amends 07 §6.2 AC-M3-05 proof, §6.5) | no | M3 acceptance, AC-M3-01, AC-M3-02, AC-M3-05, AC-M3-09 |
 | D-203 | The M3 fix pass: the review findings fixed, rejected or deferred (gCorrection's slip reference, the report engine's pairing, trust and units, the histogram's closed last band, the track-sections origin rule for stretched and unfinished laps, loop closure and the GPS seam, idle hidden worksheets, the shell's add, context menus and asynchronous export, heading pickers, rename and move without a rebuild, D-127 (a) amended, the deferrals) (refines D-194, D-195, D-197, D-198, D-199, D-200, D-201, D-202; amends D-127 (a), 04 §7.2 item 8, §8.2 item 4, §12 item 6, 06 §13.5 item 4, §14.4) | no | M3 fix pass, AC-M3-01 to AC-M3-12 |
+| D-204 | The Track Sections pass keyed by the identity of its lap indexes: a stretch published at the same index count runs it again, the dedupe is against the layer's latest run, only the latest run publishes, a closed source's runs are forgotten (refines D-195, D-199 (e); reads 02 §4.4 rule 13) | no | PR #4 review, AC-M3-04 |
+| D-205 | Track-map file names that keep the venue's identity: a readable slug and a hash of the exact venue, a file read only for the venue it holds, a write refused over another venue's file, the names of earlier builds read and moved (refines D-195 (e), D-199 (c); reads 02 §6.9 `trackmaps/<venue>.track.json`, amends outline §4) | no | PR #4 review, AC-M3-04 |
 
 ### A.1 Review amendments
 
@@ -2184,4 +2186,84 @@ sample (121.7 and 147.8 m/s off before); b = 5 m/s^2 is off by at most 16.7 m/s 
 **Consequences.** Every finding that held has a regression test; the remaining gaps are listed in M3.md §6 with an
 owner. No M1 golden changed; the track position goldens changed with (e) and the zoom summary @2x goldens with
 (q) (DrawList JSON exact, PNGs provisional).
+**User must confirm:** no.
+
+#### D-204 The Track Sections pass keyed by the identity of its lap indexes: a stretch published at the same index count runs it again, the dedupe is against the layer's latest run, only the latest run publishes, a closed source's runs are forgotten (refines D-195, D-199 (e); reads 02 §4.4 rule 13)
+**Context.** A review of PR #4 (Codex, P1) found that `SourceLoader`'s phase-2 key recorded only how many lap
+indexes a Track Sections run read (`/i<indexed laps>`, D-199 (e)). `LapStretchService` publishes its factors
+(`setRangeStretch`) once the laps' indexes exist, and `DistanceService` then hands out copies of the same indexes
+with the new stretch: the count does not change. Nothing started phase 2 for that publication (no
+`distanceReady` announces a copy, and Corr Speed's version holds), and a run started for another reason would
+have been deduplicated against the unstretched run of the same key. The stretch moves the sections of a lap
+measured backwards from its end beacon (an out lap), of a lap measured forwards that does not end at a beacon
+(an in lap), and of a complete lap whose stretched and unstretched lengths lie on different sides of the map's
+5 % tolerance (D-203 (e)); a complete lap within the tolerance either way maps proportionally and keeps them.
+Reproduced: with a 2050 m track length on the synthetic oval (laps of 2000 m) the out lap's Turn 1 stayed at
+6.06 s, its unstretched time, instead of 6.70 s. Any index replaced at the same count (one rebuilt from a newer
+Corr Dist while Corr Speed's version holds) had the same key. The dedupe set also kept every key ever started
+(it only grew, also past a source's close), so inputs that came back to an earlier run's (the stretch cleared
+again) were never annotated again: the sections stayed stretched.
+**Decision.** (a) While a map is bound the run key ends `/t<map generation>/i<indexed laps>-<digest>`; the digest
+(xxh3-128, laps in `RangeId` order) covers each indexed lap's id, its index's D-140 key (Corr Dist version,
+bounding markers and times, stretch) and whether it starts and ends at a beacon. Equal digests read equal
+indexes, so the dedupe still holds for identical inputs, and a replaced index changes the key at any count;
+identity by key, not by pointer, so a copy with the same key is the same input. (b) `setRangeStretch` starts
+phase 2 for its layer after it publishes new factors (`LapStretchService`'s deferred update among them). (c) The
+dedupe is per layer, against the latest run started (running or done) instead of every run ever started: a
+request with that run's key returns, any other becomes the latest, and the older runs of the layer are cancelled
+as before (02 §4.4 rule 13). (d) Each start has a serial: a finished run that is no longer its layer's latest
+publishes nothing (it finished before it saw its cancellation; the newer run publishes), and a latest run that was
+cancelled or failed is forgotten, so a later request runs it again. (e) `close` forgets the source's runs.
+**Consequences.** The Track Sections groups, and the section bands and time reports read from them, follow the
+lap-stretch toggle, the track length and a re-evaluated Corr Dist. Regression tests:
+`qtmodel.tst_track_sections_pass` `sectionsFollowTheLapStretch` (a stretch published at the same index count
+moves the out lap's Turn 1 to the stretched time, leaves a flying lap's in place, and clearing it brings the
+unstretched time back; it fails without (a), without (b) and with the dedupe of every earlier run instead of
+(c)) and `sectionsComeBackAfterAReopen` (a guard for (e): a file closed and opened again is annotated). No golden
+changes.
+**User must confirm:** no.
+
+#### D-205 Track-map file names that keep the venue's identity: a readable slug and a hash of the exact venue, a file read only for the venue it holds, a write refused over another venue's file, the names of earlier builds read and moved (refines D-195 (e), D-199 (c); reads 02 §6.9 `trackmaps/<venue>.track.json`, amends outline §4)
+**Context.** A review of PR #4 (Codex, P2) found that `TrackMapFile::fileNameFor` kept only a lower-cased slug of
+the venue, so distinct venues shared one file: "Spa / Francorchamps" and "Spa-Francorchamps" both became
+`spa-francorchamps.track.json`, every venue without a letter or digit `track.track.json`, and venues that differ
+only in ASCII case, spacing or punctuation (on a case-insensitive file system also in non-ASCII case) collided
+too. `TrackMapService::setMap` wrote that derived path directly, so saving the second venue overwrote the first
+while the cache still showed both maps; `map()` read the file without looking at its `venue` member (only
+`venues()` compared it with the name), so after a restart both venues loaded the map written last. Reproduced:
+`qtmodel.tst_track_map_service` `venuesOfOneSlugKeepTheirOwnMaps` against the previous code (HEAD 0baa197) left 2
+files for its 4 venues. The track-1 document already stores the venue (`TrackMap::toJson` always writes it).
+**Decision.** (a) **The name.** `fileNameFor(venue)` is `<slug>-<hash>.track.json`. The slug is the readable part:
+ASCII letters and digits lower-cased; every run of other ASCII, C1 controls, Unicode spaces, format characters,
+noncharacters or invalid UTF-8 one `-`; other UTF-8 kept; at most 48 bytes (`kMaxSlugBytes`), cut between
+characters; `track` when nothing is left. The hash is the first 16 hex digits of xxh3-128 (`esses::hash128`, 02
+§1 behaviour 3) of the venue's exact bytes, so venues that differ in any byte get different names, and the
+lower-case hex keeps them apart on a case-insensitive file system. A name has at most 76 bytes, is valid UTF-8
+(macOS refuses other names), is never a Windows device name (the stem always ends with `-<hash>`) and never ends
+with a dot or a space. (b) **The identity.** The file's `venue` member decides whose map it is (track-1 is
+unchanged; an absent member reads as ""). `TrackMapFile::loadFor(folder, venue, log)` reads the hashed file, else
+the legacy file, and passes over a file whose `venue` is not exactly the venue; a file that cannot be read counts
+as the venue's unless it names another venue, so its error reaches Messages as before; NotFound when there is
+none. `TrackMapFile::claimFor(folder, venue)` gives the file every write and removal of `setMap` uses, and refuses
+(Io, nothing changed) when the hashed name holds another venue's map, so a hash collision or a file copied there
+by hand is never overwritten. `setMap` stores a map whose `venue` differs from the venue it is stored under as a
+copy bound to that venue, so the file reads back for it; `venues()` lists a venue a file names only when
+`loadFor` finds its map, the rule `map()` uses. (c) **Earlier files.** `legacyFileNameFor` is the previous name,
+unchanged. `loadFor` still reads it, but only a file that holds exactly the venue (a map of "Spa / Francorchamps"
+written by an earlier build is found for that venue and never for "Spa-Francorchamps"); `claimFor` renames it to
+the hashed name on that venue's next write or removal, so `setMap`'s backup copy and the removal's
+`backup/<stem>.<stamp>.removed.json` work as before, and another venue of the same slug leaves it alone. A
+hashed file wins over a legacy file of the same venue; a legacy file that cannot be read is reported and never
+moved. New public names: `TrackMapFile::legacyFileNameFor`, `loadFor`, `claimFor`, `kMaxSlugBytes` (outline §4).
+**Consequences.** Distinct venues never share a track-map file, no venue shows another venue's map, and no write
+replaces one. Maps written by earlier M3 builds keep loading for their own venue and move to the new name when
+next edited. The names are longer and cannot be written by hand without the hash (`TrackMapService::pathFor` gives
+them). Regression tests (each fails on the previous naming): `project.track map file: the
+file name of a venue` (the published xxHash vectors of `libs/base/tests/hash_tests.cpp` pin the hash, so no
+build renames another's files), `... distinct venues never share a file name`, `... a map saved for one venue is
+never loaded for another`, `... a file of an earlier build is read for its own venue and moves on its next
+write`, and `qtmodel.tst_track_map_service` `venuesOfOneSlugKeepTheirOwnMaps` (the review's examples through
+`setMap`, a restart and `venues()`, the legacy file, the binding copy and the refused overwrite). Not chosen: a
+numeric suffix on a clash (the name would depend on what the folder held when it was written, and the file
+would still not say whose map it is) and the hash alone (unreadable names). No golden changes.
 **User must confirm:** no.

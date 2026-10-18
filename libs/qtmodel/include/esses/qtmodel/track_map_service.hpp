@@ -3,13 +3,17 @@
 //
 // TrackMapService (04 section 14 item 1, 06 sections 9 and 13.5, 02 sections 6.9 and 7; D-027, D-061, D-199;
 // the track work of M3): the workspace's track maps, one per venue, as the project documents
-// trackmaps/<venue>.track.json (project::TrackMapFile). map(venue) loads a venue's file on first use and
-// keeps it (an absent or unreadable file gives nullptr, the second with a Messages row through logMessage);
+// trackmaps/<venue>.track.json (project::TrackMapFile; the file of a venue is TrackMapFile::fileNameFor, a
+// slug and a hash of the exact venue, and holds that venue in its "venue" member, D-205). map(venue) loads a
+// venue's file on first use (TrackMapFile::loadFor: never a file that holds another venue) and keeps it (an
+// absent or unreadable file gives nullptr, the second with a Messages row through logMessage);
 // mapFor(source) binds a source by its Venue detail (04 section 14 item 1). setMap() is the one write path:
 // it writes the file at once (the previous file copied to <project>/backup/ by project::saveWithBackup when
 // asked, the Track Editor's Accept, 06 section 13.5 item 2), replaces the cached map and emits mapChanged;
-// nullptr deletes the file (moved to backup/). Without a project (no ProjectSession, or none open) the maps
-// live in memory only. A project change (opened, closed) drops the cache and announces every venue it held.
+// nullptr deletes the file (moved to backup/); the file is TrackMapFile::claimFor's (an earlier build's file
+// of the venue renamed to the hashed name first; Io when that name holds another venue's map, which is never
+// overwritten). Without a project (no ProjectSession, or none open) the maps live in memory only. A project
+// change (opened, closed) drops the cache and announces every venue it held.
 // Consumers: RenderService::prepareInputs fills ComponentBuildInputs::trackMap from mapFor(Main source)
 // (RenderService::setTrackMaps), SourceLoader builds the Track Sections groups from it (setTrackMaps), the
 // Track Editor and the Track Map dock edit and show it.
@@ -100,15 +104,17 @@ public:
     // unreadable). Never blocks on a worker; a small synchronous file read the first time.
     std::shared_ptr<const analysis::TrackMap> map(const std::string& venue);
     std::shared_ptr<const analysis::TrackMap> mapFor(const model::DataSource& source);
-    // <project>/trackmaps/<slug of venue>.track.json; empty without an open project.
+    // <project>/trackmaps/<TrackMapFile::fileNameFor(venue)>, where setMap writes; empty without an open
+    // project.
     std::filesystem::path pathFor(const std::string& venue) const;
     // Replaces the venue's map (nullptr removes it): the file is written (or moved to backup/) first, then
-    // the cache changes and mapChanged fires. Io on a failed write, Invalid for a map that fails
-    // TrackMap::validate. `backup`: copy the previous file to backup/ before overwriting it.
+    // the cache changes and mapChanged fires. Io on a failed write or when the venue's file name holds
+    // another venue's map, Invalid for a map that fails TrackMap::validate. `backup`: copy the previous file
+    // to backup/ before overwriting it. A map with another `venue` is stored as a copy bound to `venue`.
     Result<void> setMap(const std::string& venue, std::shared_ptr<const analysis::TrackMap> map,
                         bool backup = false);
-    // The venues with a map: the project's trackmaps/*.track.json files (by their "venue" member) and the
-    // cached ones, sorted.
+    // The venues with a map, sorted: the cached ones, and those the project's trackmaps/*.track.json files
+    // name (their "venue" member) whose map map() would find.
     QStringList venues();
     // Drops the cache (the next map() reads the files again) and announces the venues it held.
     void reload();

@@ -13,6 +13,7 @@
 #include <esses/analysis/rule_runner.hpp>
 #include <esses/base/paths.hpp>
 #include <esses/base/read_file.hpp>
+#include <esses/base/utf8.hpp>
 #include <esses/project/track_map_file.hpp>
 #include <esses/qtmodel/app_runtime.hpp>
 #include <esses/qtmodel/data_selection_model.hpp>
@@ -112,11 +113,14 @@ private Q_SLOTS:
         QVERIFY(session.newProject(dir / "proj", "p").ok());
         project::TrackMapFile file;
         file.map = ovalMap("Test Oval");
+        // A file of a build before D-205 (the slug alone) is still read for its own venue; setMap writes the
+        // hashed name.
         const std::filesystem::path path = dir / "proj" / "trackmaps" / "test-oval.track.json";
         QVERIFY(file.save(path).ok());
 
         TrackMapService maps(&session);
-        QCOMPARE(maps.pathFor("Test Oval"), path);
+        QCOMPARE(maps.pathFor("Test Oval"),
+                 dir / "proj" / "trackmaps" / pathFromUtf8(project::TrackMapFile::fileNameFor("Test Oval")));
         const auto map = maps.map("Test Oval");
         QVERIFY(map != nullptr);
         QCOMPARE(*map, file.map);
@@ -189,6 +193,82 @@ private Q_SLOTS:
         QVERIFY(maps.setMap("Test Oval", first).ok());
         TrackMapService again(&session);
         QCOMPARE(*again.map("Test Oval"), *first);
+    }
+
+    // Review finding (Codex P2 on PR #4, D-205): venues whose names slug alike ("Spa / Francorchamps" and
+    // "Spa-Francorchamps"; every name without a letter or digit) shared one file, so saving the second
+    // overwrote the first while the cache still showed both, and after a restart both loaded the last one.
+    void venuesOfOneSlugKeepTheirOwnMaps() {
+        const auto dir = test::scratchDir("tms-venues");
+        ProjectSession session(pathsFor(dir / "config"));
+        QVERIFY(session.loadDefaults().ok());
+        QVERIFY(session.newProject(dir / "proj", "p").ok());
+        const std::filesystem::path folder = dir / "proj" / "trackmaps";
+        const std::vector<std::string> venues{"Spa / Francorchamps", "Spa-Francorchamps", "***", "!!!"};
+        // A different oval per venue: straights of 300, 310, 320 and 330 m.
+        const auto ovalOf = [&](std::size_t i) {
+            return ovalMap(venues[i], 300.0 + 10.0 * static_cast<double>(i));
+        };
+        {
+            TrackMapService maps(&session);
+            for (std::size_t i = 0; i < venues.size(); ++i) {
+                QVERIFY(maps.setMap(venues[i], shared(ovalOf(i))).ok());
+            }
+            QCOMPARE(filesIn(folder), venues.size()); // one file each, none overwritten
+        }
+        TrackMapService restarted(&session);
+        for (std::size_t i = 0; i < venues.size(); ++i) {
+            const auto map = restarted.map(venues[i]);
+            QVERIFY(map != nullptr);
+            QCOMPARE(*map, ovalOf(i));
+        }
+        QVERIFY(restarted.map("Spa Francorchamps") == nullptr); // the same slug, no map of its own
+        QCOMPARE(restarted.venues(),
+                 (QStringList{QStringLiteral("!!!"), QStringLiteral("***"),
+                              QStringLiteral("Spa / Francorchamps"), QStringLiteral("Spa-Francorchamps")}));
+
+        // A map of an earlier build under the shared slug belongs to the venue it names: another venue of
+        // that slug neither shows it nor moves it, the venue's own next write moves it to the hashed name,
+        // and a removal moves that file to backup/.
+        project::TrackMapFile old;
+        old.map = ovalMap("Eau Rouge");
+        const std::filesystem::path legacy = folder / "eau-rouge.track.json";
+        QVERIFY(old.save(legacy).ok());
+        TrackMapService maps(&session);
+        QVERIFY(maps.map("Eau-Rouge") == nullptr);
+        QVERIFY(maps.setMap("Eau-Rouge", shared(ovalMap("Eau-Rouge"))).ok());
+        QVERIFY(std::filesystem::exists(legacy));
+        QVERIFY(maps.map("Eau Rouge") != nullptr);
+        QCOMPARE(*maps.map("Eau Rouge"), old.map);
+        analysis::TrackMap edited = old.map;
+        edited.sections.front().name = "La Source";
+        QVERIFY(maps.setMap("Eau Rouge", shared(edited), true).ok());
+        QVERIFY(!std::filesystem::exists(legacy));
+        QCOMPARE(filesIn(dir / "proj" / "backup"), std::size_t{1}); // the earlier build's map, backed up
+        QVERIFY(readText(maps.pathFor("Eau Rouge")).find("La Source") != std::string::npos);
+        QVERIFY(maps.setMap("Eau Rouge", nullptr).ok());
+        QVERIFY(!std::filesystem::exists(maps.pathFor("Eau Rouge")));
+        TrackMapService fresh(&session);
+        QVERIFY(fresh.map("Eau Rouge") == nullptr);
+        QCOMPARE(*fresh.map("Eau-Rouge"), ovalMap("Eau-Rouge"));
+
+        // A map handed over under another venue is stored with the venue it is stored under, so it reads
+        // back.
+        QVERIFY(maps.setMap("Pouhon", shared(ovalMap("Somewhere else"))).ok());
+        QCOMPARE(maps.map("Pouhon")->venue, std::string("Pouhon"));
+        TrackMapService reread(&session);
+        QVERIFY(reread.map("Pouhon") != nullptr);
+        QCOMPARE(reread.map("Pouhon")->venue, std::string("Pouhon"));
+
+        // A file under a venue's name that holds another venue's map is refused, never overwritten.
+        const std::filesystem::path squatted = maps.pathFor("Raidillon");
+        std::filesystem::copy_file(maps.pathFor("Pouhon"), squatted);
+        const std::string before = readText(squatted);
+        const Result<void> refused = maps.setMap("Raidillon", shared(ovalMap("Raidillon")));
+        QVERIFY(!refused.ok());
+        QCOMPARE(refused.error().code, ErrorCode::Io);
+        QCOMPARE(readText(squatted), before);
+        QVERIFY(maps.map("Raidillon") == nullptr);
     }
 
     void withoutAProjectMapsLiveInMemory() {

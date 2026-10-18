@@ -261,6 +261,10 @@ bool SourceLoader::setRangeStretch(const model::SourceId& id, std::string_view l
     }
     ++next->version;
     publishReplacement(std::move(next));
+    // The laps' indexes now carry the new stretch (DistanceService copies them on request), which moves the
+    // Track Sections of a lap measured backwards or outside the map's tolerance: the pass runs again with
+    // them. No distanceReady announces such a copy, and its run key differs by the indexes' keys (D-204).
+    startPhase2(id, std::string(model::canonicalLayerName(layer)));
     return true;
 }
 

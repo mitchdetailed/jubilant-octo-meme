@@ -4,6 +4,36 @@ All notable changes are recorded here, newest first. The project follows semanti
 
 ## Unreleased (M3)
 
+- Distinct venues never share a track-map file (PR #4 review, Codex P2; D-205). `TrackMapFile::fileNameFor`
+  kept only a lower-cased slug of the venue, so "Spa / Francorchamps" and "Spa-Francorchamps" (and every venue
+  without a letter or digit, `track.track.json`) shared one file: `TrackMapService::setMap` saved the second
+  venue over the first while the cache still showed both, and after a restart both loaded the map written last,
+  because `map()` never looked at the file's `venue` member. A venue's file is now `<slug>-<hash>.track.json`:
+  the slug stays readable (at most 48 bytes, Unicode spaces, format characters and invalid UTF-8 as separators,
+  always valid UTF-8 and never a Windows device name) and the hash is the first 16 hex digits of xxh3-128 of
+  the exact venue. The new `TrackMapFile::loadFor` reads a file only for the venue its `venue` member names, and
+  `TrackMapFile::claimFor`, which `setMap` writes and removes through, refuses (Io) a name that holds another
+  venue's map instead of overwriting it; `setMap` binds a map to the venue it is stored under, and `venues()`
+  follows `loadFor`. Maps written by earlier builds under the slug-only name (`legacyFileNameFor`) are still read
+  for their own venue, never for another venue of the same slug, and move to the new name on that venue's next
+  write or removal. track-1 is unchanged (its schema text describes the rule). Regression tests: the
+  `project.track map file*` cases (file names pinned by the published xxHash vectors, distinct venues, a map
+  never loaded for another venue, the earlier builds' files) and `qtmodel.tst_track_map_service`
+  `venuesOfOneSlugKeepTheirOwnMaps`, which leaves 2 files for 4 venues on the previous code.
+- The Track Sections follow the lap stretch (PR #4 review, Codex P1; D-204). `SourceLoader`'s phase-2 key
+  recorded only how many lap indexes a Track Sections run read, and nothing started phase 2 when
+  `LapStretchService` published its factors, so once every index existed a new stretch (the same count of
+  stretched index copies) left the sections of a lap measured from its end beacon (an out lap) or not ending
+  at one (an in lap) at their unstretched times, and with them the section bands and time reports: on the
+  synthetic oval with a 2050 m track length the out lap's Turn 1 stayed at 6.06 s instead of 6.70 s. The key
+  now ends `/i<count>-<digest>` over every indexed lap's D-140 key (Corr Dist version, markers, bounds,
+  stretch) and beacon ends, `setRangeStretch` starts phase 2 for its layer, and the dedupe is against the
+  layer's latest run (running or done) instead of every run ever started, so inputs that come back to an
+  earlier run's (the stretch cleared) run again; a run that is no longer its layer's latest publishes nothing,
+  and `close` forgets the source's runs (the old set only grew). Identical inputs are still deduplicated.
+  Regression test: `qtmodel.tst_track_sections_pass` `sectionsFollowTheLapStretch` (fails without the key
+  digest, without the restart from `setRangeStretch`, and with the old dedupe); `sectionsComeBackAfterAReopen`
+  guards the close.
 - The M3 pixel goldens are the ubuntu renders: the 86 provisional Windows PNGs (plots, reports, track,
   values_list, zoom summary and the thirteen M3 `time_distance` cases) and the stale M1 `dark_scheme` were
   replaced from the `golden-diffs-ubuntu-24.04` artefact of CI run 39104943947 (commit 811f442), and every
