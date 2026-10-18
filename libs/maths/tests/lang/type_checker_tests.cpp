@@ -261,6 +261,10 @@ TEST_CASE("checker: functions, arities and argument types", "[unit]") {
     checkErr("previous_sample('Speed'[m/s], 1.5)", codes::kArgValue);
     checkErr("range_is(\"\")", codes::kArgValue);
     checkErr("filter_cheby_bp('Speed'[m/s], 1, 5, 4, -1)", codes::kArgValue);
+    // An integral order beyond int's range is refused, not converted (UBSan, fuzz_maths_parser).
+    checkErr("filter_cheby_bp('Speed'[m/s], 2, 5, + 2^-3^2^2 -3, 0.5)", codes::kArgValue);
+    checkErr("filter_lp('Speed'[m/s], 5, 1e300)", codes::kArgValue);
+    checkErr("filter_lp('Speed'[m/s], 5, -1e300)", codes::kArgValue);
     checkErr("edge_delay('Flag' > 0, -1.0, rise)", codes::kArgValue);
 
     for (const char* src : {"filter_lp('Speed'[m/s], 5)", "filter_lp('Speed'[m/s], 5, -2)",

@@ -854,7 +854,9 @@ private:
         const bool rc = id == IntrinsicId::FilterLp || id == IntrinsicId::FilterHp;
         static constexpr std::array<int, 5> kRc{1, 2, 3, -1, -2};
         static constexpr std::array<int, 6> kCheby{2, 4, 6, -4, -8, -12};
-        bool ok = std::trunc(v) == v;
+        // Every supported order is within +-12: test the range before the conversion, which is undefined
+        // for a value outside int's range (or NaN).
+        bool ok = std::trunc(v) == v && std::fabs(v) <= 64.0;
         if (ok) {
             const int o = static_cast<int>(v);
             ok = rc ? std::find(kRc.begin(), kRc.end(), o) != kRc.end()
