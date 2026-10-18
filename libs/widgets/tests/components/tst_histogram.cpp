@@ -86,7 +86,7 @@ private Q_SLOTS:
         QVERIFY(at50.has_value());
         const int submitted = rig.c->staticBuildsSubmitted();
         w.view->setCursor(5 * kSec, qt::CursorSource::Programmatic); // u = 0.1: 50 + 50 cos(36 deg) = 90.5 %
-        QCOMPARE(rig.c->staticBuildsSubmitted(), submitted);         // Cursor -> Dynamic only
+        QVERIFY(staticUntouched(*rig.c, submitted));                 // Cursor -> Dynamic only
         const std::optional<plot::RectPx> at90 = highlighted(rig.c->layers().dynamicList());
         QVERIFY(at90.has_value());
         QVERIFY(at90->x > at50->x); // a bin further right

@@ -330,8 +330,10 @@ TimeReportEngine::eclectic(const std::vector<std::vector<std::optional<Micros>>>
     std::vector<std::optional<Micros>> out(columns + 1);
     for (const auto& row : rows) {
         for (std::size_t c = 0; c < row.size(); ++c) {
-            if (row[c] && (!out[c] || *row[c] < *out[c])) {
-                out[c] = row[c];
+            const std::optional<Micros>& cell = row[c];
+            std::optional<Micros>& best = out[c];
+            if (cell && (!best || *cell < *best)) {
+                best = cell;
             }
         }
     }

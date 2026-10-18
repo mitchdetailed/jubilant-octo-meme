@@ -359,7 +359,9 @@ private Q_SLOTS:
             QTRY_VERIFY_WITH_TIMEOUT(w.selection().sources().size() == 1, kTimeoutMs);
             const model::SourceId src = w.selection().sources().front()->id;
             QTRY_COMPARE_WITH_TIMEOUT(w.distance().state(src), qt::DistanceState::Ready, kTimeoutMs);
-            QTest::qWait(500);
+            // A generation started at the open would have run and been delivered by the time the runtime is
+            // quiet (a fixed wait proves nothing on a loaded machine).
+            QTRY_VERIFY_WITH_TIMEOUT(uitest::runtimeQuiet(*rt), kTimeoutMs);
             QVERIFY(w.trackMaps().mapFor(*w.selection().source(src)) == nullptr);
         }
         {

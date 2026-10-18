@@ -6,15 +6,21 @@
 // zoom rectangle's handles (an end: setZoom; the bottom edge: a pan at constant span); a double-click on a
 // lap of the range band zooms the worksheet to it; the wheel and the rubber band set the worksheet zoom (ESC
 // cancels the band); a click places the cursor; enableOverlays widens the overlay policy; S, L and
-// like-units grouping as spec edits; Export Data as CSV.
+// like-units grouping as spec edits; Export Data as CSV; a Static build replaced in the pool's queue is never
+// delivered while the latest one is shown (01 section 5.4 rule 2).
 
 #include "components/plots_test_support.hpp"
 
+#include <esses/base/taskpool.hpp>
 #include <esses/widgets/components/outing_graph.hpp>
 #include <esses/widgets/properties_shell/component_commands.hpp>
 
 #include <QTest>
 #include <cmath>
+#include <cstddef>
+#include <future>
+#include <latch>
+#include <memory>
 
 using namespace esses;
 using namespace esses::widgets;
@@ -34,6 +40,33 @@ double pixelOf(const OutingGraph& g) {
     const double b = *g.worksheetXAt(at + 1.0);
     return std::abs(b - a);
 }
+
+// Holds every worker of `pool` until destroyed, so that the tasks submitted meanwhile wait in its queue.
+class WorkerHold {
+public:
+    explicit WorkerHold(TaskPool& pool) : state_(std::make_shared<State>(pool.stats().workers)) {
+        for (std::size_t i = 0; i < pool.stats().workers; ++i) {
+            pool.run(Priority::Interactive, TaskKey{}, CancelToken{}, [state = state_](const CancelToken&) {
+                state->started.count_down();
+                state->release.wait();
+            });
+        }
+        state_->started.wait();
+    }
+    ~WorkerHold() { state_->promise.set_value(); }
+    WorkerHold(const WorkerHold&) = delete;
+    WorkerHold& operator=(const WorkerHold&) = delete;
+
+private:
+    struct State {
+        explicit State(std::size_t workers)
+            : started(static_cast<std::ptrdiff_t>(workers)), release(promise.get_future().share()) {}
+        std::latch started;
+        std::promise<void> promise;
+        std::shared_future<void> release;
+    };
+    std::shared_ptr<State> state_;
+};
 
 } // namespace
 
@@ -66,9 +99,8 @@ private Q_SLOTS:
         const int dynamic = rig.c->dynamicBuilds();
         w.view->zoomTo(plot::XSpan{-20.0e6, 60.0e6});
         w.view->setCursor(5 * kSec, qt::CursorSource::Programmatic);
-        QTest::qWait(50);
-        QCOMPARE(rig.c->staticBuildsSubmitted(), submitted);
         QVERIFY(rig.c->dynamicBuilds() >= dynamic + 2);
+        QVERIFY(staticUntouched(*rig.c, submitted));
         QVERIFY(std::abs(*rig.c->worksheetXAt(rig.c->zoomRectLogical().left()) + 20.0e6) <= 1.5 * px);
         // A selection change rebuilds the traces.
         w.selection.setMain(lapRef(*src, 2));
@@ -91,6 +123,8 @@ private Q_SLOTS:
         selectMain(w, lapRef(*src, 1));
         Rig<OutingGraph> rig(w, specOf("outing", kBody), QSize(600, 260));
         QVERIFY(waitQuiet(*rig.c));
+        const int submitted = rig.c->staticBuildsSubmitted();
+        const int delivered = rig.c->staticBuildsDelivered();
         const double px = pixelOf(*rig.c);
         QRectF z = rig.c->zoomRectLogical();
         const double midY = z.center().y();
@@ -115,8 +149,39 @@ private Q_SLOTS:
         const plot::XSpan after = w.view->state().zoom;
         QVERIFY(std::abs(after.length() - before.length()) < 1.0);
         QVERIFY(std::abs(after.a - (before.a + 20.0e6)) <= 1.5 * px);
-        // The traces were never rebuilt by the drags.
-        QCOMPARE(rig.c->staticBuildsDelivered(), rig.c->staticBuildsSubmitted());
+        // The traces were never rebuilt by the drags (the zoom rectangle is Dynamic): nothing submitted or
+        // delivered since the component settled, and the image shown is the latest submission's. Delivered is
+        // not compared with submitted: a build replaced while queued before the drags was never delivered.
+        QVERIFY(staticUntouched(*rig.c, submitted));
+        QCOMPARE(rig.c->staticBuildsDelivered(), delivered);
+        QCOMPARE(rig.c->staticBuildShown(), rig.c->staticBuildsSubmitted());
+    }
+
+    // 01 section 5.4 rule 2: a Static build replaced while still queued is never delivered, so delivered may
+    // stay below submitted for good (four submitted and three delivered once made a check fail); the image
+    // shown is the latest submission's all the same.
+    void aBuildReplacedInTheQueueIsNeverDelivered() {
+        World w;
+        const auto src = w.publish(SourceOptions{});
+        selectMain(w, lapRef(*src, 1));
+        Rig<OutingGraph> rig(w, specOf("outing", kBody), QSize(600, 260));
+        QVERIFY(waitQuiet(*rig.c));
+        const int submitted = rig.c->staticBuildsSubmitted();
+        const int delivered = rig.c->staticBuildsDelivered();
+        QCOMPARE(rig.c->staticBuildShown(), submitted);
+        {
+            const WorkerHold hold(w.rt.pool()); // the builds below wait in the queue
+            for (int i = 0; i < 3; ++i) {
+                rig.c->onViewChanged(w.view->state(), plot::mask(plot::Change::Data));
+                drainEvents(); // this turn's request is submitted, replacing the one still queued
+            }
+            QCOMPARE(rig.c->staticBuildsSubmitted(), submitted + 3);
+            QVERIFY(!rig.c->staticUpToDate());
+        }
+        QVERIFY(waitQuiet(*rig.c));
+        QCOMPARE(rig.c->staticBuildsSubmitted(), submitted + 3);
+        QCOMPARE(rig.c->staticBuildsDelivered(), delivered + 1); // the first two were replaced
+        QCOMPARE(rig.c->staticBuildShown(), submitted + 3);
     }
 
     void doubleClickALapZoomsToIt() {

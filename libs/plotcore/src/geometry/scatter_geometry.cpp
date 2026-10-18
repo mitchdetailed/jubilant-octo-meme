@@ -27,6 +27,7 @@
 #include <initializer_list>
 #include <limits>
 #include <map>
+#include <optional>
 #include <utility>
 
 namespace esses::plot {
@@ -414,7 +415,8 @@ Result<std::vector<ScatterSet>> gatherSlot(const ComponentBuildInputs& in, const
     std::vector<ScatterSet> out;
     const SlotData& slot = in.slots[k];
     const ResolvedChannel* x = geom::channelOf(slot, xIndex(), body.xChannel);
-    if (!geom::readable(x)) {
+    // readable() implies a series; testing it again shows clang-tidy that the accesses are checked.
+    if (!geom::readable(x) || !x->series) {
         return out;
     }
     std::vector<analysis::SampleSpan> spans = geom::visibleSpans(in, slot);
@@ -440,7 +442,7 @@ Result<std::vector<ScatterSet>> gatherSlot(const ComponentBuildInputs& in, const
     for (const int t : frame.traces) {
         const ScatterTrace& trace = body.traces[static_cast<std::size_t>(t)];
         const ResolvedChannel* y = geom::channelOf(slot, yIndex(t), trace.yChannel);
-        if (!geom::readable(y)) {
+        if (!geom::readable(y) || !y->series) {
             continue;
         }
         input.y.push_back(analysis::ScatterChannel{
@@ -453,7 +455,7 @@ Result<std::vector<ScatterSet>> gatherSlot(const ComponentBuildInputs& in, const
     }
     if (!body.colourChannel.empty()) {
         const ResolvedChannel* z = geom::channelOf(slot, zIndex(body), body.colourChannel);
-        if (geom::readable(z)) {
+        if (geom::readable(z) && z->series) {
             input.colour = analysis::ScatterChannel{
                 *z->series, inMainUnit(*z, geom::channelOf(mainSlot, zIndex(body), body.colourChannel)),
                 interpOf(*z)};
@@ -461,7 +463,7 @@ Result<std::vector<ScatterSet>> gatherSlot(const ComponentBuildInputs& in, const
     }
     if (!body.gatingChannel.empty()) {
         const ResolvedChannel* g = geom::channelOf(slot, gIndex(body), body.gatingChannel);
-        if (geom::readable(g)) {
+        if (geom::readable(g) && g->series) {
             input.gating = *g->series;
         }
     }
@@ -546,6 +548,61 @@ std::vector<float> ringOf(float cx, float cy, float r) {
 
 bool inside(const RectPx& r, float x, float y) {
     return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
+}
+
+// A set's interval average (body.intervalBinWidth) as a step per bin, when it has bins. The optional is
+// tested here, next to its use, so clang-tidy sees the check (bugprone-unchecked-optional-access).
+void emitIntervalSteps(DrawList& list, const PlotTile& tile,
+                       const std::optional<analysis::IntervalAverage>& interval, Rgba colour, float lineW) {
+    if (!interval || interval->binLo.empty()) {
+        return;
+    }
+    const analysis::IntervalAverage& iv = *interval;
+    // The bin width in x units: the spacing of the bins (the smallest positive gap), else 1 % of the scale.
+    double width = 0.0;
+    for (std::size_t i = 1; i < iv.binLo.size(); ++i) {
+        const double gap = iv.binLo[i] - iv.binLo[i - 1];
+        if (gap > 0.0 && (width == 0.0 || gap < width)) {
+            width = gap;
+        }
+    }
+    if (!(width > 0.0)) {
+        width = 0.01 * (tile.x.vMax - tile.x.vMin);
+    }
+    std::vector<float> steps;
+    for (std::size_t i = 0; i < iv.binLo.size() && i < iv.mean.size(); ++i) {
+        const float y = yPxOf(tile, iv.mean[i]);
+        steps.insert(steps.end(), {xPxOf(tile, iv.binLo[i]), y, xPxOf(tile, iv.binLo[i] + width), y});
+    }
+    if (steps.size() >= 4) {
+        list.polyline(steps.data(), steps.size() / 2, colour, 2.0F * lineW);
+    }
+}
+
+// A set's trend curve across the tile's x scale, when it has a fitted trend (same reason for the local test).
+void emitTrendCurve(DrawList& list, const ComponentBuildInputs& in, const PlotTile& tile,
+                    const ScatterSet& set, Rgba colour, float lineW) {
+    if (!set.trend || set.trend->coefficients.empty()) {
+        return;
+    }
+    const std::vector<double>& coefficients = set.trend->coefficients;
+    std::vector<float> curve;
+    for (int s = 0; s <= kTrendSegments; ++s) {
+        const double x = tile.x.vMin + (tile.x.vMax - tile.x.vMin) * s / kTrendSegments;
+        const double y = geom::polyval(coefficients, x);
+        const float px = xPxOf(tile, x);
+        const float py = yPxOf(tile, y);
+        if (std::isfinite(px) && std::isfinite(py)) {
+            curve.insert(curve.end(), {px, std::clamp(py, tile.plot.y - 4.0F * tile.plot.h,
+                                                      tile.plot.y + 5.0F * tile.plot.h)});
+        }
+    }
+    if (curve.size() >= 4) {
+        const Slot& slot = in.slots[set.slot].slot;
+        list.polyline(curve.data(), curve.size() / 2, colour,
+                      1.5F * lineW * traceWidthScale(geom::schemeOf(in), slot),
+                      traceDash(geom::schemeOf(in), slot));
+    }
 }
 
 } // namespace
@@ -729,47 +786,11 @@ void emitScatterStatic(ComponentBuild& build, const ComponentBuildInputs& in, co
                 }
             }
         }
-        if (set.interval && !set.interval->binLo.empty() && body.intervalBinWidth) {
-            const auto& iv = *set.interval;
-            // The bin width in x units: the spacing of the bins (the smallest positive gap), else 1 % of the
-            // scale.
-            double width = 0.0;
-            for (std::size_t i = 1; i < iv.binLo.size(); ++i) {
-                const double gap = iv.binLo[i] - iv.binLo[i - 1];
-                if (gap > 0.0 && (width == 0.0 || gap < width)) {
-                    width = gap;
-                }
-            }
-            if (!(width > 0.0)) {
-                width = 0.01 * (tile.x.vMax - tile.x.vMin);
-            }
-            std::vector<float> steps;
-            for (std::size_t i = 0; i < iv.binLo.size() && i < iv.mean.size(); ++i) {
-                const float y = yPxOf(tile, iv.mean[i]);
-                steps.insert(steps.end(), {xPxOf(tile, iv.binLo[i]), y, xPxOf(tile, iv.binLo[i] + width), y});
-            }
-            if (steps.size() >= 4) {
-                list.polyline(steps.data(), steps.size() / 2, colour, 2.0F * lineW);
-            }
+        if (body.intervalBinWidth) {
+            emitIntervalSteps(list, tile, set.interval, colour, lineW);
         }
-        if (trends && set.trend && !set.trend->coefficients.empty()) {
-            std::vector<float> curve;
-            for (int s = 0; s <= kTrendSegments; ++s) {
-                const double x = tile.x.vMin + (tile.x.vMax - tile.x.vMin) * s / kTrendSegments;
-                const double y = geom::polyval(set.trend->coefficients, x);
-                const float px = xPxOf(tile, x);
-                const float py = yPxOf(tile, y);
-                if (std::isfinite(px) && std::isfinite(py)) {
-                    curve.insert(curve.end(), {px, std::clamp(py, tile.plot.y - 4.0F * tile.plot.h,
-                                                              tile.plot.y + 5.0F * tile.plot.h)});
-                }
-            }
-            if (curve.size() >= 4) {
-                const Slot& slot = in.slots[set.slot].slot;
-                list.polyline(curve.data(), curve.size() / 2, colour,
-                              1.5F * lineW * traceWidthScale(geom::schemeOf(in), slot),
-                              traceDash(geom::schemeOf(in), slot));
-            }
+        if (trends) {
+            emitTrendCurve(list, in, tile, set, colour, lineW);
         }
         list.scissor(RectPx{});
         // Main point sets for nearestPoint (D-196 tags: the Main-lap time of each point).

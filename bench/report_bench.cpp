@@ -245,12 +245,16 @@ bool checkTable(const analysis::ReportTable& t, const analysis::ReportSpec& spec
             const analysis::ReportCell& cell = t.at(r, c);
             const analysis::ReportColumn& col = t.columns[c];
             const auto it = bound.byName.find(spec.channels[col.channel].name);
-            if (it == bound.byName.end() || !it->second.series || lapGroup == nullptr) {
+            if (it == bound.byName.end() || lapGroup == nullptr) {
+                return false;
+            }
+            const std::optional<store::Series>& series = it->second.series;
+            if (!series) {
                 return false;
             }
             const model::Range& lap = lapGroup->ranges[r];
-            Result<analysis::StatValue> want = analysis::ReportEngine::statistic(
-                *it->second.series, col.stat, lap.start, lap.end, spec.options, {});
+            Result<analysis::StatValue> want =
+                analysis::ReportEngine::statistic(*series, col.stat, lap.start, lap.end, spec.options, {});
             const bool ok =
                 want &&
                 ((!want->valid && cell.state == analysis::ReportCellState::Blank) ||

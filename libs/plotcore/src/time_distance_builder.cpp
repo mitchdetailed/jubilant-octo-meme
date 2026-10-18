@@ -2301,14 +2301,15 @@ std::string enumLabel(const SlotData& slot, const ResolvedChannel& rc, double va
 
 const char* const kPending = "\xE2\x80\xA6"; // U+2026, "..." while pending (D-022)
 
-// The value of a channel in a slot at the Main-domain x: its text ("..." pending, "" invalid) and the
-// display value (NaN unless valid).
+// The value of a channel in a slot at the Main-domain x: its text ("..." pending, "" invalid or missing) and
+// the display value (NaN unless valid). The callers pass only channels with a descriptor; testing it here
+// keeps the access below checked (bugprone-unchecked-optional-access).
 std::pair<std::string, double> valueAtX(const ComponentBuildInputs& inputs, const SlotData& slot,
                                         const ResolvedChannel& rc, const TdTrace* trace, double x) {
     if (rc.status == model::ChannelStatus::Pending || !rc.series) {
         return {kPending, std::numeric_limits<double>::quiet_NaN()};
     }
-    if (!slotDrawsX(inputs, slot)) {
+    if (!rc.descriptor || !slotDrawsX(inputs, slot)) {
         return {{}, std::numeric_limits<double>::quiet_NaN()};
     }
     const DomainMapper map = mapperOf(inputs, slot, &*rc.series);

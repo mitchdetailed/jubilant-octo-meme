@@ -9,6 +9,7 @@
 #pragma once
 
 #include <esses/base/paths.hpp>
+#include <esses/base/taskpool.hpp>
 #include <esses/qtmodel/app_runtime.hpp>
 #include <esses/widgets/components/time_distance_graph.hpp>
 #include <esses/widgets/shell/main_window.hpp>
@@ -67,7 +68,14 @@ void sendMouse(QWidget* w, QEvent::Type type, QPointF pos, Qt::MouseButton butto
 
 // The time_distance graph of the active worksheet (the first one in paint order), or null.
 widgets::TimeDistanceGraph* graphOf(widgets::MainWindow& w);
-// Waits until the graph's Static layer is current and stays so for `quietMs`.
+// `pool` has nothing queued, parked or running, and still nothing once what its finished tasks posted has
+// been delivered: no late result (a distance index, a maths channel, a build, a track map) can still arrive,
+// which no fixed wait guarantees on a loaded machine.
+bool poolSettled(const TaskPool& pool);
+// The runtime's pool is settled and its Dispatcher holds nothing: a check that nothing happened starts here.
+bool runtimeQuiet(qt::AppRuntime& rt);
+// Waits until the graph's pool is settled (late maths/distance results can no longer rebuild it) and its
+// Static layer current, and stays so for `quietMs` (a GUI timer may still request a build).
 bool waitQuiet(widgets::TimeDistanceGraph& g, int timeoutMs = 60000, int quietMs = 150);
 
 // The number at the start of a Values cell ("123.4 km/h", "-0.50"); nullopt for "", "…" or text.

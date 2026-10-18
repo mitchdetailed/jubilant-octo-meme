@@ -12,9 +12,11 @@
 // only. The PNGs committed with this work were rendered on Windows (goldens.json "generatedOn": "windows"):
 // provisional until they are replaced from the ubuntu artefact. ESSES_UPDATE_GOLDENS=1 rewrites the PNGs, the
 // case JSONs and the goldens.json files (generatedOn = this platform). Every render (and its diff) is written
-// to <build>/tests/golden/artefacts/plots/.
+// to <build>/tests/golden/artefacts/plots/. repeatableInAnyOrder renders every case at DPR 1, 1.25, 1.5 and
+// 2 in three orders, between other text, and requires the same image each time (on every OS).
 
 #include "../../../libs/plotcore/tests/plots_golden_cases.hpp"
+#include "golden_font_state.hpp"
 
 #include <esses/base/taskpool.hpp>
 #include <esses/qtrender/image_diff.hpp>
@@ -29,9 +31,12 @@
 #include <QJsonObject>
 #include <QSet>
 #include <QTest>
+#include <array>
 #include <cmath>
 #include <map>
 #include <memory>
+#include <numeric>
+#include <vector>
 
 using namespace esses;
 
@@ -280,6 +285,66 @@ private Q_SLOTS:
         } else if (!d.passes()) {
             qWarning("%s differs from the %s-generated golden (reported only, D-127): %s", qPrintable(stem),
                      qPrintable(generatedOn_[c.type]), qPrintable(d.summary()));
+        }
+    }
+
+    // The same inputs give the same pixels whatever the process rendered before (04 section 6.7 item 1):
+    // every case at DPR 1, 1.25, 1.5 and 2, each render with a new renderer (as plotCases), in order, then
+    // in reverse and interleaved orders after other text (golden_font_state.hpp), equals its first render
+    // exactly. Text that Qt draws as outlines (the numeric gauge's value at DPR 2) once landed where the
+    // glyphs rasterised before it left FreeType's face (raster_backend.cpp, drawText).
+    void repeatableInAnyOrder() {
+        const plot::test::Fixture fx;
+        QVERIFY(plot::test::makeResident(fx.a));
+        QVERIFY(plot::test::makeResident(fx.b));
+        const auto cases = plot::test::plotGoldenCases(fx);
+        constexpr std::array<double, 4> kDprs{1.0, 1.25, 1.5, 2.0};
+        const std::size_t count = cases.size() * kDprs.size();
+        TaskPool pool(4);
+        const auto label = [&](std::size_t item) {
+            const plot::test::PlotGoldenCase& c = cases[item / kDprs.size()];
+            return QStringLiteral("%1/%2@%3x")
+                .arg(QString::fromStdString(c.type), QString::fromStdString(c.name))
+                .arg(kDprs[item % kDprs.size()]);
+        };
+        const auto render = [&](std::size_t item) {
+            const plot::test::PlotGoldenCase& c = cases[item / kDprs.size()];
+            const double dpr = kDprs[item % kDprs.size()];
+            plot::ComponentBuildInputs in = plot::test::plotGoldenInputs(fx, c, static_cast<float>(dpr));
+            in.metrics = nullptr; // QtTextMetrics, as plotCases
+            qt::OffscreenRenderer renderer(std::make_shared<const qt::SchemeFonts>(*in.scheme, 1), &pool);
+            return renderer.renderComponent(in, QSize(c.width, c.height), dpr);
+        };
+        std::vector<QImage> first;
+        first.reserve(count);
+        for (std::size_t item = 0; item < count; ++item) {
+            first.push_back(render(item));
+            QVERIFY2(!first.back().isNull(), qPrintable(label(item)));
+        }
+        std::size_t stride = 7; // interleaved: item k * stride mod count, a permutation when coprime
+        while (std::gcd(stride, count) != 1) {
+            ++stride;
+        }
+        const std::array<const char*, 2> passes{"reverse", "interleaved"};
+        for (std::size_t pass = 0; pass < passes.size(); ++pass) {
+            for (std::size_t k = 0; k < count; ++k) {
+                const std::size_t item = pass == 0 ? count - 1 - k : k * stride % count;
+                goldentest::perturbFontState(static_cast<int>(pass * count + k));
+                const QImage again = render(item);
+                const qt::ImageDiff d = qt::compareImages(again, first[item], 0);
+                const bool same = d.sizeMatches && d.differingPixels == 0;
+                if (!same) {
+                    const QString stem = artefactsDir() + QStringLiteral("/repeat_") +
+                                         label(item).replace(QLatin1Char('/'), QLatin1Char('_'));
+                    first[item].save(stem + QStringLiteral(".first.png"));
+                    again.save(stem + QStringLiteral(".again.png"));
+                    qt::compareImages(again, first[item], 0, true)
+                        .diff.save(stem + QStringLiteral(".diff.png"));
+                }
+                QVERIFY2(same, qPrintable(label(item) +
+                                          QStringLiteral(" (%1 order): ").arg(QLatin1String(passes[pass])) +
+                                          d.summary()));
+            }
         }
     }
 

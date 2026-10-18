@@ -76,21 +76,9 @@ struct Rig {
     QString lastText;
 };
 
-bool waitQuiet(TimeDistanceGraph& g, int quietMs = 150) {
-    QElapsedTimer clock;
-    clock.start();
-    while (clock.elapsed() < kTimeoutMs) {
-        if (!QTest::qWaitFor([&g] { return g.staticUpToDate(); }, kTimeoutMs)) {
-            return false;
-        }
-        const int submitted = g.staticBuildsSubmitted();
-        QTest::qWait(quietMs);
-        if (g.staticUpToDate() && g.staticBuildsSubmitted() == submitted) {
-            return true;
-        }
-    }
-    return false;
-}
+// Settled on the pool's completion, not on a quiet period (plots_test_support.hpp).
+using plotstest::staticUntouched;
+using plotstest::waitQuiet;
 
 void sendMouse(QWidget* w, QEvent::Type type, QPointF pos, Qt::MouseButton button, Qt::MouseButtons buttons,
                Qt::KeyboardModifiers mods = Qt::NoModifier) {
@@ -256,9 +244,7 @@ private Q_SLOTS:
         const int after = g.staticBuildsSubmitted();
         w.view->setCursor(20 * kSec, qt::CursorSource::Programmatic);
         w.view->placeDatum(); // moved: Dynamic only
-        drainEvents();
-        QCOMPARE(g.staticBuildsSubmitted(), after);
-        QVERIFY(g.staticUpToDate());
+        QVERIFY(staticUntouched(g, after));
         w.view->toggleDatum(); // hidden: the key loses the columns
         QVERIFY(waitQuiet(g));
         QVERIFY(!g.layout().keyColumns.datum);

@@ -4,6 +4,44 @@ All notable changes are recorded here, newest first. The project follows semanti
 
 ## Unreleased (M3)
 
+- CI's `golden.tst_golden_plots` determinism failure (ubuntu: `gauge_numeric/numeric_reference_text_band@2x`
+  rendered twice in one process differed in 1,213 pixels) was a Qt FreeType state leak, now worked around in
+  `RasterBackend` text drawing. Qt fills a glyph larger than its glyph cache (64 device px: the numeric gauge's
+  dynamic-font value at DPR 2) from `QFontEngineFT::addGlyphsToPath`, which loads the outline under whatever
+  transform the thread's face of that font file holds, including the subpixel offset that `loadGlyph` set for
+  the last glyph the thread rasterised; with subpixel positioning (fontconfig's hintslight on Linux) the value
+  moved by a fraction of a pixel depending on the text drawn before it (here the @1x row). `drawText` now
+  resets each face of a run Qt may draw as outlines (a new engine of the face, rasterising one glyph at
+  subpixel 0) before drawing it. Reproduced on Windows (the exact case and pixel count with the fonts switched
+  to vertical-only hinting, and in a new unit test). Regression tests: `qtrender.tst_text_outline_state`
+  (a large run, in the Static and Dynamic paths at DPR 1, 1.25, 1.5 and 2, renders identically after text
+  drawn at subpixel positions) and `repeatableInAnyOrder` in `golden.tst_golden_plots` (every plot case at
+  DPR 1, 1.25, 1.5 and 2 rendered again in reverse and interleaved orders, between other text, equals its
+  first render exactly); the same check in `golden.tst_golden_images` covers the time/distance cases. Small
+  text is unchanged.
+- CI's `widgets.tst_outing_graph` failure (`dragTheZoomRectangleEndsAndBottomEdge`: 3 Static builds delivered
+  of 4 submitted) was the test's: a build replaced while still queued is dropped by design (01 section 5.4
+  rule 2: the replace key keeps one running and one pending build, and a newer submit resolves the pending one
+  Cancelled, which RenderService never delivers), so delivered may stay below submitted for good. Reproduced
+  under load and traced to such a replaced build before the drags. The test now checks that the drags
+  submitted and delivered nothing and that the image shown is the latest submission's (`staticBuildShown()`,
+  new on LayeredComponent and TimeDistanceGraph); `aBuildReplacedInTheQueueIsNeverDelivered` reproduces the
+  drop deterministically with the pool's workers held. The M3 Qt tests no longer settle on a quiet period
+  alone: `waitQuiet` (plots, time/distance, tests/ui) waits until the component's pool is idle with every
+  posted result delivered (a lap's distance index arriving after 150 ms of quiet could rebuild a component
+  behind a "nothing rebuilt" check), such checks are taken synchronously after the action and again once its
+  queued request is delivered (`staticUntouched`) instead of after a fixed wait, the track position, channel
+  report and shell animation checks count from a settled pool, and the demo's 500 ms wait before "no map was
+  generated" is a wait for a quiet runtime. No product behaviour changes.
+- The lint job's clang-tidy 19.1.5 (libstdc++) found 10 reads of a `std::optional` whose test it could not
+  see (`bugprone-unchecked-optional-access`): the scatter and histogram geometry read `*rc->series` after
+  `geom::readable(rc)`, a function of another translation unit, and `TimeReportEngine::eclectic` and the report
+  bench tested and read the optional through separate `operator[]` and iterator calls. Each read now follows a
+  test of the same object (`readable(rc) && rc->series`, or a reference bound once). clang-tidy 22.1.3 found
+  three more in M3 code, now tested next to their use too: the scatter's interval steps and trend curve (drawn
+  by two helpers of their own) and `valueAtX` of the time/distance builder, whose callers already require a
+  descriptor. No behaviour changes (`readable` implies a series); the existing analysis, plotcore and report
+  bench tests cover the code.
 - The re-verification of the M3 fix pass (D-203 (ai)): `gCorrection` estimates the longitudinal accelerometer's
   offset while it follows the wheel (from the 1 s slip reference's error, critically damped) and ends a
   prediction after 3 s, taking its drift from the wheel as offset, so an offset can no longer latch the

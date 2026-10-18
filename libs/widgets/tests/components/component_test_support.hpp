@@ -9,6 +9,7 @@
 // qtmodel services, one worksheet and its WorksheetContext.
 #pragma once
 
+#include <esses/base/taskpool.hpp>
 #include <esses/model/range.hpp>
 #include <esses/model/source.hpp>
 #include <esses/plotcore/time_distance_builder.hpp>
@@ -32,6 +33,7 @@
 #include <QImage>
 #include <QRect>
 #include <QString>
+#include <cstddef>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -52,6 +54,35 @@ inline void drainEvents() {
         QCoreApplication::sendPostedEvents();
         QCoreApplication::processEvents(QEventLoop::AllEvents);
     }
+}
+
+// Every task of `pool` has completed: nothing queued, parked or running.
+inline bool poolIdle(const TaskPool& pool) {
+    const TaskPool::Stats s = pool.stats();
+    std::size_t queued = 0;
+    for (const std::size_t q : s.queued) {
+        queued += q;
+    }
+    return queued == 0 && s.parked == 0 && s.running == 0;
+}
+
+// `pool` is idle, and still idle once what its finished tasks posted has been delivered (drainEvents): from
+// here no late result (a lap's distance index, a maths channel, a build) can still arrive, which no fixed
+// quiet period guarantees on a loaded machine. A check that an action rebuilt or re-ran nothing starts from
+// here.
+inline bool poolSettled(const TaskPool& pool) {
+    if (!poolIdle(pool)) {
+        return false;
+    }
+    drainEvents(); // a task posts its result before it counts as finished
+    return poolIdle(pool);
+}
+
+// The component's pool (its RenderService's: the World's or the shell's runtime) is settled and no Static
+// build is dirty, scheduled or in flight. `C` has the Static pipeline (LayeredComponent, TimeDistanceGraph,
+// TrackPosition).
+template <class C> bool settled(C& c) {
+    return poolSettled(c.context().render.pool()) && c.staticUpToDate();
 }
 
 std::filesystem::path repoRoot();

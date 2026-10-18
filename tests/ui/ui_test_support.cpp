@@ -4,12 +4,16 @@
 #include "ui_test_support.hpp"
 
 #include <esses/base/assert.hpp>
+#include <esses/qtmodel/dispatcher.hpp>
+#include <esses/qtmodel/render_service.hpp>
 #include <esses/qtrender/scheme_fonts.hpp>
 #include <esses/widgets/components/component_widget.hpp>
 #include <esses/widgets/shell/worksheet_canvas.hpp>
 
 #include <QApplication>
+#include <QCoreApplication>
 #include <QElapsedTimer>
+#include <QEventLoop>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -18,6 +22,7 @@
 #include <QRegularExpression>
 #include <QTest>
 #include <atomic>
+#include <cstddef>
 #include <mutex>
 #include <system_error>
 
@@ -214,16 +219,40 @@ widgets::TimeDistanceGraph* graphOf(widgets::MainWindow& w) {
     return nullptr;
 }
 
+bool poolSettled(const TaskPool& pool) {
+    const auto idle = [&pool] {
+        const TaskPool::Stats s = pool.stats();
+        std::size_t queued = 0;
+        for (const std::size_t q : s.queued) {
+            queued += q;
+        }
+        return queued == 0 && s.parked == 0 && s.running == 0;
+    };
+    if (!idle()) {
+        return false;
+    }
+    for (int i = 0; i < 5; ++i) { // what the finished tasks posted (a task posts before it counts as done)
+        QCoreApplication::sendPostedEvents();
+        QCoreApplication::processEvents(QEventLoop::AllEvents);
+    }
+    return idle();
+}
+
+bool runtimeQuiet(qt::AppRuntime& rt) {
+    return poolSettled(rt.pool()) && rt.dispatcher().pending() == 0;
+}
+
 bool waitQuiet(widgets::TimeDistanceGraph& g, int timeoutMs, int quietMs) {
+    const auto settled = [&g] { return poolSettled(g.context().render.pool()) && g.staticUpToDate(); };
     QElapsedTimer clock;
     clock.start();
     while (clock.elapsed() < timeoutMs) {
-        if (!QTest::qWaitFor([&g] { return g.staticUpToDate(); }, timeoutMs)) {
+        if (!QTest::qWaitFor(settled, timeoutMs)) {
             return false;
         }
         const int submitted = g.staticBuildsSubmitted();
         QTest::qWait(quietMs);
-        if (g.staticUpToDate() && g.staticBuildsSubmitted() == submitted) {
+        if (settled() && g.staticBuildsSubmitted() == submitted) {
             return true;
         }
     }

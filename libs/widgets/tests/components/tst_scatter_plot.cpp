@@ -83,9 +83,9 @@ private Q_SLOTS:
         const int submitted = rig.c->staticBuildsSubmitted();
         const int dynamic = rig.c->dynamicBuilds();
         w.view->setCursor(12 * kSec, qt::CursorSource::Programmatic);
-        QCOMPARE(rig.c->staticBuildsSubmitted(), submitted); // 04 section 2.2: Cursor -> Dynamic only
         QVERIFY(rig.c->dynamicBuilds() > dynamic);
         QVERIFY(!rig.c->lastDynamicDamage().isEmpty());
+        QVERIFY(staticUntouched(*rig.c, submitted)); // 04 section 2.2: Cursor -> Dynamic only
 
         // The worksheet zoom selects the data span: a zoom rebuilds the points.
         w.view->zoomTo(plot::XSpan{0.0, 20.0e6});

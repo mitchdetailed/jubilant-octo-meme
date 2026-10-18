@@ -183,7 +183,9 @@ private Q_SLOTS:
         w.selection.setMain(refOf(*src, kLaps, "Lap 3"));
         QVERIFY(settle(report.model(), before));
         QCOMPARE(text(report.tableView(), 0, 1), QStringLiteral("249.50"));
-        // Not zoom linked: a zoom change does not re-run the engine.
+        // Not zoom linked: a zoom change does not re-run the engine. Counted once the pool is settled: the
+        // world's distance pass, whose arrival re-runs every report of the source, is over by then.
+        QVERIFY(QTest::qWaitFor([&] { return poolSettled(w.rt.pool()) && !report.model().busy(); }, 30000));
         const int unlinked = report.model().deliveries();
         w.view->zoomTo(plot::XSpan{0.0, 5.0e6});
         drainEvents();

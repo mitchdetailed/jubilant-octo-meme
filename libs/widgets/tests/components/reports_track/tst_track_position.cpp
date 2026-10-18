@@ -139,7 +139,9 @@ private Q_SLOTS:
         tp->show();
         QVERIFY(QTest::qWaitFor([&] { return t.distanceReady(); }, 20000));
         tp->onDataChanged(t.src->id, 0);
-        QVERIFY(built(*tp));
+        // Settled, not only built: the other laps' distance indexes (each a Data change) are in, so nothing
+        // can rebuild the map behind the checks below.
+        QVERIFY(QTest::qWaitFor([&] { return settled(*tp); }, 20000));
         QVERIFY(tp->trackMap() != nullptr);
         QCOMPARE(tp->trackMap()->venue, kVenue);
         QVERIFY(tp->staticDelivered() >= 1);
@@ -161,6 +163,7 @@ private Q_SLOTS:
         QVERIFY(tp->dynamicBuilds() > dynamics);
         t.w.view->zoomTo(plot::XSpan{0.0, 10.0 * kSec});
         t.w.view->setDomain(plot::Domain::Distance);
+        QVERIFY(tp->staticUpToDate()); // a Static invalidation would show at once
         drainEvents();
         QCOMPARE(tp->staticSubmitted(), statics);
         QVERIFY(tp->staticUpToDate()); // nothing scheduled either
@@ -247,9 +250,12 @@ private Q_SLOTS:
         const QJsonObject scale = objectOf(next.body).value(QStringLiteral("scale")).toObject();
         QCOMPARE(scale.value(QStringLiteral("mode")).toString(), QStringLiteral("manual"));
         QCOMPARE(scale.value(QStringLiteral("zoom")).toDouble(), TrackPosition::kZoomStep);
-        // The canvas applies it: nothing is rebuilt again for the same spec.
+        // The canvas applies it: nothing is rebuilt again for the same spec (counted once nothing else, such
+        // as a lap's distance index, can still rebuild the map).
+        QVERIFY(QTest::qWaitFor([&] { return settled(tp); }, 20000));
         const int submitted = tp.staticSubmitted();
         tp.applySpec(next);
+        QVERIFY(tp.staticUpToDate());
         drainEvents();
         QCOMPARE(tp.staticSubmitted(), submitted);
         // track.fit: back to "fit", committed at once.

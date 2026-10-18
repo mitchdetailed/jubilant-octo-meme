@@ -973,6 +973,7 @@ void TimeDistanceGraph::onStaticBuilt(std::uint64_t serial, Result<plot::Compone
             layers_.rasteriseStatic(build.list);
         }
         ++staticDelivered_;
+        staticShown_ = static_cast<int>(serial); // serials count the submissions (staticSubmitted_)
         update();
         rebuildDynamic();
     }

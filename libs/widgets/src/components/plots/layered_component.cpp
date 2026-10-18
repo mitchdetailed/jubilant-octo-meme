@@ -300,6 +300,7 @@ void LayeredComponent::onStaticBuilt(std::uint64_t serial, Result<plot::Componen
             layers_.rasteriseStatic(build.list);
         }
         ++staticDelivered_;
+        staticShown_ = static_cast<int>(serial); // serials count the submissions (staticSubmitted_)
         update();
     }
     // A failed build keeps the previous image (04 section 1 item 4); a newer request may follow.

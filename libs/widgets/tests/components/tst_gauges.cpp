@@ -114,12 +114,12 @@ private Q_SLOTS:
         // A cursor move: Dynamic only.
         const int submitted = rig.c->staticBuildsSubmitted();
         w.view->setCursor(25 * kSec, qt::CursorSource::Programmatic);
-        QCOMPARE(rig.c->staticBuildsSubmitted(), submitted);
+        QVERIFY(staticUntouched(*rig.c, submitted));
         QTRY_VERIFY_WITH_TIMEOUT(!texts().empty() && texts().front() == fixed(throttleAt(1, 25.0), 1),
                                  kTimeoutMs);
         // A zoom changes nothing a gauge draws: no Static build either.
         w.view->zoomTo(plot::XSpan{0.0, 10.0e6});
-        QCOMPARE(rig.c->staticBuildsSubmitted(), submitted);
+        QVERIFY(staticUntouched(*rig.c, submitted));
     }
 
     void numericBandsAndAltN() {
@@ -206,9 +206,10 @@ private Q_SLOTS:
         // At the lap start (100 %) bandMode bar recolours the bar with band 0.
         const int submitted = rig.c->staticBuildsSubmitted();
         w.view->setCursor(0, qt::CursorSource::Programmatic);
+        QVERIFY(staticUntouched(*rig.c, submitted)); // Dynamic only
         QTRY_COMPARE_WITH_TIMEOUT(rectsOf(rig.c->layers().dynamicList(), 0xE53935FFU).size(), std::size_t{1},
                                   kTimeoutMs);
-        QCOMPARE(rig.c->staticBuildsSubmitted(), submitted); // Dynamic only
+        QCOMPARE(rig.c->staticBuildsSubmitted(), submitted);
         // ALT+0 hides the band: barColour again; the band's line leaves the Static layer.
         QVERIFY(rig.c->handleCommand(QStringLiteral("component.colour_band"), {QVariant(0)}));
         QVERIFY(waitQuiet(*rig.c));

@@ -72,21 +72,37 @@ template <class T> struct Rig {
     QString lastUndoText;
 };
 
-// Waits until the Static layer is current and stays so (late maths/distance results trigger rebuilds).
-inline bool waitQuiet(LayeredComponent& g, int quietMs = 150) {
+// Waits until the component is settled (cmptest::settled: its pool idle with every result delivered, so no
+// late maths/distance result can rebuild it any more, and no Static build pending) and stays so for `quietMs`
+// (a GUI timer, such as the trailing edge of a resize burst, may still request a build). `C` is a
+// LayeredComponent or a TimeDistanceGraph. A build replaced while queued is never delivered (01 section 5.4
+// rule 2): compare staticBuildShown(), not staticBuildsDelivered(), with staticBuildsSubmitted().
+template <class C> bool waitQuiet(C& g, int quietMs = 150) {
     QElapsedTimer clock;
     clock.start();
     while (clock.elapsed() < kTimeoutMs) {
-        if (!QTest::qWaitFor([&g] { return g.staticUpToDate(); }, kTimeoutMs)) {
+        if (!QTest::qWaitFor([&g] { return cmptest::settled(g); }, kTimeoutMs)) {
             return false;
         }
         const int submitted = g.staticBuildsSubmitted();
         QTest::qWait(quietMs);
-        if (g.staticUpToDate() && g.staticBuildsSubmitted() == submitted) {
+        if (cmptest::settled(g) && g.staticBuildsSubmitted() == submitted) {
             return true;
         }
     }
     return false;
+}
+
+// After an action that must leave the Static layer alone, on a component settled beforehand (waitQuiet: the
+// idle pool can no longer rebuild it): the Static layer is invalidated synchronously, so a rebuild shows at
+// once as !staticUpToDate(); the request it would have queued is then delivered and must not have submitted a
+// build, an exact count since nothing else arrives meanwhile (a fixed wait proves neither).
+template <class C> bool staticUntouched(C& g, int submittedBefore) {
+    if (!g.staticUpToDate()) {
+        return false;
+    }
+    cmptest::drainEvents();
+    return g.staticUpToDate() && g.staticBuildsSubmitted() == submittedBefore;
 }
 
 inline void sendMouse(QWidget* w, QEvent::Type type, QPointF pos, Qt::MouseButton button,

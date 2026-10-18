@@ -710,7 +710,8 @@ Result<detail::HistogramScene> sceneOf(const ComponentBuildInputs& inputs, const
         for (const int t : order) {
             const ResolvedChannel* rc = geom::channelOf(slot, static_cast<std::size_t>(t),
                                                         body.traces[static_cast<std::size_t>(t)].channel);
-            if (!geom::readable(rc)) {
+            // readable() implies a series; testing it again shows clang-tidy that the accesses are checked.
+            if (!geom::readable(rc) || !rc->series) {
                 continue;
             }
             analysis::HistogramInput input;
@@ -718,13 +719,13 @@ Result<detail::HistogramScene> sceneOf(const ComponentBuildInputs& inputs, const
             input.toBins = detail::converterTo(*rc, frame.binUnit, inputs.units.get());
             if (!body.gatingChannel.empty()) {
                 const ResolvedChannel* g = geom::channelOf(slot, detail::gIndex(body), body.gatingChannel);
-                if (geom::readable(g)) {
+                if (geom::readable(g) && g->series) {
                     input.gating = *g->series;
                 }
             }
             if (!body.colourChannel.empty() && !frame.colourBands.empty()) {
                 const ResolvedChannel* z = geom::channelOf(slot, detail::zIndex(body), body.colourChannel);
-                if (geom::readable(z)) {
+                if (geom::readable(z) && z->series) {
                     input.colour = *z->series;
                     input.colourToBands = z->toDisplay;
                     input.colourBands = frame.colourBands;

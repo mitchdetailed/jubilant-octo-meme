@@ -8,12 +8,16 @@
 #include <esses/base/thread_role.hpp>
 #include <esses/qtrender/raster_backend.hpp>
 
+#include <QGlyphRun>
+#include <QList>
 #include <QPen>
 #include <QPoint>
 #include <QPolygonF>
+#include <QRawFont>
 #include <QRect>
 #include <QRegion>
 #include <QStaticText>
+#include <QTextLayout>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -477,6 +481,58 @@ std::string staticTextKey(const SchemeFonts& fonts, const plot::TextRun& run, qr
     return key;
 }
 
+// Text that Qt draws as outlines must not depend on the text drawn before it (04 section 6.7 item 1). Qt's
+// raster engine fills a glyph whose device size exceeds its glyph-cache limit (pixel size^2 x |det| of the
+// device transform > QT_MAX_CACHED_GLYPH_SIZE^2, 64 px by default; QPaintEngineEx::shouldDrawCachedGlyphs)
+// with the outline from QFontEngine::addGlyphsToPath: the numeric gauge's dynamic font (TextRun::scale) at
+// DPR 2. FreeType's engine loads those outlines under whatever transform the face holds, and the face (one
+// per font file and thread, shared by every size) holds the subpixel offset of the glyph that thread last
+// rasterised (QFontEngineFT::loadGlyph: FT_Set_Transform(face, matrix, offset)); with subpixel glyph
+// positioning (slight or no hinting: fontconfig's hintslight default on Linux) the run then lands up to 3/4
+// font unit off, so one gauge rendered twice in one process differed in 1,213 pixels (tst_golden_plots,
+// ubuntu). Before such a run each face it is shaped with is reset: a new engine of the face
+// (QRawFont::setPixelSize clones it; QFontEngineFT::init sets the transform without an offset) rasterises one
+// glyph at subpixel 0 (loadGlyph sets the transform with a zero offset). Other font engines keep no such
+// state; the reset then costs a clone and one small glyph, for large runs only.
+constexpr qreal kOutlineResetPx = 8.0; // the clone's size: one small glyph to rasterise
+
+qreal cachedGlyphLimitPx() {
+    static const qreal limit = [] {
+        const int env = qEnvironmentVariableIntValue("QT_MAX_CACHED_GLYPH_SIZE"); // as Qt reads it
+        return static_cast<qreal>(env > 0 ? env : 64);
+    }();
+    return limit;
+}
+
+// Whether Qt may draw the painter's font as outlines under the painter's transform: its device size against
+// three quarters of the limit (Qt resolves the pixel size with its own rounding).
+bool mayDrawAsOutlines(const QPainter& p) {
+    const QFont& f = p.font();
+    const qreal dpi = p.device() != nullptr ? static_cast<qreal>(p.device()->logicalDpiY()) : 96.0;
+    const qreal px = f.pixelSize() > 0 ? static_cast<qreal>(f.pixelSize()) : f.pointSizeF() * dpi / 72.0;
+    const qreal limit = 0.75 * cachedGlyphLimitPx();
+    return px * px * std::abs(p.deviceTransform().determinant()) > limit * limit;
+}
+
+void resetOutlineState(const QFont& font, const QString& text) {
+    QTextLayout layout(text, font);
+    layout.beginLayout();
+    layout.createLine(); // unbounded: the whole text on one line
+    layout.endLayout();
+    const QList<QGlyphRun> runs = layout.glyphRuns();
+    for (const QGlyphRun& run : runs) {
+        QRawFont face = run.rawFont();
+        if (!face.isValid()) {
+            continue;
+        }
+        face.setPixelSize(qFuzzyCompare(face.pixelSize(), kOutlineResetPx) ? 2.0 * kOutlineResetPx
+                                                                           : kOutlineResetPx);
+        const QList<quint32> glyphs = run.glyphIndexes();
+        static_cast<void>(
+            face.alphaMapForGlyph(glyphs.isEmpty() ? 0U : glyphs.front(), QRawFont::PixelAntialiasing));
+    }
+}
+
 void drawText(QPainter& p, const plot::DrawList& list, const plot::DrawCmd& cmd, const SchemeFonts& fonts,
               qreal dpr, const QTransform& base, const QTransform& device) {
     if (cmd.textIndex >= list.texts.size()) {
@@ -499,6 +555,9 @@ void drawText(QPainter& p, const plot::DrawList& list, const plot::DrawCmd& cmd,
     // that from a call whose argument is a temporary.
     const std::string key = staticTextKey(fonts, run, dpr, tp->text);
     const QStaticText& st = detail::threadStaticText(key, tp->text);
+    if (mayDrawAsOutlines(p)) {
+        resetOutlineState(font.font, tp->text); // nothing rasterises a glyph between this and the outlines
+    }
     p.drawStaticText(tp->box.topLeft(), st);
     p.setWorldTransform(device);
 }

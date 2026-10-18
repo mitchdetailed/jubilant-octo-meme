@@ -78,9 +78,13 @@ public:
     bool staticUpToDate() const noexcept;
     bool pendingStripeShown() const noexcept { return pendingShown_; }
     std::uint64_t builtViewVersion() const noexcept { return builtViewVersion_; }
-    // Counters (tests, bench): Static builds submitted and delivered, Dynamic and Chrome lists built.
+    // Counters (tests, bench): Static builds submitted and delivered, Dynamic and Chrome lists built. A build
+    // replaced while still queued is never delivered (01 section 5.4 rule 2), so delivered may stay below
+    // submitted for good; staticBuildShown() is the number (1-based, in submission order) of the build whose
+    // image is shown, staticBuildsSubmitted() once the latest one is delivered.
     int staticBuildsSubmitted() const noexcept { return staticSubmitted_; }
     int staticBuildsDelivered() const noexcept { return staticDelivered_; }
+    int staticBuildShown() const noexcept { return staticShown_; }
     int dynamicBuilds() const noexcept { return dynamicBuilds_; }
     int chromeBuilds() const noexcept { return chromeBuilds_; }
     // The damage of the last Dynamic rebuild (logical px) and the region of the last paintEvent.
@@ -164,6 +168,7 @@ private:
     std::uint64_t builtViewVersion_ = 0;
     int staticSubmitted_ = 0;
     int staticDelivered_ = 0;
+    int staticShown_ = 0;
     int dynamicBuilds_ = 0;
     int chromeBuilds_ = 0;
     QRegion lastDamage_;

@@ -160,7 +160,9 @@ private Q_SLOTS:
         ws.setCursor(1 * kSec, qt::CursorSource::Programmatic);
         TimeDistanceGraph* g = sh.graph();
         QVERIFY(g != nullptr);
-        QTRY_VERIFY_WITH_TIMEOUT(g->staticUpToDate(), 30000);
+        // Settled, not only built: the log's distance indexes and maths results (Data changes) are in, so the
+        // count below can only move for the animation itself.
+        QTRY_VERIFY_WITH_TIMEOUT(cmptest::settled(*g), 30000);
         const int submitted = g->staticBuildsSubmitted();
         AnimationController& a = sh.w->animation();
         QCOMPARE(a.worksheet(), &ws);
