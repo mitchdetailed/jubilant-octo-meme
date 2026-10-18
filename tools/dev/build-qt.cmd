@@ -56,6 +56,9 @@ if not defined CMAKE_EXE (
 for %%D in ("%CMAKE_EXE%") do set "CMAKE_DIR=%%~dpD"
 
 if defined VSCMD_VER goto have_vs
+rem Default: the newest Visual Studio with the C++ x64 tools (vswhere), else Visual Studio 2022 Community.
+set "ESSES_VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+if not defined ESSES_VCVARS if exist "%ESSES_VSWHERE%" for /f "usebackq delims=" %%I in (`"%ESSES_VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "ESSES_VCVARS=%%I\VC\Auxiliary\Build\vcvars64.bat"
 if not defined ESSES_VCVARS set "ESSES_VCVARS=C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
 if not exist "%ESSES_VCVARS%" (
   echo build-qt: vcvars64.bat not found; set ESSES_VCVARS 1>&2

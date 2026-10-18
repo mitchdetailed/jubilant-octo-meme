@@ -3,7 +3,7 @@
 ## Building the Qt-free core on Windows
 
 `build-core.cmd` configures, builds and tests with MSVC and Ninja from any shell (cmd, PowerShell, Git Bash).
-It calls `vcvars64.bat` (Visual Studio 2022 Community by default; override with `ESSES_VCVARS`), keeps the
+It calls `vcvars64.bat` (by default that of the newest Visual Studio with the C++ x64 tools that `vswhere` reports, else Visual Studio 2022 Community; override with `ESSES_VCVARS`), keeps the
 CMake that was on `PATH` before vcvars (Visual Studio puts its own, older CMake first), and falls back to
 `C:\Qt\Tools\Ninja` when Ninja is not on `PATH`.
 
