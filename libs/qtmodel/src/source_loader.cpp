@@ -8,6 +8,7 @@
 #include "range_lookup.hpp"
 
 #include <esses/base/casefold.hpp>
+#include <esses/base/hash.hpp>
 #include <esses/base/taskpool.hpp>
 #include <esses/base/utf8.hpp>
 #include <esses/formats/registry.hpp>
@@ -19,14 +20,17 @@
 #include <esses/qtmodel/messages_model.hpp>
 #include <esses/qtmodel/project_session.hpp>
 #include <esses/qtmodel/source_loader.hpp>
+#include <esses/qtmodel/track_map_service.hpp>
 #include <esses/qtmodel/undo_commands.hpp>
 #include <esses/store/series.hpp>
 
 #include <QPointer>
 #include <QTimer>
 #include <algorithm>
+#include <bit>
 #include <chrono>
 #include <mutex>
+#include <string_view>
 #include <utility>
 
 namespace esses::qt {
@@ -71,6 +75,35 @@ formats::ImportLogEntry logEntry(formats::ImportLogEntry::Level level, std::stri
 
 // Coalesced sidecar writes (02 section 4 sidecar rule 4): 500 ms after the first edit that is not on disk.
 constexpr int kSidecarCoalesceMs = 500;
+
+// The phase-2 task keys of one layer start with this (02 section 4.4 rule 13).
+std::string phase2Prefix(const model::SourceId& id, std::string_view canonical) {
+    return "ranges/" + detail::sourceHex(id) + "/" + std::string(canonical) + "/";
+}
+
+// The identity of the lap indexes a Track Sections run reads (D-204): per indexed lap its id, its index's
+// D-140 key (Corr Dist version, bounding markers and times, stretch) and whether it starts and ends at a
+// beacon. A replaced index (rebuilt from a newer Corr Dist, or copied with a new stretch by
+// LapStretchService) changes it although the number of indexed laps stays; equal digests read equal indexes.
+std::string lapIndexesDigest(const std::map<model::RangeId, analysis::LapIndex>& indexes) {
+    Hash128Stream h;
+    h.updatePart("esses.phase2-lapindexes-1");
+    for (const auto& [lap, entry] : indexes) {
+        if (entry.index == nullptr) {
+            continue;
+        }
+        const analysis::DistanceIndexKey& key = entry.index->key();
+        h.updatePart(lap.str());
+        h.updateU64(key.corrDistVersion);
+        h.updatePart(key.startMarker.str());
+        h.updatePart(key.endMarker.str());
+        h.updateU64(static_cast<std::uint64_t>(key.start));
+        h.updateU64(static_cast<std::uint64_t>(key.end));
+        h.updateU64(std::bit_cast<std::uint64_t>(key.stretch));
+        h.updateU64((entry.startsAtBeacon ? 1U : 0U) | (entry.endsAtBeacon ? 2U : 0U));
+    }
+    return h.digest().hex();
+}
 
 } // namespace
 
@@ -129,6 +162,53 @@ SourceLoader::~SourceLoader() {
 
 void SourceLoader::setRuleRunner(analysis::RuleRunner runner) {
     rules_ = std::move(runner);
+}
+
+void SourceLoader::setDistanceService(DistanceService* distance) {
+    if (distance_ != nullptr) {
+        disconnect(distance_, nullptr, this, nullptr);
+    }
+    distance_ = distance;
+    if (distance_ != nullptr) {
+        // More lap indexes: the Track Sections of their laps can be built (M3, D-199).
+        connect(distance_, &DistanceService::distanceReady, this, [this](const model::SourceId& id) {
+            if (trackMaps_ == nullptr) {
+                return;
+            }
+            if (const auto src = source(id)) {
+                for (const model::DataLayer& l : src->layers) {
+                    startPhase2(id, l.name);
+                }
+            }
+        });
+    }
+}
+
+void SourceLoader::setTrackMaps(TrackMapService* maps) {
+    if (trackMaps_ != nullptr) {
+        disconnect(trackMaps_, nullptr, this, nullptr);
+    }
+    trackMaps_ = maps;
+    ++trackGeneration_;
+    if (trackMaps_ != nullptr) {
+        connect(trackMaps_, &TrackMapService::mapChanged, this, [this](const QString& venue) {
+            ++trackGeneration_;
+            restartPhase2(venue.toStdString());
+        });
+        connect(trackMaps_, &QObject::destroyed, this, [this] { trackMaps_ = nullptr; });
+    }
+    restartPhase2(std::nullopt);
+}
+
+void SourceLoader::restartPhase2(const std::optional<std::string>& venue) {
+    for (const std::shared_ptr<const model::DataSource>& src : open_) {
+        if (venue && TrackMapService::venueOf(*src) != *venue) {
+            continue;
+        }
+        for (const model::DataLayer& l : src->layers) {
+            startPhase2(src->id, l.name);
+        }
+    }
 }
 
 void SourceLoader::setMathsService(MathsService* maths) {
@@ -328,18 +408,67 @@ void SourceLoader::startPhase2(const model::SourceId& id, const std::string& lay
     }
     const std::string canonical(model::canonicalLayerName(layer));
     const std::string markers = model::markerSetHash(l->markers).hex();
-    // One run per (layer, marker set, Corr Speed version): the task key and the dedupe key are the same, so a
-    // newer Corr Speed or marker set never joins an older run.
-    const std::string prefix = "ranges/" + detail::sourceHex(id) + "/" + canonical + "/";
-    const std::string run = prefix + markers + "/" + speed->version.hex();
-    if (!phase2_.insert(run).second) {
-        return; // this marker set was annotated (or is being annotated) with this Corr Speed already
+    // M3: the Track Sections pass needs the venue's map and the laps' indexes (D-199); a lap without an index
+    // yet gets no sections until distanceReady starts phase 2 again.
+    // With the pass on, a source without a map runs it too: the run then removes stale Track Sections groups.
+    const bool sectionsPass = trackMaps_ != nullptr && distance_ != nullptr && hasTrackSectionsRule();
+    std::shared_ptr<const analysis::TrackMap> map;
+    auto indexes = std::make_shared<std::map<model::RangeId, analysis::LapIndex>>();
+    if (sectionsPass) {
+        map = trackMaps_->mapFor(*src);
     }
+    if (map != nullptr) {
+        bool anyBeacon = false;
+        for (const model::Marker& m : l->markers) {
+            anyBeacon = anyBeacon || (m.cls == model::MarkerClass::BCN && m.enabled);
+        }
+        for (const model::Range& lap : l->ranges.find(detail::kLapsGroup)->ranges) {
+            const model::RangeRef ref = detail::makeRef(*src, canonical, detail::kLapsGroup, lap);
+            if (auto index = distance_->index(ref, Priority::Background)) {
+                // 04 section 13 item 5: a lap that does not start at a BCN is measured from its end beacon;
+                // one that does not end at a BCN keeps no section past its end (D-195 (d)).
+                bool atBeacon = !anyBeacon;
+                bool endsAtBeacon = !anyBeacon;
+                for (const model::Marker& m : l->markers) {
+                    const bool beacon = m.cls == model::MarkerClass::BCN && m.enabled;
+                    atBeacon = atBeacon || (beacon && m.t == lap.start);
+                    endsAtBeacon = endsAtBeacon || (beacon && m.t == lap.end);
+                }
+                indexes->emplace(lap.id, analysis::LapIndex{std::move(index), atBeacon, endsAtBeacon});
+            }
+        }
+    }
+    // One run per (layer, marker set, Corr Speed version[, map generation, lap indexes]): the task key and
+    // the dedupe key are the same, so a newer Corr Speed, marker set, map or index never joins an older run.
+    // The indexes count by identity, not number (D-204): a stretch or a rebuilt index changes the key.
+    const std::string prefix = phase2Prefix(id, canonical);
+    std::string key = prefix + markers + "/" + speed->version.hex();
+    if (sectionsPass) {
+        key += "/t" + std::to_string(trackGeneration_) + "/i" + std::to_string(indexes->size()) + "-" +
+               lapIndexesDigest(*indexes);
+    }
+    // Deduplicated against the layer's latest run only: other inputs supersede it, and inputs that come back
+    // to an earlier run's (a stretch cleared again) run again, because a newer run has published in between.
+    Phase2Run& latest = phase2_[prefix];
+    if (latest.key == key) {
+        return; // this layer was annotated (or is being annotated) with these inputs already
+    }
+    latest = Phase2Run{key, ++phase2Serial_};
+    const std::uint64_t run = latest.serial; // this start
     pool_.cancelAll(prefix); // 02 section 4.4 rule 13: older ranges/<src>/<layer>/ runs are cancelled first
     Future<model::RangeGroupTree> future = pool_.submit(
-        Priority::Interactive, TaskKey{run}, CancelToken{},
-        [rules = rules_, src, canonical, series = speed->series](const CancelToken& cancel) {
-            return rules.runPhase2(*src, canonical, std::optional<store::Series>(series), cancel);
+        Priority::Interactive, TaskKey{key}, CancelToken{},
+        [rules = rules_, src, canonical, series = speed->series, sectionsPass, map,
+         indexes](const CancelToken& cancel) {
+            if (!sectionsPass) {
+                return rules.runPhase2(*src, canonical, std::optional<store::Series>(series), cancel);
+            }
+            const analysis::LapIndexLookup indexOf = [indexes](const model::Range& lap) {
+                const auto it = indexes->find(lap.id);
+                return it != indexes->end() ? it->second : analysis::LapIndex{};
+            };
+            return rules.runPhase2(*src, canonical, std::optional<store::Series>(series), map, indexOf,
+                                   cancel);
         });
     Dispatcher* dispatcher = &dispatcher_;
     const QPointer<SourceLoader> guard(this);
@@ -358,24 +487,32 @@ void SourceLoader::startPhase2(const model::SourceId& id, const std::string& lay
 }
 
 void SourceLoader::phase2Finished(const std::shared_ptr<const model::DataSource>& annotated,
-                                  const std::string& canonical, const std::string& markers,
-                                  const std::string& run, std::optional<model::RangeGroupTree> tree) {
+                                  const std::string& canonical, const std::string& markers, std::uint64_t run,
+                                  std::optional<model::RangeGroupTree> tree) {
+    const auto latest = phase2_.find(phase2Prefix(annotated->id, canonical));
+    if (latest == phase2_.end() || latest->second.serial != run) {
+        // A newer run of the layer started since (its inputs changed; D-204) or the source closed: a run that
+        // finished before it saw its cancellation must not publish over the newer one.
+        return;
+    }
     const auto current = source(annotated->id);
     if (current == nullptr) {
         return; // closed
     }
     const model::DataLayer* l = detail::layerOf(*current, canonical);
     if (l == nullptr) {
+        phase2_.erase(latest);
         return;
     }
     if (!tree) {
-        phase2_.erase(run); // cancelled or failed: a later request may run it again; the phase-1 tree stays
+        // Cancelled or failed: a later request may run it again; the phase-1 tree stays.
+        phase2_.erase(latest);
         return;
     }
     if (model::markerSetHash(l->markers).hex() != markers) {
         // The laps were rebuilt from another marker set since the run started: its annotations do not apply.
-        // Annotate the current snapshot instead (its own run dedupes against one already started).
-        phase2_.erase(run);
+        // Annotate the current snapshot instead.
+        phase2_.erase(latest);
         startPhase2(current->id, canonical);
         return;
     }
@@ -384,6 +521,24 @@ void SourceLoader::phase2Finished(const std::shared_ptr<const model::DataSource>
     // snapshot's own edits survive.
     model::RangeGroupTree merged = l->ranges;
     bool changed = false;
+    // M3: the Track Sections subtree of the run replaces the current one (D-199).
+    for (const std::shared_ptr<const analysis::IRangeRule>& rule : rules_.rules()) {
+        const auto* sections = dynamic_cast<const analysis::TrackSectionsRule*>(rule.get());
+        if (sections == nullptr || !sections->appliesTo(l->name)) {
+            continue;
+        }
+        const std::string prefix(model::parentGroupPath(sections->settings().produces));
+        const model::RangeGroup* now = merged.find(prefix);
+        const model::RangeGroup* built = tree->find(prefix);
+        if ((now == nullptr) != (built == nullptr) ||
+            (now != nullptr && built != nullptr && !(*now == *built))) {
+            merged.removeGroup(prefix);
+            if (built != nullptr) {
+                merged.setGroup(*built);
+            }
+            changed = true;
+        }
+    }
     std::as_const(*tree).forEach([&](const model::RangeGroup& from) {
         model::RangeGroup* into = merged.find(from.path);
         if (into == nullptr) {
@@ -410,6 +565,12 @@ void SourceLoader::phase2Finished(const std::shared_ptr<const model::DataSource>
     }
     ++next->version;
     publishReplacement(std::move(next));
+}
+
+bool SourceLoader::hasTrackSectionsRule() const {
+    return std::any_of(rules_.rules().begin(), rules_.rules().end(), [](const auto& rule) {
+        return dynamic_cast<const analysis::TrackSectionsRule*>(rule.get()) != nullptr;
+    });
 }
 
 void SourceLoader::publishReplacement(std::shared_ptr<const model::DataSource> next) {
@@ -557,7 +718,12 @@ void SourceLoader::close(const model::SourceId& id) {
     const std::string hex = detail::sourceHex(id);
     pool_.cancelAll("chunk/" + hex);
     pool_.cancelAll("summary/" + hex);
-    pool_.cancelAll("ranges/" + hex + "/");
+    const std::string ranges = "ranges/" + hex + "/";
+    pool_.cancelAll(ranges);
+    // The file opened again (the same SourceId) is annotated afresh: these runs were the closed source's.
+    for (auto run = phase2_.lower_bound(ranges); run != phase2_.end() && run->first.starts_with(ranges);) {
+        run = phase2_.erase(run);
+    }
     if (distance_ != nullptr) {
         distance_->forgetSource(id);
     }
@@ -584,8 +750,9 @@ void connectSourceLoader(SourceLoader& loader, DataSelectionModel& selection, Me
     // dropped instead of reaching a destroyed loader. With a project session the edit is an undoable
     // SidecarCommand on its stack (D-032, 06 section 5.2 setTrusted); its redo() commits.
     selection.setSidecarCommit(
-        [guard = QPointer<SourceLoader>(&loader), session = QPointer<ProjectSession>(selection.session())](
-            std::shared_ptr<const model::DataSource> current, model::SidecarDocument doc) {
+        [guard = QPointer<SourceLoader>(&loader), session = QPointer<ProjectSession>(selection.session()),
+         sel = QPointer<DataSelectionModel>(&selection)](std::shared_ptr<const model::DataSource> current,
+                                                         model::SidecarDocument doc) {
             SourceLoader* l = guard.data();
             if (l == nullptr || current == nullptr) {
                 return;
@@ -593,8 +760,11 @@ void connectSourceLoader(SourceLoader& loader, DataSelectionModel& selection, Me
             if (ProjectSession* s = session.data()) {
                 const std::shared_ptr<const model::DataSource> newest = l->source(current->id);
                 if (newest != nullptr) {
-                    s->undoStack().push(new SidecarCommand(*l, newest->id, newest->sidecar, std::move(doc),
-                                                           QObject::tr("Edit trust")));
+                    const QString text = sel.isNull() || sel->sidecarCommitText().isEmpty()
+                                             ? QObject::tr("Edit trust")
+                                             : sel->sidecarCommitText();
+                    s->undoStack().push(
+                        new SidecarCommand(*l, newest->id, newest->sidecar, std::move(doc), text));
                 }
                 return;
             }

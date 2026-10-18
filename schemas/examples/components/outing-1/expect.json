@@ -1,0 +1,10 @@
+{
+  "overlays-not-boolean.json": {
+    "pointer": "/enableOverlays",
+    "why": "enableOverlays is a boolean"
+  },
+  "variance-member.json": {
+    "pointer": "/display",
+    "why": "the outing graph has no variance panel"
+  }
+}

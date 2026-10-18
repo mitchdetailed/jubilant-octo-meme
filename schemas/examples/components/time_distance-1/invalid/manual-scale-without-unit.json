@@ -1,0 +1,10 @@
+{
+  "groups": [
+    {
+      "name": "Gear",
+      "scaleMode": "manual",
+      "scaleMin": 0,
+      "traces": []
+    }
+  ]
+}

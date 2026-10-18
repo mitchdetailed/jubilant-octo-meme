@@ -42,12 +42,17 @@ namespace esses {
 class TaskPool;
 } // namespace esses
 
+namespace esses::analysis {
+class StatCache;
+} // namespace esses::analysis
+
 namespace esses::qt {
 
 class DataSelectionModel;
 class Dispatcher;
 class DistanceService;
 class MathsService;
+class TrackMapService;
 
 // One channel a component shows: the name as referenced, the persisted display unit and decimals.
 struct ChannelRequest {
@@ -56,7 +61,8 @@ struct ChannelRequest {
     std::optional<int> dps;
 };
 // The channels of a component in display order: time_distance traces (TimeDistanceBody::channelNames order),
-// values_list rows; empty for other types.
+// values_list rows; every other type through plot::componentChannelUses (M3: the order its builders read
+// SlotData::channels in); empty for an unknown type.
 std::vector<ChannelRequest> componentChannels(const project::ComponentSpec& spec);
 
 class RenderService final : public QObject {
@@ -81,6 +87,16 @@ public:
                                              const plot::LayoutContext& layout,
                                              std::shared_ptr<const project::Scheme> scheme,
                                              std::shared_ptr<const plot::ITextMetrics> metrics) const;
+
+    // M3 (the reports and track work, D-199): the pool and the Dispatcher a component's own qtmodel object
+    // runs on (ReportModel), the workspace's StatCache shared by every ReportModel (created on first use),
+    // and the track maps prepareInputs binds: ComponentBuildInputs::trackMap is the map of the Main source's
+    // venue (TrackMapService::mapFor) when a service is set, else null.
+    TaskPool& pool() const noexcept { return pool_; }
+    Dispatcher& dispatcher() const noexcept { return dispatcher_; }
+    std::shared_ptr<analysis::StatCache> statCache() const;
+    void setTrackMaps(TrackMapService* maps);
+    TrackMapService* trackMaps() const;
 
 private:
     struct Impl;

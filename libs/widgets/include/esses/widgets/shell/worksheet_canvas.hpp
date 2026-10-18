@@ -17,8 +17,29 @@
 // after 30 s). clear() is the only destroyer of every worksheet's components (workbook or project change).
 // Edits (M1, no undo stack before M2): a component's specEditRequested is applied here (the worksheet
 // definition and the component's applySpec) and reported by componentEdited, from which the shell updates
-// its workbook; M2 wraps the same path in a QUndoCommand (06 section 4.3 item 11). Move/resize/snap,
-// multi-select, splitters and the clipboard follow in M3 with the layout tools.
+// its workbook; M2 wraps the same path in a QUndoCommand (06 section 4.3 item 11).
+//
+// M3 (06 section 4.3 items 2-5, 8-11; 04 section 7.2 items 6-7; AC-M3-11):
+//   - Showing the shown worksheet again with another definition (undo/redo, a paste, a delete, an edit from
+//     elsewhere) updates it in place: components are matched by id, a changed spec is applied with applySpec
+//     (and announced by componentSpecApplied), new ones are created and removed ones destroyed, so the
+//     surviving widgets (and a PropertiesDialog tracking one) stay.
+//   - Selection: a click selects the component (and focuses it), CTRL+click toggles membership, a rubber
+//     band dragged on empty canvas selects by intersection, selectAll(); selected components carry a thin
+//     accent frame drawn by an overlay above them (the focus keeps its thick Chrome border).
+//   - Move and resize: drag the caption bar, or SHIFT+drag anywhere, moves the selection; dragging an edge or
+//     corner (6 logical px zone; a plain press on a control the component draws there - a scrollbar, a
+//     handle, the offset axis, the outing's zoom rectangle - stays the component's) resizes one component;
+//     both snap to the worksheet grid (1 % by default, WorksheetDef::grid) unless ALT is held, keep at least
+//     4 x 4 grid cells and stay inside the canvas; ALT+arrow keys nudge the selection one grid cell (when no
+//     keymap row takes the key). Splitters: CTRL+drag on an edge moves that edge for every component touching
+//     it.
+//   - Every move, resize, splitter drag, nudge and z-order change is one layoutEdited(text, mergeKey) after
+//     the definition (worksheet()) was updated; the shell makes it a WorkbookCommand that merges consecutive
+//     geometry edits of the same component (mergeKey = its id).
+//   - Layout lock (project.json ui.layoutLocked): no move, resize, splitter, nudge or z-order change; the
+//     shell refuses delete, cut and paste. Properties and channel edits stay allowed.
+//   - Z order: sendToBackground / bringToFront set z = min - 1 / max + 1 and renumber the worksheet 0..n-1.
 #pragma once
 
 #include <esses/base/uuid.hpp>
@@ -27,12 +48,15 @@
 
 #include <QHash>
 #include <QList>
+#include <QPoint>
 #include <QPointer>
 #include <QRect>
+#include <QSize>
 #include <QString>
 #include <QWidget>
 #include <map>
 #include <memory>
+#include <utility>
 #include <vector>
 
 class QTimer;
@@ -51,7 +75,8 @@ public:
     // otherwise its components are created (and kept ones of that key destroyed). The focused component is
     // the one the worksheet had, else the one remembered for it (by id), else the first in TAB order; it
     // takes the keyboard focus only when the keyboard focus was inside the canvas. Showing the worksheet that
-    // is already shown (same key, definition and context) changes nothing.
+    // is already shown (same key, definition and context) changes nothing; the shown worksheet with another
+    // definition is updated in place (M3, above).
     void setWorksheet(const project::WorksheetDef& worksheet, WorksheetContext& context);
     // Destroys the components of every worksheet, shown or kept.
     void clear();
@@ -83,15 +108,73 @@ public:
     bool layoutThrottleActive() const;
     static constexpr int kLayoutCoalesceMs = 33; // 30 Hz
 
+    // ---- M3 (06 section 4.3 items 2-5, 8-11) ----------------------------------------------------------
+    static constexpr int kEdgeZonePx = 6; // resize hit zone at DPR 1 (logical px)
+    static constexpr int kMinCells = 4;   // minimum component size in grid cells
+    static constexpr int kDragThresholdPx = 3;
+
+    // The explicit selection (paint order); empty when only the focused component is "selected".
+    QList<ComponentWidget*> selection() const;
+    // What cut/copy/delete act on: the selection, else the focused component.
+    QList<ComponentWidget*> selectedOrFocused() const;
+    bool isSelected(const ComponentWidget* component) const;
+    void setSelection(const QList<ComponentWidget*>& components);
+    void toggleSelected(ComponentWidget* component);
+    void selectAll(); // component.select_all
+    void clearSelection();
+    // Selects the shown components with these ids (after a paste).
+    void selectIds(const std::vector<Uuid>& ids);
+
+    void setLayoutLocked(bool locked);
+    bool layoutLocked() const noexcept { return locked_; }
+    // The worksheet grid (columns, rows); 100 x 100 when the definition holds nonsense.
+    QSize grid() const;
+    // `rect` snapped to `grid` cells (edges rounded to the nearest cell), at least kMinCells x kMinCells and
+    // inside [0, 1]; `keepSize` moves without resizing (the width and height in cells are kept).
+    static project::Rect snapped(const project::Rect& rect, QSize grid, bool keepSize);
+
+    // The edits, each one layoutEdited (false and nothing changed when locked or a no-op). `rects` maps
+    // component ids to their new fractional rectangles (not snapped here).
+    bool setRects(const std::vector<std::pair<Uuid, project::Rect>>& rects, const QString& undoText);
+    // Moves the selection (else the focused component) by whole grid cells.
+    bool nudgeSelection(int dxCells, int dyCells);
+    // The splitter of 06 section 4.3 item 8: moves the vertical (true) or horizontal edge at fraction `from`
+    // to `to` (snapped) for every component whose edge lies there.
+    bool moveSharedEdge(bool vertical, double from, double to, bool snap = true);
+    bool sendToBackground(ComponentWidget* component);
+    bool bringToFront(ComponentWidget* component);
+
 Q_SIGNALS:
     void focusedComponentChanged(esses::widgets::ComponentWidget* component);
     // A component edit was applied to the worksheet definition (M1: no undo stack).
     void componentEdited(const esses::project::ComponentSpec& spec, const QString& undoText);
+    // M3 fix pass (D-203 (k)): a component of a kept, hidden worksheet asked for an edit (its Properties
+    // dialog stays open across a worksheet switch, 06 section 12 item 2; a deferred commit). `worksheet` is
+    // that worksheet's definition with the edit; the shell stores it as that worksheet's undoable edit.
+    void keptComponentEdited(const esses::project::WorksheetDef& worksheet,
+                             const esses::project::ComponentSpec& spec, const QString& undoText);
+    // M3: a spec was applied to a shown component (an edit, or a definition change from undo/redo).
+    void componentSpecApplied(esses::widgets::ComponentWidget* component);
+    // M3: geometry or z order of components changed in worksheet(); `mergeKey` is the id of the one
+    // component a move/resize concerned ("" for a multi-component edit).
+    void layoutEdited(const QString& undoText, const QString& mergeKey);
+    void selectionChanged();
+
+public:
+    // Added by the M3 fix pass (D-203 (t); 06 section 4.3 item 3): the component types Component > Add offers
+    // (type, title) in menu order, and where a new component goes on `sheet` with `grid` cells: the largest
+    // empty rectangle of at least 20 % x 20 %, else the whole canvas.
+    static QList<std::pair<QString, QString>> addableTypes();
+    static project::Rect placeForAdd(const project::WorksheetDef& sheet, QSize grid);
 
 protected:
+    // Added by the M3 fix pass: a right-click on empty canvas offers Add > type (06 section 4.3 item 3).
+    void contextMenuEvent(QContextMenuEvent* event) override;
     bool event(QEvent* event) override;
+    bool eventFilter(QObject* watched, QEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
     bool focusNextPrevChild(bool next) override;
 
 private:
@@ -102,9 +185,14 @@ private:
         QPointer<ComponentWidget> focused;
         QPointer<ComponentWidget> maximised;
     };
+    struct Gesture; // a mouse move / resize / splitter / rubber band in progress
+    class Overlay;
 
     void keepActive(); // hides the active worksheet's components and moves them to kept_
     void createComponents(WorksheetContext& context);
+    ComponentWidget* createComponent(const project::ComponentSpec& spec, WorksheetContext& context);
+    void syncInPlace(const project::WorksheetDef& worksheet, WorksheetContext& context);
+    void sortAndRaise();
     void layoutComponents();
     void queueLayout();
     void applyEdit(ComponentWidget* component, const project::ComponentSpec& spec, const QString& undoText);
@@ -112,6 +200,14 @@ private:
     selectFocused(ComponentWidget* component); // the worksheet's focused component, keyboard focus untouched
     ComponentWidget* componentContaining(QWidget* widget) const;
     void onApplicationFocusChanged(QWidget* old, QWidget* now);
+    // Mouse gestures (the application event filter on the canvas's descendants).
+    bool mousePress(QWidget* receiver, QMouseEvent* event);
+    bool mouseMove(QMouseEvent* event);
+    bool mouseRelease(QMouseEvent* event);
+    void finishGesture(bool commit);
+    QPointF fraction(QPointF canvasPos) const;
+    void pruneSelection();
+    project::ComponentSpec* specOf(const Uuid& id);
 
     project::WorksheetDef worksheet_;
     const WorksheetContext* context_ = nullptr; // of the shown worksheet; nullptr: none shown
@@ -125,6 +221,12 @@ private:
     QTimer* layoutTimer_ = nullptr;
     bool layoutPending_ = false;
     int layoutPasses_ = 0;
+    // M3
+    std::vector<QPointer<ComponentWidget>> selection_;
+    QPointer<ComponentWidget> priorFocused_; // the focused component before the last focus change
+    bool locked_ = false;
+    std::unique_ptr<Gesture> gesture_;
+    Overlay* overlay_ = nullptr;
 };
 
 } // namespace esses::widgets

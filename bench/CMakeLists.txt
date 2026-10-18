@@ -61,6 +61,29 @@ if(ESSES_BUILD_TESTS)
   set_tests_properties(bench.maths_bench.smoke PROPERTIES LABELS "bench-smoke" TIMEOUT 600)
 endif()
 
+# M3 (AC-M3-03): the channel report, 50 laps x 30 channels x 8 statistics cold <= 300 ms (Qt-free;
+# bench/report_bench.cpp):
+#   <build>/bin/esses-report-bench --runs 7 --gate --json report.json
+esses_add_executable(report_bench LAYER 3 QT_FREE
+  SOURCES report_bench.cpp
+  DEPS
+    esses::base
+    esses::units
+    esses::store
+    esses::model
+    esses::analysis
+    esses::nlohmann_json
+  OUTPUT_NAME esses-report-bench)
+set_target_properties(${ESSES_PREFIX}_report_bench PROPERTIES FOLDER "bench")
+if(ESSES_BUILD_BENCH)
+  add_test(NAME bench.report_bench COMMAND ${ESSES_PREFIX}_report_bench --gate)
+  set_tests_properties(bench.report_bench PROPERTIES LABELS "bench" TIMEOUT 1800 RUN_SERIAL TRUE)
+endif()
+if(ESSES_BUILD_TESTS)
+  add_test(NAME bench.report_bench.smoke COMMAND ${ESSES_PREFIX}_report_bench --smoke)
+  set_tests_properties(bench.report_bench.smoke PROPERTIES LABELS "bench-smoke" TIMEOUT 600)
+endif()
+
 # The M1 Qt benches need the widgets layer.
 if(NOT TARGET ${ESSES_PREFIX}_widgets)
   return()

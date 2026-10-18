@@ -1,0 +1,42 @@
+{
+    "activeChannel": "",
+    "body": {
+        "channel": "Corr Speed",
+        "displayUnit": "km/h",
+        "dynamicFont": true,
+        "showUnits": true
+    },
+    "caption": true,
+    "case": "numeric_value_units",
+    "colourLegend": false,
+    "cursorUs": 20000000,
+    "data": "libs/plotcore/tests/td_golden_cases.hpp (synthetic rational data, sources synthetic_a/b/c.ld); cases in libs/plotcore/tests/plots_golden_cases.hpp",
+    "datumUs": null,
+    "domain": "time",
+    "dprs": [
+        1,
+        2
+    ],
+    "focused": false,
+    "fonts": "tests/golden/fonts (Noto Sans), QtTextMetrics",
+    "pendingStripe": false,
+    "scheme": "Test Light",
+    "sizeLogical": [
+        240,
+        140
+    ],
+    "slots": [
+        {
+            "distanceData": true,
+            "kind": "Main",
+            "lap": 0,
+            "number": 0,
+            "source": "synthetic_a.ld"
+        }
+    ],
+    "type": "gauge_numeric",
+    "zoom": [
+        0,
+        60000000
+    ]
+}

@@ -1,0 +1,29 @@
+{
+    "case": "main_reference",
+    "headers": [
+        "Name",
+        "Main",
+        "Overlay",
+        "Δ",
+        "Unit"
+    ],
+    "hiddenColumns": [
+    ],
+    "rows": [
+        [
+            "Throttle",
+            "65.45",
+            "62.94",
+            "+2.51",
+            "%"
+        ],
+        [
+            "Wheel Speed FL",
+            "51.41",
+            "53.74",
+            "-2.33",
+            "m/s"
+        ]
+    ],
+    "showHeading": true
+}

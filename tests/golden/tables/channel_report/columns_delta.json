@@ -1,0 +1,66 @@
+{
+    "case": "columns_delta",
+    "headers": [
+        "Outings",
+        "Speed avg [m/s]",
+        "Speed avg Δ vs Overlay 0 [m/s]",
+        "Speed max [m/s]",
+        "Speed max Δ vs Overlay 0 [m/s]",
+        "Load max [%]",
+        "Load max Δ vs Overlay 0 [%]"
+    ],
+    "rows": [
+        [
+            {
+                "t": "test.ld"
+            },
+            {
+                "bg": "#2060ffff",
+                "t": "49.50"
+            },
+            {
+                "t": "-200.00"
+            },
+            {
+                "bg": "#2060ffff",
+                "t": "99.00"
+            },
+            {
+                "t": "-200.00"
+            },
+            {
+                "bg": "#2060ffff",
+                "t": "198.0"
+            },
+            {
+                "t": "-400.0"
+            }
+        ],
+        [
+            {
+                "t": "test.ld (Overlay 0)"
+            },
+            {
+                "bg": "#ff3030ff",
+                "t": "249.50"
+            },
+            {
+                "t": ""
+            },
+            {
+                "bg": "#ff3030ff",
+                "t": "299.00"
+            },
+            {
+                "t": ""
+            },
+            {
+                "bg": "#ff3030ff",
+                "t": "598.0"
+            },
+            {
+                "t": ""
+            }
+        ]
+    ]
+}

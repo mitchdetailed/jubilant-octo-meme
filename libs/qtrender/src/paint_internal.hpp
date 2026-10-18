@@ -27,6 +27,14 @@ const SchemeFonts& defaultSchemeFonts();
 
 // The calling thread's cached font of a text style of `fonts`.
 const FontEntry& schemeFontEntry(const SchemeFonts& fonts, plot::TextStyleId style, bool rotated);
+// The same font with its point size times `scale` (TextRun::scale; 1, a non-positive or a non-finite scale
+// give the style's font), cached per thread by the scale in thousandths.
+const FontEntry& schemeFontEntry(const SchemeFonts& fonts, plot::TextStyleId style, bool rotated,
+                                 float scale);
+// The font a text run is drawn with: its style, rotation and scale.
+inline const FontEntry& runFontEntry(const SchemeFonts& fonts, const plot::TextRun& run) {
+    return schemeFontEntry(fonts, run.style, run.quarterTurns == 1, run.scale);
+}
 
 struct TextPlacement {
     QString text;         // after elision

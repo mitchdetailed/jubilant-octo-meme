@@ -208,8 +208,8 @@ private Q_SLOTS:
                                   QStringLiteral("|"), QStringLiteral("data.toggle_domain"),
                                   QStringLiteral("data.overlays_toggle"),
                                   QStringLiteral("data.single_colour_main"),
-                                  QStringLiteral("data.lap_stretch_toggle"), QStringLiteral("|"),
-                                  QStringLiteral("schemeSelector"), QStringLiteral("|"),
+                                  QStringLiteral("data.lap_stretch_toggle"), QStringLiteral("data.animate"),
+                                  QStringLiteral("|"), QStringLiteral("schemeSelector"), QStringLiteral("|"),
                                   QStringLiteral("edit.undo"), QStringLiteral("edit.redo")}));
             // The scheme selector shows on the toolbar only when Options > Colours turns it on.
             QAction* selector = w.mainToolBar().findChild<QAction*>(QStringLiteral("schemeSelector"));

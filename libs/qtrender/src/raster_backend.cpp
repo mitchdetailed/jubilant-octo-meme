@@ -8,12 +8,16 @@
 #include <esses/base/thread_role.hpp>
 #include <esses/qtrender/raster_backend.hpp>
 
+#include <QGlyphRun>
+#include <QList>
 #include <QPen>
 #include <QPoint>
 #include <QPolygonF>
+#include <QRawFont>
 #include <QRect>
 #include <QRegion>
 #include <QStaticText>
+#include <QTextLayout>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -50,6 +54,29 @@ const FontEntry& schemeFontEntry(const SchemeFonts& fonts, plot::TextStyleId sty
         return *e;
     }
     return insertThreadFont(fonts.id(), slot, fonts.font(style, rotated));
+}
+
+const FontEntry& schemeFontEntry(const SchemeFonts& fonts, plot::TextStyleId style, bool rotated,
+                                 float scale) {
+    if (!(scale > 0.0F) || !std::isfinite(scale) || scale == 1.0F) {
+        return schemeFontEntry(fonts, style, rotated);
+    }
+    // Slots of scaled fonts: the scale in thousandths above the style slot (< 256), never 0 in the high bits.
+    const auto milli = static_cast<std::uint32_t>(
+        std::clamp(std::lround(static_cast<double>(scale) * 1000.0), 1L, static_cast<long>(0xFFFFFF)));
+    const auto slot =
+        (milli << 8U) | static_cast<std::uint32_t>(static_cast<unsigned>(style) * 2U + (rotated ? 1U : 0U));
+    if (const FontEntry* e = findThreadFont(fonts.id(), slot)) {
+        return *e;
+    }
+    QFont font = fonts.font(style, rotated);
+    if (font.pointSizeF() > 0.0) {
+        font.setPointSizeF(font.pointSizeF() * static_cast<double>(milli) / 1000.0);
+    } else if (font.pixelSize() > 0) {
+        const double px = static_cast<double>(font.pixelSize()) * static_cast<double>(milli) / 1000.0;
+        font.setPixelSize(std::max(1, static_cast<int>(std::lround(px))));
+    }
+    return insertThreadFont(fonts.id(), slot, font);
 }
 
 QTransform TextPlacement::frame() const {
@@ -172,8 +199,7 @@ CommandBounds commandBounds(const plot::DrawList& list, const plot::DrawCmd& cmd
             return out;
         }
         const plot::TextRun& run = list.texts[cmd.textIndex];
-        const bool rotated = run.quarterTurns == 1;
-        const auto tp = placeText(list, run, schemeFontEntry(fonts, run.style, rotated), dpr);
+        const auto tp = placeText(list, run, runFontEntry(fonts, run), dpr);
         if (!tp) {
             return out;
         }
@@ -448,9 +474,63 @@ std::string staticTextKey(const SchemeFonts& fonts, const plot::TextRun& run, qr
     key.append(reinterpret_cast<const char*>(&id), sizeof id);
     key.push_back(static_cast<char>(run.style));
     key.push_back(static_cast<char>(run.quarterTurns == 1 ? 1 : 0));
+    const float scale = run.scale;
+    key.append(reinterpret_cast<const char*>(&scale), sizeof scale);
     key.append(reinterpret_cast<const char*>(&dprMilli), sizeof dprMilli);
     key.append(utf8.constData(), static_cast<std::size_t>(utf8.size()));
     return key;
+}
+
+// Text that Qt draws as outlines must not depend on the text drawn before it (04 section 6.7 item 1). Qt's
+// raster engine fills a glyph whose device size exceeds its glyph-cache limit (pixel size^2 x |det| of the
+// device transform > QT_MAX_CACHED_GLYPH_SIZE^2, 64 px by default; QPaintEngineEx::shouldDrawCachedGlyphs)
+// with the outline from QFontEngine::addGlyphsToPath: the numeric gauge's dynamic font (TextRun::scale) at
+// DPR 2. FreeType's engine loads those outlines under whatever transform the face holds, and the face (one
+// per font file and thread, shared by every size) holds the subpixel offset of the glyph that thread last
+// rasterised (QFontEngineFT::loadGlyph: FT_Set_Transform(face, matrix, offset)); with subpixel glyph
+// positioning (slight or no hinting: fontconfig's hintslight default on Linux) the run then lands up to 3/4
+// font unit off, so one gauge rendered twice in one process differed in 1,213 pixels (tst_golden_plots,
+// ubuntu). Before such a run each face it is shaped with is reset: a new engine of the face
+// (QRawFont::setPixelSize clones it; QFontEngineFT::init sets the transform without an offset) rasterises one
+// glyph at subpixel 0 (loadGlyph sets the transform with a zero offset). Other font engines keep no such
+// state; the reset then costs a clone and one small glyph, for large runs only.
+constexpr qreal kOutlineResetPx = 8.0; // the clone's size: one small glyph to rasterise
+
+qreal cachedGlyphLimitPx() {
+    static const qreal limit = [] {
+        const int env = qEnvironmentVariableIntValue("QT_MAX_CACHED_GLYPH_SIZE"); // as Qt reads it
+        return static_cast<qreal>(env > 0 ? env : 64);
+    }();
+    return limit;
+}
+
+// Whether Qt may draw the painter's font as outlines under the painter's transform: its device size against
+// three quarters of the limit (Qt resolves the pixel size with its own rounding).
+bool mayDrawAsOutlines(const QPainter& p) {
+    const QFont& f = p.font();
+    const qreal dpi = p.device() != nullptr ? static_cast<qreal>(p.device()->logicalDpiY()) : 96.0;
+    const qreal px = f.pixelSize() > 0 ? static_cast<qreal>(f.pixelSize()) : f.pointSizeF() * dpi / 72.0;
+    const qreal limit = 0.75 * cachedGlyphLimitPx();
+    return px * px * std::abs(p.deviceTransform().determinant()) > limit * limit;
+}
+
+void resetOutlineState(const QFont& font, const QString& text) {
+    QTextLayout layout(text, font);
+    layout.beginLayout();
+    layout.createLine(); // unbounded: the whole text on one line
+    layout.endLayout();
+    const QList<QGlyphRun> runs = layout.glyphRuns();
+    for (const QGlyphRun& run : runs) {
+        QRawFont face = run.rawFont();
+        if (!face.isValid()) {
+            continue;
+        }
+        face.setPixelSize(qFuzzyCompare(face.pixelSize(), kOutlineResetPx) ? 2.0 * kOutlineResetPx
+                                                                           : kOutlineResetPx);
+        const QList<quint32> glyphs = run.glyphIndexes();
+        static_cast<void>(
+            face.alphaMapForGlyph(glyphs.isEmpty() ? 0U : glyphs.front(), QRawFont::PixelAntialiasing));
+    }
 }
 
 void drawText(QPainter& p, const plot::DrawList& list, const plot::DrawCmd& cmd, const SchemeFonts& fonts,
@@ -459,8 +539,7 @@ void drawText(QPainter& p, const plot::DrawList& list, const plot::DrawCmd& cmd,
         return;
     }
     const plot::TextRun& run = list.texts[cmd.textIndex];
-    const bool rotated = run.quarterTurns == 1;
-    const detail::FontEntry& font = detail::schemeFontEntry(fonts, run.style, rotated);
+    const detail::FontEntry& font = detail::runFontEntry(fonts, run);
     const auto tp = detail::placeText(list, run, font, dpr);
     if (!tp || tp->text.isEmpty()) {
         return;
@@ -476,6 +555,9 @@ void drawText(QPainter& p, const plot::DrawList& list, const plot::DrawCmd& cmd,
     // that from a call whose argument is a temporary.
     const std::string key = staticTextKey(fonts, run, dpr, tp->text);
     const QStaticText& st = detail::threadStaticText(key, tp->text);
+    if (mayDrawAsOutlines(p)) {
+        resetOutlineState(font.font, tp->text); // nothing rasterises a glyph between this and the outlines
+    }
     p.drawStaticText(tp->box.topLeft(), st);
     p.setWorldTransform(device);
 }
@@ -762,8 +844,7 @@ void measureStripCommands(const plot::DrawList& list, const SchemeFonts& fonts, 
             if (cmd.kind == plot::CmdKind::TextRun) {
                 const plot::TextRun& run = list.texts[cmd.textIndex]; // in range: the bounds are not empty
                 const qreal dpr = list.dpr > 0.0F ? static_cast<qreal>(list.dpr) : 1.0;
-                spill = std::ceil(schemeFontEntry(fonts, run.style, run.quarterTurns == 1).metrics.height() *
-                                  dpr);
+                spill = std::ceil(runFontEntry(fonts, run).metrics.height() * dpr);
             }
             c.x0 = static_cast<float>(std::floor(b.rect.left() - spill));
             c.x1 = static_cast<float>(std::ceil(b.rect.right() + spill));

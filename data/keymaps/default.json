@@ -40,7 +40,7 @@
       "doc": "Open the Select Worksheet dialog (workbook and worksheet).",
       "keys": ["F7"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "layout.editor",
@@ -48,7 +48,7 @@
       "doc": "Open the Layout Editor.",
       "keys": ["Ctrl+F7"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "args": [1],
@@ -284,7 +284,7 @@
       "doc": "Toggle the Track Map dock.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "view.command_palette",
@@ -292,7 +292,7 @@
       "doc": "Open the command palette.",
       "keys": ["Ctrl+Shift+P"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "view.reset_docks",
@@ -308,7 +308,7 @@
       "doc": "Toggle full screen.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "file.open_log",
@@ -316,7 +316,7 @@
       "doc": "Open Log File dialog (multi-select, a details pane probing the selected file); the last folder is remembered per user.",
       "keys": ["Ctrl+O"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "file.close_all",
@@ -324,7 +324,7 @@
       "doc": "Close every source without a prompt.",
       "keys": ["Ctrl+A"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "file.reload_source",
@@ -340,7 +340,7 @@
       "doc": "Save every changed project document atomically, keep a backup copy and clear the journal.",
       "keys": ["Ctrl+S"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "file.print",
@@ -394,7 +394,7 @@
       "doc": "Create a project folder.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "file.open_project",
@@ -402,7 +402,7 @@
       "doc": "Open a project folder.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "file.close_project",
@@ -410,7 +410,7 @@
       "doc": "Close the project.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "file.import_data",
@@ -418,7 +418,7 @@
       "doc": "Import data into the open project.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "file.export_data",
@@ -426,7 +426,7 @@
       "doc": "Export data from the open project.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "component.cut",
@@ -434,7 +434,7 @@
       "doc": "Copy the selected components to the clipboard and delete them, as one command.",
       "keys": ["Ctrl+X"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "component.copy",
@@ -442,7 +442,7 @@
       "doc": "Copy the selected components.",
       "keys": ["Ctrl+C"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "component.paste",
@@ -450,7 +450,7 @@
       "doc": "Paste components at their stored rectangles, offset per successive paste.",
       "keys": ["Ctrl+V"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "component.delete",
@@ -458,7 +458,7 @@
       "doc": "Delete the selected components (undoable, no confirmation).",
       "keys": ["Delete"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "component.select_all",
@@ -466,7 +466,7 @@
       "doc": "Select every component of the worksheet.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "data.toggle_domain",
@@ -546,7 +546,7 @@
       "doc": "Start or stop the cursor animation of the active worksheet.",
       "keys": ["A"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "data.lap_stretch_toggle",
@@ -649,7 +649,7 @@
       "doc": "Open the Track Editor.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "tools.corrected_speed",
@@ -657,7 +657,7 @@
       "doc": "Open the Corrected Speed and Distance dialog.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "tools.aliases",
@@ -681,7 +681,7 @@
       "doc": "Show the units list.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "tools.options",
@@ -769,7 +769,7 @@
       "doc": "Open the properties dialog on the Channels tab at the active channel.",
       "keys": ["Ctrl+N"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "component.properties",
@@ -777,7 +777,7 @@
       "doc": "Open or raise the component's properties dialog.",
       "keys": ["F5"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "component.focus_next",
@@ -785,7 +785,7 @@
       "doc": "Focus the next component in z order.",
       "keys": ["Tab"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "component.focus_prev",
@@ -793,7 +793,7 @@
       "doc": "Focus the previous component in z order.",
       "keys": ["Shift+Tab"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "component.legend",
@@ -801,7 +801,7 @@
       "doc": "Toggle the channel legend.",
       "keys": ["L"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "component.colour_legend",
@@ -809,7 +809,7 @@
       "doc": "Toggle the colour-channel legend.",
       "keys": ["K"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "component.cycle_layout",
@@ -817,7 +817,7 @@
       "doc": "Cycle the layout (graph: panels and overlapped; summary components: their layouts).",
       "keys": ["G"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "component.cycle_style",
@@ -825,7 +825,7 @@
       "doc": "Cycle the trace or bar style.",
       "keys": ["S"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "args": [0],
@@ -834,7 +834,7 @@
       "doc": "Toggle colour band n of the component's band axis.",
       "keys": ["Alt+0"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "args": [1],
@@ -843,7 +843,7 @@
       "doc": "Toggle colour band n of the component's band axis.",
       "keys": ["Alt+1"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "args": [2],
@@ -852,7 +852,7 @@
       "doc": "Toggle colour band n of the component's band axis.",
       "keys": ["Alt+2"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "args": [3],
@@ -861,7 +861,7 @@
       "doc": "Toggle colour band n of the component's band axis.",
       "keys": ["Alt+3"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "args": [4],
@@ -870,7 +870,7 @@
       "doc": "Toggle colour band n of the component's band axis.",
       "keys": ["Alt+4"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "args": [5],
@@ -879,7 +879,7 @@
       "doc": "Toggle colour band n of the component's band axis.",
       "keys": ["Alt+5"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "args": [6],
@@ -888,7 +888,7 @@
       "doc": "Toggle colour band n of the component's band axis.",
       "keys": ["Alt+6"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "args": [7],
@@ -897,7 +897,7 @@
       "doc": "Toggle colour band n of the component's band axis.",
       "keys": ["Alt+7"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "args": [8],
@@ -906,7 +906,7 @@
       "doc": "Toggle colour band n of the component's band axis.",
       "keys": ["Alt+8"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "args": [9],
@@ -915,7 +915,7 @@
       "doc": "Toggle colour band n of the component's band axis.",
       "keys": ["Alt+9"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "component.maximise",
@@ -923,7 +923,7 @@
       "doc": "Maximise or restore the focused component.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "component.send_to_background",
@@ -931,7 +931,7 @@
       "doc": "Paint the component below every other one.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "component.bring_to_front",
@@ -939,7 +939,7 @@
       "doc": "Paint the component above every other one.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "component.export_data",
@@ -947,7 +947,7 @@
       "doc": "Export the component's data (CSV).",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "component.print_clipboard",
@@ -955,7 +955,7 @@
       "doc": "Copy an image of the component to the clipboard.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "graph.status_errors",
@@ -963,7 +963,7 @@
       "doc": "Toggle the status and errors strip.",
       "keys": ["E"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "graph.device_events",
@@ -971,7 +971,7 @@
       "doc": "Hide or show device events in the marker band.",
       "keys": ["Shift+E"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "graph.variance",
@@ -979,7 +979,7 @@
       "doc": "Toggle the variance panel (drawn while an overlay is visible).",
       "keys": ["F3"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "graph.measurements",
@@ -987,7 +987,7 @@
       "doc": "Toggle min, max and mean over the visible span.",
       "keys": ["M"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "graph.copy_cursor_values",
@@ -995,7 +995,7 @@
       "doc": "Copy name, value and unit rows of every channel at the Main cursor.",
       "keys": ["Ctrl+Shift+C"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "cursor.add_annotation",
@@ -1003,7 +1003,7 @@
       "doc": "Add an annotation at the cursor.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "zoom.in",
@@ -1019,7 +1019,7 @@
       "doc": "Zoom in on the linked span; the summary recomputes.",
       "keys": ["Up"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "zoom.out",
@@ -1035,7 +1035,7 @@
       "doc": "Zoom out on the linked span; the summary recomputes.",
       "keys": ["Down"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "zoom.full",
@@ -1059,7 +1059,7 @@
       "doc": "Zoom the linked span to the Main range.",
       "keys": ["W"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "zoom.datum_main",
@@ -1075,7 +1075,7 @@
       "doc": "Vertical zoom in on the active group.",
       "keys": ["Alt+Up"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "zoom.v_out",
@@ -1083,7 +1083,7 @@
       "doc": "Vertical zoom out on the active group.",
       "keys": ["Alt+Down"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "zoom.v_full",
@@ -1091,7 +1091,7 @@
       "doc": "Vertical full scale for the active group.",
       "keys": ["Alt+F2"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "zoom.rubber_band",
@@ -1099,7 +1099,7 @@
       "doc": "Mouse: double-click, move, click zooms horizontally; Alt vertically, Ctrl both axes.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "zoom.full_axis",
@@ -1107,7 +1107,7 @@
       "doc": "Mouse: double-click a scrollbar for full zoom on that axis.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "zoom.wheel",
@@ -1115,7 +1115,7 @@
       "doc": "Mouse wheel: horizontal zoom about the pointer.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "zoom.wheel",
@@ -1123,7 +1123,7 @@
       "doc": "Mouse wheel: box zoom about the pointer.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "zoom.wheel",
@@ -1131,7 +1131,7 @@
       "doc": "Mouse wheel: zoom the track view about the pointer.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "zoom.extend",
@@ -1139,7 +1139,7 @@
       "doc": "Mouse: Shift+click in the zoom summary bar extends the span.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "zoom.outing_rect",
@@ -1147,7 +1147,7 @@
       "doc": "Mouse (outing graph): drag the rectangle or its ends to set the linked span.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "pan.left",
@@ -1171,7 +1171,7 @@
       "doc": "Pan the vertically zoomed active group up.",
       "keys": ["Shift+Up"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "pan.down",
@@ -1179,7 +1179,7 @@
       "doc": "Pan the vertically zoomed active group down.",
       "keys": ["Shift+Down"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "pan.back",
@@ -1211,7 +1211,7 @@
       "doc": "Mouse: drag an axis or a scrollbar to pan.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "cursor.left",
@@ -1227,7 +1227,7 @@
       "doc": "Move the cursor to the previous Main point.",
       "keys": ["Left"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "cursor.right",
@@ -1243,7 +1243,7 @@
       "doc": "Move the cursor to the next Main point.",
       "keys": ["Right"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "cursor.left_fast",
@@ -1259,7 +1259,7 @@
       "doc": "Move the cursor ten points back.",
       "keys": ["Ctrl+Left"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "cursor.right_fast",
@@ -1275,7 +1275,7 @@
       "doc": "Move the cursor ten points forward.",
       "keys": ["Ctrl+Right"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "cursor.home",
@@ -1299,7 +1299,7 @@
       "doc": "Cycle the cursor style: line, crosshair, values only.",
       "keys": ["Y"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "cursor.style",
@@ -1307,7 +1307,7 @@
       "doc": "Cycle the cursor style.",
       "keys": ["Y"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "cursor.insert_marker",
@@ -1323,7 +1323,7 @@
       "doc": "Mouse: click places the cursor on the nearest Main sample of the active channel.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "datum.toggle",
@@ -1355,7 +1355,7 @@
       "doc": "Offset axis on or off; turning it off zeroes the offsets of the selected ranges.",
       "keys": ["O"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "offset.main_left",
@@ -1363,7 +1363,7 @@
       "doc": "Offset the Main range one offset step back.",
       "keys": ["Ctrl+Shift+Left"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "offset.main_right",
@@ -1371,7 +1371,7 @@
       "doc": "Offset the Main range one offset step forward.",
       "keys": ["Ctrl+Shift+Right"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "offset.main_down",
@@ -1379,7 +1379,7 @@
       "doc": "Offset the Main range ten offset steps back.",
       "keys": ["Ctrl+Shift+Down"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "offset.main_up",
@@ -1387,7 +1387,7 @@
       "doc": "Offset the Main range ten offset steps forward.",
       "keys": ["Ctrl+Shift+Up"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "offset.overlay_left",
@@ -1395,7 +1395,7 @@
       "doc": "Offset the reference overlay one offset step back.",
       "keys": ["Alt+Shift+Left"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "offset.overlay_right",
@@ -1403,7 +1403,7 @@
       "doc": "Offset the reference overlay one offset step forward.",
       "keys": ["Alt+Shift+Right"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "offset.overlay_down",
@@ -1411,7 +1411,7 @@
       "doc": "Offset the reference overlay ten offset steps back.",
       "keys": ["Alt+Shift+Down"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "offset.overlay_up",
@@ -1419,7 +1419,7 @@
       "doc": "Offset the reference overlay ten offset steps forward.",
       "keys": ["Alt+Shift+Up"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "offset.drag",
@@ -1427,7 +1427,7 @@
       "doc": "Mouse: drag the Main or overlay sub-axis to offset it.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "track.zoom_in",
@@ -1435,7 +1435,7 @@
       "doc": "Zoom the track view in about its centre.",
       "keys": ["+", "="],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "track.zoom_out",
@@ -1443,7 +1443,7 @@
       "doc": "Zoom the track view out about its centre.",
       "keys": ["-"],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "track.fit",
@@ -1451,7 +1451,7 @@
       "doc": "Fit the whole track.",
       "keys": [],
       "milestone": "M3",
-      "status": "planned"
+      "status": "implemented"
     }
   ],
   "inherits": null,

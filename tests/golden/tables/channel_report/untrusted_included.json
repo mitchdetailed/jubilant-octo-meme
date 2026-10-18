@@ -1,0 +1,47 @@
+{
+    "case": "untrusted_included",
+    "headers": [
+        "Laps",
+        "Load start [%]",
+        "Load end [%]",
+        "Load change [%]"
+    ],
+    "rows": [
+        [
+            {
+                "t": "Lap 1"
+            },
+            {
+                "bg": "#2060ffff",
+                "t": "0.0"
+            },
+            {
+                "bg": "#2060ffff",
+                "t": "198.0"
+            },
+            {
+                "t": "198.0"
+            }
+        ],
+        [
+            {
+                "i": true,
+                "t": "Lap 2 (Overlay 1)"
+            },
+            {
+                "bg": "#ff3030ff",
+                "i": true,
+                "t": "200.0"
+            },
+            {
+                "bg": "#ff3030ff",
+                "i": true,
+                "t": "398.0"
+            },
+            {
+                "i": true,
+                "t": "198.0"
+            }
+        ]
+    ]
+}

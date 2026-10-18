@@ -1,0 +1,14 @@
+{
+  "bad-overlap-mode.json": {
+    "pointer": "/display/overlapMode",
+    "why": "the overlap mode is panels or overlapped"
+  },
+  "manual-scale-without-unit.json": {
+    "pointer": "/groups/0/scaleMin",
+    "why": "a persisted limit carries its unit (D-010)"
+  },
+  "unknown-member.json": {
+    "pointer": "",
+    "why": "the body is closed: every member is a property of its schema (AC-M3-08)"
+  }
+}

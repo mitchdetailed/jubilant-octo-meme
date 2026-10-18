@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:components/track_position-1",
+  "title": "track_position component body",
+  "description": "The body of a track_position component (04 section 14 item 6): what the map shows, the dot sizes, the fit or manual scale and the backdrop flag.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "showZoomSpan": {
+      "type": "boolean"
+    },
+    "showSectionLabels": {
+      "type": "boolean"
+    },
+    "showSectionMarks": {
+      "type": "boolean"
+    },
+    "showSectionColours": {
+      "type": "boolean"
+    },
+    "sizes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "detail": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "material": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 50
+        }
+      }
+    },
+    "scale": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": ["fit", "manual"]
+        },
+        "zoom": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "panX": {
+          "type": "number"
+        },
+        "panY": {
+          "type": "number"
+        },
+        "rotation": {
+          "description": "Degrees.",
+          "type": "number",
+          "minimum": -360,
+          "maximum": 360
+        }
+      }
+    },
+    "background": {
+      "type": "boolean"
+    }
+  }
+}

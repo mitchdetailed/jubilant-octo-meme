@@ -1,0 +1,43 @@
+{
+    "case": "corr_speed_delta",
+    "headers": [
+        "Name",
+        "Main",
+        "Overlay",
+        "Δ",
+        "Unit"
+    ],
+    "hiddenColumns": [
+    ],
+    "rows": [
+        [
+            "Corr Speed",
+            "172.5",
+            "171.0",
+            "+1.5",
+            "km/h"
+        ],
+        [
+            "Corr Dist",
+            "5011",
+            "6992",
+            "-1980",
+            "m"
+        ],
+        [
+            "Throttle",
+            "6.7",
+            "8.1",
+            "-1.4",
+            "%"
+        ],
+        [
+            "Missing Channel",
+            "",
+            "",
+            "",
+            ""
+        ]
+    ],
+    "showHeading": true
+}

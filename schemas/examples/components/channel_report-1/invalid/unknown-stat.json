@@ -1,0 +1,10 @@
+{
+  "report": {
+    "channels": [
+      {
+        "name": "Corr Speed",
+        "stats": ["median"]
+      }
+    ]
+  }
+}

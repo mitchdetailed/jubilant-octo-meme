@@ -4,6 +4,7 @@
 #include <esses/plotcore/hit_tester.hpp>
 
 #include <algorithm>
+#include <cstddef>
 
 namespace esses::plot {
 
@@ -21,6 +22,17 @@ HitResult HitTester::hit(float xPx, float yPx) const noexcept {
         return xPx >= r.x && xPx < r.x + r.w && yPx >= r.y && yPx < r.y + r.h;
     });
     return it != regions_.rend() ? it->result : HitResult{};
+}
+
+std::vector<HitResult> HitTester::hitAll(float xPx, float yPx) const {
+    std::vector<HitResult> out;
+    for (std::size_t i = regions_.size(); i-- > 0;) { // topmost (last added) first
+        const RectPx& r = regions_[i].rect;
+        if (xPx >= r.x && xPx < r.x + r.w && yPx >= r.y && yPx < r.y + r.h) {
+            out.push_back(regions_[i].result);
+        }
+    }
+    return out;
 }
 
 } // namespace esses::plot

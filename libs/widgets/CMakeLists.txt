@@ -16,12 +16,18 @@
 #   src/editors_data/**     include/esses/widgets/editors_data/**     (M2) ChannelEditor, MappingPanel, DetailsEditor,
 #                                                                     LapEditor
 #   src/editors_options/**  include/esses/widgets/editors_options/**  (M2) OptionsDialog, SchemeSelector
+#   src/properties_shell/** include/esses/widgets/properties_shell/** (M3) PropertiesDialog, FieldBinder,
+#                                                                     ZoomSummaryBar, CorrectedSpeedDialog,
+#                                                                     LayoutEditor, CommandPalette,
+#                                                                     AnimationController, ComponentClipboard
+# The M3 components split src/components/ further by owner (time_distance/, plots/, reports_track/; headers
+# stay flat in include/esses/widgets/components/); the components glob is recursive, so no edit is needed here.
 # Every tests/**/tst_<name>.cpp is one Qt Test executable (ctest widgets.tst_<name>, run offscreen); other
 # tests/**/*.cpp are helpers shared by them.
 
 set(CMAKE_AUTOMOC ON)
 set(_esses_widgets_sources "")
-foreach(_root shell docks components editors_maths editors_data editors_options)
+foreach(_root shell docks components editors_maths editors_data editors_options properties_shell)
   file(GLOB_RECURSE _files CONFIGURE_DEPENDS
        "${CMAKE_CURRENT_SOURCE_DIR}/src/${_root}/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/src/${_root}/*.hpp"
        "${CMAKE_CURRENT_SOURCE_DIR}/include/esses/widgets/${_root}/*.hpp")

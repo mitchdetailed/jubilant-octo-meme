@@ -10,6 +10,7 @@
 // active channel by key click; 30 Hz Size coalescing; renderToImage; nothing blocks a NoBlock GUI thread.
 
 #include "components/component_test_support.hpp"
+#include "components/plots_test_support.hpp"
 
 #include <esses/base/assert.hpp>
 #include <esses/base/thread_role.hpp>
@@ -65,22 +66,10 @@ struct Rig {
     TimeDistanceGraph* graph = nullptr;
 };
 
-// Waits until the Static layer is current and stays so (late maths/distance results trigger rebuilds).
-bool waitQuiet(TimeDistanceGraph& g, int quietMs = 150) {
-    QElapsedTimer clock;
-    clock.start();
-    while (clock.elapsed() < kTimeoutMs) {
-        if (!QTest::qWaitFor([&g] { return g.staticUpToDate(); }, kTimeoutMs)) {
-            return false;
-        }
-        const int submitted = g.staticBuildsSubmitted();
-        QTest::qWait(quietMs);
-        if (g.staticUpToDate() && g.staticBuildsSubmitted() == submitted) {
-            return true;
-        }
-    }
-    return false;
-}
+// Waits until the graph is settled on the pool's completion (late maths/distance results trigger rebuilds),
+// not on a quiet period alone (plots_test_support.hpp).
+using plotstest::staticUntouched;
+using plotstest::waitQuiet;
 
 void sendMouse(QWidget* w, QEvent::Type type, QPointF pos, Qt::MouseButton button, Qt::MouseButtons buttons) {
     QMouseEvent e(type, pos, w->mapToGlobal(pos), button, buttons, Qt::NoModifier);
@@ -232,6 +221,9 @@ private Q_SLOTS:
         Rig rig(w, timeDistanceSpec({{"Wheel Speed FL"}, {"Throttle"}}));
         TimeDistanceGraph& g = *rig.graph;
         QTRY_VERIFY_WITH_TIMEOUT(w.distanceReady(a), kTimeoutMs);
+        // M3: a datum appearing adds value@datum and delta to the key (a Static rebuild); place it first, so
+        // the datum move at the end is Dynamic only like the cursor.
+        w.view->placeDatum();
         QVERIFY(waitQuiet(g));
         QTest::qWait(50); // let the first full paint go through
 
@@ -266,9 +258,8 @@ private Q_SLOTS:
         // Snapped to a 50 Hz sample of the Main lap.
         const Micros abs = lapAt(*a, 1).start + w.view->state().cursorT;
         QCOMPARE(abs % (kSec / 50), Micros{0});
-        QTest::qWait(60);
 
-        QCOMPARE(g.staticBuildsSubmitted(), submitted);
+        QVERIFY(staticUntouched(g, submitted));
         QCOMPARE(g.chromeBuilds(), chrome);
         QCOMPARE(g.layers().staticImage().cacheKey(), staticKey);
         QVERIFY(g.dynamicBuilds() >= dynamic + 3);
@@ -282,10 +273,9 @@ private Q_SLOTS:
             }
         }
         QVERIFY(lineAtCursor);
-        // The datum is Dynamic too.
+        // Moving the datum is Dynamic too.
         w.view->placeDatum();
-        QTest::qWait(30);
-        QCOMPARE(g.staticBuildsSubmitted(), submitted);
+        QVERIFY(staticUntouched(g, submitted));
         QCOMPARE(g.layers().staticImage().cacheKey(), staticKey);
     }
 

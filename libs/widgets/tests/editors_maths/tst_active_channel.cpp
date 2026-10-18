@@ -172,6 +172,13 @@ bool readsZero(mt::Workspace& ws, qt::WorksheetViewModel& view, const qt::Channe
     return ok && std::abs(v) < 0.051;
 }
 
+// The display shows a number: neither pending (U+2026, not three dots) nor empty.
+bool readsNumber(mt::Workspace& ws, qt::WorksheetViewModel& view, const qt::ChannelRequest& request) {
+    bool ok = false;
+    static_cast<void>(valueAt(ws, view, request).toDouble(&ok));
+    return ok;
+}
+
 QString valueAt(mt::Workspace& ws, qt::WorksheetViewModel& view, const qt::ChannelRequest& request) {
     qt::ValuesModel values(*ws.selection, ws.maths);
     values.setChannelRequests({request});
@@ -408,7 +415,7 @@ private Q_SLOTS:
         qt::ChannelRequest request;
         request.name = "Oil Temp";
         request.displayUnit = "deg C";
-        QTRY_VERIFY_WITH_TIMEOUT(valueAt(ws, *d.view, request) != QStringLiteral("..."), 30000);
+        QTRY_VERIFY_WITH_TIMEOUT(readsNumber(ws, *d.view, request), 30000);
         const QString before = valueAt(ws, *d.view, request);
         bool ok = false;
         const double shown = before.toDouble(&ok);
@@ -428,7 +435,7 @@ private Q_SLOTS:
         QTRY_VERIFY_WITH_TIMEOUT(readsZero(ws, *d.view, request), 30000);
         // A second zero at another cursor adjusts the same item.
         d.view->setCursor(12'000'000, qt::CursorSource::Programmatic);
-        QTRY_VERIFY_WITH_TIMEOUT(valueAt(ws, *d.view, request) != QStringLiteral("..."), 30000);
+        QTRY_VERIFY_WITH_TIMEOUT(readsNumber(ws, *d.view, request), 30000);
         QVERIFY(!readsZero(ws, *d.view, request));
         QVERIFY(d.channels->zeroAtCursor());
         local = localMaths(ws, src->id);

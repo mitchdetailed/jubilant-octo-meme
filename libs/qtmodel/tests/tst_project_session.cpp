@@ -70,7 +70,7 @@ private Q_SLOTS:
         QVERIFY(!session.isOpen());
         QCOMPARE(session.workbooks().size(), std::size_t{1});
         QCOMPARE(session.workbooks().front().name, std::string("Circuit"));
-        QCOMPARE(session.workbooks().front().worksheets.size(), std::size_t{2});
+        QCOMPARE(session.workbooks().front().worksheets.size(), std::size_t{7}); // M1 two + the M3 five
         QCOMPARE(session.activeWorkbook(), 0);
         QCOMPARE(session.scheme()->name, session.shippedScheme(false)->name);
         QCOMPARE(session.shippedScheme(true)->background, std::string("dark"));

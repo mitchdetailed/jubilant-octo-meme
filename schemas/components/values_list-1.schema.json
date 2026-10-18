@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:esses:components/values_list-1",
+  "title": "values_list component body",
+  "description": "The body of a values_list component (04 section 15 item 5): rows of channels with their display unit and decimals, the optional columns, the heading and the column widths.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "channels": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["channel"],
+        "properties": {
+          "channel": {
+            "$ref": "#/definitions/channelName"
+          },
+          "displayUnit": {
+            "$ref": "#/definitions/unitSymbolOrEmpty"
+          },
+          "dps": {
+            "$ref": "#/definitions/dps"
+          }
+        }
+      }
+    },
+    "columns": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "datum": {
+          "type": "boolean"
+        },
+        "delta": {
+          "type": "boolean"
+        },
+        "inlineUnits": {
+          "type": "boolean"
+        }
+      }
+    },
+    "showHeading": {
+      "type": "boolean"
+    },
+    "autoSizeColumns": {
+      "type": "boolean"
+    },
+    "widths": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 2000
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 2000
+        },
+        "delta": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 2000
+        },
+        "datum": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 2000
+        }
+      }
+    }
+  },
+  "definitions": {
+    "channelName": {
+      "description": "A channel as the workbook names it (D-013: resolved through mappings, aliases, case folding and the logged name); \"\" where the member is optional means none.",
+      "type": "string"
+    },
+    "dps": {
+      "description": "Display decimals.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 15
+    },
+    "unitSymbolOrEmpty": {
+      "description": "A unit symbol or alias of the unit registry (units-1), or \"\" for the unitless unit; no leading or trailing white space.",
+      "type": "string",
+      "pattern": "^(\\S(.*\\S)?)?$"
+    }
+  }
+}

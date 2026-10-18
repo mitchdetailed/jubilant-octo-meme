@@ -1,0 +1,44 @@
+{
+  "traces": [
+    {
+      "channel": "Damper Vel FL",
+      "visible": true
+    }
+  ],
+  "bins": {
+    "mode": "even",
+    "bandMode": "width",
+    "dataMin": {
+      "v": -250,
+      "unit": "mm/s"
+    },
+    "dataMax": {
+      "v": 250,
+      "unit": "mm/s"
+    },
+    "bandWidth": {
+      "v": 10,
+      "unit": "mm/s"
+    },
+    "lessMinBand": false,
+    "greaterMaxBand": false
+  },
+  "yMode": "percent",
+  "yScale": {
+    "mode": "auto"
+  },
+  "excludeUntrusted": true,
+  "stackLines": false,
+  "style": "line",
+  "layout": "overlapped",
+  "tileCols": 0,
+  "binLabelStep": 2,
+  "condensedAxes": false,
+  "colourChannel": {
+    "channel": "",
+    "axis": null
+  },
+  "gating": {
+    "channel": ""
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "trend": {
+    "type": "poly",
+    "order": 7
+  }
+}

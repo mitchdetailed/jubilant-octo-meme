@@ -200,9 +200,10 @@ jobs:
 
   lint:
     runs-on: ubuntu-24.04
-    # 45, not 20: the clang-tidy build of the Qt-free targets (ci-linux-lint, every translation unit through
-    # clang-tidy) was cancelled at step 228 of 233 on a slow hosted runner; it grows with every library.
-    timeout-minutes: 45
+    # 75, not 20: the clang-tidy build of the Qt-free targets (ci-linux-lint, every translation unit through
+    # clang-tidy) was cancelled at step 228 of 233 on a slow hosted runner under 45 min in M2, and M3 adds
+    # about a fifth more tidied units (154 -> 185) plus their tests; it grows with every library.
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }

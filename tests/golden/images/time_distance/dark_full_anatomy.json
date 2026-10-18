@@ -1,0 +1,91 @@
+{
+    "activeChannel": "Corr Speed",
+    "body": {
+        "display": {
+            "showStatusStrip": true,
+            "statusChannels": [
+                "Engine Status"
+            ],
+            "variance": {
+                "heightFrac": 0.25,
+                "show": true
+            }
+        },
+        "groups": [
+            {
+                "name": "Speed",
+                "scaleMode": "channel",
+                "traces": [
+                    {
+                        "channel": "Corr Speed",
+                        "displayUnit": "km/h",
+                        "dps": 1
+                    }
+                ]
+            },
+            {
+                "name": "Throttle",
+                "scaleMax": {
+                    "unit": "%",
+                    "v": 100
+                },
+                "scaleMin": {
+                    "unit": "%",
+                    "v": 0
+                },
+                "scaleMode": "manual",
+                "traces": [
+                    {
+                        "channel": "Throttle Pos"
+                    }
+                ]
+            }
+        ]
+    },
+    "case": "dark_full_anatomy",
+    "cursorUs": 36000000,
+    "data": "libs/plotcore/tests/td_m3_cases.hpp (the synthetic sources of td_golden_cases.hpp with laps, track sections, markers, device events, status channels, annotations and lap distance indexes)",
+    "datumUs": 18000000,
+    "domain": "distance",
+    "dprs": [
+        1,
+        2
+    ],
+    "focused": true,
+    "fonts": "tests/golden/fonts (Noto Sans), QtTextMetrics",
+    "offsetAxis": true,
+    "overrideLimitsBase": {
+    },
+    "pendingStripe": false,
+    "scheme": "Test Dark",
+    "shows": "the dark scheme with every M3 element: bands, status strip, variance, offset axis, scrollbars, datum",
+    "sizeLogical": [
+        600,
+        420
+    ],
+    "slots": [
+        {
+            "distanceData": true,
+            "kind": "Main",
+            "lap": 1,
+            "number": 0,
+            "offsetM": 4,
+            "offsetUs": 0,
+            "source": "synthetic_a.ld"
+        },
+        {
+            "distanceData": true,
+            "kind": "Overlay0",
+            "lap": 1,
+            "number": 0,
+            "offsetM": -6,
+            "offsetUs": 0,
+            "source": "synthetic_b.ld"
+        }
+    ],
+    "type": "time_distance",
+    "zoom": [
+        -120,
+        2918.25308933258
+    ]
+}

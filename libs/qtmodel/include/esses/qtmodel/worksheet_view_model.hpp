@@ -18,6 +18,12 @@
 // of 4 samples, cursor steps; 0 = the fastest channel of the Main layer). setOffsetCommit receives the
 // alignment offsets 250 ms after the last nudge (04 section 3.3 item 4; the undoable sidecar edit is M3).
 // noDistance() is the banner state of AC-M1-09.
+// Additions (M3, the time_distance completion; AC-M3-09): beginOffsetDrag/endOffsetDrag hold the commit while
+// a sub-axis is dragged (no 250 ms commit in the middle of a slow drag) and commit at the release, so a drag
+// is one undo command; offsetRangeBy nudges by an amount the caller computed; setSourceSamplePeriod records
+// the sample period of the active channel in each visible slot's source (the focused graph reports them), so
+// offsetRange steps a range by its own source's period (04 section 3.3 item 3), the Main source's
+// activeSamplePeriod() when none was reported.
 #pragma once
 
 #include <esses/base/time.hpp>
@@ -33,6 +39,7 @@
 #include <cstdint>
 #include <functional>
 #include <unordered_map>
+#include <vector>
 
 class QTimer;
 
@@ -70,6 +77,10 @@ public:
     bool animating() const noexcept;
     double animationRate() const noexcept { return animationRate_; }
     void setOffsetCommit(OffsetCommit commit) { offsetCommit_ = std::move(commit); }
+    bool offsetDragActive() const noexcept { return offsetDragDepth_ > 0; }
+    // The offset step of a source's ranges in time mode: its reported period, else activeSamplePeriod().
+    Micros samplePeriodOf(const model::SourceId& source) const;
+    void setSourceSamplePeriod(const model::SourceId& source, Micros periodUs);
     // Pending alignment offsets during a drag or key repeat (04 section 3.3 item 4), in domain units.
     const std::unordered_map<model::RangeRef, double>& pendingOffsets() const noexcept {
         return pendingOffsets_;
@@ -97,7 +108,10 @@ public Q_SLOTS:
     void swapDatum();            // X
     void setOffsetAxis(bool on); // O
     void offsetRange(const esses::model::RangeRef& r, int steps);
+    void offsetRangeBy(const esses::model::RangeRef& r, double amount); // nudge; committed 250 ms later
     void dragOffset(const esses::model::RangeRef& r, double delta);
+    void beginOffsetDrag();
+    void endOffsetDrag(); // commits the pending offsets now
     void onSelectionChanged(const esses::plot::SelectionSnapshot& snapshot);
     void setAnimating(bool on);
     void setAnimationRate(double x);
@@ -152,6 +166,8 @@ private:
     double animationCarryUs_ = 0.0;
     QTimer* offsetTimer_ = nullptr;
     OffsetCommit offsetCommit_;
+    int offsetDragDepth_ = 0;
+    std::unordered_map<model::SourceId, Micros> sourcePeriods_;
 };
 
 } // namespace esses::qt

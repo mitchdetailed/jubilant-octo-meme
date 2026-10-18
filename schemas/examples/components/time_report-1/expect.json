@@ -1,0 +1,10 @@
+{
+  "all-outings-scope.json": {
+    "pointer": "/scope",
+    "why": "a time report covers the selected ranges or outings"
+  },
+  "band-without-pct.json": {
+    "pointer": "/bands/0",
+    "why": "a band names its percentage"
+  }
+}

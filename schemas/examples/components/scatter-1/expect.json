@@ -1,0 +1,10 @@
+{
+  "order-seven.json": {
+    "pointer": "/trend/order",
+    "why": "polynomial trends have order 2 to 6"
+  },
+  "trace-without-y.json": {
+    "pointer": "/traces/0",
+    "why": "a trace names its Y channel"
+  }
+}
