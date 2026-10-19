@@ -4,7 +4,8 @@
 // The editors a FieldBinder binds (06 section 12 items 4 and 6; D-027; AC-M3-08), shared by every
 // PropertiesDialog page:
 //   leaf kinds    Bool QCheckBox, Enum QComboBox, Integer QSpinBox, Number NumberEdit, Text QLineEdit,
-//                 Colour ColourEdit, Channel an editable QComboBox (makeLeafEditor builds them);
+//                 Colour ColourEdit, Channel an editable QComboBox, Unit (M4) an editable QComboBox of the
+//                 unit symbols of a sibling channel's quantity (makeLeafEditor builds them);
 //   subtree kinds a FieldEditor: UnitValueEdit ({v, unit}, D-010), FieldForm (an object as rows of its own
 //                 FieldBinder: BandAxis, scale lines, the gauge font), RecordListEditor (an array of records
 //                 or scalars with Add / Remove / Up / Down and a detail editor: groups and traces, the
@@ -20,6 +21,7 @@
 
 #include <esses/widgets/properties_shell/field_binder.hpp>
 
+#include <QHash>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonValue>
@@ -156,6 +158,9 @@ struct FieldRow {
     QStringList enumValues;
     std::function<FieldEditor*(QWidget*)>
         make; // UnitValue (default UnitValueEdit), BandAxis, ColourBands, Custom
+    // Added by M4 (D-211 (b)): a Unit row's sibling Channel row (its pointer in the same form or page, e.g.
+    // "/channel"), whose channel's quantity gives the units the picker offers.
+    QString unitOf{};
 };
 
 // An object as a form: its rows bound through its own FieldBinder.
@@ -291,5 +296,19 @@ void setHeadingChoices(QWidget* headingEditor, const QStringList& headings);
 void setChannelChoices(QWidget* channelEditor, const QStringList& names);
 // Marks a field invalid (red frame, the reason as tool tip) or valid again.
 void markInvalid(QWidget* editor, const QString& reason);
+
+// Added by M4 (D-211 (b); docs/milestones/M3.md section 6 item 26): the display-unit pickers. A Unit editor
+// carries the pointer of its sibling Channel editor (setUnitOf, the FieldRow's unitOf); linkUnitPickers
+// connects every Unit editor among the direct children of `parent` to the Channel editor of the same parent
+// named by that pointer (editors are named by their row's pointer), so a change of the channel changes the
+// units offered. setUnitChoices gives a Unit editor the unit symbols per channel name (the PropertiesDialog
+// computes them from its component's sources: the units of each channel's quantity, compat units left out)
+// and shows those of the linked channel now: "" (the channel's default display unit) first, then the symbols;
+// a channel without an entry offers "" only. The text is kept; free text stays allowed.
+void setUnitOf(QWidget* unitEditor, const QString& channelPointer);
+void linkUnitPickers(QWidget* parent);
+void setUnitChoices(QWidget* unitEditor, const QHash<QString, QStringList>& unitsByChannel);
+// The units a Unit editor offers now (its items, "" first), for tests.
+QStringList unitChoices(const QWidget* unitEditor);
 
 } // namespace esses::widgets

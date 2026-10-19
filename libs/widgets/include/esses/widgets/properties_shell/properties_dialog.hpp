@@ -67,6 +67,9 @@ public:
     QString validationMessage() const;
     int channelsTabIndex() const;
     bool focusChannel(const QString& channel);
+    // Added by M4 (D-211 (e)): shows record `index` of the record list bound at `pointer` ("/groups": a
+    // graph's Group Properties) on its tab; false when no such list or record exists.
+    bool focusRecord(const QString& pointer, int index);
     FieldBinder& headerBinder();
     bool wasApplied() const noexcept;
     // Where dialog geometries are kept (per component type); unset: not kept.

@@ -680,10 +680,14 @@ void WorksheetCanvas::contextMenuEvent(QContextMenuEvent* event) {
 
 bool WorksheetCanvas::event(QEvent* event) {
     if (event->type() == QEvent::DevicePixelRatioChange || event->type() == QEvent::ScreenChangeInternal) {
-        queueLayout(); // the components rebuild through their own DPR handling
-        update();
+        refreshGeometry(); // the components rebuild through their own DPR handling
     }
     return QWidget::event(event);
+}
+
+void WorksheetCanvas::refreshGeometry() {
+    queueLayout();
+    update();
 }
 
 void WorksheetCanvas::resizeEvent(QResizeEvent* event) {

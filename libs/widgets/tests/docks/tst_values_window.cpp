@@ -22,11 +22,14 @@
 #include <esses/widgets/docks/values_window.hpp>
 
 #include <QCheckBox>
+#include <QImage>
 #include <QSignalSpy>
+#include <QStyledItemDelegate>
 #include <QTableView>
 #include <QTest>
 #include <cmath>
 #include <memory>
+#include <optional>
 
 // The qtmodel synthetic-source helpers (in memory, circuit laps), compiled into this executable only.
 #include "../../../qtmodel/tests/qtmodel_test_support.cpp" // NOLINT(bugprone-suspicious-include)
@@ -119,6 +122,21 @@ struct World {
         return true;
     }
 };
+
+// The box of the pixels in `cell` that differ from its first pixel (the cell's background), if any.
+std::optional<QRect> inkBox(const QImage& image, const QRect& cell) {
+    const QRect inside = cell.adjusted(1, 1, -1, -1) & image.rect();
+    const QRgb background = image.pixel(inside.topLeft());
+    std::optional<QRect> box;
+    for (int y = inside.top(); y <= inside.bottom(); ++y) {
+        for (int x = inside.left(); x <= inside.right(); ++x) {
+            if (image.pixel(x, y) != background) {
+                box = box ? box->united(QRect(x, y, 1, 1)) : QRect(x, y, 1, 1);
+            }
+        }
+    }
+    return box;
+}
 
 } // namespace
 
@@ -213,6 +231,62 @@ private Q_SLOTS:
         win.setWorksheet(nullptr);
         QVERIFY(!QObject::disconnect(w.dist.get(), nullptr, &w.model, nullptr));
         QCOMPARE(w.cell(0, qt::ValuesModel::MainCol), QString());
+    }
+
+    // The window's own delegate (one drawText a cell, D-217 (k)) puts each text where the standard item puts
+    // it: the name left, the numbers right, the same rows, one line.
+    void cellsDrawWhereTheStandardItemDoes() {
+        World w;
+        QTRY_VERIFY_WITH_TIMEOUT(w.ready(), 30000);
+        w.selection.setMain(rangeRef(*w.a, 2));
+        w.selection.toggleOverlay(rangeRef(*w.a, 3));
+        ValuesWindow win(w.model);
+        FakeComponent graph(*w.context, {QStringLiteral("Corr Speed"), QStringLiteral("Throttle")});
+        win.followComponent(&graph);
+        win.setWorksheet(w.time.get());
+        w.time->setCursor(12 * kSec, qt::CursorSource::Click);
+        QTRY_VERIFY(w.settled(0) && w.settled(1));
+        win.resize(600, 300);
+        win.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&win));
+        QTableView& table = win.table();
+        const QImage ours = table.viewport()->grab().toImage();
+        QStyledItemDelegate standard;
+        QAbstractItemDelegate* own = table.itemDelegate();
+        QVERIFY(own != nullptr && dynamic_cast<QStyledItemDelegate*>(own) != nullptr);
+        table.setItemDelegate(&standard);
+        const QImage theirs = table.viewport()->grab().toImage();
+        table.setItemDelegate(own);
+        int compared = 0;
+        for (int row = 0; row < table.model()->rowCount(); ++row) {
+            for (int column = 0; column < table.model()->columnCount(); ++column) {
+                const QRect cell = table.visualRect(table.model()->index(row, column));
+                const std::optional<QRect> a = inkBox(ours, cell);
+                const std::optional<QRect> b = inkBox(theirs, cell);
+                QCOMPARE(a.has_value(), b.has_value());
+                if (!a) {
+                    continue;
+                }
+                const QString where =
+                    QStringLiteral("row %1 column %2: ours (%3,%4)-(%5,%6), the standard's (%7,%8)-(%9,%10)")
+                        .arg(row)
+                        .arg(column)
+                        .arg(a->left())
+                        .arg(a->top())
+                        .arg(a->right())
+                        .arg(a->bottom())
+                        .arg(b->left())
+                        .arg(b->top())
+                        .arg(b->right())
+                        .arg(b->bottom());
+                QVERIFY2(std::abs(a->left() - b->left()) <= 1 && std::abs(a->right() - b->right()) <= 1,
+                         qPrintable(where));
+                QVERIFY2(std::abs(a->top() - b->top()) <= 1 && std::abs(a->bottom() - b->bottom()) <= 1,
+                         qPrintable(where));
+                ++compared;
+            }
+        }
+        QVERIFY(compared >= 8); // two names, two Main and two Overlay values, two units at least
     }
 
     void allChannelsToggle() {

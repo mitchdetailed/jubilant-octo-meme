@@ -46,6 +46,8 @@ ValuesList::ValuesList(const project::ComponentSpec& spec, WorksheetContext& con
     layout->setContentsMargins(0, 0, 0, 0);
     layout->addWidget(table_);
     model_->setWorksheet(&context.view);
+    // An unlinked cursor or datum (D-211 (f)): the values are read at the component's own view.
+    model_->setViewSource([this] { return viewState(); });
     if (context.scheme != nullptr) {
         applyFonts(*context.scheme);
     }
@@ -90,8 +92,12 @@ void ValuesList::applyFonts(const project::Scheme& scheme) {
     table_->horizontalHeader()->setFont(fonts.role(QStringLiteral("valuesHeader")));
 }
 
-void ValuesList::onViewChanged(const plot::ViewState&, plot::ChangeMask) {
-    // The ValuesModel follows the WorksheetViewModel itself (ValuesModel::setWorksheet).
+void ValuesList::onViewChanged(const plot::ViewState&, plot::ChangeMask what) {
+    // The ValuesModel follows the WorksheetViewModel itself (ValuesModel::setWorksheet); the changes of the
+    // component's own cursor or datum (D-211 (f)) reach it here.
+    if (!cursorLinked() || !datumLinked()) {
+        model_->refresh(what);
+    }
 }
 
 void ValuesList::onSchemeChanged(const project::Scheme& scheme) {

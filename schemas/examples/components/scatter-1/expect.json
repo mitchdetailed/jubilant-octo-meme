@@ -1,4 +1,8 @@
 {
+  "display-unit-padded.json": {
+    "pointer": "/traces/0/displayUnit",
+    "why": "a display unit is a unit symbol without leading or trailing white space"
+  },
   "order-seven.json": {
     "pointer": "/trend/order",
     "why": "polynomial trends have order 2 to 6"

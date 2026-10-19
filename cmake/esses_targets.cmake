@@ -5,7 +5,8 @@
 #   esses_add_library(<name> LAYER <n> [QT_FREE] [HEADER_ONLY] SOURCES ... DEPS ... PRIVATE_DEPS ...)
 #   esses_add_executable(<name> LAYER <n> [QT_FREE] SOURCES ... DEPS ... [OUTPUT_NAME <exe>])
 #   esses_add_test(<name> [QT_FREE] [CUSTOM_MAIN] SOURCES ... DEPS ... [LABELS ...] [TIMEOUT <s>] [PREFIX <p>])
-#   esses_add_qt_test(<name> SOURCES ... DEPS ... [TEST_NAME <ctest name>] [LABELS ...] [TIMEOUT <s>])
+#   esses_add_qt_test(<name> SOURCES ... DEPS ... [TEST_NAME <ctest name>] [ARGS ...] [LABELS ...] [TIMEOUT <s>])
+#   esses_add_qt_test_entry(<name> TEST_NAME <ctest name> [ARGS ...] [LABELS ...] [TIMEOUT <s>])
 #   esses_add_qt_test_dir(<prefix> DIR <dir> DEPS ... [LABELS ...] [TIMEOUT <s>])
 #   esses_component_enabled(<component> <out-var>)
 # Library targets are ${ESSES_PREFIX}_<name> with the alias ${ESSES_NAMESPACE}::<name>. The layer check
@@ -204,16 +205,19 @@ function(esses_add_test name)
 endfunction()
 
 # ---- Qt Test executables (08 section 6.2: Qt Test for the Qt layers; run offscreen) ------------------------
-# esses_add_qt_test(<name> SOURCES ... DEPS ... [TEST_NAME <ctest name>] [LABELS ...] [TIMEOUT <s>])
+# esses_add_qt_test(<name> SOURCES ... DEPS ... [TEST_NAME <ctest name>] [ARGS <arg>...] [LABELS ...]
+#                   [TIMEOUT <s>])
 # One executable ${ESSES_PREFIX}_<name> (AUTOMOC on, linked with Qt6::Test) = one ctest entry (default name
-# <name> with the first '_' turned into '.'). The test runs with ESSES_QT_TEST_ENVIRONMENT (offscreen, Qt Test
-# output on stdout on every OS) and the Qt kit's bin directory prepended to PATH, so it needs no deployment. Only
-# with ESSES_BUILD_QT and ESSES_BUILD_TESTS.
+# <name> with the first '_' turned into '.'), run with ARGS (the Qt Test functions to run, for example; default
+# none: every function). The test runs with ESSES_QT_TEST_ENVIRONMENT (offscreen, Qt Test output on stdout on
+# every OS) and the Qt kit's bin directory prepended to PATH, so it needs no deployment; esses_add_qt_test_entry
+# adds another entry of the same executable with arguments of its own. Only with ESSES_BUILD_QT and
+# ESSES_BUILD_TESTS.
 function(esses_add_qt_test name)
   if(NOT ESSES_BUILD_TESTS OR NOT ESSES_BUILD_QT)
     return()
   endif()
-  cmake_parse_arguments(A "" "TIMEOUT;TEST_NAME" "SOURCES;DEPS;LABELS" ${ARGN})
+  cmake_parse_arguments(A "" "TIMEOUT;TEST_NAME" "SOURCES;DEPS;LABELS;ARGS" ${ARGN})
   set(t ${ESSES_PREFIX}_${name})
   if(NOT A_TEST_NAME)
     string(REGEX REPLACE "^([^_]+)_" "\\1." A_TEST_NAME "${name}")   # qtmodel_dispatcher -> qtmodel.dispatcher
@@ -228,12 +232,27 @@ function(esses_add_qt_test name)
                                           "ESSES_TEST_REPO_ROOT=\"${CMAKE_SOURCE_DIR}\"")
   esses_apply_warnings(${t})
   set_target_properties(${t} PROPERTIES AUTOMOC ON FOLDER "tests" ESSES_DEPS "${A_DEPS}")
-  add_test(NAME ${A_TEST_NAME} COMMAND ${t})
+  esses_add_qt_test_entry(${name} TEST_NAME ${A_TEST_NAME} ARGS ${A_ARGS} LABELS ${A_LABELS} TIMEOUT ${A_TIMEOUT})
+  _esses_register(${t} test "")
+endfunction()
+
+# esses_add_qt_test_entry(<name> TEST_NAME <ctest name> [ARGS <arg>...] [LABELS ...] [TIMEOUT <s>])
+# One ctest entry (labels qt and LABELS; default TIMEOUT 300) of the Qt Test executable ${ESSES_PREFIX}_<name> that
+# esses_add_qt_test made, run with ARGS in the Qt test environment. M4: the soak's own function and the soak guard's
+# tests are two entries of one executable (tests/soak, D-216 (b)).
+function(esses_add_qt_test_entry name)
+  if(NOT ESSES_BUILD_TESTS OR NOT ESSES_BUILD_QT)
+    return()
+  endif()
+  cmake_parse_arguments(A "" "TIMEOUT;TEST_NAME" "ARGS;LABELS" ${ARGN})
+  if(NOT A_TIMEOUT)
+    set(A_TIMEOUT 300)
+  endif()
+  add_test(NAME ${A_TEST_NAME} COMMAND ${ESSES_PREFIX}_${name} ${A_ARGS})
   set_tests_properties(${A_TEST_NAME} PROPERTIES
                        ENVIRONMENT "${ESSES_QT_TEST_ENVIRONMENT}"
                        ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>"
                        LABELS "qt;${A_LABELS}" TIMEOUT ${A_TIMEOUT})
-  _esses_register(${t} test "")
 endfunction()
 
 # esses_add_qt_test_dir(<prefix> DIR <dir> DEPS ... [LABELS ...] [TIMEOUT <s>])

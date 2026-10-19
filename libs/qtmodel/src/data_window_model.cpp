@@ -200,9 +200,17 @@ QVariant DataWindowModel::data(const QModelIndex& index, int role) const {
         if (role == Qt::DisplayRole && index.column() == NameCol) {
             return n->label;
         }
+        if (role == StaleRole) {
+            return isStale(n->src); // M4 reload: the badge (06 section 6 item 1)
+        }
         if (role == Qt::ToolTipRole) {
-            return QString::fromStdWString(src->prov.path.wstring()) + QStringLiteral(" (") +
-                   QString::fromStdString(src->prov.importerId) + QLatin1Char(')');
+            QString tip = QString::fromStdWString(src->prov.path.wstring()) + QStringLiteral(" (") +
+                          QString::fromStdString(src->prov.importerId) + QLatin1Char(')');
+            if (isStale(n->src)) {
+                tip +=
+                    QLatin1Char('\n') + tr("Changed on disk since it was opened: Reload File opens it again");
+            }
+            return tip;
         }
         return {};
     }

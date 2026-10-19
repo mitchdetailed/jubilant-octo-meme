@@ -3,7 +3,9 @@
 //
 // SourceLoader (ARCHITECTURE_OUTLINE section 2.1, 01 section 4.1, 05 section 2; AC-M1-01/AC-M1-10): the open
 // pipeline on the TaskPool, publication on the GUI thread, built-in maths registration, the summary pass and
-// the phase-2 range annotations.
+// the phase-2 range annotations. M4 followups (D-210 (b), (d)): the summary pass announces its end
+// (summariesReady), and the Track Sections pass is keyed by the identity of the source's bound track map and
+// runs again when a Venue detail edit binds another one.
 
 #include "range_lookup.hpp"
 
@@ -105,6 +107,68 @@ std::string lapIndexesDigest(const std::map<model::RangeId, analysis::LapIndex>&
     return h.digest().hex();
 }
 
+// The value columns of every logged channel of a source, in layer and channel order: what the summary pass
+// streams.
+std::vector<store::Column> loggedColumns(const model::DataSource& source) {
+    std::vector<store::Column> columns;
+    for (const model::DataLayer& layer : source.layers) {
+        for (const model::Channel& c : layer.channels) {
+            if (c.desc.source == model::ChannelSource::Logged) {
+                columns.push_back(store::seriesValues(c.series));
+            }
+        }
+    }
+    return columns;
+}
+
+// One summary/<sourceId>/<first column id> task (02 section 3.2 rule 10): every logged channel's
+// SummaryPyramid, streamed without inserting chunks into the cache. When it has run, summariesReady(id) (M3
+// item 18, D-210 (b)), posted, so never before sourcePublished, and only while the source is open with the
+// columns it summarised. The column id (process-unique) keeps a file closed and opened again (the same
+// SourceId, new columns) from joining the closed source's pass, which a close cancels (summary/ keys are
+// shared); close() and the destructor still cancel every pass of the source by the summary/<sourceId>
+// prefix.
+void runSummaryPass(TaskPool& pool, Dispatcher& dispatcher, const QPointer<SourceLoader>& guard,
+                    const model::SourceId& id, const std::vector<store::Column>& columns) {
+    Dispatcher* d = &dispatcher; // runtime-owned (01 section 5.3 rule 11)
+    if (columns.empty()) {
+        d->post(d, [guard, id] {
+            if (SourceLoader* self = guard.data(); self != nullptr && self->source(id) != nullptr) {
+                Q_EMIT self->summariesReady(id);
+            }
+        });
+        return;
+    }
+    const TaskKey key{"summary/" + detail::sourceHex(id) + "/" + std::to_string(columns.front().id())};
+    Future<void> done = pool.submit(Priority::Background, key, CancelToken{},
+                                    [columns](const CancelToken& cancel) -> Result<void> {
+                                        for (const store::Column& c : columns) {
+                                            if (cancel.checkpoint()) {
+                                                return fail(ErrorCode::Cancelled, "summary cancelled");
+                                            }
+                                            if (c.valid()) {
+                                                static_cast<void>(c.buildSummary(cancel));
+                                            }
+                                        }
+                                        return ok();
+                                    });
+    done.onReady([d, guard, id, columns](const Result<void>& result) {
+        if (!result) {
+            return; // cancelled: the source closed (or the loader went)
+        }
+        d->post(d, [guard, id, columns] {
+            SourceLoader* self = guard.data();
+            if (self == nullptr) {
+                return;
+            }
+            const std::shared_ptr<const model::DataSource> current = self->source(id);
+            if (current != nullptr && loggedColumns(*current) == columns) {
+                Q_EMIT self->summariesReady(id);
+            }
+        });
+    });
+}
+
 } // namespace
 
 // The generation of the sidecar document on disk, per source. A write takes the mutex and writes only a newer
@@ -147,8 +211,8 @@ SourceLoader::~SourceLoader() {
     // The edits not on disk yet are written now (exit: a queued write may be cancelled by the pool's
     // shutdown), and the opens in flight are cancelled.
     while (!sidecarsDue_.empty() || !sidecarsInFlight_.empty()) {
-        flushSidecar(!sidecarsDue_.empty() ? sidecarsDue_.begin()->first : sidecarsInFlight_.begin()->first,
-                     false);
+        static_cast<void>(flushSidecar(
+            !sidecarsDue_.empty() ? sidecarsDue_.begin()->first : sidecarsInFlight_.begin()->first, false));
     }
     for (auto& [id, inFlight] : opens_) {
         inFlight.cancel.cancel();
@@ -191,10 +255,9 @@ void SourceLoader::setTrackMaps(TrackMapService* maps) {
     trackMaps_ = maps;
     ++trackGeneration_;
     if (trackMaps_ != nullptr) {
-        connect(trackMaps_, &TrackMapService::mapChanged, this, [this](const QString& venue) {
-            ++trackGeneration_;
-            restartPhase2(venue.toStdString());
-        });
+        // The bound map's stamp is part of the phase-2 key (D-210 (d)): only the venue's sources run again.
+        connect(trackMaps_, &TrackMapService::mapChanged, this,
+                [this](const QString& venue) { restartPhase2(venue.toStdString()); });
         connect(trackMaps_, &QObject::destroyed, this, [this] { trackMaps_ = nullptr; });
     }
     restartPhase2(std::nullopt);
@@ -337,6 +400,7 @@ void SourceLoader::cancelOpens() {
                       "the open waiting for the Mapping panel was cancelled (the project changed "
                       "or the files were closed)")});
     }
+    budgetDropPending(); // M4 hook (D-206): the opens waiting at the budget gate go too
 }
 
 void SourceLoader::published(const std::filesystem::path& path,
@@ -346,12 +410,18 @@ void SourceLoader::published(const std::filesystem::path& path,
         Q_EMIT openFailed(toQString(path), tr("the importer returned no source"));
         return;
     }
-    if (this->source(source->id) != nullptr) {
-        // A second open of the same file (06 section 19 item 6): it is already in the Data window.
+    if (this->source(source->id) != nullptr && !reloadSameContent(path, source->id)) {
+        // A second open of the same file (06 section 19 item 6): it is already in the Data window. (The
+        // reopen of a stale source with the same content replaced it instead: M4 reload, D-217.)
         formats::ImportLogEntry note;
         note.code = "open.already_open";
         note.message = "the file is already open";
         Q_EMIT importLog(toQString(path), {note});
+        return;
+    }
+    // M4 hook (D-206): an open above the memory budget waits here, before anything decodes a chunk of it or
+    // registers its maths; the budget package publishes it again through published() on Continue.
+    if (budgetHolds(path, source, log)) {
         return;
     }
     open_.push_back(source);
@@ -369,30 +439,13 @@ void SourceLoader::published(const std::filesystem::path& path,
     }
     Q_EMIT importLog(toQString(path), log);
 
-    // One summary/<sourceId> task (02 section 3.2 rule 10): every logged channel's SummaryPyramid, streamed
-    // without inserting chunks into the cache.
-    std::vector<store::Column> columns;
-    for (const model::DataLayer& layer : source->layers) {
-        for (const model::Channel& c : layer.channels) {
-            if (c.desc.source == model::ChannelSource::Logged) {
-                columns.push_back(store::seriesValues(c.series));
-            }
-        }
+    // The summary pass, announced by summariesReady when it has run (M3 item 18, D-210 (b)); not for a source
+    // a listener of sourcePublished closed again.
+    if (const std::shared_ptr<const model::DataSource> current = this->source(source->id)) {
+        runSummaryPass(pool_, dispatcher_, QPointer<SourceLoader>(this), current->id,
+                       loggedColumns(*current));
     }
-    if (!columns.empty()) {
-        pool_.submit(Priority::Background, TaskKey{"summary/" + detail::sourceHex(source->id)}, CancelToken{},
-                     [columns = std::move(columns)](const CancelToken& cancel) -> Result<void> {
-                         for (const store::Column& c : columns) {
-                             if (cancel.checkpoint()) {
-                                 return fail(ErrorCode::Cancelled, "summary cancelled");
-                             }
-                             if (c.valid()) {
-                                 static_cast<void>(c.buildSummary(cancel));
-                             }
-                         }
-                         return ok();
-                     });
-    }
+    reloadPublished(source); // M4 hook (D-206): a reload's selection restore and the source's stamp
 }
 
 void SourceLoader::startPhase2(const model::SourceId& id, const std::string& layer) {
@@ -413,9 +466,18 @@ void SourceLoader::startPhase2(const model::SourceId& id, const std::string& lay
     // With the pass on, a source without a map runs it too: the run then removes stale Track Sections groups.
     const bool sectionsPass = trackMaps_ != nullptr && distance_ != nullptr && hasTrackSectionsRule();
     std::shared_ptr<const analysis::TrackMap> map;
+    std::uint64_t mapStamp = 0;
     auto indexes = std::make_shared<std::map<model::RangeId, analysis::LapIndex>>();
     if (sectionsPass) {
-        map = trackMaps_->mapFor(*src);
+        // The map bound by the source's Venue detail and its identity (D-210 (d)). No run starts while the
+        // venue's file is still being read on the pool (its mapChanged starts the pass), so the groups never
+        // drop to "no map" in between.
+        const std::string venue = TrackMapService::venueOf(*src);
+        map = trackMaps_->map(venue);
+        if (trackMaps_->isLoading(venue)) {
+            return;
+        }
+        mapStamp = trackMaps_->mapStamp(venue);
     }
     if (map != nullptr) {
         bool anyBeacon = false;
@@ -438,14 +500,16 @@ void SourceLoader::startPhase2(const model::SourceId& id, const std::string& lay
             }
         }
     }
-    // One run per (layer, marker set, Corr Speed version[, map generation, lap indexes]): the task key and
-    // the dedupe key are the same, so a newer Corr Speed, marker set, map or index never joins an older run.
-    // The indexes count by identity, not number (D-204): a stretch or a rebuilt index changes the key.
+    // One run per (layer, marker set, Corr Speed version[, bound map, lap indexes]): the task key and the
+    // dedupe key are the same, so a newer Corr Speed, marker set, map or index never joins an older run.
+    // The indexes count by identity, not number (D-204): a stretch or a rebuilt index changes the key. The
+    // map counts by identity too (D-210 (d)): the service (setTrackMaps' generation) and the stamp of the map
+    // the source's venue binds now, so another venue's map, an edited or reloaded map changes the key.
     const std::string prefix = phase2Prefix(id, canonical);
     std::string key = prefix + markers + "/" + speed->version.hex();
     if (sectionsPass) {
-        key += "/t" + std::to_string(trackGeneration_) + "/i" + std::to_string(indexes->size()) + "-" +
-               lapIndexesDigest(*indexes);
+        key += "/t" + std::to_string(trackGeneration_) + "-" + std::to_string(mapStamp) + "/i" +
+               std::to_string(indexes->size()) + "-" + lapIndexesDigest(*indexes);
     }
     // Deduplicated against the layer's latest run only: other inputs supersede it, and inputs that come back
     // to an earlier run's (a stretch cleared again) run again, because a newer run has published in between.
@@ -618,6 +682,13 @@ SourceLoader::commitSidecar(std::shared_ptr<const model::DataSource> current, mo
         }
     }
     publishReplacement(next);
+    // M3 item 31 (D-210 (d)): a Venue detail edit binds another track map, so the Track Sections pass runs
+    // again (the bound map's identity is in its key; phase 1 kept the previous venue's groups).
+    if (trackMaps_ != nullptr && TrackMapService::venueOf(*current) != TrackMapService::venueOf(*next)) {
+        for (const model::DataLayer& l : next->layers) {
+            startPhase2(next->id, l.name);
+        }
+    }
     if (!report.notes.empty()) {
         std::vector<formats::ImportLogEntry> notes;
         for (const model::ModelNote& n : report.notes) {
@@ -681,7 +752,7 @@ void SourceLoader::writeDueSidecars() {
     }
 }
 
-void SourceLoader::flushSidecar(const model::SourceId& source, bool report) {
+bool SourceLoader::flushSidecar(const model::SourceId& source, bool report, bool keepOnFailure) {
     // The newest document of the source: the one due, else the one whose Background write may not have run.
     std::optional<SidecarDue> latest;
     if (const auto it = sidecarsDue_.find(source); it != sidecarsDue_.end()) {
@@ -695,17 +766,21 @@ void SourceLoader::flushSidecar(const model::SourceId& source, bool report) {
         sidecarsInFlight_.erase(it);
     }
     if (!latest) {
-        return;
+        return true;
     }
     const SidecarDue& due = *latest;
     const std::shared_ptr<SidecarSlot> slot = slotFor(source);
     // On this thread: a Background write of an older document in flight finishes first (the slot's mutex).
-    if (Result<void> r = writeSidecarFile(slot->m, slot->written, due.doc, due.path, due.generation);
-        !r && report) {
+    Result<void> r = writeSidecarFile(slot->m, slot->written, due.doc, due.path, due.generation);
+    if (!r && report) {
         Q_EMIT importLog(toQString(due.path),
                          {logEntry(formats::ImportLogEntry::Level::Warning, "sidecar.write_failed",
                                    "the sidecar could not be written: " + r.error().toString())});
     }
+    if (!r && keepOnFailure) {
+        sidecarsDue_.insert_or_assign(source, std::move(*latest)); // a later flush writes it (D-217)
+    }
+    return r.ok();
 }
 
 void SourceLoader::close(const model::SourceId& id) {
@@ -713,7 +788,7 @@ void SourceLoader::close(const model::SourceId& id) {
     if (it == open_.end()) {
         return;
     }
-    flushSidecar(id, true); // the edits not on disk yet, before the source goes (D-190)
+    static_cast<void>(flushSidecar(id, true)); // the edits not on disk yet, before the source goes (D-190)
     open_.erase(it);
     const std::string hex = detail::sourceHex(id);
     pool_.cancelAll("chunk/" + hex);
@@ -730,7 +805,11 @@ void SourceLoader::close(const model::SourceId& id) {
     if (maths_ != nullptr) {
         maths_->removeSource(id);
     }
-    registry_->release(id);
+    if (!keepDecodeLogOnClose_) { // a reopen with the same content id registered its own (D-217)
+        registry_->release(id);
+    }
+    budgetForget(id); // M4 hooks (D-206)
+    reloadForget(id);
     Q_EMIT sourceClosed(id);
 }
 

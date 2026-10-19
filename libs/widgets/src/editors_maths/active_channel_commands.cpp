@@ -11,6 +11,7 @@
 #include <esses/model/layer.hpp>
 #include <esses/model/source.hpp>
 #include <esses/plotcore/change_mask.hpp>
+#include <esses/plotcore/display_units.hpp>
 #include <esses/plotcore/time_distance_builder.hpp>
 #include <esses/project/channel_overrides.hpp>
 #include <esses/qtmodel/command_registry.hpp>
@@ -587,7 +588,8 @@ int channelDps(const qt::ProjectSession& session, const qt::MathsService& maths,
     return 2;
 }
 
-// The display unit the channel is shown in by the component (its trace's), else the stored unit's symbol.
+// The display unit the channel is shown in by the component (its trace's), else its default display unit's
+// symbol (the stored unit; "%" for a fraction stored in "ratio", D-211 (a)): the unit the shown value is in.
 QString displayUnitOf(const qt::MathsService& maths, const model::DataSource& src, const std::string& layer,
                       const qt::ChannelRequest& request) {
     if (!request.displayUnit.empty()) {
@@ -602,8 +604,9 @@ QString displayUnitOf(const qt::MathsService& maths, const model::DataSource& sr
             unit = c->desc.unit;
         }
     }
-    return reg != nullptr && unit != units::kNoUnit && reg->contains(unit) ? qs(reg->unit(unit).symbol)
-                                                                           : QString();
+    return reg != nullptr && unit != units::kNoUnit && reg->contains(unit)
+               ? qs(reg->unit(plot::defaultDisplayUnit(*reg, unit)).symbol)
+               : QString();
 }
 
 } // namespace

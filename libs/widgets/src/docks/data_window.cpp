@@ -4,6 +4,7 @@
 #include <esses/qtmodel/command_registry.hpp>
 #include <esses/qtmodel/data_selection_model.hpp>
 #include <esses/qtmodel/data_window_model.hpp>
+#include <esses/qtmodel/source_reload.hpp>
 #include <esses/widgets/docks/data_window.hpp>
 #include <esses/widgets/shell/command_actions.hpp>
 
@@ -25,6 +26,8 @@
 #include <QPushButton>
 #include <QTreeView>
 #include <QVBoxLayout>
+#include <cmath>
+#include <functional>
 #include <memory>
 #include <utility>
 
@@ -33,26 +36,69 @@ namespace esses::widgets {
 namespace {
 
 constexpr int kMainSlot = 100; // DataWindowModel::SlotRole value of the Main range
+constexpr const char* kReloadCommand = "file.reload_source"; // qt::kReloadSourceCommand (06 section 14.4)
 
 QColor toColor(project::Rgba c) {
     return QColor(project::red(c), project::green(c), project::blue(c), project::alpha(c));
 }
 
-// The filter icon of 06 section 6 (a funnel in the text colour), drawn once.
-QIcon filterIcon() {
-    static const QIcon icon = [] {
-        QPixmap pm(12, 12);
+// An icon of `logical` px drawn by `paint` (in logical coordinates) once per device pixel ratio a monitor may
+// have, so a HiDPI screen gets a pixmap drawn at its own resolution, never one scaled up (06 section 17,
+// D-217).
+QIcon drawnIcon(QSize logical, const std::function<void(QPainter&)>& paint) {
+    QIcon icon;
+    for (const qreal dpr : {1.0, 1.25, 1.5, 2.0, 3.0}) {
+        QPixmap pm(QSize(static_cast<int>(std::lround(logical.width() * dpr)),
+                         static_cast<int>(std::lround(logical.height() * dpr))));
+        pm.setDevicePixelRatio(dpr);
         pm.fill(Qt::transparent);
         QPainter p(&pm);
         p.setRenderHint(QPainter::Antialiasing);
-        p.setPen(Qt::NoPen);
-        p.setBrush(QApplication::palette().color(QPalette::Text));
-        const QPolygonF funnel({QPointF(1.0, 1.5), QPointF(11.0, 1.5), QPointF(7.0, 6.0), QPointF(7.0, 11.0),
-                                QPointF(5.0, 10.0), QPointF(5.0, 6.0)});
-        p.drawPolygon(funnel);
+        paint(p);
         p.end();
-        return QIcon(pm);
-    }();
+        icon.addPixmap(pm);
+    }
+    return icon;
+}
+
+void paintStale(QPainter& p) {
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(0xE0, 0xA0, 0x00));
+    p.drawEllipse(QRectF(0.5, 0.5, 11.0, 11.0));
+    p.setBrush(QColor(0x20, 0x20, 0x20));
+    p.drawRect(QRectF(5.0, 2.5, 2.0, 5.0));
+    p.drawRect(QRectF(5.0, 8.5, 2.0, 1.5));
+}
+
+void paintFilter(QPainter& p) {
+    p.setPen(Qt::NoPen);
+    p.setBrush(QApplication::palette().color(QPalette::Text));
+    const QPolygonF funnel({QPointF(1.0, 1.5), QPointF(11.0, 1.5), QPointF(7.0, 6.0), QPointF(7.0, 11.0),
+                            QPointF(5.0, 10.0), QPointF(5.0, 6.0)});
+    p.drawPolygon(funnel);
+}
+
+// The stale badge of 06 section 6 item 1 (M4 reload): an amber disc with an exclamation mark, so that the
+// shape, not the colour alone, carries it (06 section 20 item 4; the tool tip says what it means). Drawn
+// once.
+QIcon staleIcon() {
+    static const QIcon icon = drawnIcon(QSize(12, 12), paintStale);
+    return icon;
+}
+
+// The filter icon of 06 section 6 (a funnel in the text colour), drawn once.
+QIcon filterIcon() {
+    static const QIcon icon = drawnIcon(QSize(12, 12), paintFilter);
+    return icon;
+}
+
+// A stale source that is also filtered: the badge, then the funnel. Drawn once, not on every repaint (D-217).
+QIcon staleAndFilterIcon() {
+    static const QIcon icon = drawnIcon(QSize(26, 12), [](QPainter& p) {
+        paintStale(p);
+        p.translate(14.0, 0.0);
+        paintFilter(p);
+    });
     return icon;
 }
 
@@ -99,6 +145,12 @@ public:
 
     QVariant data(const QModelIndex& index, int role) const override {
         using M = qt::DataWindowModel;
+        // M4 reload: a stale source row carries the badge, before the filter icon when it has both; the stale
+        // line of its tool tip is the model's.
+        if (index.column() == M::NameCol && role == Qt::DecorationRole && !index.parent().isValid() &&
+            QIdentityProxyModel::data(index, M::StaleRole).toBool()) {
+            return sourceFilter(index) ? staleAndFilterIcon() : staleIcon();
+        }
         if (index.column() == M::NameCol && (role == Qt::DecorationRole || role == Qt::ToolTipRole)) {
             // Filters (06 section 5.4): a row kept only by its slot, and a filtered source, carry the icon.
             if (QIdentityProxyModel::data(index, M::FilteredInRole).toBool()) {
@@ -441,6 +493,17 @@ std::unique_ptr<QMenu> DataWindow::contextMenu(const QModelIndex& index) {
     }
     if (tools) {
         menu->addSeparator();
+    }
+    // Reload File (06 section 6; M4 reload): file.reload_source on this row's source, enabled when it is
+    // stale.
+    if (const auto src = highlightedSource();
+        src && commands_.find(QString::fromLatin1(kReloadCommand)) != nullptr) {
+        QAction* reload = menu->addAction(tr("Reload File"));
+        reload->setObjectName(QStringLiteral("dataReloadFile"));
+        reload->setEnabled(model_->isStale(*src));
+        connect(reload, &QAction::triggered, this, [this, arg = qt::sourceIdArgument(*src)] {
+            static_cast<void>(commands_.invoke(QString::fromLatin1(kReloadCommand), {arg}));
+        });
     }
     if (QAction* a = shared("data.close_file")) {
         menu->addAction(a);

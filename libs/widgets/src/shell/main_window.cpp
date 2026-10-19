@@ -31,6 +31,7 @@
 #include <esses/widgets/shell/layout_file.hpp>
 #include <esses/widgets/shell/main_window.hpp>
 #include <esses/widgets/shell/recovery_dialog.hpp>
+#include <esses/widgets/shell/shell_extension.hpp>
 #include <esses/widgets/shell/worksheet_canvas.hpp>
 
 #include <QAction>
@@ -38,6 +39,7 @@
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QDialog>
+#include <QDockWidget>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QFileDialog>
@@ -209,6 +211,7 @@ MainWindow::MainWindow(qt::AppRuntime& runtime, Paths paths, QWidget* parent)
                  .arg(QString::fromStdString(r.error().toString())));
     }
     wireModels();
+    createM4Extensions(); // M4 (D-206): the packages' shell extensions, called at the points below
     buildWidgets();
     registerShellCommands();
     qt::registerSelectionCommands(*d.commands, *d.selection);
@@ -230,6 +233,7 @@ MainWindow::MainWindow(qt::AppRuntime& runtime, Paths paths, QWidget* parent)
     qt::registerLapStretchCommand(*d.commands, *d.stretch);
     registerEditorCommands();
     registerM3Commands(); // M3: replaces file.open_log and registers the M3 rows (main_window_m3.cpp)
+    forEachM4Extension([](ShellExtension& e) { e.registerCommands(); }); // M4: before the planned rows
     registerPlannedCommands();
     const QStringList rejected = d.keymap->setKeymap(d.session->keymap());
     // Keys a component handles itself follow the user's keymap (D-203 (o)).
@@ -254,6 +258,7 @@ MainWindow::MainWindow(qt::AppRuntime& runtime, Paths paths, QWidget* parent)
     }
     d.actions->populateMenuBar(*menuBar(), order, withArgs);
     buildM3Menus(); // Data > Animation Rate (M3)
+    forEachM4Extension([](ShellExtension& e) { e.buildMenus(); });
     // The Main toolbar (06 section 2.1): open, save | time/distance, overlays, single colour, lap stretch |
     // the scheme selector (when Options > Colours shows it) | undo, redo.
     d.actions->populateToolBar(
@@ -309,10 +314,12 @@ MainWindow::MainWindow(qt::AppRuntime& runtime, Paths paths, QWidget* parent)
     // The worksheet has the keyboard when the window comes up (not whichever dock the dock manager touched
     // last while the docks were placed).
     d.canvas->setFocus(Qt::OtherFocusReason);
+    forEachM4Extension([](ShellExtension& e) { e.windowReady(); });
 }
 
 MainWindow::~MainWindow() {
     Impl& d = *impl_;
+    destroyM4Extensions();                // M4 (D-206): teardown() and gone before any widget, dock or model
     ComponentWidget::setKeysProvider({}); // the keymap goes with the window (D-203 (o))
     if (d.saveLayoutOnExit && !d.layoutSaved) {
         saveLayout();
@@ -346,8 +353,19 @@ MainWindow::~MainWindow() {
     d.valuesWindow->setWorksheet(nullptr);
     delete d.docks;
     d.docks = nullptr;
+    // The QDockWidget frames and the tab bars of tabbed docks belong to QMainWindow's layout, which keeps raw
+    // pointers to both: deleted here, one by one while the layout lives, a tab bar older than a dock of its
+    // group (a dock floated and docked back, or dragged into another group) is gone when that dock's removal
+    // reaches it (Qt 6.12: SIGSEGV in ~QDockWidget; D-217). Only their contents reference the models and go
+    // now; the frames and the tab bars go in ~QWidget, after the layout, as in any QMainWindow.
     const QList<QWidget*> kids = findChildren<QWidget*>(Qt::FindDirectChildrenOnly);
-    qDeleteAll(kids);
+    for (QWidget* kid : kids) {
+        if (auto* dock = qobject_cast<QDockWidget*>(kid)) {
+            delete dock->widget();
+        } else if (qobject_cast<QTabBar*>(kid) == nullptr) {
+            delete kid;
+        }
+    }
     // The models emit while they are torn down (the undo stack clears itself): nothing reaches this window.
     QObject::disconnect(&d.session->undoStack(), nullptr, this, nullptr);
     QObject::disconnect(d.session.get(), nullptr, this, nullptr);
@@ -624,6 +642,7 @@ void MainWindow::buildWidgets() {
                                     on);
     });
     buildM3Widgets(d.central);
+    forEachM4Extension([&d](ShellExtension& e) { e.buildWidgets(*d.central); });
 }
 
 void MainWindow::registerShellCommands() {
@@ -1019,6 +1038,7 @@ void MainWindow::rebuildWorksheets() {
     disconnect(d.cursorInfo);
     // M3 followers of the active worksheet let go of it before its view model and context go.
     followWorksheetM3(-1);
+    forEachM4Extension([](ShellExtension& e) { e.worksheetActivated(-1); });
     d.canvas->clear();
     d.valuesWindow->setWorksheet(nullptr);
     d.contexts.clear();
@@ -1124,6 +1144,7 @@ void MainWindow::selectWorksheet(int index) {
         returnFocus();
     }
     followWorksheetM3(index);
+    forEachM4Extension([index](ShellExtension& e) { e.worksheetActivated(index); });
     d.actions->refresh();
     Q_EMIT worksheetActivated(index);
 }
@@ -1205,7 +1226,9 @@ bool MainWindow::openProject(const std::filesystem::path& folder, std::vector<st
     if (const std::filesystem::path a = std::filesystem::absolute(f, ec); !ec) {
         f = a;
     }
+    d.projectOpenCancelled = false;
     if (!confirmLeaveProject()) {
+        d.projectOpenCancelled = true;
         return false; // the open project stays
     }
     saveLayout(); // the layout of the state being left (06 section 3.4: written on project close)
@@ -1257,6 +1280,10 @@ bool MainWindow::openProject(const std::filesystem::path& folder, std::vector<st
 
 void MainWindow::setExitPrompt(std::function<ExitAnswer()> prompt) {
     impl_->exitPrompt = std::move(prompt);
+}
+
+bool MainWindow::projectOpenCancelled() const {
+    return impl_->projectOpenCancelled;
 }
 
 bool MainWindow::confirmLeaveProject() {

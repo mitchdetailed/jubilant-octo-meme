@@ -25,6 +25,14 @@
 //     straight into the layer's pixels instead of stroking them with QPainter (04 section 6.5 item 3;
 //     QPainter costs ~100 ms at DPR 1 and seconds at DPR 2 for 20 noisy M4 traces): the same picture, see
 //     src/span_raster.hpp. paintList() (Dynamic, Chrome, any painter) always uses QPainter.
+//  7. Crisp strokes at a fractional DPR (1.25, 1.5; M4 hidpi, D-209; 04 section 6.6 items 1, 4): a
+//     Polyline or Lines command of a list whose DPR is not whole, wider than 1 px and made only of horizontal
+//     and vertical segments, is drawn lround(width) device px wide (at least 1) on whole pixels: across a
+//     segment the centre c covers the W pixels from floor(c + (1 - W) / 2), along it each free end goes to
+//     the pixel edge the span rasteriser ends it at (ceil(e - 1/2)); a polyline's vertices snap both ways, so
+//     its corners stay joined (mitred on the QPainter path). Both paths (Static and paintList) draw the same
+//     pixels. Slanted strokes, dots and every list at DPR 1 or 2 are drawn as listed, and the DrawList itself
+//     is unchanged (its JSON goldens are what the builders emit).
 // Coordinates: every DrawList coordinate is a device pixel of a layer of list.dpr; paintList maps them onto
 // the painter's logical coordinate system (scale 1 / list.dpr), so the same call paints a DPR-tagged QImage
 // and a widget of that DPR 1:1 in device pixels.

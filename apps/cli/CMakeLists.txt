@@ -16,6 +16,7 @@ esses_add_library(cli_core LAYER 3 QT_FREE
     src/fixture.cpp
     src/maths_cli.cpp
     src/export.cpp
+    src/convert.cpp
   DEPS
     esses::base
     esses::units
@@ -59,6 +60,7 @@ if(ESSES_BUILD_TESTS)
   # Windows argument quoting, schema ids) and of the commands on synthetic files.
   esses_add_test(cli_tests QT_FREE TIMEOUT 300
     SOURCES tests/cli_tests.cpp tests/document_roundtrip_tests.cpp tests/validate_tests.cpp tests/maths_cli_tests.cpp
+            tests/convert_tests.cpp
     DEPS esses::cli_core esses::formats esses::project esses::maths esses::nlohmann_json)
   if(TARGET ${ESSES_PREFIX}_cli_tests)
     target_compile_definitions(${ESSES_PREFIX}_cli_tests PRIVATE "ESSES_TEST_REPO_ROOT=\"${CMAKE_SOURCE_DIR}\"")
@@ -151,6 +153,26 @@ if(ESSES_BUILD_TESTS)
              WORKING_DIRECTORY "${CMAKE_BINARY_DIR}")
     set_tests_properties(cli.maths_corpus_check.relative_cli PROPERTIES LABELS "cli" TIMEOUT 120
                          PASS_REGULAR_EXPRESSION "5 items \\(5 enabled\\).*PASS")
+  endif()
+  # M4 (07 section 2.2 item 11, AC-M4-01; D-214): one golden-JSON test per esses-cli subcommand (info, channels,
+  # laps, eval, convert, export, validate, fixture), run by tests/cli_golden.py against expectations that do
+  # not come from the code under test: the fixtures' committed expectations, tools/ld_ref_decode.py, the
+  # schema examples' layout and expect.json. convert includes the .ld -> motec.ld -> read back round trip.
+  # bench is the benchmark executables' (D-155: ctest -L bench).
+  if(Python3_Interpreter_FOUND)
+    foreach(_cmd info channels laps eval convert export validate fixture)
+      add_test(NAME cli.golden.${_cmd}
+               COMMAND "${Python3_EXECUTABLE}" -I "${CMAKE_CURRENT_SOURCE_DIR}/tests/cli_golden.py" ${_cmd}
+                       --cli ${_cli} --root "${CMAKE_SOURCE_DIR}"
+                       --inputs "${CMAKE_BINARY_DIR}/fixture-inputs/motec.ld"
+                       --work "${CMAKE_CURRENT_BINARY_DIR}/golden-${_cmd}" --python "${Python3_EXECUTABLE}")
+      if(_cmd STREQUAL "validate")
+        set_tests_properties(cli.golden.${_cmd} PROPERTIES LABELS "cli" TIMEOUT 600)
+      else()
+        set_tests_properties(cli.golden.${_cmd} PROPERTIES FIXTURES_REQUIRED esses_fixture_inputs
+                             LABELS "cli;fixtures" TIMEOUT 600)
+      endif()
+    endforeach()
   endif()
   # fixture diff (05 section 9.2) explains an altered copy of a committed CSV fixture.
   add_test(NAME cli.fixture_diff.explains

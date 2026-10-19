@@ -20,6 +20,19 @@
 //                       variance.show off and on, alternately, 10 pairs per run; the row is the median of
 //                       the per-pair differences (on - off), and a build that makes any VarianceTable fails
 //                       the row. Limit 1 ms (timing noise).
+//   plot.relayout_resize_20tr  (M4, 07 section 12 "Full relayout / resize <= 50 ms, coalesced to 30 Hz";
+//   D-217)
+//                       the graph's window resized alternately to 3,000 x 800 and back to its 4,200 x 1,000
+//                       (12 steps a run): resize() -> the size change on the 30 Hz coalescer's leading edge
+//                       (each step starts once the previous step's throttle has run out) -> the full relayout
+//                       and Static build on the pool -> delivered and rasterised -> a synchronous repaint.
+//                       Limit 50 ms.
+//   values.refresh_250ch  (M4, 07 section 12 "Values window refresh, 250 channels <= 2 ms"; D-217) the Values
+//                       window (ValuesWindow over qt::ValuesModel, "All channels" of a 250-channel log, Main
+//                       a lap) at 600 x 900 logical px: 60 cursor moves, each WorksheetViewModel::setCursor
+//                       -> the model's refresh of the visible rows -> dataChanged -> a synchronous repaint of
+//                       the table. Limit 2 ms. Its log (250 channels at 1 kHz, 60 s, 30 s laps) is written
+//                       beside the other on first use.
 // Each row is the median over --runs runs (default 5, D-042) of the per-run median; the reference machine is
 // the developer's (bench/workloads.md). Prints one line per row and writes --json; --gate makes a row over
 // its limit exit 1. --smoke: a 2 min file and 1 run (ctest bench.plot_bench.smoke checks the harness, not the
@@ -31,10 +44,12 @@
 #include <esses/base/taskpool.hpp>
 #include <esses/base/thread_role.hpp>
 #include <esses/plotcore/time_distance_builder.hpp>
+#include <esses/qtmodel/values_model.hpp>
 #include <esses/qtrender/image_diff.hpp>
 #include <esses/qtrender/layer_cache.hpp>
 #include <esses/qtrender/raster_backend.hpp>
 #include <esses/qtrender/scheme_fonts.hpp>
+#include <esses/widgets/docks/values_window.hpp>
 
 #include <QApplication>
 #include <QCommandLineParser>
@@ -46,8 +61,10 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSysInfo>
+#include <QTableView>
 #include <QTextStream>
 #include <QThread>
+#include <QWindow>
 #include <cmath>
 #include <functional>
 #include <utility>
@@ -65,6 +82,11 @@ constexpr double kAnimationRate = 10.0;     // the bench rate of AC-M3-10 (a Dat
 constexpr Micros kAnimationTickUs = 33'333; // WorksheetViewModel's 30 Hz tick
 constexpr double kVarianceLimitMs = 1.0;    // AC-M3-05: "F3 costs 0 ms" without an overlay, within noise
 constexpr int kVariancePairs = 10;
+constexpr double kRelayoutLimitMs = 50.0; // 07 section 12: full relayout / resize
+constexpr int kRelayoutSteps = 12;
+constexpr double kValuesLimitMs = 2.0; // 07 section 12: Values window refresh, 250 channels
+constexpr int kValuesChannels = 250;
+constexpr int kValuesMoves = 60;
 
 double msSince(const QElapsedTimer& t) {
     return static_cast<double>(t.nsecsElapsed()) / 1e6;
@@ -119,9 +141,12 @@ int main(int argc, char** argv) {
     const QCommandLineOption stagesOpt(
         QStringLiteral("stages"), QStringLiteral("Also time the stages of a Static rebuild (04 section 6.4: "
                                                  "build = decimate + layout on the pool, raster_static)."));
-    parser.addOptions({runsOpt, fileOpt, jsonOpt, widthOpt, gateOpt, smokeOpt, stagesOpt});
+    const QCommandLineOption valuesOnlyOpt(QStringLiteral("values-only"),
+                                           QStringLiteral("Only values.refresh_250ch (with its phases)."));
+    parser.addOptions({runsOpt, fileOpt, jsonOpt, widthOpt, gateOpt, smokeOpt, stagesOpt, valuesOnlyOpt});
     parser.process(app);
     const bool smoke = parser.isSet(smokeOpt);
+    const bool valuesOnly = parser.isSet(valuesOnlyOpt);
     const int runs = smoke ? 1 : std::max(1, parser.value(runsOpt).toInt());
     const int traceWidth = std::max(200, parser.value(widthOpt).toInt());
     constexpr int kTraces = 20;
@@ -147,12 +172,14 @@ int main(int argc, char** argv) {
     std::vector<double> animationRunMedians;
     std::vector<double> zoomRunMedians;
     std::vector<double> varianceRunMedians;
+    std::vector<double> relayoutRunMedians;
+    std::vector<double> valuesRunMedians;
     int varianceTablesBuilt = 0;
     QJsonArray runRows;
     QJsonObject phases;
     std::size_t zoomSamples = 0;
-    int achievedWidth = 0;
-    {
+    int achievedWidth = valuesOnly ? traceWidth : 0;
+    if (!valuesOnly) {
         bench::Harness h;
         const std::vector<std::string> names = channelNames(kTraces);
         std::vector<std::vector<std::string>> groups(4);
@@ -311,7 +338,30 @@ int main(int argc, char** argv) {
             ThreadRole::set(ThreadRole::NoBlock);
         };
 
+        // 07 section 12's full relayout (D-217): the window resized between the bench size and 3,000 x 800
+        // and back (an even count ends at the bench size); a step starts once the previous one's 30 Hz
+        // throttle has run out, so its size arrives on the coalescer's leading edge.
+        const QSize benchSize = g.size();
+        const auto relayoutSequence = [&](std::vector<double>& into) {
+            const QSize sizes[2] = {benchSize, QSize(3000, 800)};
+            for (int i = 0; i < kRelayoutSteps; ++i) {
+                const QSize next = sizes[(i + 1) % 2];
+                static_cast<void>(bench::spinUntil(
+                    [&] { return !g.sizeThrottleActive() && h.idle() && g.staticUpToDate(); }, kTimeoutMs));
+                QElapsedTimer t;
+                t.start();
+                h.host().resize(next);
+                g.resize(next);
+                static_cast<void>(bench::spinUntil(
+                    [&] { return g.staticUpToDate() && g.layers().staticImage().size() == g.size(); },
+                    kTimeoutMs));
+                g.repaint();
+                into.push_back(msSince(t));
+            }
+        };
+
         std::vector<double> warm;
+        relayoutSequence(warm);
         zoomSequence(warm); // warm-up: every zoom level's chunks resident
         varianceSequence(warm);
         cursorSequence(warm);
@@ -407,6 +457,15 @@ int main(int argc, char** argv) {
             varianceSequence(variance);
             const bench::Stats vs = bench::statsOf(variance);
             varianceRunMedians.push_back(vs.median);
+            std::vector<double> relayout;
+            relayoutSequence(relayout);
+            const bench::Stats rs = bench::statsOf(relayout);
+            relayoutRunMedians.push_back(rs.median);
+            out << QStringLiteral("run %1: full relayout / resize median %2 ms (p95 %3, max %4)\n")
+                       .arg(r + 1)
+                       .arg(rs.median, 0, 'f', 3)
+                       .arg(rs.p95, 0, 'f', 3)
+                       .arg(rs.max, 0, 'f', 3);
             const bench::Stats zs = bench::statsOf(zoom);
             const bench::Stats cs = bench::statsOf(cursor);
             const bench::Stats as = bench::statsOf(animation);
@@ -462,19 +521,129 @@ int main(int argc, char** argv) {
                              {QStringLiteral("repaint"), bench::toJson(pp)}};
     }
 
+    // 07 section 12's Values window refresh (D-217): a 250-channel log, the Values window with "All
+    // channels".
+    {
+        const QString valuesFile = QDir(QFileInfo(file).absolutePath())
+                                       .filePath(smoke ? QStringLiteral("plot-bench-250ch-smoke.ld")
+                                                       : QStringLiteral("plot-bench-250ch-1min.ld"));
+        if (!bench::ensureBenchFile(
+                valuesFile,
+                {QStringLiteral("--bench-channels"), QString::number(kValuesChannels),
+                 QStringLiteral("--bench-seconds"), smoke ? QStringLiteral("20") : QStringLiteral("60"),
+                 QStringLiteral("--bench-lap-seconds"), smoke ? QStringLiteral("8") : QStringLiteral("30")},
+                error)) {
+            err << "plot_bench: " << error << '\n';
+            return 2;
+        }
+        bench::Harness hv; // no graph: the row is the Values window's alone
+        hv.open(std::filesystem::path(valuesFile.toStdWString()));
+        if (!bench::spinUntil([&] { return hv.published() != nullptr || !hv.failure().isEmpty(); },
+                              kTimeoutMs) ||
+            hv.published() == nullptr) {
+            err << "plot_bench: cannot open " << valuesFile << ": " << hv.failure() << '\n';
+            return 2;
+        }
+        hv.selection().selectFastest();
+        hv.view().zoomToMainRange();
+        qt::ValuesModel model(hv.selection(), hv.maths());
+        widgets::ValuesWindow values(model);
+        values.setAllChannels(true);
+        values.setWorksheet(&hv.view());
+        values.resize(600, 900);
+        values.show();
+        if (!bench::spinUntil(
+                [&] { return values.windowHandle() != nullptr && values.windowHandle()->isExposed(); },
+                kTimeoutMs)) {
+            err << "plot_bench: the Values window was not shown\n";
+            return 2;
+        }
+        const Micros lapV = static_cast<Micros>(hv.view().state().zoom.b);
+        const auto settled = [&] {
+            for (int row = 0; row < model.rowCount(); ++row) {
+                if (model.cellText(row, qt::ValuesModel::MainCol).contains(QChar(0x2026))) {
+                    return false; // a cell still waits for its chunk
+                }
+            }
+            return hv.idle();
+        };
+        std::vector<double> modelMs;   // the phases (diagnostics): the cursor move with the model's refresh,
+        std::vector<double> paintMs;   // and the table's repaint (the visible rows computed in it),
+        std::vector<double> repaintMs; // and the same repaint again, nothing changed (the painting alone)
+        const auto valuesSequence = [&](std::vector<double>& into) {
+            for (int i = 0; i < kValuesMoves; ++i) {
+                const Micros t = lapV / 10 + (lapV * 8 / 10) * i / (kValuesMoves - 1);
+                QElapsedTimer timer;
+                timer.start();
+                hv.view().setCursor(t, qt::CursorSource::Click);
+                const double refreshed = msSince(timer);
+                values.table().viewport()->repaint();
+                const double total = msSince(timer);
+                into.push_back(total);
+                modelMs.push_back(refreshed);
+                paintMs.push_back(total - refreshed);
+                QElapsedTimer again;
+                again.start();
+                values.table().viewport()->repaint();
+                repaintMs.push_back(msSince(again));
+            }
+        };
+        std::vector<double> warmValues;
+        for (int pass = 0; pass < 3; ++pass) { // every visible row's chunks resident
+            valuesSequence(warmValues);
+            static_cast<void>(bench::spinUntil(settled, kTimeoutMs));
+        }
+        if (model.rowCount() < kValuesChannels) {
+            err << "plot_bench: the Values window lists " << model.rowCount() << " channels, not "
+                << kValuesChannels << '\n';
+            return 2;
+        }
+        modelMs.clear();
+        paintMs.clear();
+        repaintMs.clear();
+        for (int r = 0; r < runs; ++r) {
+            std::vector<double> samples;
+            valuesSequence(samples);
+            const bench::Stats s = bench::statsOf(samples);
+            valuesRunMedians.push_back(s.median);
+            out << QStringLiteral(
+                       "run %1: Values window refresh (%2 channels) median %3 ms (p95 %4, max %5)\n")
+                       .arg(r + 1)
+                       .arg(model.rowCount())
+                       .arg(s.median, 0, 'f', 3)
+                       .arg(s.p95, 0, 'f', 3)
+                       .arg(s.max, 0, 'f', 3);
+            out.flush();
+        }
+        out << QStringLiteral(
+                   "Values window phases (medians): cursor move and the model's refresh %1 ms, repaint %2 ms "
+                   "(%3 ms of it painting: the same repaint again; %4 rows on screen)\n")
+                   .arg(bench::statsOf(modelMs).median, 0, 'f', 3)
+                   .arg(bench::statsOf(paintMs).median, 0, 'f', 3)
+                   .arg(bench::statsOf(repaintMs).median, 0, 'f', 3)
+                   .arg(values.table().rowAt(values.table().viewport()->height() - 1) + 1);
+    }
+
     QJsonObject rows;
     out << QStringLiteral("plot_bench: %1 traces, trace area %2 px, DPR 1, %3 run(s), %4\n")
                .arg(kTraces)
                .arg(achievedWidth)
                .arg(runs)
                .arg(QDir::toNativeSeparators(file));
-    bench::report(rows, QStringLiteral("plot.cursor_move"), bench::statsOf(cursorRunMedians), kCursorLimitMs);
-    bench::report(rows, QStringLiteral("plot.zoom_pan_step"), bench::statsOf(zoomRunMedians),
-                  kZoomPanLimitMs);
-    bench::report(rows, QStringLiteral("plot.animation_frame_10x"), bench::statsOf(animationRunMedians),
-                  kAnimationLimitMs);
-    bench::report(rows, QStringLiteral("plot.variance_f3_no_overlay"), bench::statsOf(varianceRunMedians),
-                  kVarianceLimitMs);
+    if (!valuesOnly) {
+        bench::report(rows, QStringLiteral("plot.cursor_move"), bench::statsOf(cursorRunMedians),
+                      kCursorLimitMs);
+        bench::report(rows, QStringLiteral("plot.zoom_pan_step"), bench::statsOf(zoomRunMedians),
+                      kZoomPanLimitMs);
+        bench::report(rows, QStringLiteral("plot.animation_frame_10x"), bench::statsOf(animationRunMedians),
+                      kAnimationLimitMs);
+        bench::report(rows, QStringLiteral("plot.variance_f3_no_overlay"), bench::statsOf(varianceRunMedians),
+                      kVarianceLimitMs);
+        bench::report(rows, QStringLiteral("plot.relayout_resize_20tr"), bench::statsOf(relayoutRunMedians),
+                      kRelayoutLimitMs);
+    }
+    bench::report(rows, QStringLiteral("values.refresh_250ch"), bench::statsOf(valuesRunMedians),
+                  kValuesLimitMs);
     if (varianceTablesBuilt != 0) { // AC-M3-05: no VarianceTable without an overlay
         err << "plot_bench: " << varianceTablesBuilt << " VarianceTable(s) built without an overlay\n";
         QJsonObject row = rows.value(QStringLiteral("plot.variance_f3_no_overlay")).toObject();
@@ -485,18 +654,19 @@ int main(int argc, char** argv) {
     const QString jsonPath =
         parser.isSet(jsonOpt) ? parser.value(jsonOpt) : bench::defaultJsonPath(QStringLiteral("plot_bench"));
     if (!jsonPath.isEmpty()) {
-        const QJsonObject doc{{QStringLiteral("bench"), QStringLiteral("plot_bench")},
-                              {QStringLiteral("ac"), QStringLiteral("AC-M1-02, AC-M3-05, AC-M3-10")},
-                              {QStringLiteral("cpu"), QSysInfo::currentCpuArchitecture()},
-                              {QStringLiteral("os"), QSysInfo::prettyProductName()},
-                              {QStringLiteral("threads"), QThread::idealThreadCount()},
-                              {QStringLiteral("traces"), kTraces},
-                              {QStringLiteral("traceWidthPx"), achievedWidth},
-                              {QStringLiteral("dpr"), 1},
-                              {QStringLiteral("file"), QDir::toNativeSeparators(file)},
-                              {QStringLiteral("runs"), runRows},
-                              {QStringLiteral("zoomPanPhases"), phases},
-                              {QStringLiteral("rows"), rows}};
+        const QJsonObject doc{
+            {QStringLiteral("bench"), QStringLiteral("plot_bench")},
+            {QStringLiteral("ac"), QStringLiteral("AC-M1-02, AC-M3-05, AC-M3-10, AC-M4-05")},
+            {QStringLiteral("cpu"), QSysInfo::currentCpuArchitecture()},
+            {QStringLiteral("os"), QSysInfo::prettyProductName()},
+            {QStringLiteral("threads"), QThread::idealThreadCount()},
+            {QStringLiteral("traces"), kTraces},
+            {QStringLiteral("traceWidthPx"), achievedWidth},
+            {QStringLiteral("dpr"), 1},
+            {QStringLiteral("file"), QDir::toNativeSeparators(file)},
+            {QStringLiteral("runs"), runRows},
+            {QStringLiteral("zoomPanPhases"), phases},
+            {QStringLiteral("rows"), rows}};
         if (!bench::writeJson(jsonPath, doc, rows)) {
             err << "plot_bench: cannot write " << jsonPath << '\n';
             return 2;
@@ -505,6 +675,14 @@ int main(int argc, char** argv) {
     if (achievedWidth != traceWidth) {
         err << "plot_bench: the trace area is " << achievedWidth << " px, not " << traceWidth << '\n';
         return smoke ? 0 : 2;
+    }
+    if (valuesOnly) {
+        return parser.isSet(gateOpt) && !rows.value(QStringLiteral("values.refresh_250ch"))
+                                             .toObject()
+                                             .value(QStringLiteral("pass"))
+                                             .toBool()
+                   ? 1
+                   : 0;
     }
     const bool pass =
         rows.value(QStringLiteral("plot.cursor_move")).toObject().value(QStringLiteral("pass")).toBool() &&
@@ -516,6 +694,11 @@ int main(int argc, char** argv) {
         rows.value(QStringLiteral("plot.variance_f3_no_overlay"))
             .toObject()
             .value(QStringLiteral("pass"))
-            .toBool();
+            .toBool() &&
+        rows.value(QStringLiteral("plot.relayout_resize_20tr"))
+            .toObject()
+            .value(QStringLiteral("pass"))
+            .toBool() &&
+        rows.value(QStringLiteral("values.refresh_250ch")).toObject().value(QStringLiteral("pass")).toBool();
     return parser.isSet(gateOpt) && !pass ? 1 : 0;
 }

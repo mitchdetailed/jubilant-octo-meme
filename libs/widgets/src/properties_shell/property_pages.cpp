@@ -43,6 +43,13 @@ FieldRow sub(const char* pointer, K kind, const char* label, Make make) {
     return r;
 }
 
+// A display-unit picker (M4, D-211 (b)): the units of the quantity of the channel `channelPointer` names.
+FieldRow unitRow(const char* pointer, const char* label, const char* channelPointer) {
+    FieldRow r = leaf(pointer, K::Unit, label);
+    r.unitOf = QString::fromLatin1(channelPointer);
+    return r;
+}
+
 FieldRow unitValue(const char* pointer, const char* label) {
     return sub(pointer, K::UnitValue, label, [](QWidget* parent) { return new UnitValueEdit(parent); });
 }
@@ -196,12 +203,12 @@ Make groupsEditor(const SchemaTree* s) {
             group.push_back(std::move(r));
         }
     }
-    group.push_back(
-        sub("/traces", K::Custom, "Traces",
-            list(form({leaf("/channel", K::Channel, "Channel"), leaf("/visible", K::Bool, "Visible"),
-                       leaf("/displayUnit", K::Text, "Display unit"), leaf("/dps", K::Integer, "Decimals")},
-                      s, QStringLiteral("/groups/0/traces/0")),
-                 QJsonObject{{QStringLiteral("channel"), QString()}, {QStringLiteral("visible"), true}})));
+    group.push_back(sub(
+        "/traces", K::Custom, "Traces",
+        list(form({leaf("/channel", K::Channel, "Channel"), leaf("/visible", K::Bool, "Visible"),
+                   unitRow("/displayUnit", "Display unit", "/channel"), leaf("/dps", K::Integer, "Decimals")},
+                  s, QStringLiteral("/groups/0/traces/0")),
+             QJsonObject{{QStringLiteral("channel"), QString()}, {QStringLiteral("visible"), true}})));
     return list(form(std::move(group), s, QStringLiteral("/groups/0")),
                 QJsonObject{{QStringLiteral("name"), tr("Group")}, {QStringLiteral("traces"), QJsonArray()}});
 }
@@ -251,10 +258,11 @@ std::vector<Page> graphPages(const SchemaTree* s, bool outing) {
 std::vector<Page> scatterPages(const SchemaTree* s) {
     Page channels{
         tr("Channels"),
-        {leaf("/xChannel", K::Channel, "X channel"),
+        {leaf("/xChannel", K::Channel, "X channel"), unitRow("/xDisplayUnit", "X display unit", "/xChannel"),
          sub("/traces", K::Custom, "Y channels",
              list(form({leaf("/yChannel", K::Channel, "Y channel"), leaf("/visible", K::Bool, "Visible"),
-                        leaf("/yDelayUs", K::Integer, "Y delay (us)")},
+                        leaf("/yDelayUs", K::Integer, "Y delay (us)"),
+                        unitRow("/displayUnit", "Y display unit", "/yChannel")},
                        s, QStringLiteral("/traces/0")),
                   QJsonObject{{QStringLiteral("yChannel"), QString()}, {QStringLiteral("visible"), true}}))}};
     Page display{tr("Display"),
@@ -272,6 +280,7 @@ std::vector<Page> scatterPages(const SchemaTree* s) {
     scaleRows(display.rows, "/scales/z", "Colour");
     Page colour{tr("Colour Channel"),
                 {leaf("/colourChannel/channel", K::Channel, "Colour channel"),
+                 unitRow("/colourChannel/displayUnit", "Colour display unit", "/colourChannel/channel"),
                  sub("/colourChannel/axis", K::BandAxis, "Colour bands",
                      bandAxis(s, QStringLiteral("/colourChannel/axis")))}};
     Page data{tr("Data"),
@@ -319,7 +328,7 @@ std::vector<Page> channelReportPages(const SchemaTree* s) {
         tr("Channels"),
         {sub(
             "/report/channels", K::Custom, "Channels",
-            list(form({leaf("/name", K::Channel, "Channel"),
+            list(form({leaf("/name", K::Channel, "Channel"), unitRow("/displayUnit", "Display unit", "/name"),
                        sub("/stats", K::Custom, "Statistics",
                            scalarList(K::Enum,
                                       SchemaTree::enumValues(
@@ -335,6 +344,7 @@ std::vector<Page> channelReportPages(const SchemaTree* s) {
                  leaf("/report/options/excludeOverlays", K::Bool, "Exclude overlays"),
                  leaf("/report/options/includeUntrusted", K::Bool, "Include untrusted laps"),
                  leaf("/report/options/interpolateBoundaries", K::Bool, "Interpolate at range edges"),
+                 leaf("/report/options/ignoreInterpolated", K::Bool, "Ignore interpolated values"), // D-210
                  leaf("/report/options/probeSeconds", K::Number, "Probe (s)"),
                  leaf("/report/options/zoomLinked", K::Bool, "Follow the zoom"),
                  leaf("/deltaVsOverlay0", K::Bool, "Difference to Overlay 0"),
@@ -380,13 +390,13 @@ std::vector<Page> trackPositionPages() {
 }
 
 std::vector<Page> valuesListPages(const SchemaTree* s) {
-    Page channels{
-        tr("Channels"),
-        {sub("/channels", K::Custom, "Channels",
-             list(form({leaf("/channel", K::Channel, "Channel"),
-                        leaf("/displayUnit", K::Text, "Display unit"), leaf("/dps", K::Integer, "Decimals")},
-                       s, QStringLiteral("/channels/0")),
-                  QJsonObject{{QStringLiteral("channel"), QString()}}))}};
+    Page channels{tr("Channels"),
+                  {sub("/channels", K::Custom, "Channels",
+                       list(form({leaf("/channel", K::Channel, "Channel"),
+                                  unitRow("/displayUnit", "Display unit", "/channel"),
+                                  leaf("/dps", K::Integer, "Decimals")},
+                                 s, QStringLiteral("/channels/0")),
+                            QJsonObject{{QStringLiteral("channel"), QString()}}))}};
     Page display{
         tr("Display"),
         {leaf("/columns/datum", K::Bool, "Datum column"), leaf("/columns/delta", K::Bool, "Delta column"),
@@ -399,7 +409,8 @@ std::vector<Page> valuesListPages(const SchemaTree* s) {
 
 std::vector<Page> gaugeNumericPages(const SchemaTree* s) {
     Page channels{tr("Channels"),
-                  {leaf("/channel", K::Channel, "Channel"), leaf("/displayUnit", K::Text, "Display unit"),
+                  {leaf("/channel", K::Channel, "Channel"),
+                   unitRow("/displayUnit", "Display unit", "/channel"),
                    leaf("/displayDps", K::Integer, "Decimals")}};
     Page display{
         tr("Display"),
@@ -419,8 +430,9 @@ std::vector<Page> gaugeNumericPages(const SchemaTree* s) {
 }
 
 std::vector<Page> gaugeBarPages(const SchemaTree* s) {
-    Page channels{tr("Channels"),
-                  {leaf("/channel", K::Channel, "Channel"), leaf("/displayUnit", K::Text, "Display unit")}};
+    Page channels{
+        tr("Channels"),
+        {leaf("/channel", K::Channel, "Channel"), unitRow("/displayUnit", "Display unit", "/channel")}};
     Page display{tr("Display"), {}};
     scaleRows(display.rows, "/scale", "Bar");
     for (FieldRow r :

@@ -9,6 +9,7 @@
 #include <esses/project/schema_registry.hpp>
 #include <esses/qtmodel/data_selection_model.hpp>
 #include <esses/qtmodel/maths_service.hpp>
+#include <esses/units/unit_registry.hpp>
 #include <esses/widgets/components/component_widget.hpp>
 #include <esses/widgets/properties_shell/field_binder.hpp>
 #include <esses/widgets/properties_shell/field_editors.hpp>
@@ -126,6 +127,57 @@ QStringList channelChoices(const ComponentWidget& c) {
     for (const QString& n : names) {
         if (!n.isEmpty()) {
             out.push_back(n);
+        }
+    }
+    return out;
+}
+
+// The unit symbols a display-unit picker offers per channel name (M4, D-211 (b)): the units of the
+// channel's quantity in the first open source that has it (logged channels, then maths outputs), compat
+// units left out (06 section 13.1 item 1: transient units are not offered).
+QHash<QString, QStringList> unitChoicesByChannel(const ComponentWidget& c) {
+    QHash<QString, QStringList> out;
+    WorksheetContext& context = const_cast<ComponentWidget&>(c).context();
+    const std::shared_ptr<const units::UnitRegistry> registry = context.maths.units();
+    if (registry == nullptr) {
+        return out;
+    }
+    std::map<units::QuantityId, QStringList> byQuantity;
+    const auto unitsOf = [&](units::QuantityId q) -> const QStringList& {
+        auto it = byQuantity.find(q);
+        if (it == byQuantity.end()) {
+            QStringList symbols;
+            if (registry->containsQuantity(q)) {
+                for (const units::UnitId id : registry->unitsOf(q)) {
+                    const units::Unit& u = registry->unit(id);
+                    if (!u.isCompat() && !u.symbol.empty()) {
+                        symbols.push_back(QString::fromStdString(u.symbol));
+                    }
+                }
+            }
+            it = byQuantity.emplace(q, std::move(symbols)).first;
+        }
+        return it->second;
+    };
+    const auto add = [&](const model::ChannelDescriptor& d) {
+        const QString name = QString::fromStdString(d.name);
+        if (!name.isEmpty() && !out.contains(name)) {
+            out.insert(name, unitsOf(d.quantity));
+        }
+    };
+    for (const auto& src : context.selection.sources()) {
+        if (src == nullptr) {
+            continue;
+        }
+        if (const model::DataLayer* layer = src->layer("Normal")) {
+            for (const model::Channel& ch : layer->channels) {
+                add(ch.desc);
+            }
+        }
+        for (const maths::ChannelKey& key : context.maths.outputs(src->id, "Normal")) {
+            if (const std::optional<model::ChannelDescriptor> d = context.maths.descriptor(key)) {
+                add(*d);
+            }
         }
     }
     return out;
@@ -322,10 +374,12 @@ void PropertiesDialog::build() {
                 editor = makeLeafEditor(r.kind, r.enumValues, node, page);
             }
             editor->setObjectName(r.pointer);
+            setUnitOf(editor, r.unitOf);
             form->addRow(r.label, editor);
             binder_->bind(r.pointer, r.kind, editor, r.label,
                           r.enumValues.isEmpty() ? SchemaTree::enumValues(node) : r.enumValues);
         }
+        linkUnitPickers(page);
         if (p.title == tr("Display")) {
             auto* group = new QGroupBox(tr("Component"), page);
             group->setObjectName(QStringLiteral("header"));
@@ -333,10 +387,16 @@ void PropertiesDialog::build() {
             for (const FieldRow& r : pages::headerRows()) {
                 QWidget* editor = makeLeafEditor(r.kind, r.enumValues, {}, group);
                 editor->setObjectName(r.pointer);
-                if (r.pointer.startsWith(QLatin1String("/links/"))) {
-                    // Kept with the component; honouring them waits for M4 (D-203 (m)).
-                    editor->setToolTip(tr("Kept with the component; every component follows the worksheet's "
-                                          "zoom, cursor and datum until component links are built"));
+                // Honoured since M4 (D-211 (f)): an unlinked component keeps its own zoom, cursor or datum.
+                if (r.pointer == QLatin1String("/links/zoom")) {
+                    editor->setToolTip(tr("Off: this component keeps its own zoom, starting from the "
+                                          "worksheet's"));
+                } else if (r.pointer == QLatin1String("/links/cursor")) {
+                    editor->setToolTip(tr("Off: this component keeps its own cursor, starting from the "
+                                          "worksheet's"));
+                } else if (r.pointer == QLatin1String("/links/datum")) {
+                    editor->setToolTip(tr("Off: this component keeps its own datum, starting from the "
+                                          "worksheet's"));
                 }
                 headerForm->addRow(r.label, editor);
                 d_->header->bind(r.pointer, r.kind, editor, r.label);
@@ -355,10 +415,12 @@ void PropertiesDialog::refreshChannelChoices() {
         return;
     }
     const QStringList choices = channelChoices(component_);
+    const QHash<QString, QStringList> units = unitChoicesByChannel(component_);
     const HeadingSource& headings = headingSource();
     const QStringList headingList = headings ? headings() : QStringList();
     for (QComboBox* c : findChildren<QComboBox*>()) {
         setChannelChoices(c, choices);
+        setUnitChoices(c, units);
         if (!headingList.isEmpty()) {
             setHeadingChoices(c, headingList);
         }
@@ -481,6 +543,22 @@ bool PropertiesDialog::focusChannel(const QString& channel) {
             c->setFocus(Qt::OtherFocusReason);
             return true;
         }
+    }
+    return false;
+}
+
+bool PropertiesDialog::focusRecord(const QString& pointer, int index) {
+    for (int tab = 0; tab < d_->tabs->count(); ++tab) {
+        auto* list = d_->tabs->widget(tab)->findChild<RecordListEditor*>(pointer);
+        if (list == nullptr) {
+            continue;
+        }
+        if (index < 0 || index >= list->count()) {
+            return false;
+        }
+        d_->tabs->setCurrentIndex(tab);
+        list->setCurrentIndex(index);
+        return true;
     }
     return false;
 }

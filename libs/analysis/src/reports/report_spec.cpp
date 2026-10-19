@@ -117,6 +117,9 @@ Result<ReportSpec> ReportSpec::fromJson(const JsonDoc& report) {
                 if (const nlohmann::json* name = c.optional("name")) {
                     channel.name = asString(*name, c.child("name"));
                 }
+                if (const nlohmann::json* unit = c.optional("displayUnit")) {
+                    channel.displayUnit = asString(*unit, c.child("displayUnit"));
+                }
                 if (const nlohmann::json* stats = c.optional("stats")) {
                     const std::string statsPointer = c.child("stats");
                     if (!stats->is_array()) {
@@ -156,6 +159,9 @@ Result<ReportSpec> ReportSpec::fromJson(const JsonDoc& report) {
             if (const nlohmann::json* q = o.optional("zoomLinked")) {
                 spec.options.zoomLinked = asBool(*q, o.child("zoomLinked"));
             }
+            if (const nlohmann::json* q = o.optional("ignoreInterpolated")) {
+                spec.options.ignoreInterpolated = asBool(*q, o.child("ignoreInterpolated")); // D-210 (c)
+            }
         }
         return spec;
     });
@@ -169,17 +175,24 @@ JsonDoc ReportSpec::toJson() const {
         for (const ReportStat s : c.stats) {
             stats.push_back(std::string(reportStatName(s)));
         }
-        channelsJson.push_back(nlohmann::json{{"name", c.name}, {"stats", std::move(stats)}});
+        nlohmann::json channel{{"name", c.name}, {"stats", std::move(stats)}};
+        if (!c.displayUnit.empty()) {
+            channel["displayUnit"] = c.displayUnit; // absent = the channel's default display unit (D-211)
+        }
+        channelsJson.push_back(std::move(channel));
     }
-    const nlohmann::json j{{"scope", std::string(reportScopeName(scope))},
-                           {"headers", headers},
-                           {"channels", std::move(channelsJson)},
-                           {"options",
-                            {{"excludeOverlays", options.excludeOverlays},
-                             {"includeUntrusted", options.includeUntrusted},
-                             {"interpolateBoundaries", options.interpolateBoundaries},
-                             {"probeSeconds", options.probeSeconds},
-                             {"zoomLinked", options.zoomLinked}}}};
+    nlohmann::json j{{"scope", std::string(reportScopeName(scope))},
+                     {"headers", headers},
+                     {"channels", std::move(channelsJson)},
+                     {"options",
+                      {{"excludeOverlays", options.excludeOverlays},
+                       {"includeUntrusted", options.includeUntrusted},
+                       {"interpolateBoundaries", options.interpolateBoundaries},
+                       {"probeSeconds", options.probeSeconds},
+                       {"zoomLinked", options.zoomLinked}}}};
+    if (options.ignoreInterpolated) {
+        j["options"]["ignoreInterpolated"] = true; // absent = false: M3 bodies read and write back unchanged
+    }
     Result<JsonDoc> doc = jsonio::toDoc(j);
     return doc ? std::move(doc).value() : JsonDoc{}; // fails only on a non-finite probeSeconds
 }

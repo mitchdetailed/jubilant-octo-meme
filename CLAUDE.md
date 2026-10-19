@@ -27,8 +27,8 @@ Instructions for Claude Code in the Esses repository (D-128, D-151). The full gu
 
 ## The maintainer's machine
 
-- Windows 11, MSVC 2022 (14.44), Ninja, CMake 4.4, Qt 6.7.2 at `C:/Qt/6.7.2/msvc2019_64`, Python 3.12. The Bash
-  tool is Git Bash; the repository path contains spaces, so quote it and prefer absolute paths.
+- Windows 11, Visual Studio 2026 (MSVC 14.51), Ninja, CMake 4.4, Qt 6.7.2 at `C:/Qt/6.7.2/msvc2019_64`, Python
+  3.12. The Bash tool is Git Bash; the repository path contains spaces, so quote it and prefer absolute paths.
 - Build with the wrappers, each into its own binary directory under `build/`:
   `tools\dev\build-core.cmd ci-win-msvc-core build\<task>-core` (Qt-free, as CI) and
   `tools\dev\build-qt.cmd ci-win-msvc-qt build\<task>-qt` (with Qt, offscreen tests, as CI). Run Qt tests with

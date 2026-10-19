@@ -1,0 +1,38 @@
+// SPDX-FileCopyrightText: 2026 the Esses contributors
+// SPDX-License-Identifier: MIT
+//
+// Windows resources of esses.exe (configured by apps/app/CMakeLists.txt; D-212): the application icon, which
+// Explorer, the taskbar, the .ld association (DefaultIcon "esses.exe,0") and Qt's window class use, and the
+// version resource (the file's Details tab; FILEVERSION major.minor.patch.<commits since the tag>).
+#include <windows.h>
+
+IDI_ICON1 ICON "@ESSES_APP_ICON_ICO@"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION @ESSES_APP_RC_VERSION@
+ PRODUCTVERSION @ESSES_APP_RC_VERSION@
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0x0L
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName", "the Esses contributors"
+            VALUE "FileDescription", "Esses motorsport data analysis"
+            VALUE "FileVersion", "@ESSES_VERSION_STRING@"
+            VALUE "InternalName", "esses"
+            VALUE "LegalCopyright", "Copyright (C) 2026 the Esses contributors. MIT licence."
+            VALUE "OriginalFilename", "esses.exe"
+            VALUE "ProductName", "Esses"
+            VALUE "ProductVersion", "@ESSES_VERSION_STRING@"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

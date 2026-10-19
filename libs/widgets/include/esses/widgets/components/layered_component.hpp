@@ -101,6 +101,8 @@ protected:
     LayeredComponent(const project::ComponentSpec& spec, WorksheetContext& context, Builders builders,
                      plot::ChangeMask staticMask, QWidget* parent);
 
+    // M4 (D-211 (f)): the Main slot's mapping of the prepared inputs (an unlinked part's own view).
+    std::optional<plot::DomainMapper> mainMapper() const override;
     // Called on the prepared inputs before every build (Static, Dynamic, Chrome): a subclass's transient view
     // state that is not persisted (the scatter's own axis zoom).
     virtual void adjustInputs(plot::ComponentBuildInputs& inputs) const;

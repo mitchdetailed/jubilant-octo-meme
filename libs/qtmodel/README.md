@@ -297,3 +297,111 @@ No `M2-STUB` is left in this library.
   SidecarCommit hook (with a session one undoable `SidecarCommand` named `undoText`; `connectSourceLoader` reads
   `sidecarCommitText()`); `setTrusted` goes through it with its M2 text "Edit trust". The graph's annotation Edit /
   Remove use it.
+
+## M4 contract (07 §7.1; `docs/milestones/M4.md` §2-3; D-206)
+
+- `memory_budget.hpp` (budget package, `src/m4_budget/`): the budget setting (`kBudgetSettingKey`
+  `memory.chunkCacheBudgetBytes`, `kMinBudgetBytes`), `OpenBudgetCheck` (`exceeds()`: estimate > budget, final),
+  `PerformanceSnapshot` and `PerformanceMonitor` (final: polls `ChunkCache::stats()`, the budget and
+  `TaskPool::stats()` on a GUI timer); `budgetFromSettings`, `budgetWarningText`, `formatBytes`,
+  `performanceLine`, `performanceDetails`.
+- `SourceLoader` (`source_loader.hpp` is frozen; one marked section per package): budget
+  (`src/m4_budget/source_loader_budget.cpp`: the gate, Continue/Cancel, `budgetExceeded`, the hook `budgetHolds`
+  at the start of `published()`), reload (`src/m4_reload/source_loader_reload.cpp`: `checkChangedFiles`,
+  `isStale`, `reload`, `staleChanged`, `sourceReloaded`, the hooks at the end of `published()` and in `close()`),
+  followups (`summariesReady`, emitted from `source_loader.cpp`, which that package owns with the hook calls
+  kept). Each package keeps its state in its nested struct (`SourceLoader::M4Budget`, `M4Reload`).
+- `Message::altAction`/`altActionArgs` and `MessagesModel::AltActionRole` (final): a row's second action.
+- `DataWindowModel`: `StaleRole`, `setStaleQuery`/`isStale` (final), `refreshStale`
+  (`src/m4_reload/data_window_model_stale.cpp`).
+- Test: `tests/m4/tst_m4_contract.cpp` (`qtmodel.tst_m4_contract`); the packages' tests are in
+  `tests/m4_<package>/`. Every member above is implemented by its package (D-207, D-208, D-210; the sections below);
+  no contract stub is left (D-216).
+
+## M4 budget: the open-time warning and the Stats (AC-M4-02; D-207; 07 §7.1 row 1, 01 §7.2)
+
+- `memory_budget.hpp` (`src/m4_budget/memory_budget.cpp`): `budgetFromSettings` reads
+  `memory.chunkCacheBudgetBytes` (an integer or a double above 0, raised to `kMinBudgetBytes`, 1 GiB; nullopt
+  otherwise, so the runtime keeps its budget); `formatBytes` ("512 bytes", "1023 KB", "4.2 MB", "812 MB", "1.4 GB";
+  units of 2^10, 2^20, 2^30 bytes); `budgetWarningText` ("needs about 4.2 MB of memory once loaded, above the 2.0 MB
+  memory budget (0 bytes in use). Continue to open it anyway, or Cancel."); `performanceLine` ("Resident 412 MB of
+  4.0 GB", " (over budget)" above it) and `performanceDetails` (memory, chunks, hits and misses, evictions, the
+  pool's queues and workers); empty texts for an empty snapshot (the runtime shut down).
+- `SourceLoader`'s budget gate (`src/m4_budget/source_loader_budget.cpp`, state in `SourceLoader::M4Budget`): with
+  `setBudgetGate(&cache)`, `published()` holds an open whose `formats::estimateResident` exceeds the cache's budget
+  before it registers anything (no chunk decoded, no maths, no summary pass, no Import Log yet) and announces
+  `budgetExceeded(pendingId, check)` (the check carries the estimate, the budget and the resident bytes, reported,
+  not added). `continueOverBudget` publishes the same snapshot as the open's own publication (a second open of the
+  file published meanwhile gives `open.already_open`); `cancelOverBudget` and `cancelOpens()` drop it with an Import
+  Log row `open.budget_cancelled` (Info) and release the registry's decode log unless another open or waiting open
+  has the same source id; `close()` leaves the waiting opens of the file alone. A held open is not counted by
+  `pendingOpens()`; without a gate (the default) no open ever waits.
+- Test: `tests/m4_budget/tst_memory_budget.cpp` (`qtmodel.tst_memory_budget`): the texts and the setting by hand,
+  and the gate over a synthetic `.ld` whose 4.2 MB estimate (worked out by hand from 01 §7.1) exceeds a 2 MiB budget:
+  held with the cache never asked for a chunk, Continue, Cancel, `cancelOpens()`, two opens of one file, a close
+  while an open waits, an open within the budget and an open without a gate.
+
+## M4 followups: the loader, the track maps and the report model (D-210; `docs/milestones/M4.md` §5.1)
+
+- `TrackMapService` with a `MathsService` and a `Dispatcher` (the application's) does every file operation on
+  `MathsService::pool()` (Interactive) and none on the GUI thread (M3 item 23): `map()` on a cache miss gives
+  nullptr and reads on a worker (`isLoading`; `mapChanged` when it lands, found or not; a project change drops
+  the reads in flight); `setMap()` validates, replaces the cached map and announces it at once and queues the
+  write, one per venue file in flight with the next one held and merged (newest map, backed up if any merged
+  edit asked); a write that fails is a `logMessage` row, the venue is read back from its file, and the
+  `TrackMapCommand`s it carried become failed and obsolete (QUndoStack drops them at the next undo or redo);
+  writes still queued are made by the destructor; `venues()` answers from a scan on the pool
+  (`venuesChanged`); a generated map reaches `onGui` only once the venue's own map is known. `mapStamp(venue)`
+  identifies the cached map, `pendingIo()` counts what has not landed. Without a Dispatcher everything stays
+  synchronous (headless tools, the M3 tests). Tests: `qtmodel.tst_track_map_io`.
+- `SourceLoader`: the summary pass (`summary/<sourceId>/<first column id>`) posts `summariesReady(id)` when it
+  has run, after `sourcePublished`, only while the source is open with the columns it summarised (M3 item 18;
+  `qtmodel.tst_summaries_ready`). The phase-2 key holds the bound track map's identity
+  (`/t<setTrackMaps generation>-<mapStamp>/i...`), `mapChanged` no longer bumps a global generation, no run
+  starts while the venue's map is being read, and a sidecar edit that changes the Venue detail starts the pass
+  (M3 item 31; `qtmodel.tst_track_sections_pass` `aVenueEditRunsThePassForTheNewVenue`). The serial guard of
+  D-204 (d) has its own test, `aSupersededRunNeverPublishes` (M3 item 32).
+- `ReportModel`: a delivery or a display change that keeps the table's rows and columns is one `dataChanged`
+  over the table instead of a reset, so a view keeps its selection (M3 item 30;
+  `qtmodel.tst_report_model` `aRefreshOfTheSameShapeKeepsTheSelection`); `ReportTable` (widgets) re-measures
+  its columns on `dataChanged`.
+- `SessionRestore::check` also waits while an open is held at the memory budget warning
+  (`pendingBudgetOpens()`, D-207): Continue publishes it and Cancel announces it, and either runs the check
+  again, so the restored selection includes a file continued later (`qtmodel.tst_restore_budget`).
+- Not here: the components' rebuild on `summariesReady` (the widgets' Data path) belongs to the widgets
+  follow-ups; the frozen `source_loader.hpp` comment still names the M3 key form `/t<map generation>`.
+
+## M4 reload: changed source files and Reload (AC-M4-10; D-208; 06 §6 "Changed files")
+
+- `SourceLoader` (`src/m4_reload/source_loader_reload.cpp`): `checkChangedFiles()` runs `formats::checkSourceFile`
+  for every open source not yet stale; a Changed or Missing file marks it stale (until it is reloaded or closed)
+  and `staleChanged(id, true)` follows, once, after the pass. `checkChangedFilesInBackground()` (the shell's
+  activation check since D-217 (g)) runs the same re-stats on the pool and marks on the GUI thread
+  (`fileChecksPending()`; `staleState(id)` says Changed or Missing). `reload(id)` (D-217 (e), amends D-208) keeps
+  the source open: it writes its sidecar first (a failed write refuses the reload with `Io` and keeps the source)
+  and refuses a Missing file (`NotFound`); it opens the path again beside the stale source, and when the new open
+  publishes (`sourceReloaded(previous, source)`) the previous source is closed; a reload whose open fails or is
+  cancelled leaves the stale source as it was (`pendingReloads()`). A reload of an unchanged file
+  (`reloadSameContent`) is the same path. Every second the loader reads each open source's DecodeLog (D-217 (f)):
+  new entries go out as `importLog` (Messages), and `ld.io_fault` marks the source Missing, `ld.source_changed` or
+  `text.source_changed` Changed, at once rather than at the next activation.
+- `source_reload.hpp` (new): `connectSourceReload(loader, selection, messages)` appends the stale source's Messages
+  row (`staleSourceMessage`: Import, Warning, `open.file_changed`, the action `file.reload_source` with the id as
+  32 hex digits, `sourceIdArgument`/`parseSourceIdArgument`) and restores the selection on `sourceReloaded`; the
+  shell calls it beside `connectSourceLoader`, whose file another package owns.
+- `DataSelectionModel`: `closeSource` parks what it takes from the selection for the `kParkedCloses` (8) newest
+  closes, and `sourceReloaded(previous, source)` gives it to the reopened file: slots by RangeId, else by lap number
+  and class (06 §5.6), else dropped with a hint; a Main the close moved elsewhere back to its slot; the source's own
+  filter; its Data-window position (before the source that followed it). `closeAllSources` clears the parking.
+- `DataWindowModel`: a source row answers `StaleRole` and adds a stale line to its tool tip; `refreshStale(id)`
+  announces the row (`dataChanged`).
+- Test: `tests/m4_reload/tst_source_reload.cpp` (`qtmodel.tst_source_reload`).
+
+## M4 followups of the widgets (D-211)
+
+- The channel resolution of `RenderService::prepareInputs`, `ValuesModel` and `ReportModel` falls back to the
+  quantity's default display unit (`plot::defaultDisplayUnit`: a fraction stored in `ratio` shows in %) where the
+  component names none of the channel's quantity, and fills `ResolvedChannel::displayUnitId`; `ReportModel` passes
+  a report channel's `displayUnit`.
+- `ValuesModel::setViewSource`: the view a values_list component with an unlinked cursor or datum reads its values
+  at (the worksheet still gives the DistanceService).

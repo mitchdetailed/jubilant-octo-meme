@@ -8,7 +8,8 @@
 // in the fields) and the user settings; an invalid field refuses Apply and OK with the reason and keeps the
 // dialog open; the autosave interval and the maths compat switch reach the session; the Fonts tab lists the
 // active scheme's font roles and follows a scheme change; the Keys tab lists every shipped row with the
-// user's keys and imports (refusing conflicts), exports and reveals the keymap.
+// user's keys and imports (refusing conflicts), exports and reveals the keymap. M4 (budget package): the
+// memory budget field on General, a user setting in GB.
 
 #include "../../../qtmodel/tests/qtmodel_test_support.hpp"
 
@@ -377,6 +378,47 @@ private Q_SLOTS:
         QVERIFY(
             d.findChild<QLabel*>(QStringLiteral("coloursNote"))->text().startsWith(QStringLiteral("Copied")));
         QVERIFY(d.schemeSelector().currentText().endsWith(QStringLiteral(" copy")));
+    }
+
+    // M4 budget package (07 section 7.1 row 1, 01 section 7.2): the memory budget is a user setting in GB of
+    // 2^30 bytes on General, at least 1 GB; untouched it writes nothing (the runtime's default stays).
+    void memoryBudgetIsAUserSettingInGigabytes() {
+        World w;
+        QVERIFY(w.start());
+        const QString key = QStringLiteral("memory.chunkCacheBudgetBytes");
+        {
+            OptionsDialog d(*w.session, w.settings.get());
+            auto* budget = field<QDoubleSpinBox>(d, "memory.chunkCacheBudgetBytes");
+            QCOMPARE(budget->suffix(), QStringLiteral(" GB"));
+            QCOMPARE(budget->minimum(), 1.0);
+            QCOMPARE(budget->decimals(), 1);
+            QVERIFY(budget->value() >= 1.0); // the default: a quarter of the RAM, at least 1 GB
+            QVERIFY(d.apply());
+            QVERIFY(!w.settings->value(key).isValid()); // untouched: nothing written
+            budget->setValue(2.5);
+            QVERIFY(d.hasPendingEdits());
+            QVERIFY(d.apply());
+            QCOMPARE(w.settings->value(key).toLongLong(), qint64{2684354560}); // 2.5 x 2^30
+            QCOMPARE(w.session->undoStack().count(), 0);                       // not a project option
+            // A value set elsewhere shows (raised to the floor, as the shell applies it).
+            w.settings->setValue(key, qint64{536870912});
+            QCOMPARE(budget->value(), 1.0);
+            w.settings->setValue(key, qint64{4294967296});
+            QCOMPARE(budget->value(), 4.0);
+            // An out-of-range entry refuses Apply with the reason.
+            auto* edit = budget->findChild<QLineEdit*>();
+            QVERIFY(edit != nullptr);
+            edit->setText(QString());
+            QVERIFY(!budget->hasAcceptableInput());
+            field<QSpinBox>(d, "general.autosaveMinutes")->setValue(9);
+            QVERIFY(!d.apply());
+            QVERIFY(d.errorText().contains(QStringLiteral("Memory budget")));
+            QVERIFY(d.errorText().contains(QStringLiteral("GB")));
+        }
+        {
+            OptionsDialog d(*w.session, w.settings.get()); // a new dialog reads the setting
+            QCOMPARE(field<QDoubleSpinBox>(d, "memory.chunkCacheBudgetBytes")->value(), 4.0);
+        }
     }
 };
 

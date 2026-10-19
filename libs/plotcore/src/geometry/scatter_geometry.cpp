@@ -90,6 +90,9 @@ Result<ScatterBody> ScatterBody::parse(const JsonDoc& body) {
         if (const json* v = r.optional("xChannel")) {
             out.xChannel = jsonio::asString(*v, r.child("xChannel"));
         }
+        if (const json* v = r.optional("xDisplayUnit")) {
+            out.xDisplayUnit = jsonio::asString(*v, r.child("xDisplayUnit"));
+        }
         if (const json* tracesJ = r.optional("traces")) {
             if (!tracesJ->is_array()) {
                 jsonio::violate(r.child("traces"), "expected an array");
@@ -109,6 +112,9 @@ Result<ScatterBody> ScatterBody::parse(const JsonDoc& body) {
                 if (const json* v = t.optional("yDelayUs")) {
                     trace.yDelayUs = jsonio::asInt(*v, t.child("yDelayUs"));
                 }
+                if (const json* v = t.optional("displayUnit")) {
+                    trace.displayUnit = jsonio::asString(*v, t.child("displayUnit"));
+                }
                 out.traces.push_back(std::move(trace));
             }
         }
@@ -119,6 +125,9 @@ Result<ScatterBody> ScatterBody::parse(const JsonDoc& body) {
             jsonio::ObjectReader c(*colour, r.child("colourChannel"));
             if (const json* v = c.optional("channel")) {
                 out.colourChannel = jsonio::asString(*v, c.child("channel"));
+            }
+            if (const json* v = c.optional("displayUnit")) {
+                out.colourDisplayUnit = jsonio::asString(*v, c.child("displayUnit"));
             }
             if (const json* v = c.optional("axis")) {
                 out.colourAxis = bandAxisOf(*v, c.child("axis"));
@@ -229,6 +238,7 @@ JsonDoc ScatterBody::toJson() const {
     const ScatterBody d;
     json j = detail::mergeOver(rest);
     detail::put(j, "xChannel", xChannel, d.xChannel);
+    detail::put(j, "xDisplayUnit", xDisplayUnit, d.xDisplayUnit);
     if (!traces.empty() || j.contains("traces")) {
         const json old = j.contains("traces") && j["traces"].is_array() ? j["traces"] : json::array();
         json arr = json::array();
@@ -239,12 +249,14 @@ JsonDoc ScatterBody::toJson() const {
             tj["yChannel"] = t.yChannel;
             detail::put(tj, "visible", t.visible, td.visible);
             detail::put(tj, "yDelayUs", t.yDelayUs, td.yDelayUs);
+            detail::put(tj, "displayUnit", t.displayUnit, td.displayUnit);
             arr.push_back(std::move(tj));
         }
         j["traces"] = std::move(arr);
     }
     json colour = detail::childObject(j, "colourChannel");
     detail::put(colour, "channel", colourChannel, d.colourChannel);
+    detail::put(colour, "displayUnit", colourDisplayUnit, d.colourDisplayUnit);
     if (colourAxis) {
         const json old = colour.contains("axis") ? colour["axis"] : json();
         colour["axis"] = detail::bandAxisJson(old.is_object() ? &old : nullptr, *colourAxis);
@@ -300,12 +312,12 @@ JsonDoc ScatterBody::toJson() const {
 std::vector<ChannelUse> ScatterBody::channels() const {
     std::vector<ChannelUse> out;
     out.reserve(traces.size() + 3);
-    out.push_back(ChannelUse{xChannel, {}, std::nullopt});
+    out.push_back(ChannelUse{xChannel, xDisplayUnit, std::nullopt});
     for (const ScatterTrace& t : traces) {
-        out.push_back(ChannelUse{t.yChannel, {}, std::nullopt});
+        out.push_back(ChannelUse{t.yChannel, t.displayUnit, std::nullopt});
     }
     if (!colourChannel.empty()) {
-        out.push_back(ChannelUse{colourChannel, {}, std::nullopt});
+        out.push_back(ChannelUse{colourChannel, colourDisplayUnit, std::nullopt});
     }
     if (!gatingChannel.empty()) {
         out.push_back(ChannelUse{gatingChannel, {}, std::nullopt});

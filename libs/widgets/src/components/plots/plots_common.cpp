@@ -5,7 +5,12 @@
 
 #include "plots_common.hpp"
 
+#include <esses/base/read_file.hpp>
+#include <esses/base/uuid.hpp>
+#include <esses/formats/csv.hpp>
+#include <esses/formats/importer.hpp>
 #include <esses/maths/channel_key.hpp>
+#include <esses/model/detail.hpp>
 #include <esses/model/resolver.hpp>
 #include <esses/plotcore/domain_mapper.hpp>
 #include <esses/qtmodel/data_selection_model.hpp>
@@ -16,10 +21,15 @@
 
 #include <QCoreApplication>
 #include <QEventLoop>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QObject>
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <memory>
+#include <set>
+#include <system_error>
 #include <utility>
 #include <variant>
 
@@ -154,8 +164,8 @@ int wheelNotches(int& remainder, int angleDelta) {
     return notches;
 }
 
-void zoomAboutCursor(WorksheetContext& context, const plot::ComponentBuildInputs& inputs, double factor) {
-    const plot::ViewState& view = context.view.state();
+void zoomAboutCursor(ComponentWidget& component, const plot::ComponentBuildInputs& inputs, double factor) {
+    const plot::ViewState view = component.viewState();
     double c = static_cast<double>(view.cursorT);
     if (!inputs.slots.empty()) {
         const plot::SlotData& main = inputs.slots.front();
@@ -169,15 +179,21 @@ void zoomAboutCursor(WorksheetContext& context, const plot::ComponentBuildInputs
     }
     const plot::XSpan z = view.zoom;
     c = std::clamp(c, std::min(z.a, z.b), std::max(z.a, z.b));
-    context.view.zoomTo(plot::XSpan{c - (c - z.a) * factor, c + (z.b - c) * factor});
+    component.setViewZoom(plot::XSpan{c - (c - z.a) * factor, c + (z.b - c) * factor});
 }
 
-std::optional<QByteArray> timeSeriesCsv(const plot::ComponentBuildInputs& inputs,
-                                        const std::vector<std::size_t>& channels, const CancelToken& cancel) {
-    if (inputs.slots.empty()) {
+std::optional<QByteArray> legacyCsv(const plot::ComponentBuildInputs& inputs,
+                                    const std::vector<std::size_t>& channels, const LegacyExportInfo& info,
+                                    const CancelToken& cancel) {
+    if (inputs.slots.empty() || inputs.slots.front().source == nullptr) {
         return std::nullopt;
     }
     const plot::SlotData& main = inputs.slots.front();
+    const model::DataSource& from = *main.source;
+    const model::DataLayer* fromLayer = from.layer(main.layer);
+    if (fromLayer == nullptr) {
+        return std::nullopt;
+    }
     plot::RangeGeom geom = main.range;
     geom.offsetUs = 0;
     geom.offsetM = 0.0;
@@ -187,80 +203,102 @@ std::optional<QByteArray> timeSeriesCsv(const plot::ComponentBuildInputs& inputs
     }
     const Micros t0 = std::max(main.outing.start, map.timeAt(inputs.view.zoom.a));
     const Micros t1 = std::min(main.outing.end, map.timeAt(inputs.view.zoom.b));
-    std::vector<const plot::ResolvedChannel*> cols;
-    const store::UniformSeries* base = nullptr;
-    const plot::ResolvedChannel* baseRc = nullptr;
+    if (t1 <= t0) {
+        return std::nullopt;
+    }
+
+    // A source of its own for the writer: the Main source's details and one layer holding the component's
+    // channels under the names the component gives them (maths outputs included), each with a fresh id.
+    auto src = std::make_shared<model::DataSource>();
+    src->id = from.id;
+    src->prov = from.prov;
+    src->details = from.details;
+    std::string rangeName = main.slot.range.name;
+    if (const model::RangeGroup* group = fromLayer->ranges.find(main.slot.range.groupPath)) {
+        for (const model::Range& r : group->ranges) {
+            if (r.id == main.slot.range.range) {
+                rangeName = r.name;
+            }
+        }
+    }
+    const auto setDetail = [&src](const char* id, const std::string& text) {
+        std::erase_if(src->details, [id](const model::Detail& d) { return d.id == id; });
+        if (!text.empty()) {
+            model::Detail d;
+            d.id = id;
+            d.value = text;
+            src->details.push_back(std::move(d));
+        }
+    };
+    setDetail("Export Range", rangeName);
+    setDetail("Export Worksheet", info.worksheet);
+    setDetail("Export Workbook", std::string());
+    model::DataLayer layer;
+    layer.name = std::string(model::kNormalLayer);
+    layer.origin = fromLayer->origin;
+    layer.duration = fromLayer->duration;
+    formats::ExportView view;
+    QJsonObject units;
+    std::set<std::string> names;
     for (const std::size_t i : channels) {
         if (i >= main.channels.size()) {
             continue;
         }
         const plot::ResolvedChannel& rc = main.channels[i];
-        if (!rc.descriptor || !rc.series || rc.status == model::ChannelStatus::Pending) {
+        if (!rc.descriptor || !rc.series || rc.status == model::ChannelStatus::Pending ||
+            !names.insert(rc.name).second) {
             continue;
         }
-        cols.push_back(&rc);
-        if (base == nullptr) {
-            base = std::get_if<store::UniformSeries>(&*rc.series);
-            baseRc = base != nullptr ? &rc : nullptr;
+        model::Channel ch;
+        ch.desc = *rc.descriptor;
+        ch.desc.name = rc.name;
+        ch.desc.id = model::ChannelId{uuidRandom()};
+        ch.series = *rc.series;
+        if (inputs.units != nullptr && inputs.units->contains(rc.displayUnitId) &&
+            rc.displayUnitId != rc.descriptor->unit) {
+            units.insert(QString::fromStdString(rc.name),
+                         QString::fromStdString(inputs.units->unit(rc.displayUnitId).symbol));
         }
+        view.channels.push_back(ch.desc.id);
+        layer.addChannel(std::move(ch));
     }
-    if (cols.empty() || base == nullptr || baseRc == nullptr || !base->rate.valid() || t1 <= t0) {
+    if (view.channels.empty()) {
         return std::nullopt;
     }
-    // The sample indexes of a uniform series within [from, to), clamped to the series.
-    const auto indexes = [](const store::UniformSeries& u, SampleIdx size, Micros from, Micros to) {
-        const SampleIdx a = from <= u.t0 ? 0 : u.rate.indexAt(from - 1, u.t0) + 1;
-        const SampleIdx b = to <= u.t0 ? 0 : u.rate.indexAt(to - 1, u.t0) + 1;
-        return std::pair<SampleIdx, SampleIdx>{std::clamp<SampleIdx>(a, 0, size),
-                                               std::clamp<SampleIdx>(b, 0, size)};
-    };
-    const auto [i0, i1] = indexes(*base, store::seriesSize(*baseRc->series), t0, t1);
-    if (i1 <= i0) {
+    src->layers.push_back(std::move(layer));
+    view.source = src;
+    view.layer = std::string(model::kNormalLayer);
+    view.start = t0;
+    view.end = t1;
+    formats::WriterOptions options;
+    if (!units.isEmpty()) {
+        const QJsonObject o{{QStringLiteral("csv"), QJsonObject{{QStringLiteral("units"), units}}}};
+        Result<JsonDoc> doc = JsonDoc::parse(QJsonDocument(o).toJson(QJsonDocument::Compact).toStdString());
+        if (!doc) {
+            return std::nullopt;
+        }
+        options.options = std::move(doc).value();
+    }
+
+    // The writer writes a file (atomically); its bytes are read back and the file removed.
+    std::error_code ec;
+    const std::filesystem::path dir = std::filesystem::temp_directory_path(ec);
+    if (ec) {
         return std::nullopt;
     }
-    // Pin what the rows read, so Resampler::sampleAt finds every chunk resident.
-    std::vector<store::ChunkHandle> pins;
-    for (const plot::ResolvedChannel* rc : cols) {
-        const store::Column& values = store::seriesValues(*rc->series);
-        const SampleIdx size = values.size();
-        if (size == 0) {
-            continue;
-        }
-        SampleIdx first = 0;
-        SampleIdx last = size - 1;
-        if (const auto* u = std::get_if<store::UniformSeries>(&*rc->series);
-            u != nullptr && u->rate.valid()) {
-            const auto [a, b] = indexes(*u, size, t0, t1);
-            first = std::max<SampleIdx>(0, a - 1); // the neighbours interpolation reads
-            last = std::min<SampleIdx>(size - 1, b);
-        }
-        Result<store::ChunkHandle> pin = values.require(first, last, Priority::Background, cancel);
-        if (!pin) {
-            return std::nullopt;
-        }
-        pins.push_back(std::move(*pin));
+    const std::filesystem::path path = dir / ("esses-export-" + uuidRandom().str() + ".csv");
+    const std::unique_ptr<formats::IWriter> writer = formats::makeLegacyCsvWriter(inputs.units.get());
+    const Result<formats::WriteReport> written = writer->write(path, view, options, {}, cancel);
+    if (!written) {
+        std::filesystem::remove(path, ec);
+        return std::nullopt;
     }
-    QByteArray out = "Time [s]";
-    for (const plot::ResolvedChannel* rc : cols) {
-        out += ',';
-        out += csvText(QString::fromStdString(
-            rc->displayUnit.empty() ? rc->name : rc->name + " [" + rc->displayUnit + "]"));
+    Result<std::string> bytes = readWholeFile(path, "the exported CSV");
+    std::filesystem::remove(path, ec);
+    if (!bytes) {
+        return std::nullopt;
     }
-    out += '\n';
-    for (SampleIdx i = i0; i < i1; ++i) {
-        if ((i - i0) % 4096 == 0 && cancel.checkpoint()) {
-            return std::nullopt;
-        }
-        const Micros t = base->rate.timeAt(i, base->t0);
-        out += csvNumber(static_cast<double>(t) / 1e6);
-        for (const plot::ResolvedChannel* rc : cols) {
-            const store::ValueSample v = store::Resampler::sampleAt(*rc->series, t, rc->descriptor->interp);
-            out += ',';
-            out += v.state == store::SampleState::Valid ? csvNumber(rc->toDisplay(v.value)) : QByteArray();
-        }
-        out += '\n';
-    }
-    return out;
+    return QByteArray::fromStdString(*bytes);
 }
 
 } // namespace esses::widgets::plots

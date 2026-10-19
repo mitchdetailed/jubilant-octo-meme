@@ -64,14 +64,26 @@ std::optional<units::QuantityId> quantityOf(WorksheetContext& context, const std
 // starts again from zero.
 int wheelNotches(int& remainder, int angleDelta);
 
-// The worksheet zoom scaled by `factor` about the cursor (a summary component's wheel, zoom.wheel).
-void zoomAboutCursor(WorksheetContext& context, const plot::ComponentBuildInputs& inputs, double factor);
+// The component's zoom (the worksheet's, or its own when links.zoom is off; D-211 (f)) scaled by `factor`
+// about its cursor (a summary component's wheel, zoom.wheel).
+void zoomAboutCursor(ComponentWidget& component, const plot::ComponentBuildInputs& inputs, double factor);
 
-// Worker: the Main slot's samples of `channels` (indexes into SlotData::channels) over the view's zoom of
-// `inputs` as CSV: "Time [s]" (log time) and one column per channel ("<name> [<unit>]"), on the sample times
-// of the first channel with a uniform series, the others at those times by their own interpolation; nullopt
-// when no channel can be read or the work is cancelled.
-std::optional<QByteArray> timeSeriesCsv(const plot::ComponentBuildInputs& inputs,
-                                        const std::vector<std::size_t>& channels, const CancelToken& cancel);
+// What the legacy CSV's metadata names besides the Main source's details (05 section 6 writer item 1): the
+// worksheet the export comes from (its "Worksheet" field).
+struct LegacyExportInfo {
+    std::string worksheet;
+};
+
+// Worker (M4, D-211 (d); 04 section 7.2 item 8): the Main slot's `channels` (indexes into
+// SlotData::channels; repeats and channels that cannot be read are left out) over the view's zoom of `inputs`
+// in the legacy CSV dialect of esses-cli export --format motec.csv (formats::makeLegacyCsvWriter: the
+// metadata lines with the Main source's details, the export range and worksheet, names and units rows, every
+// channel resampled onto one grid at the highest uniform rate capped at 1 kHz by its own interpolation, Time
+// from 0 at the start of the span, values in each channel's display unit, CRLF, every field quoted). The
+// writer writes a file, so the bytes pass through a temporary file that is removed again. nullopt when no
+// channel can be read, the span is empty, or the work is cancelled or fails.
+std::optional<QByteArray> legacyCsv(const plot::ComponentBuildInputs& inputs,
+                                    const std::vector<std::size_t>& channels, const LegacyExportInfo& info,
+                                    const CancelToken& cancel);
 
 } // namespace esses::widgets::plots

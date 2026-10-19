@@ -14,7 +14,8 @@
 //                 and the measurement lines (min / max / avg over the visible span, read on the worker); plus
 //                 the HitTester (panels, key labels, values and measurements, axes, bands, markers,
 //                 annotations, status rows, the variance panel, the offset sub-axes, scrollbars, Lo/Hi and
-//                 splitter handles)
+//                 splitter handles; M4: each group's part of the key column as its GroupHeading, beneath its
+//                 labels)
 //   buildDynamic  GUI thread, never blocks: cursor (line, crosshair or none) and datum lines, key values at
 //   the
 //                 cursor per visible slot, with a datum value@datum and delta (Resampler::sampleAt over

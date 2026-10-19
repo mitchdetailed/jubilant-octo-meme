@@ -1,0 +1,9 @@
+{
+  "xChannel": "Corr Speed",
+  "traces": [
+    {
+      "yChannel": "G Force Lat",
+      "displayUnit": " G"
+    }
+  ]
+}

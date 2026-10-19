@@ -127,14 +127,23 @@ if(ESSES_BUILD_QT)
     endif()
   endforeach()
   # Qt Test suites that span the Qt layers (07 section 4.2: tests/ui walkthrough, F9, render parity; tests/golden
-  # pixel goldens). Added after every library and application so their targets exist.
+  # pixel goldens; M4: tests/soak, the Saturday soak of 07 section 7.1, added when the soak package creates it,
+  # D-206). Added after every library and application so their targets exist.
   if(ESSES_BUILD_TESTS)
-    foreach(_esses_qt_test_dir tests/ui tests/golden)
+    foreach(_esses_qt_test_dir tests/ui tests/golden tests/soak)
       if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_esses_qt_test_dir}/CMakeLists.txt")
         add_subdirectory(${_esses_qt_test_dir})
       endif()
     endforeach()
   endif()
+endif()
+# M4 (D-212): tools/packaging/ (every install rule, windeployqt, the Inno Setup installer, the portable zip, the
+# AppImage and DMG scripts, the third-party manifest; 07 section 7.1 "Packaging", 08 sections 2 and 7). Added with
+# and without the Qt layers (D-216 (c)): a Qt-free tree installs the command-line tool, the data, the notices and
+# the user guide, which the lint job stages and scans for vendor marks (AC-M4-08); the application's rules apply
+# when its targets exist.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/packaging/CMakeLists.txt")
+  add_subdirectory(tools/packaging)
 endif()
 
 # bench/: the budget benchmarks (07 section 12): the Qt ones of M1 (plot_bench, open_bench, AC-M1-02/03) with the

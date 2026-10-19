@@ -3,17 +3,19 @@
 //
 // ReportSpec (04 section 12 item 2; ARCHITECTURE_OUTLINE section 4 esses_analysis; D-027): what a
 // channel_report computes. The JSON form is the body's "report" member (04 section 12 item 8:
-// {scope, headers[], channels[{name, stats[]}], options{...}}); `layout` and `deltaVsOverlay0` are body
-// members the engine needs too, set by the caller from the body. Built by value from the ComponentSpec and
-// the current selection and handed to workers (01 section 5.3 rule 2).
+// {scope, headers[], channels[{name, stats[], displayUnit}], options{...}}); `layout` and `deltaVsOverlay0`
+// are body members the engine needs too, set by the caller from the body. Built by value from the
+// ComponentSpec and the current selection and handed to workers (01 section 5.3 rule 2).
 //   scope    selectedRanges | selectedOutings | allOutings
 //   headers  ordered range-group paths that divide the data, outermost first ("Outings",
 //            "Outings:Laps:Track Sections:Default", "Outings:Laps"), or detail groups ("Events", "Driver",
 //            ...)
 //   stats    avg, min, max, absMax, start, end, change, stdDev, delta (delta = max - min)
-//   options  excludeOverlays, includeUntrusted, interpolateBoundaries, probeSeconds (5), zoomLinked
+//   options  excludeOverlays, includeUntrusted, interpolateBoundaries, probeSeconds (5), zoomLinked,
+//            ignoreInterpolated (M4)
 // fromJson reads the members it knows and ignores others (the body schema is closed); toJson writes every
-// member, so toJson -> fromJson is exact.
+// member (a channel's displayUnit only when set, options.ignoreInterpolated only when true), so toJson ->
+// fromJson is exact.
 #pragma once
 
 #include <esses/base/json_doc.hpp>
@@ -41,6 +43,9 @@ std::optional<ReportScope> parseReportScope(std::string_view name) noexcept;
 struct ReportChannel {
     std::string name;
     std::vector<ReportStat> stats;
+    // Added by M4 (D-211 (a)): the unit the channel's cells are shown in ("" = the channel's default display
+    // unit, esses_plotcore display_units.hpp); written by toJson only when set.
+    std::string displayUnit{};
     friend bool operator==(const ReportChannel&, const ReportChannel&) = default;
 };
 
@@ -50,6 +55,10 @@ struct ReportOptions {
     bool interpolateBoundaries = false;
     double probeSeconds = 5.0; // start/end probe inward for a valid sample
     bool zoomLinked = false;   // clip every range to the worksheet zoom
+    // Added by M4 (D-210 (c), M3 item 25): only the channel's own samples count, never a value interpolated
+    // between two of them, so start/end/change take the range's samples (with the probe) even with
+    // interpolateBoundaries on; the other statistics read samples only in any case (D-197 (a)).
+    bool ignoreInterpolated = false;
     friend bool operator==(const ReportOptions&, const ReportOptions&) = default;
 };
 

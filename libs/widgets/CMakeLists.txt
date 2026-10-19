@@ -58,6 +58,11 @@ esses_add_library(widgets LAYER 5
   PRIVATE_DEPS
     ${_esses_widgets_ads})
 
+# Help > Help Contents asks Windows whether a program opens .md files (AssocQueryString, DocsShell; D-217).
+if(WIN32)
+  target_link_libraries(${ESSES_PREFIX}_widgets PRIVATE shlwapi)
+endif()
+
 # Qt keywords off for every Qt target (use Q_SIGNALS, Q_SLOTS, Q_EMIT): Qt-free headers use the plain names, e.g.
 # 04 section 4.2's TraceBuilder::emit and ComponentBuildInputs::slots. PUBLIC, so consumers and tests inherit it.
 target_compile_definitions(${ESSES_PREFIX}_widgets PUBLIC QT_NO_KEYWORDS)

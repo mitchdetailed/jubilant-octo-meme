@@ -103,7 +103,10 @@ int SessionRestore::start(std::vector<std::filesystem::path> logs) {
 }
 
 void SessionRestore::check() {
-    if (!keys_ || loader_.pendingOpens() > 0 || loader_.pendingMappings() > 0) {
+    // An open held at the memory budget warning (D-207) has neither published nor failed yet: Continue
+    // publishes it (sourcePublished), Cancel announces it (importLog), and either runs the check again.
+    if (!keys_ || loader_.pendingOpens() > 0 || loader_.pendingMappings() > 0 ||
+        loader_.pendingBudgetOpens() > 0) {
         return;
     }
     const project::SelectionKeys keys = std::move(*keys_);

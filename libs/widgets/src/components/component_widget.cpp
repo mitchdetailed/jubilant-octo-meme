@@ -5,6 +5,7 @@
 // coalescing, DPR changes, focus and the caption double-click (04 section 7.2 items 1 and 7).
 
 #include <esses/maths/channel_key.hpp>
+#include <esses/plotcore/component_build.hpp>
 #include <esses/qtmodel/data_selection_model.hpp>
 #include <esses/qtmodel/distance_service.hpp>
 #include <esses/qtmodel/keymap_binder.hpp>
@@ -24,6 +25,8 @@
 #include <QResizeEvent>
 #include <QTimer>
 #include <algorithm>
+#include <cmath>
+#include <cstdlib>
 #include <utility>
 
 namespace esses::widgets {
@@ -70,12 +73,27 @@ ComponentWidget::ComponentWidget(const project::ComponentSpec& spec, WorksheetCo
         }
     });
 
+    takeOwnView(!zoomLinked(), !cursorLinked(), !datumLinked());
     connect(&context_.view, &qt::WorksheetViewModel::changed, this, [this](plot::ChangeMask what) {
         // The worksheet's Size bit is its cursor-step width (WorksheetViewModel::setSize); a component's own
         // size reaches it through resizeEvent.
         what = static_cast<plot::ChangeMask>(what & ~plot::mask(plot::Change::Size));
+        // Unlinked parts keep their own values (D-211 (f)); F9 converted the worksheet's zoom into the new
+        // domain, and an own zoom restarts from it.
+        if (plot::has(what, plot::Change::Domain) && !zoomLinked()) {
+            own_.zoom = context_.view.state().zoom;
+            ++ownVersion_;
+        } else if (!zoomLinked()) {
+            what = static_cast<plot::ChangeMask>(what & ~plot::mask(plot::Change::Zoom));
+        }
+        if (!cursorLinked()) {
+            what = static_cast<plot::ChangeMask>(what & ~plot::mask(plot::Change::Cursor));
+        }
+        if (!datumLinked()) {
+            what = static_cast<plot::ChangeMask>(what & ~plot::mask(plot::Change::Datum));
+        }
         if (what != 0) {
-            onViewChanged(context_.view.state(), what);
+            onViewChanged(viewState(), what);
         }
     });
     connect(&context_.selection, &qt::DataSelectionModel::changed, this,
@@ -162,8 +180,299 @@ bool ComponentWidget::keyBound(const QString& commandId, const QKeyEvent& event,
 }
 
 void ComponentWidget::applySpec(const project::ComponentSpec& spec) {
+    const bool zoomBefore = zoomLinked();
+    const bool cursorBefore = cursorLinked();
+    const bool datumBefore = datumLinked();
+    const plot::ViewState before = viewState();
     spec_ = spec;
+    // A part whose link is switched off starts from the worksheet's value; one switched on shows the
+    // worksheet's again, delivered once the subclass has taken the new spec (D-211 (f)).
+    takeOwnView(zoomBefore && !zoomLinked(), cursorBefore && !cursorLinked(), datumBefore && !datumLinked());
+    const plot::ChangeMask changed = plot::viewChanges(before, viewState());
+    if (changed != 0) {
+        ++ownVersion_;
+        QMetaObject::invokeMethod(
+            this, [this, changed] { onViewChanged(viewState(), changed); }, Qt::QueuedConnection);
+    }
     update();
+}
+
+// ---- links (M4, 04 section 2.4, D-211 (f)) ----------------------------------------------------------------
+
+bool ComponentWidget::zoomLinked() const noexcept {
+    // The outing graph is the zoom control (04 section 9 item 2): its zoom is always the worksheet's.
+    return spec_.links.zoom || spec_.type == "outing";
+}
+
+plot::ViewState ComponentWidget::viewState() const {
+    plot::ViewState v = context_.view.state();
+    if (!zoomLinked()) {
+        v.zoom = own_.zoom;
+    }
+    if (!cursorLinked()) {
+        v.cursorT = own_.cursorT;
+    }
+    if (!datumLinked()) {
+        v.datumT = own_.datumT;
+    }
+    v.version += ownVersion_;
+    return v;
+}
+
+void ComponentWidget::takeOwnView(bool zoom, bool cursor, bool datum) {
+    const plot::ViewState& ws = context_.view.state();
+    if (zoom) {
+        own_.zoom = ws.zoom;
+    }
+    if (cursor) {
+        own_.cursorT = ws.cursorT;
+    }
+    if (datum) {
+        own_.datumT = ws.datumT;
+        own_.hiddenDatumT.reset();
+    }
+}
+
+void ComponentWidget::ownViewChanged(plot::ChangeMask what) {
+    ++ownVersion_;
+    onViewChanged(viewState(), what);
+}
+
+std::optional<plot::DomainMapper> ComponentWidget::mainMapper() const {
+    return std::nullopt;
+}
+
+std::optional<plot::DomainMapper> ComponentWidget::mainMapperOf(const plot::ComponentBuildInputs& inputs,
+                                                                plot::Domain domain) {
+    if (inputs.slots.empty()) {
+        return std::nullopt;
+    }
+    const plot::SlotData& main = inputs.slots.front();
+    plot::RangeGeom geom = main.range;
+    geom.offsetUs = 0;
+    geom.offsetM = 0.0;
+    return plot::DomainMapper(domain, geom, main.outing, main.chain, Rate{}, 0);
+}
+
+plot::XSpan ComponentWidget::clampToOuting(plot::XSpan span,
+                                           const std::optional<plot::DomainMapper>& map) const {
+    if (!(span.b > span.a) || !std::isfinite(span.a) || !std::isfinite(span.b)) {
+        return own_.zoom;
+    }
+    if (!map) {
+        return span;
+    }
+    const plot::XSpan extent = map->outingExtent();
+    if (!(extent.b > extent.a)) {
+        return span;
+    }
+    const double length = std::min(span.length(), extent.length());
+    double a = std::clamp(span.a, extent.a, extent.b - length);
+    if (span.length() > extent.length()) {
+        a = extent.a;
+    }
+    return plot::XSpan{a, a + length};
+}
+
+std::optional<double> ComponentWidget::ownCursorX(const std::optional<plot::DomainMapper>& map) const {
+    const Micros t = viewState().cursorT;
+    if (context_.view.domain() == plot::Domain::Time) {
+        return static_cast<double>(t);
+    }
+    if (map && map->hasDistance()) {
+        return map->xOf(map->range().start + t);
+    }
+    return std::nullopt;
+}
+
+std::optional<Micros> ComponentWidget::ownTimeAt(const std::optional<plot::DomainMapper>& map,
+                                                 double x) const {
+    if (!std::isfinite(x)) {
+        return std::nullopt;
+    }
+    if (context_.view.domain() == plot::Domain::Time) {
+        // x is microseconds from the Main range start: range-check before the conversion (UBSan).
+        constexpr double kLimit = 9.0e18;
+        return x > -kLimit && x < kLimit ? std::optional<Micros>(static_cast<Micros>(std::llround(x)))
+                                         : std::nullopt;
+    }
+    if (map && map->hasDistance()) {
+        return map->timeAt(x) - map->range().start;
+    }
+    return std::nullopt;
+}
+
+void ComponentWidget::setViewCursor(Micros tMainLap, qt::CursorSource source) {
+    if (cursorLinked()) {
+        context_.view.setCursor(tMainLap, source);
+        return;
+    }
+    if (own_.cursorT != tMainLap) {
+        own_.cursorT = tMainLap;
+        ownViewChanged(plot::mask(plot::Change::Cursor));
+    }
+}
+
+void ComponentWidget::setViewZoom(plot::XSpan span) {
+    if (zoomLinked()) {
+        context_.view.zoomTo(span);
+        return;
+    }
+    const plot::XSpan next = clampToOuting(span, mainMapper());
+    if (!(next == own_.zoom)) {
+        own_.zoom = next;
+        ownViewChanged(plot::mask(plot::Change::Zoom));
+    }
+}
+
+void ComponentWidget::viewPanBy(double fractionOfSpan) {
+    if (zoomLinked()) {
+        context_.view.panBy(fractionOfSpan);
+        return;
+    }
+    const double d = fractionOfSpan * own_.zoom.length();
+    setViewZoom(plot::XSpan{own_.zoom.a + d, own_.zoom.b + d});
+}
+
+void ComponentWidget::viewZoomFull() {
+    if (zoomLinked()) {
+        context_.view.zoomFull();
+        return;
+    }
+    if (const std::optional<plot::DomainMapper> map = mainMapper()) {
+        setViewZoom(map->outingExtent());
+    }
+}
+
+// The worksheet keyboard rows on an unlinked part of the focused component (the shell offers them to the
+// component first): the WorksheetViewModel's rules applied to the component's own state.
+bool ComponentWidget::handleOwnViewCommand(const QString& id) {
+    const bool cursorRow = id.startsWith(QLatin1String("cursor."));
+    const bool zoomRow = id.startsWith(QLatin1String("zoom.")) || id.startsWith(QLatin1String("pan."));
+    const bool datumRow = id.startsWith(QLatin1String("datum."));
+    if ((cursorRow && cursorLinked()) || (zoomRow && zoomLinked()) || (datumRow && datumLinked()) ||
+        (!cursorRow && !zoomRow && !datumRow)) {
+        return false;
+    }
+    const std::optional<plot::DomainMapper> map = mainMapper();
+    const plot::ViewState v = viewState();
+    const std::optional<double> cx = ownCursorX(map);
+    // Cursor steps: one device pixel of the component per step (CTRL: ten), at least one sample period.
+    const auto step = [&](int pixels) {
+        if (!cx) {
+            return false;
+        }
+        const double widthPx = std::max(1.0, static_cast<double>(width()) * devicePixelRatioF());
+        const std::optional<Micros> t = ownTimeAt(map, *cx + v.zoom.length() / widthPx * pixels);
+        if (!t) {
+            return false;
+        }
+        Micros next = *t;
+        if (const Micros period = context_.view.activeSamplePeriod(); period > 0) {
+            const Micros moved = next - v.cursorT;
+            const Micros steps = std::max<Micros>(1, (std::abs(moved) + period / 2) / period);
+            next = v.cursorT + (moved < 0 ? -steps : steps) * period;
+        }
+        setViewCursor(next, qt::CursorSource::Keyboard);
+        return true;
+    };
+    const auto cursorTo = [&](double x) {
+        const std::optional<Micros> t = ownTimeAt(map, x);
+        if (t) {
+            setViewCursor(*t, qt::CursorSource::Keyboard);
+        }
+        return t.has_value();
+    };
+    const auto zoomAbout = [&](double factor) {
+        if (!cx) {
+            return false;
+        }
+        const double c = std::clamp(*cx, std::min(v.zoom.a, v.zoom.b), std::max(v.zoom.a, v.zoom.b));
+        setViewZoom(plot::XSpan{c - (c - v.zoom.a) * factor, c + (v.zoom.b - c) * factor});
+        return true;
+    };
+    if (id == QLatin1String("cursor.left") || id == QLatin1String("cursor.right")) {
+        return step(id.endsWith(QLatin1String("left")) ? -1 : 1);
+    }
+    if (id == QLatin1String("cursor.left_fast") || id == QLatin1String("cursor.right_fast")) {
+        return step(id.endsWith(QLatin1String("left_fast")) ? -10 : 10);
+    }
+    if (id == QLatin1String("cursor.home")) {
+        return cursorTo(v.zoom.a);
+    }
+    if (id == QLatin1String("cursor.end")) {
+        return cursorTo(std::nextafter(v.zoom.b, v.zoom.a));
+    }
+    if (id == QLatin1String("zoom.in")) {
+        return zoomAbout(0.5);
+    }
+    if (id == QLatin1String("zoom.out")) {
+        return zoomAbout(2.0);
+    }
+    if (id == QLatin1String("zoom.default_range")) {
+        if (!map) {
+            return false;
+        }
+        setViewZoom(plot::XSpan{0.0, map->extent()});
+        return true;
+    }
+    if (id == QLatin1String("zoom.datum_main")) {
+        if (!cx || !v.datumT) {
+            return false;
+        }
+        const std::optional<double> dx = context_.view.domain() == plot::Domain::Time
+                                             ? std::optional<double>(static_cast<double>(*v.datumT))
+                                         : map && map->hasDistance()
+                                             ? std::optional<double>(map->xOf(map->range().start + *v.datumT))
+                                             : std::nullopt;
+        if (!dx || *dx == *cx) {
+            return false;
+        }
+        setViewZoom(plot::XSpan{std::min(*cx, *dx), std::max(*cx, *dx)});
+        return true;
+    }
+    if (id == QLatin1String("pan.left") || id == QLatin1String("pan.right")) {
+        viewPanBy(id.endsWith(QLatin1String("left")) ? -0.1 : 0.1);
+        return true;
+    }
+    if (id == QLatin1String("pan.back") || id == QLatin1String("pan.forward")) {
+        viewPanBy(id.endsWith(QLatin1String("back")) ? -0.9 : 0.9);
+        return true;
+    }
+    if (id == QLatin1String("pan.centre_cursor")) {
+        if (!cx) {
+            return false;
+        }
+        const double half = 0.5 * v.zoom.length();
+        setViewZoom(plot::XSpan{*cx - half, *cx + half});
+        return true;
+    }
+    if (id == QLatin1String("datum.place")) {
+        own_.datumT = v.cursorT;
+        own_.hiddenDatumT.reset();
+        ownViewChanged(plot::mask(plot::Change::Datum));
+        return true;
+    }
+    if (id == QLatin1String("datum.toggle")) {
+        if (own_.datumT) {
+            own_.hiddenDatumT = own_.datumT;
+            own_.datumT.reset();
+        } else {
+            own_.datumT = own_.hiddenDatumT.value_or(v.cursorT);
+            own_.hiddenDatumT.reset();
+        }
+        ownViewChanged(plot::mask(plot::Change::Datum));
+        return true;
+    }
+    if (id == QLatin1String("datum.swap")) {
+        if (cursorLinked() || !own_.datumT) {
+            return false; // the swap moves both: only when both are the component's own
+        }
+        std::swap(own_.cursorT, *own_.datumT);
+        ownViewChanged(plot::Change::Cursor | plot::Change::Datum);
+        return true;
+    }
+    return false;
 }
 
 // Base-class behaviours (04 section 7.1): components override what applies to them.
@@ -278,8 +587,10 @@ bool ComponentWidget::sizeThrottleActive() const {
     return sizeTimer_->isActive();
 }
 
-bool ComponentWidget::handleCommand(const QString&, const QVariantList&) {
-    return false; // the shell's generic behaviour applies (M3)
+bool ComponentWidget::handleCommand(const QString& id, const QVariantList&) {
+    // M4 (D-211 (f)): the worksheet rows of an unlinked part act on the component's own view; otherwise the
+    // shell's generic behaviour applies (M3).
+    return handleOwnViewCommand(id);
 }
 
 bool ComponentWidget::cancelTransient() {

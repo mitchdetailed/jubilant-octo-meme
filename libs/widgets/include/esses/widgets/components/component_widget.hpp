@@ -30,11 +30,23 @@
 // Focus (04 section 7.2 item 1): WorksheetCanvas owns "the focused component of the worksheet" and calls
 // setFocusedComponent (Chrome border); a click emits focusRequested; a double-click on the caption bar emits
 // maximiseRequested (06 section 4.3 item 6).
+// Links (M4, 04 section 2.4, D-211 (f); docs/milestones/M3.md section 6 item 27): a component with
+// links.cursor, links.zoom or links.datum off keeps its own cursor, zoom or datum, taken from the worksheet's
+// when it is created or the link is switched off and never persisted; domain and offsetAxis stay the
+// worksheet's (F9 restarts an own zoom from the worksheet's converted one); the outing graph's zoom is always
+// the worksheet's (it is the zoom control). viewState() is what the component shows and is what
+// onViewChanged receives: a worksheet change of an unlinked part is not delivered, and the component's own
+// view edits (setViewCursor, setViewZoom, viewPanBy, viewZoomFull: its mouse) go to its own state when
+// unlinked. While it is the focused component, the worksheet keyboard rows of an unlinked part (cursor.*,
+// zoom.in/out/default_range/datum_main, pan.*, datum.*) act on its own state (handleCommand's default),
+// through the Main mapping the component supplies (mainMapper; without one, time mode only).
 #pragma once
 
 #include <esses/base/cancel.hpp>
+#include <esses/base/time.hpp>
 #include <esses/model/ids.hpp>
 #include <esses/plotcore/change_mask.hpp>
+#include <esses/plotcore/domain_mapper.hpp>
 #include <esses/plotcore/hit_tester.hpp>
 #include <esses/plotcore/selection_snapshot.hpp>
 #include <esses/plotcore/view_state.hpp>
@@ -66,11 +78,16 @@ class DataSelectionModel;
 class MathsService;
 class RenderService;
 class WorksheetViewModel;
+enum class CursorSource : std::uint8_t;
 } // namespace esses::qt
 
 namespace esses::maths {
 struct ChannelKey;
 } // namespace esses::maths
+
+namespace esses::plot {
+struct ComponentBuildInputs;
+} // namespace esses::plot
 
 namespace esses::widgets {
 
@@ -156,7 +173,8 @@ public:
     // graph.copy_cursor_values, component.export_data, ...). True when the component handled it. False by
     // default: the shell then applies its generic behaviour (the body toggles and cycles of L, K, G, S,
     // ALT+n, F3, M, E, SHIFT+E, Y; widgets src/properties_shell/component_commands.cpp) or tells the user the
-    // component has no such command.
+    // component has no such command. M4 (D-211 (f)): the default carries out the worksheet keyboard rows of
+    // an unlinked part on the component's own view (see Links above); a subclass falls through to it.
     virtual bool handleCommand(const QString& id, const QVariantList& args);
     // Added in M3: the caption bar height in logical px (the canvas's move zone, the maximise zone).
     int captionBarHeight() const { return captionHeight(); }
@@ -177,6 +195,24 @@ public:
     void setFocusedComponent(bool focused);
     // The device pixel ratio of the last delivered Size change (0 before the first).
     qreal layoutDevicePixelRatio() const noexcept { return dpr_; }
+    // M4 (hidpi package, D-206; src/components/m4_hidpi/component_dpr.cpp): re-checks devicePixelRatioF()
+    // against layoutDevicePixelRatio() now (DprWatcher calls it for the components of a window whose screen
+    // or DPR changed) and, when they differ, queues the Size | Scheme rebuild that QEvent::
+    // DevicePixelRatioChange queues; true when it did.
+    bool recheckDevicePixelRatio();
+    // M4 (04 section 2.4, D-211 (f)): the links of the component's spec (the outing graph's zoom is always
+    // linked) and the view it shows (the worksheet's, with its own zoom, cursor or datum where unlinked).
+    bool zoomLinked() const noexcept;
+    bool cursorLinked() const noexcept { return spec_.links.cursor; }
+    bool datumLinked() const noexcept { return spec_.links.datum; }
+    plot::ViewState viewState() const;
+    // The component's own view edits (its mouse, its commands): the worksheet's when the part is linked
+    // (WorksheetViewModel::setCursor, zoomTo, panBy, zoomFull), else its own state, clamped to the Main
+    // outing when mainMapper() knows it, followed by onViewChanged(viewState(), the changed bits).
+    void setViewCursor(Micros tMainLap, qt::CursorSource source);
+    void setViewZoom(plot::XSpan span);
+    void viewPanBy(double fractionOfSpan);
+    void viewZoomFull();
     // Size changes delivered to onViewChanged so far (tests: the 30 Hz coalescing).
     int sizeChangesDelivered() const noexcept { return sizeDeliveries_; }
     // True while the 30 Hz size throttle runs (a size change now would be coalesced, not delivered at once).
@@ -205,6 +241,12 @@ protected:
     // the heap, deleted when closed; empty when none applies).
     void contextMenuEvent(QContextMenuEvent* event) override;
     QMenu* commandMenu(const QStringList& commandIds);
+    // The Main slot's mapping in the current domain, from the component's inputs (alignment offsets
+    // excluded); nullopt (the default) when the component has none. The own zoom's limits and the keyboard
+    // rows of an unlinked part use it; mainMapperOf builds it from a component's prepared inputs.
+    virtual std::optional<plot::DomainMapper> mainMapper() const;
+    static std::optional<plot::DomainMapper> mainMapperOf(const plot::ComponentBuildInputs& inputs,
+                                                          plot::Domain domain);
     void mousePressEvent(QMouseEvent* event) override;
     void mouseDoubleClickEvent(QMouseEvent* event) override;
 
@@ -214,6 +256,21 @@ protected:
 private:
     void queueSizeChange(plot::ChangeMask what);
     void flushSizeChange();
+    // M4 (D-211 (f)): the own view of the unlinked parts.
+    struct OwnView {
+        plot::XSpan zoom;
+        Micros cursorT = 0;
+        std::optional<Micros> datumT;
+        std::optional<Micros> hiddenDatumT; // D hid the own datum: its value, shown again by D
+    };
+    void takeOwnView(bool zoom, bool cursor, bool datum); // from the worksheet's current view
+    void ownViewChanged(plot::ChangeMask what);
+    bool handleOwnViewCommand(const QString& id);
+    std::optional<double> ownCursorX(const std::optional<plot::DomainMapper>& map) const;
+    std::optional<Micros> ownTimeAt(const std::optional<plot::DomainMapper>& map, double x) const;
+    plot::XSpan clampToOuting(plot::XSpan span, const std::optional<plot::DomainMapper>& map) const;
+    OwnView own_;
+    std::uint64_t ownVersion_ = 0; // own view changes so far (added to the worksheet's version)
 
     QTimer* sizeTimer_ = nullptr;
     plot::ChangeMask sizePending_ = 0;

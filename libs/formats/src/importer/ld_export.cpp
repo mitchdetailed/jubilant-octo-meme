@@ -351,9 +351,21 @@ public:
 
         // The companion (05 section 5 item 7).
         const ld::LdxDocument ldx = ldxFromSource(src, *layer, view.includeMarkers, view.includeDetails);
-        if (ldxWorthWriting(ldx, src)) {
-            std::filesystem::path ldxPath = path;
-            ldxPath.replace_extension(".ldx");
+        std::filesystem::path ldxPath = path;
+        ldxPath.replace_extension(".ldx");
+        if (!ldxWorthWriting(ldx, src)) {
+            // What is written is the .ld alone: a companion already beside it (an earlier export to the same
+            // name, or another file's) would be read with it and lend it its markers and details (D-217).
+            std::error_code ec;
+            if (std::filesystem::exists(ldxPath, ec) && !std::filesystem::remove(ldxPath, ec) && ec) {
+                ErrorContext ctx;
+                ctx.path = ldxPath;
+                ctx.importer = std::string(kLdImporterId);
+                return fail(ErrorCode::Io,
+                            "motec.ld export: cannot remove the earlier companion: " + ec.message(),
+                            std::move(ctx));
+            }
+        } else {
             const std::string text = ld::writeLdx(ldx);
             if (auto r = ld::writeLdxFile(ldxPath, ldx); !r) {
                 return Failure{r.error()};

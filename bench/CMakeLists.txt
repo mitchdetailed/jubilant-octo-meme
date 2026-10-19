@@ -13,6 +13,14 @@
 #     reference machine, D-042); ESSES_BENCH_REPETITIONS sets the runs and ESSES_BENCH_OUT the directory of
 #     their JSON (a Google-Benchmark-style "benchmarks" array plus the rows).
 #   ESSES_BUILD_TESTS=ON: bench.<name>.smoke, label `bench-smoke`, the harness on small files (no budget).
+#   ESSES_BENCH_GATE (default ON): the bench entries carry --gate. The hosted alarm's preset (linux-gcc-bench) sets
+#     it OFF: a hosted runner is not the reference machine, so its rows are results for the +-30 % comparison of
+#     bench.yml, not a verdict on the absolute limits (D-042, D-217).
+option(ESSES_BENCH_GATE "Register the bench entries with --gate (the reference machine's absolute limits)" ON)
+set(_esses_bench_gate "")
+if(ESSES_BENCH_GATE)
+  set(_esses_bench_gate --gate)
+endif()
 
 # M2 (AC-M2-13): the text engine on a 300 MB, 100-channel CSV (Qt-free; bench/formats_bench.cpp):
 #   <build>/bin/esses-formats-bench --runs 5 --gate --json formats.json
@@ -28,7 +36,7 @@ esses_add_executable(formats_bench LAYER 3 QT_FREE
 set_target_properties(${ESSES_PREFIX}_formats_bench PROPERTIES FOLDER "bench")
 target_compile_definitions(${ESSES_PREFIX}_formats_bench PRIVATE "ESSES_BENCH_SOURCE_DIR=\"${CMAKE_SOURCE_DIR}\"")
 if(ESSES_BUILD_BENCH)
-  add_test(NAME bench.formats_bench COMMAND ${ESSES_PREFIX}_formats_bench --gate)
+  add_test(NAME bench.formats_bench COMMAND ${ESSES_PREFIX}_formats_bench ${_esses_bench_gate})
   set_tests_properties(bench.formats_bench PROPERTIES LABELS "bench" TIMEOUT 3600 RUN_SERIAL TRUE)
 endif()
 if(ESSES_BUILD_TESTS)
@@ -53,7 +61,7 @@ esses_add_executable(maths_bench LAYER 3 QT_FREE
 set_target_properties(${ESSES_PREFIX}_maths_bench PROPERTIES FOLDER "bench")
 target_compile_definitions(${ESSES_PREFIX}_maths_bench PRIVATE "ESSES_BENCH_SOURCE_DIR=\"${CMAKE_SOURCE_DIR}\"")
 if(ESSES_BUILD_BENCH)
-  add_test(NAME bench.maths_bench COMMAND ${ESSES_PREFIX}_maths_bench --gate)
+  add_test(NAME bench.maths_bench COMMAND ${ESSES_PREFIX}_maths_bench ${_esses_bench_gate})
   set_tests_properties(bench.maths_bench PROPERTIES LABELS "bench" TIMEOUT 1800 RUN_SERIAL TRUE)
 endif()
 if(ESSES_BUILD_TESTS)
@@ -76,7 +84,7 @@ esses_add_executable(report_bench LAYER 3 QT_FREE
   OUTPUT_NAME esses-report-bench)
 set_target_properties(${ESSES_PREFIX}_report_bench PROPERTIES FOLDER "bench")
 if(ESSES_BUILD_BENCH)
-  add_test(NAME bench.report_bench COMMAND ${ESSES_PREFIX}_report_bench --gate)
+  add_test(NAME bench.report_bench COMMAND ${ESSES_PREFIX}_report_bench ${_esses_bench_gate})
   set_tests_properties(bench.report_bench PROPERTIES LABELS "bench" TIMEOUT 1800 RUN_SERIAL TRUE)
 endif()
 if(ESSES_BUILD_TESTS)
@@ -109,10 +117,16 @@ foreach(_bench plot_bench open_bench)
   if(TARGET ${ESSES_PREFIX}_gen_fixtures)
     add_dependencies(${ESSES_PREFIX}_${_bench} ${ESSES_PREFIX}_gen_fixtures)
   endif()
+  # open_bench's startup row launches the application (07 section 12 "Startup to empty workspace"; D-217).
+  if(_bench STREQUAL "open_bench" AND TARGET ${ESSES_PREFIX}_app)
+    add_dependencies(${ESSES_PREFIX}_${_bench} ${ESSES_PREFIX}_app)
+    target_compile_definitions(${ESSES_PREFIX}_${_bench} PRIVATE
+                               "ESSES_APP_EXE=\"$<TARGET_FILE:${ESSES_PREFIX}_app>\"")
+  endif()
   set(_bench_env ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
                  ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:Qt6::Core>")
   if(ESSES_BUILD_BENCH)
-    add_test(NAME bench.${_bench} COMMAND ${ESSES_PREFIX}_${_bench} --gate)
+    add_test(NAME bench.${_bench} COMMAND ${ESSES_PREFIX}_${_bench} ${_esses_bench_gate})
     set_tests_properties(bench.${_bench} PROPERTIES LABELS "bench" TIMEOUT 1800 RUN_SERIAL TRUE ${_bench_env})
   endif()
   if(ESSES_BUILD_TESTS)

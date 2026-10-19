@@ -124,10 +124,10 @@ TEST_CASE("section detector: a stadium has two turns and three straight pieces",
 
 TEST_CASE("section detector: user sections stay, generated ones are replaced", "[unit][AC-M3-04]") {
     TrackMap m = stadium();
-    m.sections.push_back(TrackSection{"u1", "Driver Notes", "Back straight", 300.0, 450.0, "Fast", true});
-    m.sections.push_back(TrackSection{"t1", "Default", "Hairpin entry", 80.0, 110.0, "corner", true});
-    m.sections.push_back(TrackSection{"s9", "Default", "Old generated", 0.0, 50.0, "straight", false});
-    m.sections.push_back(TrackSection{"x1", "Imported", "Kept", 0.0, 50.0, "straight", false});
+    m.sections.push_back(TrackSection{"u1", "Driver Notes", "Back straight", 300.0, 450.0, "Fast", true, ""});
+    m.sections.push_back(TrackSection{"t1", "Default", "Hairpin entry", 80.0, 110.0, "corner", true, ""});
+    m.sections.push_back(TrackSection{"s9", "Default", "Old generated", 0.0, 50.0, "straight", false, ""});
+    m.sections.push_back(TrackSection{"x1", "Imported", "Kept", 0.0, 50.0, "straight", false, ""});
     REQUIRE(SectionDetector::defaults(m));
     checkTiling(m);
     CHECK(names(m) == std::vector<std::string>{"Straight 1", "Turn 1", "Straight 2", "Turn 2", "Straight 3",

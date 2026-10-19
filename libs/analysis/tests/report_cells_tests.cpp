@@ -100,7 +100,7 @@ ReportSpec speedSpec(std::vector<ReportStat> stats, std::vector<std::string> hea
     ReportSpec spec;
     spec.scope = ReportScope::SelectedOutings;
     spec.headers = std::move(headers);
-    spec.channels = {ReportChannel{"Speed", std::move(stats)}};
+    spec.channels = {ReportChannel{"Speed", std::move(stats), ""}};
     return spec;
 }
 
@@ -282,9 +282,10 @@ TEST_CASE("report_cells: Pending, Missing and Error channels; an affine display 
     ReportSpec spec;
     spec.headers = {};
     spec.channels = {
-        ReportChannel{"Temp", {ReportStat::Avg, ReportStat::StdDev, ReportStat::Delta, ReportStat::Change}},
-        ReportChannel{"Busy", {ReportStat::Avg}}, ReportChannel{"Ghost", {ReportStat::Max}},
-        ReportChannel{"Broken", {ReportStat::Min}}, ReportChannel{"Speed", {}}};
+        ReportChannel{
+            "Temp", {ReportStat::Avg, ReportStat::StdDev, ReportStat::Delta, ReportStat::Change}, ""},
+        ReportChannel{"Busy", {ReportStat::Avg}, ""}, ReportChannel{"Ghost", {ReportStat::Max}, ""},
+        ReportChannel{"Broken", {ReportStat::Min}, ""}, ReportChannel{"Speed", {}, ""}};
     const ReportTable t = run(spec, f.inputs({sourceRange(f.main, kLaps, "Lap 1")}), f.cache);
     REQUIRE(t.columns.size() == 7);
     CHECK(t.at(0, 0).value == Catch::Approx(20.0 * 1.8 + 32.0));
@@ -320,11 +321,40 @@ TEST_CASE("report_cells: the StatCache serves a second run and keys the options"
     ReportChannelData bare;
     bare.series = speedSeries(f.tc);
     ReportInputs noDescriptor = inputs;
-    noDescriptor.channels = [&bare](const ReportSource&, std::string_view) { return bare; };
+    noDescriptor.channels = [&bare](const ReportSource&, const ReportChannel&) { return bare; };
     StatCache other;
     const ReportTable uncached = run(spec, noDescriptor, other);
     CHECK(other.size() == 0);
     CHECK(uncached.at(0, 0).value == 49.5);
+}
+
+// M3 item 25 (D-210 (c)): Lap 1's T1 [10 s, 14 s) holds samples 100..139 (0..39 m/s); 14 s is sample 140
+// (40 m/s). End: interpolated at the edge 40 m/s = 144 km/h, by the samples 39 m/s = 140.4 km/h.
+// ignoreInterpolated gives the samples' value and shares the cache key of interpolateBoundaries off.
+TEST_CASE("report_cells: ignoreInterpolated keeps the samples and shares the uninterpolated cache key",
+          "[unit]") {
+    Fixture f;
+    ReportSpec spec = speedSpec({ReportStat::End}, {});
+    spec.scope = ReportScope::SelectedRanges;
+    const auto inputs = f.inputs({sourceRange(f.main, kSections, "T1")});
+    spec.options.interpolateBoundaries = true;
+    const ReportTable interpolated = run(spec, inputs, f.cache);
+    REQUIRE(interpolated.rows.size() == 1);
+    REQUIRE(interpolated.columns.size() == 1);
+    CHECK(interpolated.at(0, 0).value == Catch::Approx(40.0 * kKmh).epsilon(1e-12));
+    CHECK(f.cache.size() == 1);
+
+    spec.options.ignoreInterpolated = true;
+    const ReportTable samples = run(spec, inputs, f.cache);
+    CHECK(samples.at(0, 0).state == ReportCellState::Ok);
+    CHECK(samples.at(0, 0).value == Catch::Approx(39.0 * kKmh).epsilon(1e-12));
+    CHECK(f.cache.size() == 2); // not the interpolated cell
+
+    spec.options.interpolateBoundaries = false;
+    spec.options.ignoreInterpolated = false;
+    const ReportTable plain = run(spec, inputs, f.cache);
+    CHECK(f.cache.size() == 2); // the cell of the ignoreInterpolated run
+    CHECK(plain.at(0, 0) == samples.at(0, 0));
 }
 
 TEST_CASE("report_cells: errors, cancellation and the layout flag", "[unit]") {
@@ -491,8 +521,8 @@ TEST_CASE("report_cells: min, max, absMax and delta under an offset and a negati
     ReportSpec spec;
     spec.headers = {};
     spec.channels = {
-        ReportChannel{"Temp", {ReportStat::AbsMax}},
-        ReportChannel{"Flip", {ReportStat::Min, ReportStat::Max, ReportStat::Delta, ReportStat::Change}}};
+        ReportChannel{"Temp", {ReportStat::AbsMax}, ""},
+        ReportChannel{"Flip", {ReportStat::Min, ReportStat::Max, ReportStat::Delta, ReportStat::Change}, ""}};
     const ReportTable t = run(spec, f.inputs({sourceRange(f.main, kLaps, "Lap 1")}), f.cache);
     REQUIRE(t.columns.size() == 5);                    // Temp's hidden extremes are not shown
     CHECK(t.at(0, 0).value == Catch::Approx(20.0));    // |-20 deg C|, not c(283.15) = 10

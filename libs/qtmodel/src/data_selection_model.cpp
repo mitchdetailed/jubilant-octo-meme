@@ -950,6 +950,49 @@ void DataSelectionModel::closeSource(const model::SourceId& id) {
         return;
     }
     const auto index = static_cast<std::size_t>(pos - sources_.begin());
+    // M4 reload: what this close takes from the selection is parked for sourceReloaded (06 section 6).
+    ParkedClose parked;
+    parked.id = id;
+    if (index + 1 < sources_.size()) {
+        parked.before = sources_[index + 1]->id;
+    }
+    if (const auto own = filters_.find(id); own != filters_.end()) {
+        parked.filter = own->second;
+    }
+    if (snapshot_.overlay0 && snapshot_.overlay0->src == id) {
+        parked.overlay0 = parkedSlot(**pos, *snapshot_.overlay0);
+    }
+    for (std::size_t i = 0; i < snapshot_.overlays.size(); ++i) {
+        if (snapshot_.overlays[i].src == id) {
+            parked.overlays.emplace_back(i, parkedSlot(**pos, snapshot_.overlays[i]));
+        }
+    }
+    // A Main that an earlier parked close moved onto this source goes back to that close's record: when the
+    // earlier source is reloaded, it is that source's Main again, and this range goes back to the slot it
+    // had.
+    ParkedClose* movedHere = nullptr;
+    for (ParkedClose& p : parked_) {
+        if (hasMain() && p.fallbackMain && *p.fallbackMain == snapshot_.main && snapshot_.main.src == id) {
+            movedHere = &p;
+        }
+    }
+    if (hasMain() && snapshot_.main.src == id) {
+        if (movedHere == nullptr) {
+            parked.main = parkedSlot(**pos, snapshot_.main);
+        } else if (movedHere->fallbackFrom == ParkedClose::From::Overlay0) {
+            parked.overlay0 = parkedSlot(**pos, snapshot_.main);
+        } else if (movedHere->fallbackFrom == ParkedClose::From::Overlay) {
+            // The positions above were taken without this range, which held `fallbackIndex` before.
+            const std::size_t k = movedHere->fallbackIndex;
+            for (auto& entry : parked.overlays) {
+                entry.first += entry.first >= k ? 1 : 0;
+            }
+            parked.overlays.emplace_back(k, parkedSlot(**pos, snapshot_.main));
+            std::sort(parked.overlays.begin(), parked.overlays.end(),
+                      [](const auto& x, const auto& y) { return x.first < y.first; });
+        }
+    }
+
     Changes what = Change::Sources;
     if (snapshot_.overlay0 && snapshot_.overlay0->src == id) {
         snapshot_.overlay0.reset();
@@ -977,17 +1020,211 @@ void DataSelectionModel::closeSource(const model::SourceId& id) {
         }
         for (const std::size_t i : order) {
             if (const auto main = initialMainOf(*sources_[i])) {
+                // Where the new Main came from, for a reload to give it back (M4).
+                ParkedClose::From from = ParkedClose::From::None;
+                std::size_t fromIndex = 0;
+                if (snapshot_.overlay0 && *snapshot_.overlay0 == *main) {
+                    from = ParkedClose::From::Overlay0;
+                } else if (const auto o =
+                               std::find(snapshot_.overlays.begin(), snapshot_.overlays.end(), *main);
+                           o != snapshot_.overlays.end()) {
+                    from = ParkedClose::From::Overlay;
+                    fromIndex = static_cast<std::size_t>(o - snapshot_.overlays.begin());
+                }
+                ParkedClose& owner = movedHere != nullptr ? *movedHere : parked;
+                owner.fallbackMain = *main;
+                owner.fallbackFrom = from;
+                owner.fallbackIndex = fromIndex;
                 removeFromSlots(*main, what);
                 snapshot_.main = *main;
                 break;
             }
         }
+        if (movedHere != nullptr && !hasMain()) {
+            movedHere->fallbackMain.reset(); // no range was left to move into Main
+        }
+    }
+    std::erase_if(parked_, [&](const ParkedClose& p) { return p.id == id; });
+    parked_.push_back(std::move(parked));
+    if (parked_.size() > kParkedCloses) {
+        parked_.erase(parked_.begin());
     }
     Q_EMIT sourcesChanged();
     commit(what);
 }
 
+DataSelectionModel::ParkedSlot DataSelectionModel::parkedSlot(const model::DataSource& src,
+                                                              const model::RangeRef& r) {
+    ParkedSlot slot;
+    slot.ref = r;
+    if (const model::Range* range = detail::findRange(src, r)) {
+        slot.kind = range->kind;
+        slot.lapClass = range->lapClass;
+        slot.number = range->number;
+    }
+    return slot;
+}
+
+std::optional<model::RangeRef> DataSelectionModel::reResolveParked(const model::DataSource& src,
+                                                                   const ParkedSlot& slot) const {
+    const model::RangeGroup* g = detail::groupOf(src, slot.ref.layer, slot.ref.groupPath);
+    if (g == nullptr) {
+        return std::nullopt;
+    }
+    for (const model::Range& range : g->ranges) {
+        if (range.id == slot.ref.range) {
+            return detail::makeRef(src, slot.ref.layer, slot.ref.groupPath, range);
+        }
+    }
+    // Fallback: the same lap number and class (06 section 5.6).
+    if (slot.kind == model::RangeKind::Lap) {
+        for (const model::Range& range : g->ranges) {
+            if (range.kind == model::RangeKind::Lap && range.number == slot.number &&
+                range.lapClass == slot.lapClass) {
+                return detail::makeRef(src, slot.ref.layer, slot.ref.groupPath, range);
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+void DataSelectionModel::sourceReloaded(const model::SourceId& previous,
+                                        std::shared_ptr<const model::DataSource> src) {
+    if (src == nullptr) {
+        return;
+    }
+    if (source(src->id) == nullptr) {
+        sourcePublished(src);
+    }
+    const auto it =
+        std::find_if(parked_.begin(), parked_.end(), [&](const ParkedClose& p) { return p.id == previous; });
+    const auto at =
+        std::find_if(sources_.begin(), sources_.end(), [&](const auto& s) { return s->id == src->id; });
+    if (it == parked_.end() || at == sources_.end()) {
+        return;
+    }
+    const ParkedClose p = std::move(*it);
+    parked_.erase(it);
+    Changes what;
+
+    // The Data-window position (06 section 6: sources in a stable order): before the source that followed it,
+    // or, when that one is closed too, before the one that followed that one; else last.
+    std::optional<model::SourceId> anchor = p.before;
+    for (std::size_t hops = 0; anchor && source(*anchor) == nullptr && hops <= kParkedCloses; ++hops) {
+        const auto next = std::find_if(parked_.begin(), parked_.end(),
+                                       [&](const ParkedClose& q) { return q.id == *anchor; });
+        anchor = next == parked_.end() ? std::nullopt : next->before;
+    }
+    if (anchor && source(*anchor) == nullptr) {
+        anchor.reset();
+    }
+    {
+        const auto from = static_cast<std::size_t>(at - sources_.begin());
+        std::shared_ptr<const model::DataSource> moving = sources_[from];
+        sources_.erase(sources_.begin() + static_cast<std::ptrdiff_t>(from));
+        auto to = sources_.end();
+        if (anchor) {
+            to = std::find_if(sources_.begin(), sources_.end(),
+                              [&](const auto& s) { return s->id == *anchor; });
+        }
+        const auto placed = static_cast<std::size_t>(to - sources_.begin());
+        sources_.insert(to, std::move(moving));
+        if (placed != from) {
+            what |= Change::Sources;
+        }
+    }
+    // The source's own filter.
+    bool filterMoved = false;
+    if (p.filter && !(filter(src->id) == *p.filter)) {
+        filters_[src->id] = *p.filter;
+        writeFilters();
+        filterMoved = true;
+    }
+
+    QStringList dropped;
+    const auto give = [&](const ParkedSlot& slot) -> std::optional<model::RangeRef> {
+        auto r = reResolveParked(*src, slot);
+        if (!r) {
+            dropped << QString::fromStdString(slot.ref.name);
+        }
+        return r;
+    };
+    if (p.main) {
+        if (const auto main = give(*p.main)) {
+            // The range the close moved into Main goes back to the slot it held, when it is still Main.
+            if (p.fallbackMain && hasMain() && snapshot_.main == *p.fallbackMain &&
+                !(*p.fallbackMain == *main)) {
+                const model::RangeRef back = snapshot_.main;
+                if (p.fallbackFrom == ParkedClose::From::Overlay0 && !snapshot_.overlay0) {
+                    snapshot_.overlay0 = back;
+                    what |= Change::Overlay0;
+                } else if (p.fallbackFrom == ParkedClose::From::Overlay &&
+                           std::find(snapshot_.overlays.begin(), snapshot_.overlays.end(), back) ==
+                               snapshot_.overlays.end()) {
+                    const std::size_t k = std::min(p.fallbackIndex, snapshot_.overlays.size());
+                    snapshot_.overlays.insert(snapshot_.overlays.begin() + static_cast<std::ptrdiff_t>(k),
+                                              back);
+                    what |= Change::Overlays;
+                }
+            }
+            removeFromSlots(*main, what);
+            if (!hasMain() || !(snapshot_.main == *main)) {
+                snapshot_.main = *main;
+                what |= Change::Main;
+            }
+        }
+    }
+    // A slot whose range is Main now (this source's first range became Main when it was published alone):
+    // when another parked close will take Main back, that close gives this range its slot then.
+    const auto handOver = [&](const model::RangeRef& r, ParkedClose::From slotKind, std::size_t slotIndex) {
+        for (auto q = parked_.rbegin(); q != parked_.rend(); ++q) {
+            if (q->main) {
+                q->fallbackMain = r;
+                q->fallbackFrom = slotKind;
+                q->fallbackIndex = slotIndex;
+                return;
+            }
+        }
+    };
+    if (p.overlay0) {
+        if (const auto o = give(*p.overlay0)) {
+            if (hasMain() && *o == snapshot_.main) {
+                handOver(*o, ParkedClose::From::Overlay0, 0);
+            } else {
+                removeFromSlots(*o, what);
+                snapshot_.overlay0 = *o;
+                what |= Change::Overlay0;
+            }
+        }
+    }
+    for (const auto& [k, slot] : p.overlays) {
+        const auto o = give(slot);
+        if (o && hasMain() && *o == snapshot_.main) {
+            handOver(*o, ParkedClose::From::Overlay, k);
+            continue;
+        }
+        if (!o || (snapshot_.overlay0 && *o == *snapshot_.overlay0) ||
+            std::find(snapshot_.overlays.begin(), snapshot_.overlays.end(), *o) != snapshot_.overlays.end()) {
+            continue;
+        }
+        const std::size_t pos = std::min(k, snapshot_.overlays.size());
+        snapshot_.overlays.insert(snapshot_.overlays.begin() + static_cast<std::ptrdiff_t>(pos), *o);
+        what |= Change::Overlays;
+    }
+    for (const QString& name : dropped) {
+        Q_EMIT hint(tr("Reload: %1 no longer exists and left its slot.").arg(name));
+    }
+    if (filterMoved) {
+        Q_EMIT filterChanged(src->id);
+    }
+    if (what.testFlag(Change::Sources)) {
+        Q_EMIT sourcesChanged();
+    }
+    commit(what);
+}
+
 void DataSelectionModel::closeAllSources() {
+    parked_.clear();
     if (sources_.empty()) {
         return;
     }

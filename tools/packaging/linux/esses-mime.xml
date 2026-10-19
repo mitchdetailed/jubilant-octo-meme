@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 the Esses contributors -->
+<!-- SPDX-License-Identifier: MIT -->
+<!-- The MIME type of .ld log files for Esses (06 section 19 item 5; D-212): installed as
+     share/mime/packages/esses.xml. The glob's weight is low (the default is 50), so another type claiming *.ld
+     (a linker script, say) wins where it is defined. -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-esses-log">
+    <comment>Data-logger log file</comment>
+    <generic-icon name="application-x-generic"/>
+    <glob pattern="*.ld" weight="10"/>
+  </mime-type>
+</mime-info>

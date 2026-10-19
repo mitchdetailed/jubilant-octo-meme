@@ -491,11 +491,17 @@ Micros probeMicros(const ReportOptions& options) noexcept {
     return us >= 9.0e18 ? kMicrosMax : static_cast<Micros>(std::llround(us));
 }
 
+// Whether start/end/change read the value at the exact range edge: interpolateBoundaries, unless
+// ignoreInterpolated keeps every statistic on the channel's own samples (D-210 (c)).
+bool interpolatesEdges(const ReportOptions& options) noexcept {
+    return options.interpolateBoundaries && !options.ignoreInterpolated;
+}
+
 // The edges of [start, end) when the options interpolate and a requested statistic needs them.
 Result<Edges> edgesFor(const store::Series& series, Micros start, Micros end, const ReportOptions& options,
                        store::Interp interp, bool needed, const CancelToken& cancel) {
     Edges e;
-    if (!options.interpolateBoundaries || !needed) {
+    if (!interpolatesEdges(options) || !needed) {
         return e;
     }
     Result<std::optional<double>> a = valueAtEdge(series, start, interp, cancel);
@@ -811,7 +817,8 @@ Result<Scan> scanRow(const store::Series& series, Micros start, Micros end,
 std::uint64_t optionsHashOf(const ReportOptions& options, store::Interp interp) {
     Hash128Stream h;
     h.updateU64(static_cast<std::uint64_t>(probeMicros(options)));
-    h.updateU64(options.interpolateBoundaries ? static_cast<std::uint64_t>(interp) + 1u : 0u);
+    // ignoreInterpolated gives the cells of interpolateBoundaries off, so it shares their key.
+    h.updateU64(interpolatesEdges(options) ? static_cast<std::uint64_t>(interp) + 1u : 0u);
     return h.digest().lo | 1u; // never 0, the value of the statistics that ignore the options
 }
 
@@ -912,7 +919,7 @@ Result<ReportTable> ReportEngine::cells(const ReportSpec& spec, const ReportInpu
     const auto lookup = [&](std::size_t source, std::size_t ch) -> const ReportChannelData& {
         std::optional<ReportChannelData>& slot = lookups[source * nch + ch];
         if (!slot) {
-            slot = inputs.channels ? inputs.channels(inputs.sources[source], spec.channels[ch].name)
+            slot = inputs.channels ? inputs.channels(inputs.sources[source], spec.channels[ch])
                                    : ReportChannelData{};
         }
         return *slot;

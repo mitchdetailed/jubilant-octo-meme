@@ -199,8 +199,8 @@ struct BoundChannels {
         }
     }
     analysis::ReportChannelLookup lookup() const {
-        return [this](const analysis::ReportSource&, std::string_view name) {
-            const auto it = byName.find(std::string(name));
+        return [this](const analysis::ReportSource&, const analysis::ReportChannel& c) {
+            const auto it = byName.find(c.name);
             return it != byName.end() ? it->second : analysis::ReportChannelData{};
         };
     }

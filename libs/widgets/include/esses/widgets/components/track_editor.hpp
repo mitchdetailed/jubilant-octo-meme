@@ -14,10 +14,12 @@
 //   3. default sections (analysis::SectionDetector::defaults, Turns/Straights, >= 10 m) at the first
 //      acceptance; a later acceptance keeps the map's user sections and regenerates the default ones (one
 //      command); "Regenerate default sections"
-//   4. sections table: name, set, start, end (metres along the track; Corr Dist is metres), category,
-//      user-defined; add (numerically, or from the cursor span the shell passes with setCursorSpan), edit,
-//      delete; >= 10 m and inside the track enforced; user sections go to a named set ("User" by default) and
-//      may overlap other sets
+//   4. sections table: name, set, start, end, category, speed class (M4: none, slow or fast), user-defined;
+//      add (numerically, or from the cursor span the shell passes with setCursorSpan), edit, delete; >= 10 m
+//      and inside the track enforced; user sections go to a named set ("User" by default) and may overlap
+//      other sets. M4 (D-211 (c)): the table and the start / end fields show and edit the bounds in the Corr
+//      Dist display unit (distanceUnit(): plot::corrDistDisplayUnit of the project's Corr Dist and Corr
+//      Speed overrides, m without them), followed when the overrides change; the API below stays in metres
 //   6. rename (moves the map to another venue's file) / delete the track file; "Auto-generate on open" (the
 //      project option trackMaps.autoGenerateOnOpen, a SetProjectOptionsCommand)
 // Every edit is one QUndoCommand on the project's stack (02 section 7). A generation whose maths inputs are
@@ -34,6 +36,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -96,11 +99,19 @@ public:
     // The track-distance span "add from cursor span" uses (the shell sets it from the worksheet); nullopt
     // disables the button.
     void setCursorSpan(std::optional<std::pair<double, double>> span);
+    // `speedClass`: "" (none), "slow" or "fast" (analysis::TrackMap::kSpeedClasses); editSection keeps the
+    // section's class when it is nullopt.
     bool addSection(const QString& name, double startM, double endM, const QString& category,
-                    const QString& set = QString::fromLatin1(kUserSet));
+                    const QString& set = QString::fromLatin1(kUserSet), const QString& speedClass = {});
     bool addSectionFromCursorSpan(const QString& name);
     bool editSection(const QString& id, const QString& name, double startM, double endM,
-                     const QString& category);
+                     const QString& category, const std::optional<QString>& speedClass = std::nullopt);
+    // M4 (D-211 (c)): the symbol of the unit the section bounds are shown and edited in (the Corr Dist
+    // display unit) and the form's fields in it (tests).
+    QString distanceUnit() const;
+    QDoubleSpinBox* startField() const noexcept { return start_; }
+    QDoubleSpinBox* endField() const noexcept { return end_; }
+    QComboBox* speedClassField() const noexcept { return speedClass_; }
     bool deleteSection(const QString& id);
     // 6. files and the project option.
     bool renameVenue(const QString& to);
@@ -122,11 +133,20 @@ private:
     void refreshSections();
     void refreshAvailability();
     void loadForm(int row);
+    // M4 (D-211 (c)): the Corr Dist display unit's conversions (metres <-> shown) and the fields' units.
+    double toShown(double metres) const;
+    double toMetres(double shown) const;
+    // A bound field in metres (D-217): the stored bound while the field still shows it (the field rounds it
+    // to its decimals, so a section that ends at the track's length would otherwise leave the track or
+    // shrink), else the field's value, kept on the track [0, lengthM].
+    double fieldMetres(const QDoubleSpinBox& field, std::optional<double> storedM, double lengthM) const;
+    void applyDistanceUnit();
     void setStatus(const QString& text);
     bool pushMap(std::shared_ptr<const analysis::TrackMap> after, const QString& text,
                  bool backupFirst = false);
     static void keepEditedDefaults(analysis::TrackMap& map);
     bool checkSection(const analysis::TrackMap& map, double startM, double endM, const QString& name);
+    bool checkSpeedClass(const std::string& speedClass);
     std::optional<model::RangeRef> lapAt(const QComboBox* combo) const;
     std::string venueOf(const model::RangeRef& lap) const;
 
@@ -164,6 +184,7 @@ private:
     QDoubleSpinBox* start_ = nullptr;
     QDoubleSpinBox* end_ = nullptr;
     QComboBox* category_ = nullptr;
+    QComboBox* speedClass_ = nullptr; // M4: "" / slow / fast as item data
     QPushButton* add_ = nullptr;
     QPushButton* addSpan_ = nullptr;
     QPushButton* apply_ = nullptr;

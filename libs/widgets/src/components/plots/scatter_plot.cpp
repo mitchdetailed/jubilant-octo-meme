@@ -301,11 +301,11 @@ bool ScatterPlot::stepCursor(int points) {
     }
     const plot::SlotData& main = in.slots.front();
     const Micros period = std::max<Micros>(1, u->rate.timeAt(1, 0));
-    const Micros t = main.range.start + context_.view.state().cursorT;
+    const Micros t = main.range.start + viewState().cursorT;
     const auto index =
         static_cast<Micros>(std::llround(static_cast<double>(t - u->t0) / static_cast<double>(period)));
     const Micros next = u->t0 + (index + points) * period;
-    context_.view.setCursor(next - main.range.start, qt::CursorSource::Keyboard);
+    setViewCursor(next - main.range.start, qt::CursorSource::Keyboard);
     return true;
 }
 
@@ -318,7 +318,7 @@ bool ScatterPlot::pickPoint(QPointF logical) {
     if (hit.kind == plot::HitKind::None) {
         return false;
     }
-    context_.view.setCursor(tag, qt::CursorSource::Click); // the point's Main-lap time (D-196)
+    setViewCursor(tag, qt::CursorSource::Click); // the point's Main-lap time (D-196)
     return true;
 }
 
@@ -360,7 +360,7 @@ void ScatterPlot::setAxisZoom(std::optional<AxisZoom> zoom) {
         return;
     }
     axisZoom_ = zoom;
-    onViewChanged(context_.view.state(), plot::mask(plot::Change::Scale));
+    onViewChanged(viewState(), plot::mask(plot::Change::Scale));
 }
 
 void ScatterPlot::adjustInputs(plot::ComponentBuildInputs& in) const {

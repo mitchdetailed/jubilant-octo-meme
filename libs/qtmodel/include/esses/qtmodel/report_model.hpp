@@ -10,8 +10,11 @@
 // report/<componentId>) and delivers the table on the GUI thread through the Dispatcher (posted with the
 // Dispatcher as the context and a QPointer made at submit time). Calls in one event-loop turn coalesce into
 // one run; a delivered table is always shown (a superseded one as an interim). Pending cells show "..." and
-// fill in when the widget refreshes on Data. One analysis::StatCache per workspace is shared by every
-// ReportModel (RenderService::statCache()).
+// fill in when the widget refreshes on Data. M4 (M3 item 30, D-210 (e)): a delivery or a display change
+// (highlight, time format) that keeps the table's rows and columns (the same header labels, row labels and
+// row kinds) updates the cells in place with one dataChanged over the table, so a view's selection and
+// current cell survive the refresh; any other table resets the model. One analysis::StatCache per workspace
+// is shared by every ReportModel (RenderService::statCache()).
 //
 // Scope. Channel reports: selectedRanges = every visible slot's range (Main, Overlay 0, overlays, with
 // their roles); selectedOutings = the outing around each visible slot (once, the first slot's role);

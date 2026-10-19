@@ -9,7 +9,11 @@
 //
 // Before each decode the provider checks MappedFile::changedOnDisk(): a changed file fails the chunk with Io
 // and logs ld.source_changed once in the DecodeLog. The decode loop runs through MappedFile::guarded(), so a
-// page fault seals the chunk AllInvalid with ld.io_fault instead of terminating the process.
+// page fault seals the chunk AllInvalid with ld.io_fault instead of terminating the process; ld.io_fault is
+// logged once per source (the DecodeLog is the source's, shared by its channels; 02 section 1 behaviour 5).
+// M4 (AC-M4-10, 02 section 8 AC-4a): setDecoder replaces decodeConverted for the fault-injection tests, which
+// raise a page fault inside MappedFile::guarded() where no real one can be made (Windows refuses the
+// truncation that would cause it).
 //
 // An optional LdConversion (the open pipeline's conversion to the quantity's base unit, D-010) is applied in
 // F64 after the channel's scaling and before the one narrowing to the output dtype, so a converted F32 sample
@@ -47,6 +51,11 @@ Result<void> decodeConverted(const LdFile& file, std::uint32_t ch, std::uint64_t
 
 class LdChunkProvider final : public store::IChunkProvider {
 public:
+    // The decode of one chunk's samples: decodeConverted's signature.
+    using Decoder = Result<void> (*)(const LdFile& file, std::uint32_t ch, std::uint64_t first,
+                                     std::uint64_t count, store::Dtype outDtype,
+                                     const std::optional<LdConversion>& conversion, std::span<std::byte> out);
+
     // `log` may be null (no decode diagnostics recorded).
     LdChunkProvider(std::shared_ptr<const LdFile> file, std::uint32_t channel,
                     std::shared_ptr<DecodeLog> log = nullptr,
@@ -62,12 +71,16 @@ public:
     const LdFile& file() const noexcept { return *file_; }
     std::uint32_t channel() const noexcept { return channel_; }
     const std::optional<LdConversion>& conversion() const noexcept { return conversion_; }
+    // Tests only (AC-4a fault injection): the decode materialise() runs; null restores decodeConverted. Set
+    // it before the provider is shared.
+    void setDecoder(Decoder decoder) noexcept { decoder_ = decoder != nullptr ? decoder : &decodeConverted; }
 
 private:
     std::shared_ptr<const LdFile> file_;
     std::uint32_t channel_;
     std::shared_ptr<DecodeLog> log_;
     std::optional<LdConversion> conversion_;
+    Decoder decoder_ = &decodeConverted;
     std::atomic<bool> changeLogged_{false};
 };
 

@@ -23,13 +23,18 @@
 #include <esses/qtrender/raster_backend.hpp>
 #include <esses/store/resampler.hpp>
 #include <esses/widgets/components/time_distance_graph.hpp>
+#include <esses/widgets/properties_shell/properties_dialog.hpp>
 
 #include <QClipboard>
 #include <QContextMenuEvent>
 #include <QGuiApplication>
 #include <QHelpEvent>
 #include <QHideEvent>
+#include <QHoverEvent>
 #include <QInputDialog>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QKeyEvent>
 #include <QMenu>
 #include <QMouseEvent>
@@ -43,9 +48,11 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <map>
 #include <string_view>
 #include <utility>
 #include <variant>
+#include <vector>
 
 namespace esses::widgets {
 
@@ -84,6 +91,74 @@ QString valueText(const plot::ResolvedChannel& rc, Micros t, int dps, double* ou
     return QString::number(display, 'f', std::clamp(dps, 0, 9));
 }
 
+// Where each group of `before` is in `after` (-1: gone), for the vertical zoom, which is local view state
+// keyed by the group's index (D-217). A group still in its place stays there; the others are found by their
+// name and channels (the k-th of equal groups to the k-th), so a move, its undo and its redo carry the zoom
+// along. The groups left over on both sides are then paired in order when there are as many of each, so a
+// group edited in place (a channel added or removed, renamed in Group Properties) keeps its zoom as it did
+// by index. When a group was added or removed the counts differ, and only the groups found follow.
+std::vector<int> followGroups(const std::vector<plot::TdGroup>& before,
+                              const std::vector<plot::TdGroup>& after) {
+    const auto identity = [](const plot::TdGroup& g) {
+        std::string key = g.name;
+        for (const plot::TdTrace& t : g.traces) {
+            key += '\x1f';
+            key += t.channel;
+        }
+        return key;
+    };
+    std::vector<std::string> oldKeys;
+    oldKeys.reserve(before.size());
+    for (const plot::TdGroup& g : before) {
+        oldKeys.push_back(identity(g));
+    }
+    std::vector<std::string> newKeys;
+    newKeys.reserve(after.size());
+    for (const plot::TdGroup& g : after) {
+        newKeys.push_back(identity(g));
+    }
+    std::vector<int> to(before.size(), -1);
+    std::vector<bool> taken(after.size(), false);
+    for (std::size_t i = 0; i < before.size() && i < after.size(); ++i) {
+        if (oldKeys[i] == newKeys[i]) {
+            to[i] = static_cast<int>(i);
+            taken[i] = true;
+        }
+    }
+    // identity -> a group of `after` not taken yet (equal identities in order)
+    std::multimap<std::string, int> unmatched;
+    for (std::size_t j = 0; j < after.size(); ++j) {
+        if (!taken[j]) {
+            unmatched.emplace(newKeys[j], static_cast<int>(j));
+        }
+    }
+    std::vector<std::size_t> leftOver;
+    for (std::size_t i = 0; i < before.size(); ++i) {
+        if (to[i] >= 0) {
+            continue;
+        }
+        if (const auto it = unmatched.lower_bound(oldKeys[i]);
+            it != unmatched.end() && it->first == oldKeys[i]) {
+            to[i] = it->second;
+            unmatched.erase(it);
+        } else {
+            leftOver.push_back(i);
+        }
+    }
+    if (leftOver.size() == unmatched.size()) {
+        std::vector<int> open;
+        open.reserve(unmatched.size());
+        for (const auto& entry : unmatched) {
+            open.push_back(entry.second);
+        }
+        std::sort(open.begin(), open.end());
+        for (std::size_t k = 0; k < leftOver.size(); ++k) {
+            to[leftOver[k]] = open[k];
+        }
+    }
+    return to;
+}
+
 } // namespace
 
 TimeDistanceGraph::TimeDistanceGraph(const project::ComponentSpec& spec, WorksheetContext& context,
@@ -95,6 +170,7 @@ TimeDistanceGraph::TimeDistanceGraph(const project::ComponentSpec& spec, Workshe
     }
     setAttribute(Qt::WA_OpaquePaintEvent); // the Static image covers the component (background Clear)
     setMouseTracking(body_.keyStats);      // the measurement hover line needs button-less moves
+    setAttribute(Qt::WA_Hover);            // HoverMove: the group headings' pointer (D-211 (e))
     setScheme(schemeOrDefault(context.scheme));
     pendingTimer_->setSingleShot(true);
     pendingTimer_->setInterval(kPendingStripeDelayMs);
@@ -155,18 +231,25 @@ double TimeDistanceGraph::dprOrOne() const {
 
 void TimeDistanceGraph::applySpec(const project::ComponentSpec& spec) {
     ComponentWidget::applySpec(spec);
+    const std::vector<plot::TdGroup> before = std::move(body_.groups);
     if (auto parsed = plot::TimeDistanceBody::parse(spec.body)) {
         body_ = std::move(parsed).value();
     } else {
         body_ = plot::TimeDistanceBody{};
     }
-    // Vertical zoom is per group: a group that is gone loses it.
-    std::erase_if(local_.vZoom, [this](const auto& z) {
-        return z.first < 0 || static_cast<std::size_t>(z.first) >= body_.groups.size();
-    });
+    // Vertical zoom is per group: it follows its group into the new body (followGroups; D-217), also on undo
+    // and redo; a group that is gone loses it.
+    const std::vector<int> to = followGroups(before, body_.groups);
+    std::map<int, plot::TdGroupZoom> zoom;
+    for (const auto& [g, z] : local_.vZoom) {
+        if (g >= 0 && static_cast<std::size_t>(g) < to.size() && to[static_cast<std::size_t>(g)] >= 0) {
+            zoom[to[static_cast<std::size_t>(g)]] = z;
+        }
+    }
+    local_.vZoom = std::move(zoom);
     setMouseTracking(body_.keyStats || bandStart_.has_value());
     hoverLineX_.reset();
-    onViewChanged(context_.view.state(), plot::kFullRebuild);
+    onViewChanged(viewState(), plot::kFullRebuild);
 }
 
 void TimeDistanceGraph::onViewChanged(const plot::ViewState& view, plot::ChangeMask what) {
@@ -203,18 +286,18 @@ void TimeDistanceGraph::onViewChanged(const plot::ViewState& view, plot::ChangeM
 void TimeDistanceGraph::onSelectionChanged(const plot::SelectionSnapshot&) {
     // The snapshot is read again when the build is prepared (the WorksheetViewModel's Selection bit, which
     // may arrive first, coalesces with this one).
-    onViewChanged(context_.view.state(), plot::mask(plot::Change::Selection));
+    onViewChanged(viewState(), plot::mask(plot::Change::Selection));
 }
 
 void TimeDistanceGraph::onDataChanged(const model::SourceId& source, std::uint64_t) {
     if (showsSource(source)) {
-        onViewChanged(context_.view.state(), plot::mask(plot::Change::Data));
+        onViewChanged(viewState(), plot::mask(plot::Change::Data));
     }
 }
 
 void TimeDistanceGraph::onSchemeChanged(const project::Scheme& scheme) {
     setScheme(std::make_shared<const project::Scheme>(scheme));
-    onViewChanged(context_.view.state(), plot::mask(plot::Change::Scheme));
+    onViewChanged(viewState(), plot::mask(plot::Change::Scheme));
 }
 
 QStringList TimeDistanceGraph::channelNames() const {
@@ -315,19 +398,19 @@ bool TimeDistanceGraph::handleCommand(const QString& id, const QVariantList& arg
         if (arg(0).toString() == QLatin1String("y")) {
             verticalZoomFull();
         } else {
-            context_.view.zoomFull();
+            viewZoomFull();
         }
     } else if (id == QLatin1String("zoom.wheel")) {
         const int notches = args.isEmpty() ? 1 : arg(0).toInt();
-        plots::zoomAboutCursor(context_, inputs_, std::pow(kWheelZoomIn, notches));
+        plots::zoomAboutCursor(*this, inputs_, std::pow(kWheelZoomIn, notches));
     } else if (id == QLatin1String("pan.drag_axis")) {
-        context_.view.panBy(arg(0).toDouble());
+        viewPanBy(arg(0).toDouble());
     } else if (id == QLatin1String("cursor.place")) {
         if (!inputs_.slots.empty()) {
             const plot::SlotData& main = inputs_.slots.front();
             const plot::DomainMapper map(inputs_.view.domain, main.range, main.outing, main.chain, Rate{}, 0);
-            const double x = args.isEmpty() ? map.xOf(main.range.start + context_.view.state().cursorT)
-                                            : arg(0).toDouble();
+            const double x =
+                args.isEmpty() ? map.xOf(main.range.start + viewState().cursorT) : arg(0).toDouble();
             setCursorAtDomainX(x, body_.cursorSnap);
         }
     } else {
@@ -388,7 +471,7 @@ void TimeDistanceGraph::cycleStyle() {
 
 QString TimeDistanceGraph::cursorValuesText() const {
     QStringList lines;
-    const plot::ViewState& view = context_.view.state();
+    const plot::ViewState view = viewState();
     if (inputs_.slots.empty()) {
         return {};
     }
@@ -445,7 +528,10 @@ ComponentWidget::ExportJob TimeDistanceGraph::exportJob(const ExportOptions& opt
     for (std::size_t i = 0; i < body_.channelNames().size(); ++i) {
         channels.push_back(i);
     }
-    return [in, channels](const CancelToken& cancel) { return plots::timeSeriesCsv(in, channels, cancel); };
+    const plots::LegacyExportInfo info{context_.view.definition().name};
+    return [in, channels, info](const CancelToken& cancel) {
+        return plots::legacyCsv(in, channels, info, cancel);
+    };
 }
 
 bool TimeDistanceGraph::exportData(ExportSink& sink, const ExportOptions& options) const {
@@ -502,7 +588,7 @@ void TimeDistanceGraph::changeVerticalZoom(int group, plot::TdGroupZoom zoom) {
     } else {
         local_.vZoom[group] = next;
     }
-    onViewChanged(context_.view.state(), plot::mask(plot::Change::Scale));
+    onViewChanged(viewState(), plot::mask(plot::Change::Scale));
 }
 
 void TimeDistanceGraph::verticalZoom(double factor) {
@@ -548,8 +634,7 @@ std::optional<double> TimeDistanceGraph::cursorValueFraction(int group) const {
                 continue;
             }
             double v = std::numeric_limits<double>::quiet_NaN();
-            static_cast<void>(valueText(main.channels[index],
-                                        main.range.start + context_.view.state().cursorT,
+            static_cast<void>(valueText(main.channels[index], main.range.start + viewState().cursorT,
                                         t.dps.value_or(main.channels[index].dps), &v));
             if (!std::isfinite(v)) {
                 return std::nullopt;
@@ -579,7 +664,7 @@ std::optional<double> TimeDistanceGraph::offsetStep(int slot) const {
     if (slot < 0 || static_cast<std::size_t>(slot) >= inputs_.slots.size()) {
         return std::nullopt;
     }
-    if (context_.view.state().domain == plot::Domain::Distance) {
+    if (viewState().domain == plot::Domain::Distance) {
         return analysis::DistanceIndex::kStepM;
     }
     const plot::SlotData& s = inputs_.slots[static_cast<std::size_t>(slot)];
@@ -618,7 +703,7 @@ bool TimeDistanceGraph::addAnnotationAtCursor(const QString& text) {
     }
     model::Annotation a;
     a.id = uuidRandom();
-    a.tUs = main->start + context_.view.state().cursorT; // the Main source's absolute time
+    a.tUs = main->start + viewState().cursorT; // the Main source's absolute time
     a.text = text.toStdString();
     if (!spec_.activeChannel.empty()) {
         a.channel = spec_.activeChannel;
@@ -886,8 +971,8 @@ void TimeDistanceGraph::prepare() {
     layers_.resize(size(), dpr);
     const QSize device = layers_.deviceSize();
     const plot::LayoutContext layout{device.width(), device.height(), static_cast<float>(dpr)};
-    inputs_ = context_.render.prepareInputs(spec_, context_.view.state(), context_.selection.snapshot(),
-                                            layout, scheme_, metrics_);
+    inputs_ = context_.render.prepareInputs(spec_, viewState(), context_.selection.snapshot(), layout,
+                                            scheme_, metrics_);
     // A drag or key burst in progress (04 section 3.3 item 4): the pending offsets move the traces now.
     const auto& pending = context_.view.pendingOffsets();
     for (plot::SlotData& slot : inputs_.slots) {
@@ -996,7 +1081,7 @@ void TimeDistanceGraph::rebuildDynamic() {
         return;
     }
     dynamicDirty_ = false;
-    inputs_.view = context_.view.state();
+    inputs_.view = viewState();
     plot::DrawList next = plot::TimeDistanceBuilder::buildDynamic(inputs_, local_);
     const plot::Rgba zoomColour = scheme_->role("cursorZoom", kBandFallback);
     if (bandStart_ && layout_.traceArea.w > 0.0F) { // rubber band (Dynamic, 04 section 5.2)
@@ -1030,6 +1115,14 @@ void TimeDistanceGraph::rebuildDynamic() {
         const float y = std::round(*guideY_) + 0.5F;
         const std::array<float, 4> seg{layout_.traceArea.x, y, layout_.traceArea.x + layout_.traceArea.w, y};
         next.lines(seg.data(), 2, zoomColour, lineW, plot::DashId::Dash);
+    }
+    if (groupDropY_) { // a group heading being dragged: where the group goes, across the key and the panels
+        const float y = std::round(*groupDropY_) + 0.5F;
+        const float x0 = std::min(layout_.keyColumn.x, layout_.traceArea.x);
+        const float x1 =
+            std::max(layout_.keyColumn.x + layout_.keyColumn.w, layout_.traceArea.x + layout_.traceArea.w);
+        const std::array<float, 4> seg{x0, y, x1, y};
+        next.lines(seg.data(), 2, zoomColour, 2.0F * lineW, plot::DashId::Dash);
     }
     ++dynamicBuilds_;
     lastDamage_ = layers_.dynamicDamage(layers_.dynamicList(), next);
@@ -1103,7 +1196,7 @@ void TimeDistanceGraph::updateWorksheetHints() {
     }
     context_.view.setActiveSamplePeriod(period);
     // The offset step of every visible slot's source (04 section 3.3 item 3): its active channel's period.
-    if (context_.view.state().domain == plot::Domain::Time) {
+    if (viewState().domain == plot::Domain::Time) {
         for (std::size_t k = 0; k < inputs_.slots.size(); ++k) {
             if (const std::optional<double> step = offsetStep(static_cast<int>(k))) {
                 context_.view.setSourceSamplePeriod(inputs_.slots[k].slot.range.src,
@@ -1203,13 +1296,13 @@ std::optional<double> TimeDistanceGraph::domainXAt(double logicalX) const {
     const double x0 = static_cast<double>(layout_.traceArea.x);
     const auto width = static_cast<double>(layout_.traceWidthPx);
     const double px = std::clamp(logicalX * dpr, x0, x0 + width);
-    return plot::DomainMapper::xOfPx(px, context_.view.state().zoom, x0, width);
+    return plot::DomainMapper::xOfPx(px, viewState().zoom, x0, width);
 }
 
 double TimeDistanceGraph::logicalXOf(double domainX) const {
-    const double px = plot::DomainMapper::pxOf(domainX, context_.view.state().zoom,
-                                               static_cast<double>(layout_.traceArea.x),
-                                               static_cast<double>(layout_.traceWidthPx));
+    const double px =
+        plot::DomainMapper::pxOf(domainX, viewState().zoom, static_cast<double>(layout_.traceArea.x),
+                                 static_cast<double>(layout_.traceWidthPx));
     return px / dprOrOne();
 }
 
@@ -1218,7 +1311,7 @@ std::optional<double> TimeDistanceGraph::cursorLogicalX() const {
         return std::nullopt;
     }
     const plot::SlotData& main = inputs_.slots.front();
-    const plot::ViewState& view = context_.view.state();
+    const plot::ViewState view = viewState();
     const plot::DomainMapper map(view.domain, main.range, main.outing, main.chain, Rate{}, 0);
     if (view.domain == plot::Domain::Distance && !map.hasDistance()) {
         return std::nullopt;
@@ -1246,7 +1339,7 @@ void TimeDistanceGraph::setCursorAtDomainX(double x, bool snap) {
         return;
     }
     const plot::SlotData& main = inputs_.slots.front();
-    const plot::ViewState& view = context_.view.state();
+    const plot::ViewState view = viewState();
     const plot::DomainMapper map(view.domain, main.range, main.outing, main.chain, Rate{}, 0);
     if (view.domain == plot::Domain::Distance && !map.hasDistance()) {
         return; // no x axis to place a cursor on (banner)
@@ -1266,7 +1359,7 @@ void TimeDistanceGraph::setCursorAtDomainX(double x, bool snap) {
             }
         }
     }
-    context_.view.setCursor(t - main.range.start, qt::CursorSource::Click);
+    setViewCursor(t - main.range.start, qt::CursorSource::Click);
 }
 
 void TimeDistanceGraph::startRubberBand(QPointF logical, BandAxis axis) {
@@ -1300,7 +1393,7 @@ void TimeDistanceGraph::finishRubberBand(QPointF logical) {
     const int group = bandGroup_;
     endRubberBand();
     if (axis != BandAxis::Vertical && end && *end != start) {
-        context_.view.zoomTo(plot::XSpan{std::min(start, *end), std::max(start, *end)});
+        setViewZoom(plot::XSpan{std::min(start, *end), std::max(start, *end)});
     }
     if (axis != BandAxis::Horizontal) {
         // Vertical: the band's share of the active group's panel becomes its shown fraction.
@@ -1361,7 +1454,7 @@ void TimeDistanceGraph::mousePressEvent(QMouseEvent* event) {
     case plot::HitKind::Axis:
         if (hit.group < 0) { // the x axis (a group's axis strip is its vertical axis)
             drag_ = Drag::Pan;
-            dragStartZoom_ = context_.view.state().zoom;
+            dragStartZoom_ = viewState().zoom;
         } else {
             drag_ = Drag::VPan;
             dragStartVZoom_ = verticalZoomOf(hit.group);
@@ -1370,16 +1463,16 @@ void TimeDistanceGraph::mousePressEvent(QMouseEvent* event) {
     case plot::HitKind::ScrollBar:
         if (hit.handleKind == plot::HandleKind::ScrollThumb) {
             drag_ = hit.group < 0 ? Drag::Thumb : Drag::VThumb;
-            dragStartZoom_ = context_.view.state().zoom;
+            dragStartZoom_ = viewState().zoom;
             dragStartVZoom_ = verticalZoomOf(hit.group);
         } else if (hit.group < 0 && layout_.scrollbar.w > 0.0F) {
             // A click on the track pages toward it (04 section 8.6: F / B).
             const double px = p.x() * dprOrOne();
-            const double thumbCentre = 0.5 * (context_.view.state().zoom.a + context_.view.state().zoom.b);
+            const double thumbCentre = 0.5 * (viewState().zoom.a + viewState().zoom.b);
             const plot::XSpan extent = info_.scrollExtent;
             const double clicked = extent.a + (px - static_cast<double>(layout_.scrollbar.x)) /
                                                   static_cast<double>(layout_.scrollbar.w) * extent.length();
-            context_.view.panBy(clicked < thumbCentre ? -0.9 : 0.9);
+            viewPanBy(clicked < thumbCentre ? -0.9 : 0.9);
         } else if (hit.group >= 0) {
             if (const plot::TdGroupLayout* gl = groupLayout(hit.group);
                 gl != nullptr && gl->vScroll.h > 0.0F) {
@@ -1408,9 +1501,109 @@ void TimeDistanceGraph::mousePressEvent(QMouseEvent* event) {
         }
         break;
     }
+    case plot::HitKind::GroupHeading: // a drag moves the group (04 section 8.2 item 4, D-211 (e))
+        drag_ = Drag::Group;
+        groupDropIndex_.reset();
+        groupDropY_.reset();
+        break;
     default: // bands, markers, annotations: a click never moves the cursor (04 section 8.11 item 1)
         break;
     }
+}
+
+// M4 (D-211 (e)): where a group heading dragged to `logicalY` would go. The groups' keys in their order down
+// the key column; the dragged group is placed before the first other group whose key's middle lies below the
+// pointer. Nothing shows until the pointer has moved 4 logical px.
+void TimeDistanceGraph::updateGroupDrop(double logicalY) {
+    const int from = dragHit_.group;
+    std::optional<int> index;
+    std::optional<float> lineY;
+    if (std::abs(logicalY - dragStartY_) >= 4.0 && from >= 0) {
+        const float y = static_cast<float>(logicalY * dprOrOne());
+        std::vector<const plot::TdGroupLayout*> others;
+        for (const plot::TdGroupLayout& gl : layout_.groups) {
+            if (gl.group != from && gl.key.h > 0.0F) {
+                others.push_back(&gl);
+            }
+        }
+        std::sort(
+            others.begin(), others.end(),
+            [](const plot::TdGroupLayout* a, const plot::TdGroupLayout* b) { return a->key.y < b->key.y; });
+        std::size_t k = 0;
+        while (k < others.size() && others[k]->key.y + 0.5F * others[k]->key.h < y) {
+            ++k;
+        }
+        index = static_cast<int>(k);
+        lineY = k < others.size() ? others[k]->key.y
+                : others.empty()  ? layout_.keyColumn.y
+                                  : others.back()->key.y + others.back()->key.h;
+    }
+    if (index != groupDropIndex_ || lineY != groupDropY_) {
+        groupDropIndex_ = index;
+        groupDropY_ = lineY;
+        rebuildDynamic();
+    }
+}
+
+bool TimeDistanceGraph::moveGroup(int from, int to) {
+    const int n = static_cast<int>(body_.groups.size());
+    if (from < 0 || from >= n || to < 0 || to >= n || from == to) {
+        return false;
+    }
+    plot::TimeDistanceBody body = body_;
+    // Panels laid out by explicit edges keep their heights, stacked in the new order from the first top.
+    const bool explicitEdges =
+        !body.overlapped() && std::any_of(body.groups.begin(), body.groups.end(), [](const plot::TdGroup& g) {
+            return g.edgeTop != 0.0 || g.edgeBottom != 1.0;
+        });
+    double top = 1.0;
+    for (const plot::TdGroup& g : body.groups) {
+        top = std::min(top, g.edgeTop);
+    }
+    const auto move = [from, to](auto& v) {
+        auto item = std::move(v[static_cast<std::size_t>(from)]);
+        v.erase(v.begin() + from);
+        v.insert(v.begin() + to, std::move(item));
+    };
+    move(body.groups);
+    if (explicitEdges) {
+        for (plot::TdGroup& g : body.groups) {
+            const double h = std::max(0.0, g.edgeBottom - g.edgeTop);
+            g.edgeTop = top;
+            g.edgeBottom = std::min(1.0, top + h);
+            top = g.edgeBottom;
+        }
+    }
+    // The group's unknown members (x-i2, ...) travel with it: toJson merges the typed groups over `rest`'s by
+    // index.
+    QJsonObject rest = QJsonDocument::fromJson(QByteArray::fromStdString(body.rest.compact())).object();
+    if (QJsonArray groups = rest.value(QStringLiteral("groups")).toArray(); groups.size() == n) {
+        const QJsonValue moved = groups.at(from);
+        groups.removeAt(from);
+        groups.insert(to, moved);
+        rest.insert(QStringLiteral("groups"), groups);
+        if (Result<model::OpaqueJson> doc =
+                model::OpaqueJson::parse(QJsonDocument(rest).toJson(QJsonDocument::Compact).toStdString())) {
+            body.rest = std::move(*doc);
+        }
+    }
+    // The vertical zoom follows its group when the new body is applied (applySpec, also on undo and redo).
+    local_.builtScales.clear();
+    requestBody(
+        body,
+        tr("Move group %1").arg(QString::fromStdString(body.groups[static_cast<std::size_t>(to)].name)));
+    return true;
+}
+
+PropertiesDialog* TimeDistanceGraph::openGroupProperties(int group) {
+    if (group < 0 || static_cast<std::size_t>(group) >= body_.groups.size()) {
+        return nullptr;
+    }
+    PropertiesDialog* dialog = PropertiesDialog::openFor(*this);
+    if (dialog != nullptr) {
+        dialog->focusRecord(QStringLiteral("/groups"), group);
+    }
+    return dialog;
 }
 
 // 04 section 8.12 / 7.2 item 3: a right-click on a channel label makes it active and shows the channel menu;
@@ -1490,7 +1683,7 @@ void TimeDistanceGraph::mouseMoveEvent(QMouseEvent* event) {
                 const double barLogical = static_cast<double>(layout_.scrollbar.w) / dpr;
                 d = (p.x() - dragStartX_) / barLogical * info_.scrollExtent.length();
             }
-            context_.view.zoomTo(plot::XSpan{dragStartZoom_.a + d, dragStartZoom_.b + d});
+            setViewZoom(plot::XSpan{dragStartZoom_.a + d, dragStartZoom_.b + d});
         }
         break;
     case Drag::VPan:
@@ -1511,7 +1704,7 @@ void TimeDistanceGraph::mouseMoveEvent(QMouseEvent* event) {
             static_cast<std::size_t>(dragHit_.slot) < inputs_.slots.size()) {
             // The sub-axis follows the pointer: an offset of the dragged distance in domain units.
             const double widthLogical = static_cast<double>(layout_.traceWidthPx) / dpr;
-            const double delta = (p.x() - dragLastX_) / widthLogical * context_.view.state().zoom.length();
+            const double delta = (p.x() - dragLastX_) / widthLogical * viewState().zoom.length();
             dragLastX_ = p.x();
             context_.view.dragOffset(inputs_.slots[static_cast<std::size_t>(dragHit_.slot)].slot.range,
                                      delta);
@@ -1523,6 +1716,9 @@ void TimeDistanceGraph::mouseMoveEvent(QMouseEvent* event) {
                                           static_cast<double>(layout_.traceArea.y + layout_.traceArea.h)));
         rebuildDynamic();
         break;
+    case Drag::Group:
+        updateGroupDrop(p.y());
+        break;
     case Drag::None:
         break;
     }
@@ -1533,7 +1729,15 @@ void TimeDistanceGraph::mouseReleaseEvent(QMouseEvent* event) {
     const Drag ended = drag_;
     drag_ = Drag::None;
     event->accept();
-    if (ended == Drag::Offset) {
+    if (ended == Drag::Group) {
+        const std::optional<int> to = groupDropIndex_;
+        groupDropIndex_.reset();
+        groupDropY_.reset();
+        rebuildDynamic();
+        if (to) {
+            moveGroup(dragHit_.group, *to);
+        }
+    } else if (ended == Drag::Offset) {
         context_.view.endOffsetDrag(); // one undo command for the whole drag (AC-M3-09)
     } else if (ended == Drag::Handle && guideY_ && layout_.traceArea.h > 0.0F) {
         const double f =
@@ -1601,7 +1805,7 @@ void TimeDistanceGraph::mouseDoubleClickEvent(QMouseEvent* event) {
         if (index >= 0 && static_cast<std::size_t>(index) < entries.size()) {
             const plot::TdBandEntry& e = entries[static_cast<std::size_t>(index)];
             if (e.x1 > e.x0) {
-                context_.view.zoomTo(plot::XSpan{e.x0, e.x1});
+                setViewZoom(plot::XSpan{e.x0, e.x1});
             }
         }
     };
@@ -1627,10 +1831,15 @@ void TimeDistanceGraph::mouseDoubleClickEvent(QMouseEvent* event) {
         return;
     case plot::HitKind::ScrollBar:
         if (hit.group < 0) {
-            context_.view.zoomFull(); // full in that axis (04 section 8.6)
+            viewZoomFull(); // full in that axis (04 section 8.6)
         } else {
             verticalZoomFull(hit.group);
         }
+        event->accept();
+        return;
+    case plot::HitKind::GroupHeading: // Group Properties (04 section 8.2 item 4, D-211 (e))
+        drag_ = Drag::None;
+        openGroupProperties(hit.group);
         event->accept();
         return;
     case plot::HitKind::KeyMeasurement:
@@ -1674,8 +1883,8 @@ void TimeDistanceGraph::wheelEvent(QWheelEvent* event) {
     }
     // Horizontal zoom x0.8 / x1.25 per notch about the pointer (04 section 8.6).
     const double f = std::pow(kWheelZoomIn, notches);
-    const plot::XSpan z = context_.view.state().zoom;
-    context_.view.zoomTo(plot::XSpan{*xp - (*xp - z.a) * f, *xp + (z.b - *xp) * f});
+    const plot::XSpan z = viewState().zoom;
+    setViewZoom(plot::XSpan{*xp - (*xp - z.a) * f, *xp + (z.b - *xp) * f});
     event->accept();
 }
 
@@ -1751,6 +1960,15 @@ QString TimeDistanceGraph::toolTipAt(QPointF logical) const {
 }
 
 bool TimeDistanceGraph::event(QEvent* event) {
+    if (event->type() == QEvent::HoverMove && drag_ == Drag::None) {
+        // A group heading can be dragged (D-211 (e)): an open hand over it.
+        const plot::HitResult hit = hitAt(static_cast<const QHoverEvent*>(event)->position());
+        if (hit.kind == plot::HitKind::GroupHeading) {
+            setCursor(Qt::OpenHandCursor);
+        } else {
+            unsetCursor();
+        }
+    }
     if (event->type() == QEvent::ToolTip) {
         const auto* help = static_cast<QHelpEvent*>(event);
         const QString text = toolTipAt(help->pos());
@@ -1773,6 +1991,11 @@ void TimeDistanceGraph::keyPressEvent(QKeyEvent* event) {
         return;
     }
     ComponentWidget::keyPressEvent(event);
+}
+
+// M4 (D-211 (f)): an unlinked zoom, cursor or datum is mapped through the prepared inputs' Main slot.
+std::optional<plot::DomainMapper> TimeDistanceGraph::mainMapper() const {
+    return mainMapperOf(inputs_, viewState().domain);
 }
 
 } // namespace esses::widgets

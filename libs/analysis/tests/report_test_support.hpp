@@ -132,9 +132,9 @@ public:
         table_[{src.get(), std::move(name)}] = std::move(d);
     }
     ReportChannelLookup lookup() const {
-        return [this](const ReportSource& s, std::string_view name) {
+        return [this](const ReportSource& s, const ReportChannel& c) {
             ++calls_;
-            const auto it = table_.find({s.source.get(), std::string(name)});
+            const auto it = table_.find({s.source.get(), c.name});
             return it != table_.end() ? it->second : ReportChannelData{};
         };
     }

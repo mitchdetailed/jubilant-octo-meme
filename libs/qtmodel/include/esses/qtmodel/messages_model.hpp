@@ -38,6 +38,10 @@ struct Message {
     QString code;   // stable code (Import Log code, maths diagnostic code), may be empty
     QString action; // command id, may be empty
     QVariantList actionArgs;
+    // M4 (D-206): a second action of the row, run like `action` (MessagesWindow::invokeAltAction): the
+    // open-time budget warning offers Continue (action) and Cancel (altAction). May be empty.
+    QString altAction;
+    QVariantList altActionArgs;
 };
 
 class MessagesModel final : public QAbstractListModel {
@@ -50,7 +54,8 @@ public:
         SourceRole,
         CodeRole,
         ActionRole,
-        TimestampRole
+        TimestampRole,
+        AltActionRole // M4 (D-206)
     };
 
     explicit MessagesModel(QObject* parent = nullptr);

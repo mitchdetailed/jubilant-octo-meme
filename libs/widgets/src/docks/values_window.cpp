@@ -14,7 +14,10 @@
 #include <QHeaderView>
 #include <QIdentityProxyModel>
 #include <QMenu>
+#include <QPainter>
 #include <QPalette>
+#include <QStyle>
+#include <QStyledItemDelegate>
 #include <QTableView>
 #include <QVBoxLayout>
 
@@ -45,6 +48,59 @@ public:
     }
 };
 
+// A cell is one line of text, drawn at its place with QPainter::drawText(QPoint, ...) over the style's item
+// panel: the style's CE_ItemViewItem lays every cell's text out (QTextLayout) and measures it twice, which
+// was most of a repaint on a cursor move (07 section 12 "Values window refresh, 250 channels <= 2 ms"; D-217
+// (k)). Selection, focus, alignment, the pending colour and the elision stay the standard item's.
+class ValuesDelegate final : public QStyledItemDelegate {
+public:
+    using QStyledItemDelegate::QStyledItemDelegate;
+
+    void paint(QPainter* painter, const QStyleOptionViewItem& option,
+               const QModelIndex& index) const override {
+        QStyleOptionViewItem opt = option;
+        initStyleOption(&opt, index);
+        const QWidget* widget = opt.widget;
+        QStyle* style = widget != nullptr ? widget->style() : QApplication::style();
+        style->drawPrimitive(QStyle::PE_PanelItemViewItem, &opt, painter, widget);
+        const bool selected = (opt.state & QStyle::State_Selected) != 0;
+        const QPalette::ColorGroup group = (opt.state & QStyle::State_Enabled) == 0  ? QPalette::Disabled
+                                           : (opt.state & QStyle::State_Active) != 0 ? QPalette::Normal
+                                                                                     : QPalette::Inactive;
+        if (!opt.text.isEmpty()) {
+            const int margin = style->pixelMetric(QStyle::PM_FocusFrameHMargin, &opt, widget) + 1;
+            const QRect textRect = opt.rect.adjusted(margin, 0, -margin, 0);
+            const QFontMetrics& metrics = opt.fontMetrics;
+            QString shown = opt.text;
+            int width = metrics.horizontalAdvance(shown);
+            if (width > textRect.width()) {
+                shown = metrics.elidedText(shown, opt.textElideMode, textRect.width());
+                width = metrics.horizontalAdvance(shown);
+            }
+            const Qt::Alignment h =
+                QStyle::visualAlignment(opt.direction, opt.displayAlignment) & Qt::AlignHorizontal_Mask;
+            const int x = (h & Qt::AlignRight) != 0     ? textRect.right() + 1 - width
+                          : (h & Qt::AlignHCenter) != 0 ? textRect.left() + (textRect.width() - width) / 2
+                                                        : textRect.left();
+            const int y = textRect.top() + (textRect.height() - metrics.height()) / 2 + metrics.ascent();
+            painter->save();
+            painter->setFont(opt.font);
+            painter->setPen(opt.palette.color(group, selected ? QPalette::HighlightedText : QPalette::Text));
+            painter->drawText(QPoint(x, y), shown);
+            painter->restore();
+        }
+        if ((opt.state & QStyle::State_HasFocus) != 0) {
+            QStyleOptionFocusRect focus;
+            focus.QStyleOption::operator=(opt);
+            focus.rect = style->subElementRect(QStyle::SE_ItemViewItemFocusRect, &opt, widget);
+            focus.state |= QStyle::State_KeyboardFocusChange | QStyle::State_Item;
+            focus.backgroundColor =
+                opt.palette.color(group, selected ? QPalette::Highlight : QPalette::Window);
+            style->drawPrimitive(QStyle::PE_FrameFocusRect, &focus, painter, widget);
+        }
+    }
+};
+
 } // namespace
 
 ValuesWindow::ValuesWindow(qt::ValuesModel& model, QWidget* parent) : QWidget(parent), model_(model) {
@@ -57,12 +113,17 @@ ValuesWindow::ValuesWindow(qt::ValuesModel& model, QWidget* parent) : QWidget(pa
     table_->setObjectName(QStringLiteral("valuesTable"));
     table_->setAccessibleName(tr("Values at the cursor"));
     table_->setModel(proxy_);
+    table_->setItemDelegate(new ValuesDelegate(table_));
     table_->setSelectionBehavior(QAbstractItemView::SelectRows);
     table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     table_->setContextMenuPolicy(Qt::CustomContextMenu);
     table_->verticalHeader()->hide();
     table_->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
     table_->horizontalHeader()->setSectionResizeMode(qt::ValuesModel::NameCol, QHeaderView::Stretch);
+    // The value columns fit what is on screen, not all 250 rows: a cursor move then reads only the visible
+    // rows (ValuesModel computes a row when it is asked for; 07 section 12, D-217).
+    table_->horizontalHeader()->setResizeContentsPrecision(0);
+    table_->setWordWrap(false); // one line a value, as the Values List component
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->addWidget(allChannels_);

@@ -108,6 +108,9 @@ public:
     QString focusedDockId() const;
     QString dockIdOf(const QWidget* widget) const;
     QWidget* content(const QString& id) const;
+    // M4 (D-206, the hidpi package's DprWatcher): the top-level window that shows the dock now: a floating
+    // dock's own window, else the host window (nullptr for an unknown id). Final.
+    QWidget* windowOf(const QString& id) const;
     IDockBackend& backend() noexcept { return *backend_; }
     const IDockBackend& backend() const noexcept { return *backend_; }
 

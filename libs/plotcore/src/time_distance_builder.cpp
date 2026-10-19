@@ -2251,6 +2251,11 @@ Result<ComponentBuild> TimeDistanceBuilder::buildStatic(const ComponentBuildInpu
         if (gl.key.w <= 0.0F) {
             continue;
         }
+        // The group heading (04 section 8.2 item 4; M4, D-211 (e)): the group's part of the key column; its
+        // labels, values and measurement cells, added after it, win where they lie.
+        if (gl.key.h > 0.0F) {
+            build.hits.addRect(gl.key, hitOf(HitKind::GroupHeading, gl.group));
+        }
         KeyLayout::emitLabels(list, gl.rows, gl.keyGeometry, gl.key.x, gl.key.y, colours.foreground2);
         for (std::size_t r = 0; r < gl.rows.size() && r < gl.keyGeometry.rowRects.size(); ++r) {
             RectPx rect = gl.keyGeometry.rowRects[r];

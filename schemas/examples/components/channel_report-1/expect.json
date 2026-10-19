@@ -3,6 +3,14 @@
     "pointer": "/report/scope",
     "why": "the scope is selectedRanges, selectedOutings or allOutings"
   },
+  "display-unit-not-text.json": {
+    "pointer": "/report/channels/0/displayUnit",
+    "why": "a display unit is a unit symbol"
+  },
+  "ignore-interpolated-not-boolean.json": {
+    "pointer": "/report/options/ignoreInterpolated",
+    "why": "ignoreInterpolated is true or false"
+  },
   "unknown-stat.json": {
     "pointer": "/report/channels/0/stats/0",
     "why": "statistics are avg, min, max, absMax, start, end, change, stdDev and delta"

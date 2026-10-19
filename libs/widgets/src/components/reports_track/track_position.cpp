@@ -138,13 +138,13 @@ void TrackPosition::onViewChanged(const plot::ViewState& view, plot::ChangeMask 
 }
 
 void TrackPosition::onSelectionChanged(const plot::SelectionSnapshot&) {
-    onViewChanged(context_.view.state(), plot::mask(plot::Change::Selection));
+    onViewChanged(viewState(), plot::mask(plot::Change::Selection));
 }
 
 void TrackPosition::onDataChanged(const model::SourceId& source, std::uint64_t) {
     for (const plot::Slot& slot : context_.selection.snapshot().visibleSlots()) {
         if (slot.range.src == source) {
-            onViewChanged(context_.view.state(), plot::mask(plot::Change::Data));
+            onViewChanged(viewState(), plot::mask(plot::Change::Data));
             return;
         }
     }
@@ -157,7 +157,7 @@ void TrackPosition::onChannelDataChanged(const maths::ChannelKey&) {
 
 void TrackPosition::onSchemeChanged(const project::Scheme& scheme) {
     setScheme(std::make_shared<const project::Scheme>(scheme));
-    onViewChanged(context_.view.state(), plot::mask(plot::Change::Scheme));
+    onViewChanged(viewState(), plot::mask(plot::Change::Scheme));
 }
 
 QStringList TrackPosition::contextCommands() const {
@@ -187,17 +187,16 @@ void TrackPosition::prepare() {
         }
         mapsConnected_ = maps;
         if (maps != nullptr) {
-            connect(maps, &qt::TrackMapService::mapChanged, this, [this](const QString&) {
-                onViewChanged(context_.view.state(), plot::mask(plot::Change::Data));
-            });
+            connect(maps, &qt::TrackMapService::mapChanged, this,
+                    [this](const QString&) { onViewChanged(viewState(), plot::mask(plot::Change::Data)); });
         }
     }
     const qreal dpr = devicePixelRatioF();
     layers_.resize(size(), dpr);
     const QSize device = layers_.deviceSize();
     const plot::LayoutContext layout{device.width(), device.height(), static_cast<float>(dpr)};
-    inputs_ = context_.render.prepareInputs(spec_, context_.view.state(), context_.selection.snapshot(),
-                                            layout, scheme_, metrics_);
+    inputs_ = context_.render.prepareInputs(spec_, viewState(), context_.selection.snapshot(), layout,
+                                            scheme_, metrics_);
     inputs_.focused = isFocusedComponent();
     prepared_ = true;
 }
@@ -251,7 +250,7 @@ void TrackPosition::rebuildDynamic() {
         return;
     }
     dynamicDirty_ = false;
-    inputs_.view = context_.view.state();
+    inputs_.view = viewState();
     plot::DrawList next = plot::TrackGeometry::buildDynamic(inputs_);
     ++dynamicBuilds_;
     const QRegion damage = layers_.dynamicDamage(layers_.dynamicList(), next);
@@ -548,6 +547,11 @@ void TrackPosition::mouseDoubleClickEvent(QMouseEvent* event) {
         return;
     }
     ComponentWidget::mouseDoubleClickEvent(event); // the caption maximises
+}
+
+// M4 (D-211 (f)): an unlinked zoom, cursor or datum is mapped through the prepared inputs' Main slot.
+std::optional<plot::DomainMapper> TrackPosition::mainMapper() const {
+    return mainMapperOf(inputs_, viewState().domain);
 }
 
 } // namespace esses::widgets

@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <optional>
 #include <set>
 #include <utility>
@@ -214,6 +215,9 @@ Result<TrackMap> TrackMap::fromJson(const JsonDoc& document) {
                 if (const json* v = s.optional("userDefined")) {
                     section.userDefined = asBool(*v, s.child("userDefined"));
                 }
+                if (const json* v = s.optional("speedClass")) {
+                    section.speedClass = asString(*v, s.child("speedClass"));
+                }
                 s.closed();
                 map.sections.push_back(std::move(section));
             }
@@ -255,13 +259,17 @@ JsonDoc TrackMap::toJson() const {
     j["lines"] = json{{"centre", lineJson(centre)}, {"inner", lineJson(inner)}, {"outer", lineJson(outer)}};
     json sectionsJson = json::array();
     for (const TrackSection& s : sections) {
-        sectionsJson.push_back(json{{"id", s.id},
-                                    {"set", s.set},
-                                    {"name", s.name},
-                                    {"startDist", lengthJson(s.startM)},
-                                    {"endDist", lengthJson(s.endM)},
-                                    {"category", s.category},
-                                    {"userDefined", s.userDefined}});
+        json sj{{"id", s.id},
+                {"set", s.set},
+                {"name", s.name},
+                {"startDist", lengthJson(s.startM)},
+                {"endDist", lengthJson(s.endM)},
+                {"category", s.category},
+                {"userDefined", s.userDefined}};
+        if (!s.speedClass.empty()) {
+            sj["speedClass"] = s.speedClass; // M4: only when set, so earlier maps are written unchanged
+        }
+        sectionsJson.push_back(std::move(sj));
     }
     j["sections"] = std::move(sectionsJson);
     auto doc = jsonio::toDoc(j);
@@ -306,6 +314,11 @@ Result<void> TrackMap::validate() const {
         }
         if (s.category.empty()) {
             return invalidAt(p + "/category", "a section has a category");
+        }
+        if (!s.speedClass.empty() && std::find(std::begin(kSpeedClasses), std::end(kSpeedClasses),
+                                               s.speedClass) == std::end(kSpeedClasses)) {
+            return invalidAt(p + "/speedClass",
+                             "the speed class of the section '" + s.name + "' is slow, fast or none");
         }
         if (!finite(s.startM) || s.startM < -kEpsM) {
             return invalidAt(p + "/startDist", "the section '" + s.name + "' starts before the start line");

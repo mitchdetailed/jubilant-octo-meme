@@ -697,3 +697,149 @@ gestures, splitters, nudge, z order, lock), `tst_shell_m3` (summary bar, Track M
 Static builds, the dialogs of the rows, full screen, offsets and annotations, merged geometry edits, the
 component rows following the focus, projects and Close All); `tests/ui/keymap/keymap_m3_cases.hpp` (every M3
 keymap row, mouse rows by pointer events). AC-M3-10: `bench/plot_bench` `plot.animation_frame_10x`.
+
+## M4 contract (07 §7.1; `docs/milestones/M4.md` §2-3; D-206)
+
+The shell's M4 wiring goes through one hook: `MainWindow` creates a `ShellExtension` (`shell/shell_extension.hpp`)
+per package in a fixed order (`BudgetShell`, `ReloadShell`, `HiDpiShell`, `FollowupsShell`, `AboutShell`,
+`DocsShell`; `src/shell/main_window_m4.cpp`) and calls `buildWidgets`, `registerCommands`, `buildMenus`,
+`windowReady`, `worksheetActivated` and `teardown` at fixed points; each package edits only its
+`src/shell/main_window_m4_<package>.cpp` and its header, never `main_window.cpp`, `main_window_m3.cpp`,
+`main_window.hpp` or `main_window_impl.hpp`. Other M4 names: `DprWatcher` (`src/shell/m4_hidpi/`),
+`ComponentWidget::recheckDevicePixelRatio` (defined in `src/components/m4_hidpi/component_dpr.cpp`; the rest of
+`component_widget.cpp` is the followups package's), `DockHost::windowOf` (final), `MessagesWindow::invokeAltAction`/
+`showPerformance`/`performanceText` (`src/docks/m4_budget/`), `AboutDialog`, `BuildInfo`/`buildInfo` (final but
+`dockLibrary`), `versionReport` (what `esses --version` prints), `qtLicenceNotice`, `sourceUrl`
+(`src/shell/m4_about/`). Help > About is a menu command without a keymap row. Every M4 member is implemented by its
+package as the sections below describe (no contract stub is left; D-216). Test: `tests/shell/tst_m4_contract.cpp`
+(`widgets.tst_m4_contract`: the extensions in order, every M4 keymap row implemented, Help > About, the build
+identification, `windowOf`, the signatures); the packages' tests are in `tests/m4_<package>/`.
+
+## M4 budget: the warning, the Performance field and the Stats line (AC-M4-02; D-207)
+
+`BudgetShell` (`src/shell/main_window_m4_budget.cpp`) applies the budget setting to the runtime's chunk cache at
+`windowReady` and on every change (raised to 1 GiB; a removed key gives the runtime its budget of `windowReady`
+back, `runtimeBudget()`; so does `teardown`), sets the loader's budget gate, and turns `budgetExceeded` into one
+Messages row (Budget, Warning, code `budget.open_estimate`, the file as source, `qt::budgetWarningText`) whose action
+is `file.continue_open` and whose alternate action is `file.cancel_open` with the pending id; it shows the Messages
+dock and says so in the status bar. The two commands ("Continue Opening", "Cancel Opening"; no menu, no keymap row)
+are enabled while an open waits; without an id (the command palette) they answer the newest waiting open. The
+status bar's Performance field (`status.performance`, `MainWindow::statusField("performance")`) shows
+`qt::performanceLine` of a `qt::PerformanceMonitor` (every second, and at once after a setting change and Continue)
+with the details as tool-tip; a click shows Messages; a worksheet switch sets it again. `MessagesWindow`
+(`src/docks/messages_window.cpp`, `src/docks/m4_budget/`) shows a row's alternate action as a second suffix and runs
+it on SHIFT+ENTER or SHIFT+double-click (`invokeAltAction`), offers both actions in the row's context menu
+(`rowMenu`), and shows the Stats line (`messagesStats`, `showPerformance`, `performanceText`) above the list.
+`OptionsDialog` has the "Memory budget" field on General (GB of 2^30 bytes, one decimal, 1.0 to 4096.0; the applied
+value, else the default of a quarter of the RAM; written only when changed). Tests: `tests/m4_budget/
+tst_budget_shell.cpp` (`widgets.tst_budget_shell`), `tests/editors_options/tst_options_dialog.cpp`
+(`memoryBudgetIsAUserSettingInGigabytes`) and `tests/ui/tst_budget_warning.cpp` (`ui.tst_budget_warning`, the
+AC-M4-02 run in the shell).
+
+## M4 reload: the stale badge and Reload File (AC-M4-10; D-208)
+
+`ReloadShell` (`src/shell/main_window_m4_reload.cpp`) runs `SourceLoader::checkChangedFiles` when the application
+becomes active, gives the Data window's model the loader's stale query, refreshes the source row and the command
+on `staleChanged`, and wires `qt::connectSourceReload` (the Messages row with the Reload action, the selection
+restored on reload). `file.reload_source` ("Reload File", File menu, data_window, no key; keymap row implemented)
+is enabled while a source is stale: with an argument (the Messages row, the Data window's context menu) it reloads
+that source, without one the highlighted source when it is stale, else the first stale source. The Data window
+(`src/docks/data_window.cpp`) draws the stale badge (an amber disc with an exclamation mark, before the filter icon)
+on a stale source row and offers Reload File in the row's context menu, enabled on a stale row. Tests:
+`tests/ui/tst_reload_source.cpp` (`ui.tst_reload_source`) and the keymap row
+(`tests/ui/keymap/keymap_m4_reload_cases.hpp`).
+
+## M4 hidpi: per-monitor DPR (AC-M4-07; D-209)
+
+`HiDpiShell` (`src/shell/main_window_m4_hidpi.cpp`) watches the main window and every dock window with a
+`DprWatcher` (`src/shell/m4_hidpi/dpr_watcher.cpp`). An event filter on each top-level widget (no `QWindow` is forced
+into existence) turns its `DevicePixelRatioChange`, `ScreenChangeInternal` and `Show` into one coalesced check of that
+window on the next event-loop turn: every `ComponentWidget` under it runs `recheckDevicePixelRatio()`
+(`src/components/m4_hidpi/component_dpr.cpp`: a component laid out at another DPR than its window's queues the
+`Size | Scheme` rebuild a DPR event queues, once), every `WorksheetCanvas` runs `refreshGeometry()` (the 1 % grid
+placement again through the coalesced relayout, and a repaint), and a change of the window's DPR is counted and
+announced (`changes`, `lastDpr`, `dprChanged`). The shell follows each dock's window (`DockHost::windowOf`) on
+`DockHost::stateChanged` and re-checks every watched window one turn later (`dockRefreshes`, `dockRefreshRebuilds`):
+a dock that floats or docks back moves its widgets into another window without a DPR event from Qt. Qt's own events
+still reach every widget first (`ComponentWidget::event`, `WorksheetCanvas::event`); the watcher closes the gap and
+never rebuilds a component twice. `apps/app` sets the `PassThrough` rounding policy before the `QApplication` (06 §17
+item 1). Tests, offscreen on four screens of DPR 1, 1.25, 1.5 and 2 from the offscreen platform's screen
+configuration (`tests/m4_hidpi/dpr_test_support.hpp`): `tests/m4_hidpi/tst_dpr_sweep.cpp` (the ten MVP types on one
+worksheet at each DPR: the same logical placement, the layout within 3 logical px of DPR 1, layers and lists at the
+window's DPR, the widget and its window showing the layer composite pixel for pixel, whole device pixels for the
+axis-aligned geometry at 1.25 and 1.5), `tst_dpr_watcher.cpp` (the watcher, the reparent gap, the canvas placement),
+`tst_dpr_values_list.cpp` (values_list at DPR 1.5: the table text against the table goldens, provisional PNGs in
+`tests/golden/images/dpr_sweep/values_list/`) and `tests/ui/tst_dpr_switch.cpp` (`ui.tst_dpr_switch`, AC-M4-07 in
+the shell).
+
+## M4 followups of the widgets (D-211; `docs/milestones/M4.md` §5.1, M3.md §6 items 18-19, 21-22, 24, 26-27)
+
+- **Default display units** (item 19): the components show a channel without a named display unit in its
+  quantity's default (`plot::defaultDisplayUnit`: a fraction stored in `ratio` reads in %); the Channel Editor's
+  Unit cell without an override, the Maths Editor's channel insertion and the unit CTRL+SHIFT+O / CTRL+SHIFT+Z
+  write their offset in follow it (`src/editors_maths/`).
+- **Unit pickers** (item 26, `src/properties_shell/`): `FieldKind::Unit` rows (`FieldRow::unitOf` names the sibling
+  channel field) are editable combos of the units of that channel's quantity, compat units left out, `""` first;
+  `linkUnitPickers` follows a change of the channel field, `PropertiesDialog::refreshChannelChoices` gives every
+  picker the units per open channel (`unitChoicesByChannel`). Every `displayUnit` row uses one, the scatter's
+  `xDisplayUnit`, `traces[].displayUnit`, `colourChannel.displayUnit` and the channel report's
+  `report.channels[].displayUnit` included. `PropertiesDialog::focusRecord` shows a record of a list (Group
+  Properties).
+- **Track Editor** (item 22): a Speed class column and field (`slow`, `fast` or none; `addSection`/`editSection`
+  take it), the bounds shown and edited in the Corr Dist display unit (`distanceUnit()`,
+  `plot::corrDistDisplayUnit` of the project's Corr Dist and Corr Speed overrides; decimals enough for 0.1 m),
+  followed when the overrides change; the API stays in metres.
+- **Export Data** (item 24, `src/components/plots/plots_common.cpp` `legacyCsv`): the graph, outing graph and
+  gauges write 05 §6's legacy CSV through `formats::makeLegacyCsvWriter` (the Main slot's channels under the
+  component's names, display units, the export range's span, `Export Range`/`Export Worksheet` metadata), through a
+  temporary file on the export's worker; the scatter's sets, the histogram's bins and the reports' tables stay as
+  they were.
+- **Group headings** (item 21, `TimeDistanceGraph`): a group's key column is its `GroupHeading` (an open hand on
+  hover); a drag shows the insertion line and moves the group (`moveGroup`, one undoable edit, explicit panel
+  heights kept, unknown members and the vertical zoom along); a double-click opens Group Properties
+  (`openGroupProperties`).
+- **Links** (item 27, `ComponentWidget`): an unlinked zoom, cursor or datum is the component's own
+  (`viewState()`, `setViewCursor`/`setViewZoom`/`viewPanBy`/`viewZoomFull`, `mainMapper`), taken from the
+  worksheet when created or unlinked, not persisted; the worksheet's changes of that part are not delivered; the
+  keyboard rows offered to the focused component act on it (`handleCommand`'s default); the outing graph's zoom
+  stays linked; the values list reads at its own cursor (`ValuesModel::setViewSource`).
+- **summariesReady** (item 18, `FollowupsShell`): every component of the window gets `onDataChanged(source, 0)` when
+  the loader's summary pass of a source has run (D-210 (b)).
+- Tests: `tests/m4_followups/tst_followups_units.cpp` (`widgets.tst_followups_units`),
+  `tests/m4_followups/tst_followups_view.cpp` (`widgets.tst_followups_view`), the helper
+  `tests/m4_followups/legacy_csv_support.hpp` (the legacy layout read by 05 §6, not by the writer).
+
+## M4 docs: Help Contents (F1; D-215)
+
+`DocsShell` (`shell/docs_shell.hpp`, `src/shell/main_window_m4_docs.cpp`) registers `help.contents` ("Help
+Contents", Help menu, F1, Global; the keymap row is implemented). The command (`openContents`) hands the installed
+start page of the user guide to the URL opener: the first regular file of `<data dir>/../docs/user/index.md` and
+`<exe dir>/docs/user/index.md` (`installedStartPage`; `contentsUrl()` is its file URL, empty when not installed),
+so the packages install `docs/user/` beside the shipped `data/` (Windows `<install dir>\docs\user\`, Linux
+`share/esses/docs/user/`, macOS `Contents/Resources/docs/user/`). Without an installed page, or when the opener
+refuses it, the online page (`onlineUrl(version)`: the public repository at `v<version>` for a tagged build, else
+`main`) is opened; when neither opens, a Messages warning (System, source "Help", code `help.not_opened`) names both
+places and the Messages dock is shown. `setUrlOpener` replaces the default `QDesktopServices::openUrl` (an empty
+opener restores it), so tests never start a browser. Tests: `tests/m4_docs/tst_docs_shell.cpp`
+(`widgets.tst_docs_shell`) and the `help.contents` entry of `tests/ui/keymap/keymap_m4_docs_cases.hpp`.
+
+## M4 packaging: Help > About and the build identification (AC-M4-06, AC-M4-09; D-212)
+
+`about_dialog.hpp` (`src/shell/m4_about/about_dialog.cpp`): `buildInfo()` fills the version, commit and build date
+stamped by `cmake/version.cmake` (`esses::versionInfo`), the Qt version run against and built against, the docking
+library in use (`ADS <version>` from ADS's own `ads_version.h`, which this file includes only for the version macros,
+or `QDockWidget`; `DockHost::defaultBackendName()` decides) and the release tag. `versionReport()` is what
+`esses --version` prints: `esses <version>`, then `commit:`, `Qt: <runtime> (built with <build>)`, `build date:`,
+`dock library:` and `source:`. `qtLicenceNotice()` states "This application uses Qt <version> under the GNU LGPL v3"
+(08 §9 item 2), where the licence texts are, that Qt may be replaced, and the exact source archive of the Qt in use
+(`qtSourceArchiveUrl`); `dockLibraryNotice()` the same for ADS (LGPL-2.1-or-later, its tag URL). `sourceUrl()` is the
+source of this build (`sourceUrlFor(tag, commit)`): the public repository's `tree/<tag>` in a release build
+(`ESSES_RELEASE_TAG`, defined for `about_dialog.cpp` only by `tools/packaging/CMakeLists.txt` when a release is
+configured with `-DESSES_RELEASE_TAG=v<version>`), else `commit/<sha>`, else the repository (`kRepositoryUrl`).
+`noticesUrl(paths)` links the NOTICES.md installed beside the data folder, else the repository's copy. `AboutDialog`
+(Help > About, `AboutShell` opens it window-modal with the window's `Paths`) shows the version report, the Qt and ADS
+notices with their links, the MIT notice with the source link, the notices link and the settings folder (marked
+portable when `portable.marker` is beside the program); Copy puts `text()` on the clipboard. Tests:
+`tests/m4_about/tst_about_dialog.cpp` (`widgets.tst_about_dialog`: the report's fields against `versionInfo()` and
+Qt, the docking library against `third_party/qtads/CMakeLists.txt`, the URL rule by hand, the notices, the links,
+the installed NOTICES.md, the portable settings folder, Copy, Help > About in the shell).

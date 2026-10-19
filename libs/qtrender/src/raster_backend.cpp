@@ -259,12 +259,14 @@ Qt::PenStyle penStyle(plot::DashId dash) {
     return Qt::SolidLine;
 }
 
-QPen strokePen(plot::Rgba colour, float widthPx, plot::DashId dash, bool aliased) {
+// `square`: a stroke snapped to whole pixels (crispStroke below) joins its right angles with a mitre, which
+// covers the corner's pixels exactly where a round join would leave them partly covered.
+QPen strokePen(plot::Rgba colour, float widthPx, plot::DashId dash, bool aliased, bool square = false) {
     QPen pen(toQColor(colour));
     pen.setWidthF(aliased ? 1.0 : static_cast<qreal>(widthPx));
     pen.setStyle(penStyle(dash));
     pen.setCapStyle(aliased ? Qt::SquareCap : Qt::FlatCap);
-    pen.setJoinStyle(Qt::RoundJoin);
+    pen.setJoinStyle(square ? Qt::MiterJoin : Qt::RoundJoin);
     return pen;
 }
 
@@ -312,10 +314,10 @@ void drawPolylineRun(QPainter& p, const float* v, std::size_t begin, std::size_t
     }
 }
 
-void drawPolyline(QPainter& p, const plot::DrawList& list, const plot::DrawCmd& cmd) {
+void drawPolyline(QPainter& p, const plot::DrawList& list, const plot::DrawCmd& cmd, bool square = false) {
     const bool aliased = cmd.widthPx <= 1.0F;
     p.setRenderHint(QPainter::Antialiasing, !aliased);
-    p.setPen(strokePen(cmd.colour, cmd.widthPx, cmd.dash, aliased));
+    p.setPen(strokePen(cmd.colour, cmd.widthPx, cmd.dash, aliased, square));
     p.setBrush(Qt::NoBrush);
     const float* v = list.verts.data() + static_cast<std::size_t>(cmd.vertexOffset) * 2;
     const std::size_t n = cmd.vertexCount;
@@ -333,10 +335,10 @@ void drawPolyline(QPainter& p, const plot::DrawList& list, const plot::DrawCmd& 
     }
 }
 
-void drawLines(QPainter& p, const plot::DrawList& list, const plot::DrawCmd& cmd) {
+void drawLines(QPainter& p, const plot::DrawList& list, const plot::DrawCmd& cmd, bool square = false) {
     const bool aliased = cmd.widthPx <= 1.0F;
     p.setRenderHint(QPainter::Antialiasing, !aliased);
-    p.setPen(strokePen(cmd.colour, cmd.widthPx, cmd.dash, aliased));
+    p.setPen(strokePen(cmd.colour, cmd.widthPx, cmd.dash, aliased, square));
     p.setBrush(Qt::NoBrush);
     const float* v = list.verts.data() + static_cast<std::size_t>(cmd.vertexOffset) * 2;
     Scratch& s = scratch();
@@ -379,6 +381,137 @@ void drawLines(QPainter& p, const plot::DrawList& list, const plot::DrawCmd& cmd
         }
     }
     flush();
+}
+
+// Crisp axis-aligned strokes at fractional DPR (M4 hidpi, D-209; 04 section 6.6 items 1 and 4, 06 section 17
+// item 2). A line is logical width x DPR wide and a builder centres it where a 1 px line would sit (a pixel
+// centre) or on a data position; at DPR 1.25 and 1.5 that gives 1.25, 1.5 or round(DPR) = 2 px strokes off
+// the pixel grid, which the antialiased path smears over one pixel more than their width at partial coverage
+// (blurred). As the backend already does for 1 px strokes (snapped to the pixel containing them) and for
+// axis-aligned Quads and rectangles (whole pixels), a stroke of a list at a fractional DPR that is made only
+// of horizontal and vertical segments and is wider than 1 px is drawn lround(width) pixels wide (at least 1)
+// and centred so both its edges lie on pixel boundaries: across a segment a centre c becomes P + W / 2 with
+// P = floor(c + (1 - W) / 2), the W pixels nearest to [c - W / 2, c + W / 2); along it a free end goes to the
+// nearest pixel edge (crispEnd; a polyline's vertices are snapped both ways first, so its corners stay
+// joined, and are mitred on the QPainter path). A Lines command is judged on all its segments; a stroke with
+// a slanted segment (a trace, a trend line, a curved track) is drawn as listed, antialiased. The DrawList is
+// unchanged (its JSON goldens stay what the builders emit), and so is every list at DPR 1 or 2, whose pixel
+// goldens are authoritative (D-025): there the builders' 2 px lines on pixel centres (DPR 2 grid, cursor,
+// ticks) stay as the goldens show them (docs/milestones/M4.md, hidpi open issues).
+float crispCentre(float c, int widthPx) {
+    const double first = std::floor(static_cast<double>(c) + 0.5 * static_cast<double>(1 - widthPx));
+    return static_cast<float>(first + 0.5 * static_cast<double>(widthPx));
+}
+
+// A stroke's free end along its segment on the pixel edge the span rasteriser ends it at (the pixels whose
+// centres lie before the end: ceil(e - 1/2)), so the QPainter path covers the same whole pixels.
+float crispEnd(float e) {
+    return static_cast<float>(std::ceil(static_cast<double>(e) - 0.5));
+}
+
+// The list and command to draw for `cmd`: `cmd` itself, or a snapped copy over this thread's scratch list.
+struct StrokeToDraw {
+    const plot::DrawList* list;
+    plot::DrawCmd cmd;
+    bool snapped = false;
+};
+
+bool fractionalDpr(const plot::DrawList& list) {
+    const double dpr = static_cast<double>(list.dpr);
+    return dpr > 0.0 && std::abs(dpr - std::round(dpr)) > 1e-6;
+}
+
+StrokeToDraw crispStroke(const plot::DrawList& list, const plot::DrawCmd& cmd) {
+    // kMaxCrispWidthPx keeps lround in range (no builder draws a stroke anywhere near it).
+    constexpr float kMaxCrispWidthPx = 1024.0F;
+    if (!fractionalDpr(list) || !(cmd.widthPx > 1.0F) || !(cmd.widthPx <= kMaxCrispWidthPx) ||
+        cmd.vertexCount == 0) {
+        return {&list, cmd, false};
+    }
+    const float* v = list.verts.data() + static_cast<std::size_t>(cmd.vertexOffset) * 2;
+    const std::size_t n = cmd.vertexCount;
+    const bool lines = cmd.kind == plot::CmdKind::Lines;
+    const std::size_t step = lines ? 2 : 1;
+    bool segment = false; // a dot (only zero-length segments) keeps its round shape
+    for (std::size_t i = 0; i + 1 < n; i += step) {
+        if (!finiteVertex(v, i) || !finiteVertex(v, i + 1)) {
+            continue; // a gap: not a segment
+        }
+        const bool sameX = v[2 * i] == v[2 * i + 2];
+        const bool sameY = v[2 * i + 1] == v[2 * i + 3];
+        if (!sameX && !sameY) {
+            return {&list, cmd, false}; // slanted
+        }
+        segment = segment || !(sameX && sameY);
+    }
+    if (!segment) {
+        return {&list, cmd, false};
+    }
+    const int width = static_cast<int>(std::max(1L, std::lround(static_cast<double>(cmd.widthPx))));
+    thread_local plot::DrawList snapped;
+    snapped.verts.assign(v, v + 2 * n);
+    float* out = snapped.verts.data();
+    if (lines) {
+        for (std::size_t i = 0; i + 1 < n; i += 2) {
+            if (!finiteVertex(v, i) || !finiteVertex(v, i + 1)) {
+                continue;
+            }
+            const bool horizontal = v[2 * i + 1] == v[2 * i + 3];
+            const bool vertical = v[2 * i] == v[2 * i + 2];
+            for (const std::size_t k : {i, i + 1}) {
+                // Across: the crisp centre; along: the end on a pixel edge (a flat end covers whole pixels).
+                out[2 * k] = horizontal && !vertical ? crispEnd(v[2 * k]) : crispCentre(v[2 * k], width);
+                out[2 * k + 1] =
+                    vertical && !horizontal ? crispEnd(v[2 * k + 1]) : crispCentre(v[2 * k + 1], width);
+            }
+        }
+    } else {
+        // Every vertex both ways (the corners stay joined), then each run's free ends along their segment.
+        for (std::size_t i = 0; i < n; ++i) {
+            if (finiteVertex(v, i)) {
+                out[2 * i] = crispCentre(v[2 * i], width);
+                out[2 * i + 1] = crispCentre(v[2 * i + 1], width);
+            }
+        }
+        const auto freeEnd = [&](std::size_t k, std::size_t towards) {
+            if (v[2 * k + 1] == v[2 * towards + 1]) { // horizontal
+                out[2 * k] = crispEnd(v[2 * k]);
+            } else if (v[2 * k] == v[2 * towards]) { // vertical
+                out[2 * k + 1] = crispEnd(v[2 * k + 1]);
+            }
+        };
+        const auto differs = [&](std::size_t a, std::size_t b) {
+            return v[2 * a] != v[2 * b] || v[2 * a + 1] != v[2 * b + 1];
+        };
+        std::size_t i = 0;
+        while (i < n) {
+            while (i < n && !finiteVertex(v, i)) {
+                ++i;
+            }
+            std::size_t j = i;
+            while (j < n && finiteVertex(v, j)) {
+                ++j;
+            }
+            std::size_t first = i + 1;
+            while (first < j && !differs(first, i)) {
+                ++first;
+            }
+            if (first < j) {
+                freeEnd(i, first);
+                std::size_t last = j - 2;
+                while (last > i && !differs(last, j - 1)) {
+                    --last;
+                }
+                freeEnd(j - 1, last);
+            }
+            i = j;
+        }
+    }
+    snapped.dpr = list.dpr;
+    plot::DrawCmd c = cmd;
+    c.vertexOffset = 0;
+    c.widthPx = static_cast<float>(width);
+    return {&snapped, c, true};
 }
 
 void drawPoints(QPainter& p, const plot::DrawList& list, const plot::DrawCmd& cmd) {
@@ -746,19 +879,21 @@ void paintCommands(QPainter& painter, const plot::DrawList& list, const SchemeFo
             break;
         case plot::CmdKind::Polyline:
             if (vertexRangeOk(list, cmd)) {
-                if (fastEligible(fast, cmd)) {
-                    fastPolyline(*fast, list, cmd, strip, index);
+                const StrokeToDraw s = crispStroke(list, cmd);
+                if (fastEligible(fast, s.cmd)) {
+                    fastPolyline(*fast, *s.list, s.cmd, strip, index);
                 } else {
-                    drawPolyline(painter, list, cmd);
+                    drawPolyline(painter, *s.list, s.cmd, s.snapped);
                 }
             }
             break;
         case plot::CmdKind::Lines:
             if (vertexRangeOk(list, cmd)) {
-                if (fastEligible(fast, cmd)) {
-                    fastLines(*fast, list, cmd);
+                const StrokeToDraw s = crispStroke(list, cmd);
+                if (fastEligible(fast, s.cmd)) {
+                    fastLines(*fast, *s.list, s.cmd);
                 } else {
-                    drawLines(painter, list, cmd);
+                    drawLines(painter, *s.list, s.cmd, s.snapped);
                 }
             }
             break;

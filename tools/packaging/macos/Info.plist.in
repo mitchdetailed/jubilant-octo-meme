@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- SPDX-FileCopyrightText: 2026 the Esses contributors -->
+<!-- SPDX-License-Identifier: MIT -->
+<!-- The Info.plist of Esses.app (08 section 7.2, 06 section 19 item 5; D-212): apps/app/CMakeLists.txt names this
+     file as MACOSX_BUNDLE_INFO_PLIST and sets the MACOSX_BUNDLE_* values; .ld log files open with Esses as an
+     alternate handler (LSHandlerRank Alternate: another application keeps its role). The log type is Esses's own,
+     so it is exported; LSMinimumSystemVersion is the build's deployment target (D-217). -->
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleExecutable</key>
+  <string>${MACOSX_BUNDLE_EXECUTABLE_NAME}</string>
+  <key>CFBundleIconFile</key>
+  <string>${MACOSX_BUNDLE_ICON_FILE}</string>
+  <key>CFBundleIdentifier</key>
+  <string>${MACOSX_BUNDLE_GUI_IDENTIFIER}</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>${MACOSX_BUNDLE_BUNDLE_NAME}</string>
+  <key>CFBundleDisplayName</key>
+  <string>${MACOSX_BUNDLE_BUNDLE_NAME}</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>${MACOSX_BUNDLE_SHORT_VERSION_STRING}</string>
+  <key>CFBundleVersion</key>
+  <string>${MACOSX_BUNDLE_BUNDLE_VERSION}</string>
+  <key>CFBundleGetInfoString</key>
+  <string>${MACOSX_BUNDLE_BUNDLE_NAME} ${MACOSX_BUNDLE_LONG_VERSION_STRING}</string>
+  <key>NSHumanReadableCopyright</key>
+  <string>${MACOSX_BUNDLE_COPYRIGHT}</string>
+  <key>LSMinimumSystemVersion</key>
+  <string>${ESSES_MACOS_MINIMUM}</string>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+  <key>NSPrincipalClass</key>
+  <string>NSApplication</string>
+  <key>NSSupportsAutomaticGraphicsSwitching</key>
+  <true/>
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>Data-logger log file</string>
+      <key>CFBundleTypeRole</key>
+      <string>Viewer</string>
+      <key>LSHandlerRank</key>
+      <string>Alternate</string>
+      <key>CFBundleTypeExtensions</key>
+      <array>
+        <string>ld</string>
+      </array>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>${MACOSX_BUNDLE_GUI_IDENTIFIER}.log</string>
+      </array>
+    </dict>
+  </array>
+  <key>UTExportedTypeDeclarations</key>
+  <array>
+    <dict>
+      <key>UTTypeIdentifier</key>
+      <string>${MACOSX_BUNDLE_GUI_IDENTIFIER}.log</string>
+      <key>UTTypeDescription</key>
+      <string>Data-logger log file</string>
+      <key>UTTypeConformsTo</key>
+      <array>
+        <string>public.data</string>
+      </array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key>
+        <array>
+          <string>ld</string>
+        </array>
+      </dict>
+    </dict>
+  </array>
+</dict>
+</plist>

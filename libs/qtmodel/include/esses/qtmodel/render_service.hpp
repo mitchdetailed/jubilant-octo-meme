@@ -16,8 +16,9 @@
 // reaches onGui while `context` lives. Channels are resolved per slot through the source's ChannelResolver
 // (no project mappings or aliases before M2) or MathsService for maths outputs (Pending until evaluated,
 // requested at Visible); the display unit is the component's trace/row displayUnit when it names a unit of
-// the channel's quantity, else the stored (base) unit. componentChannels() lists a component's channels
-// (time_distance traces, values_list rows).
+// the channel's quantity, else the stored (base) unit (M4, D-211 (a): else the quantity's default display
+// unit, plot::defaultDisplayUnit: "%" for a fraction stored in "ratio"). componentChannels() lists a
+// component's channels (time_distance traces, values_list rows).
 #pragma once
 
 #include <esses/base/cancel.hpp>
