@@ -400,7 +400,8 @@ Registered under the §10 rule when the M3 headers were laid down (`docs/milesto
 ### Names added by the M4 contracts (2026-10-18, D-206)
 
 Registered under the §10 rule when the M4 headers were laid down (`docs/milestones/M4.md` §2); each name's header
-says which package owns it and which members are still `M4-STUB`s.
+says which package owns it. Every one is implemented as built by its package (the sections below; no contract stub is
+left at the integration of wave 2, D-216).
 - `esses_formats`: `ResidentEstimate`, `estimateChannel`, `estimateResident` (from a `ProbeResult` and from a
   `DataSource`); `SourceFileState`, `sourceFileStateName`, `SourceFileCheck`, `checkSourceFile`.
 - `esses_qtmodel`: `kBudgetSettingKey`, `kMinBudgetBytes`, `budgetFromSettings`, `OpenBudgetCheck`,
@@ -453,6 +454,39 @@ says which package owns it and which members are still `M4-STUB`s.
   `TimeDistanceGraph::moveGroup`/`openGroupProperties`/`groupDropIndex`; `TrackEditor::distanceUnit`/
   `startField`/`endField`/`speedClassField` and the `speedClass` parameters of `addSection`/`editSection`;
   `FollowupsShell::lastSummaryDeliveries`.
+
+### Names added by the M4 packaging package (2026-10-19, D-212)
+
+- `esses_widgets` (`about_dialog.hpp`): `kRepositoryUrl`, `BuildInfo::releaseTag`, `dockLibraryNotice`,
+  `sourceUrlFor`, `qtSourceArchiveUrl`, `noticesUrl`, `AboutDialog(const Paths&, QWidget*)`, `AboutDialog::html`/
+  `noticesLink`/`copyButton`.
+- `esses` (`apps/app/src`, namespace `esses::app`; the application's own, not a library): `LaunchRequest`
+  (`toMessage`, `fromMessage`, `kProtocol`, `kMaxLogs`), `CommandLine`, `shouldForward`, `absoluteFrom`,
+  `isProjectArgument`; `InstanceServer` (`listen`, `close`, `requestReceived`, `clientRefused`), `forwardToInstance`,
+  `ForwardResult`, `instanceName`, `instanceAddress`, `kMaxMessageBytes`, `kClientTimeoutMs`, `kForwardTimeoutMs`;
+  `openRequestedFiles`, `LaunchKind`, `applyScheme`, `applyKeymap`, `applyStartOptions`, `bringToFront`.
+- Command-line options of `esses`: `--new-instance`, `--scheme`, `--keymap` (06 §19, now built); environment
+  `ESSES_INSTANCE_NAME`; Messages codes `launch.scheme`, `launch.keymap`.
+- Build: the cache variable `ESSES_RELEASE_TAG`, the install components `app` and `cli`,
+  `<build>/packaging/package_info.json` (`esses-package-info-1`); `tools/packaging/third_party.json`.
+
+### Names added by the M4 soak, walkthrough and docs packages (2026-10-19, D-213, D-214, D-215)
+
+- Soak (test code only, `tests/soak/`, namespace `esses::soak`): the environment `ESSES_SOAK_SECONDS`,
+  `ESSES_SOAK_MIN_CYCLES`, `ESSES_SOAK_SCALE`, `ESSES_SOAK_SETTLE_SECONDS`, `ESSES_SOAK_LOG_DIR`, `ESSES_SOAK_CRT_CHECK`,
+  `ESSES_SOAK_SELFTEST`; the ctest label `soak`; `tests/soak/lsan.supp`, `tests/soak/lsan_check.py`.
+- `esses-cli convert` (`apps/cli/src/convert.hpp`, namespace `esses::cli`): `ConvertOptions`, `runConvert`,
+  `convertWouldOverwriteInput`; the options `--format` (alias `--to`; `csv`, `motec.csv`, `motec.ld`), `--channels`,
+  `--range`, `--rate`, `--layer`, `--writer-options`, `-o`.
+- `esses_widgets` (`docs_shell.hpp`): `DocsShell::openContents`, `installedStartPage`, `onlineUrl`, `UrlOpener`,
+  `kStartPage`, `kRepositoryUrl`, `kNotOpenedCode` (the Messages code `help.not_opened`); `docs/user/` (the guide,
+  `index.md` its start page).
+
+### Names added by the M4 integration (2026-10-19, D-216)
+
+- Build: `esses_add_qt_test(... ARGS ...)`, `esses_add_qt_test_entry` (`cmake/esses_targets.cmake`);
+  `esses_version_from_git` (`cmake/version_parse.cmake`); ctest entries `soak.guard`, `lint.version_stamp`,
+  `app.tst_demo_command_line`. `DocsShell::kRepositoryUrl` is now the About dialog's `kRepositoryUrl`.
 
 ---
 

@@ -1,0 +1,299 @@
+# SPDX-FileCopyrightText: 2026 the Esses contributors
+# SPDX-License-Identifier: MIT
+#
+# The packages (M4, D-212; 07 section 7.1 "Packaging" and "Release", 08 sections 4.1 "package" and 7): on each OS a
+# Release build with Qt (the CI and release Qt of ci.yml, installed the same way), tools/packaging/package.py (install
+# rules of tools/packaging/CMakeLists.txt, windeployqt / linuxdeploy / macdeployqt, THIRD_PARTY_LICENSES.md and a
+# CycloneDX SBOM per package, the vendor-mark check of every staged tree, the archives, SHA-256 checksums), then
+# tools/packaging/smoke.py on what was made:
+#   windows-2022  the portable zip (unzipped, --version, an offscreen start with settings beside the program, nothing
+#                 under %APPDATA%, the association scripts), the esses-cli zip, the installer (silent install with the
+#                 .ld association, DisplayVersion = the version = the tag, --version, an offscreen start, uninstall)
+#                 and the installer's runtime check (a test build requiring a runtime no machine has: refused when
+#                 administrative, app-local runtime DLLs when per-user);
+#   ubuntu-24.04  the AppImage (--version, an offscreen start, the extracted tree) and the esses-cli tarball;
+#   macos-14      the DMG mounted read-only (Info.plist, the bundle, its ad hoc signature, --version, an offscreen
+#                 start of the app inside) and the esses-cli tarball.
+# AppImage and DMG are "builds green, not supported" (D-116, U-09 default): their jobs never block the Windows
+# release. The source job runs `reuse lint`, writes the source SBOM (`reuse spdx`, SPDX) and the packaging tools'
+# self-tests. On a tag v*, the build is a release build (-DESSES_RELEASE_TAG=<tag>: CMake refuses a tag that is not
+# "v" + the stamped version, so the installer's version equals the tag, AC-M4-09) and the release job drafts the
+# GitHub release with every artefact and one sha256sums.txt (the maintainer reviews and publishes it, M4.md 6.5).
+# Signing stays off (U-11 default: unsigned 0.1); no step needs a secret, so the workflow runs on pull requests from
+# forks too (the release job runs only for tags of this repository). Actions and tools are pinned to exact versions;
+# Qt comes from aqtinstall at the master commit ci.yml uses.
+name: package
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - "tools/packaging/**"
+      - "apps/app/**"
+      - ".github/workflows/package.yml"
+
+concurrency:
+  group: package-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  QT_VERSION: "6.12.0"
+  # As ci.yml (its comment explains why a master commit and not a release).
+  AQT_SOURCE: "git+https://github.com/miurahr/aqtinstall.git@076e1659807d0b362a3ed684d54c2e9c775eb9c7"
+  REUSE_VERSION: "5.0.2"
+  LINUXDEPLOY_URL: "https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20250213-2/linuxdeploy-x86_64.AppImage"
+  LINUXDEPLOY_QT_URL: "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/1-alpha-20250213-1/linuxdeploy-plugin-qt-x86_64.AppImage"
+
+jobs:
+  source:
+    name: package (source, licences, tools)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with: { fetch-depth: 0 }
+      - name: The packaging tools' self-tests and the third-party manifest's consistency
+        run: |
+          python3 -I tools/packaging/package.py --self-test
+          python3 -I tools/packaging/gen_third_party.py --self-test
+          python3 -I tools/packaging/gen_third_party.py --check
+          python3 -I tools/packaging/smoke.py --self-test
+          python3 -I tools/packaging/icons/make_icons.py --check
+          python3 -I tools/check_vendor_marks.py --self-test
+          python3 -I tools/check_vendor_marks.py
+      - name: REUSE (AC-M4-06)
+        run: pipx run --spec "reuse==${REUSE_VERSION}" reuse lint
+      - name: Source SBOM (SPDX, reuse spdx)
+        run: |
+          mkdir -p dist
+          v=$(git describe --tags --always)
+          pipx run --spec "reuse==${REUSE_VERSION}" reuse spdx --output "dist/esses-${v#v}-source.spdx"
+      - uses: actions/upload-artifact@v4.6.2
+        with:
+          name: esses-source-sbom
+          path: dist/*.spdx
+          if-no-files-found: error
+
+  windows:
+    name: package (windows-2022)
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with: { fetch-depth: 0 } # git describe needs the tags (cmake/version.cmake)
+      - uses: lukka/get-cmake@v3.31.6
+      - name: Install Qt ${{ env.QT_VERSION }} (aqtinstall)
+        uses: jurplel/install-qt-action@v4.1.1
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: win64_msvc2022_64
+          cache: true
+          aqtsource: ${{ env.AQT_SOURCE }}
+          py7zrversion: "==1.1.3"
+          extra: --external 7z
+      - uses: ilammy/msvc-dev-cmd@v1.13.0 # also VCToolsRedistDir: the runtime the installer and the zips carry
+      - name: Release tag and build date
+        id: release
+        shell: bash
+        run: |
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+          tag=""
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then tag="${GITHUB_REF#refs/tags/}"; fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - name: Configure (Release, Qt, no tests)
+        shell: bash
+        run: >-
+          cmake -S . -B build/package -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl
+          -DCMAKE_CXX_COMPILER=cl -DESSES_BUILD_QT=ON -DESSES_BUILD_TESTS=OFF
+          -DCMAKE_PREFIX_PATH="${QT_ROOT_DIR//\\//}" -DESSES_RELEASE_TAG="${{ steps.release.outputs.tag }}"
+      - name: Build
+        run: cmake --build build/package --parallel
+      - name: Inno Setup (preinstalled on the runner image, else 6.4.3)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --version=6.4.3 --no-progress -y
+          }
+      - name: Package
+        shell: bash
+        run: python -I tools/packaging/package.py --build build/package --out dist --runtime-test-installer
+      # The portable zip first: %APPDATA%\esses does not exist yet, so the check that it stays absent means something.
+      - name: Smoke tests
+        shell: bash
+        run: |
+          v=$(python -I -c "import json; print(json.load(open('build/package/packaging/package_info.json'))['version'])")
+          tag="${{ steps.release.outputs.tag }}"
+          python -I tools/packaging/smoke.py windows-portable --zip "dist/esses-$v-win64-portable.zip" --version "$v" --tag "$tag"
+          python -I tools/packaging/smoke.py cli --archive "dist/esses-cli-$v-win64.zip" --version "$v"
+          python -I tools/packaging/smoke.py windows-installer --installer "dist/esses-$v-win64-setup.exe" \
+            --runtime-test "dist/esses-$v-win64-setup-runtime-test.exe" --version "$v" --tag "$tag"
+      - uses: actions/upload-artifact@v4.6.2
+        with:
+          name: esses-windows
+          path: |
+            dist/*.exe
+            !dist/*-runtime-test.exe
+            dist/*.zip
+            dist/*.cdx.json
+            dist/sha256sums-*.txt
+          if-no-files-found: error
+
+  linux:
+    name: package (ubuntu-24.04, builds green, not supported)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      APPIMAGE_EXTRACT_AND_RUN: "1" # linuxdeploy and the AppImage run without FUSE
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with: { fetch-depth: 0 }
+      - uses: lukka/get-cmake@v3.31.6
+      - name: Install Qt ${{ env.QT_VERSION }} (aqtinstall)
+        uses: jurplel/install-qt-action@v4.1.1
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: linux_gcc_64
+          cache: true
+          aqtsource: ${{ env.AQT_SOURCE }}
+          py7zrversion: "==1.1.3"
+      # As ci.yml, plus the libraries the xcb platform plugin needs (linuxdeploy copies what the system lacks).
+      - name: Build and deployment dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgl-dev libegl-dev libglx-dev libopengl-dev \
+            libxkbcommon-dev libfontconfig1-dev libfreetype-dev libdbus-1-3 libxcb1-dev libxkbcommon-x11-0 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 desktop-file-utils
+      - name: linuxdeploy and its Qt plugin (pinned releases)
+        run: |
+          mkdir -p "$RUNNER_TEMP/linuxdeploy"
+          curl -fsSL -o "$RUNNER_TEMP/linuxdeploy/linuxdeploy-x86_64.AppImage" "$LINUXDEPLOY_URL"
+          curl -fsSL -o "$RUNNER_TEMP/linuxdeploy/linuxdeploy-plugin-qt-x86_64.AppImage" "$LINUXDEPLOY_QT_URL"
+          chmod +x "$RUNNER_TEMP"/linuxdeploy/*.AppImage
+          echo "$RUNNER_TEMP/linuxdeploy" >> "$GITHUB_PATH"
+      - name: Release tag and build date
+        id: release
+        run: |
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+          tag=""
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then tag="${GITHUB_REF#refs/tags/}"; fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - name: Configure (Release, Qt, no tests)
+        run: >-
+          cmake -S . -B build/package -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc
+          -DCMAKE_CXX_COMPILER=g++ -DESSES_BUILD_QT=ON -DESSES_BUILD_TESTS=OFF -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
+          -DESSES_RELEASE_TAG="${{ steps.release.outputs.tag }}"
+      - name: Build
+        run: cmake --build build/package --parallel
+      - name: Package
+        run: >-
+          python3 -I tools/packaging/package.py --build build/package --out dist
+          --linuxdeploy "$RUNNER_TEMP/linuxdeploy/linuxdeploy-x86_64.AppImage"
+      - name: Smoke tests
+        run: |
+          v=$(python3 -I -c "import json; print(json.load(open('build/package/packaging/package_info.json'))['version'])")
+          tag="${{ steps.release.outputs.tag }}"
+          python3 -I tools/packaging/smoke.py appimage --appimage "dist/esses-$v-x86_64.AppImage" --version "$v" --tag "$tag"
+          python3 -I tools/packaging/smoke.py cli --archive "dist/esses-cli-$v-linux-x86_64.tar.gz" --version "$v"
+      - uses: actions/upload-artifact@v4.6.2
+        with:
+          name: esses-linux
+          path: |
+            dist/*.AppImage
+            dist/*.tar.gz
+            dist/*.cdx.json
+            dist/sha256sums-*.txt
+          if-no-files-found: error
+
+  macos:
+    name: package (macos-14, builds green, not supported)
+    runs-on: macos-14
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with: { fetch-depth: 0 }
+      - uses: lukka/get-cmake@v3.31.6
+      - name: Install Qt ${{ env.QT_VERSION }} (aqtinstall)
+        uses: jurplel/install-qt-action@v4.1.1
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: clang_64
+          cache: true
+          aqtsource: ${{ env.AQT_SOURCE }}
+          py7zrversion: "==1.1.3"
+      - name: Release tag and build date
+        id: release
+        run: |
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+          tag=""
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then tag="${GITHUB_REF#refs/tags/}"; fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      # A universal binary (08 section 7.2): the Qt 6 clang_64 kit is universal.
+      - name: Configure (Release, Qt, no tests, arm64 and x86_64)
+        run: >-
+          cmake -S . -B build/package -G Ninja -DCMAKE_BUILD_TYPE=Release -DESSES_BUILD_QT=ON -DESSES_BUILD_TESTS=OFF
+          -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
+          -DESSES_RELEASE_TAG="${{ steps.release.outputs.tag }}"
+      - name: Build
+        run: cmake --build build/package --parallel
+      - name: Package
+        run: python3 -I tools/packaging/package.py --build build/package --out dist
+      - name: Smoke tests
+        run: |
+          v=$(python3 -I -c "import json; print(json.load(open('build/package/packaging/package_info.json'))['version'])")
+          tag="${{ steps.release.outputs.tag }}"
+          python3 -I tools/packaging/smoke.py dmg --dmg "dist/esses-$v-macos.dmg" --version "$v" --tag "$tag"
+          python3 -I tools/packaging/smoke.py cli --archive "dist/esses-cli-$v-macos.tar.gz" --version "$v"
+      - uses: actions/upload-artifact@v4.6.2
+        with:
+          name: esses-macos
+          path: |
+            dist/*.dmg
+            dist/*.tar.gz
+            dist/*.cdx.json
+            dist/sha256sums-*.txt
+          if-no-files-found: error
+
+  # Tags only: the draft release with every artefact that was made (Linux and macOS are best-effort, so their failure
+  # leaves them out instead of stopping the Windows release) and one sha256sums.txt over all of them.
+  release:
+    name: draft release
+    if: startsWith(github.ref, 'refs/tags/v') && !cancelled() && needs.windows.result == 'success' && needs.source.result == 'success'
+    needs: [source, windows, linux, macos]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4.1.8
+        with:
+          pattern: esses-*
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: |
+          cd dist
+          rm -f sha256sums-*.txt
+          sha256sum -- * | sort -k 2 > sha256sums.txt
+          cat sha256sums.txt
+      - name: Draft the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          {
+            echo "Esses ${TAG#v}: public alpha (not the beta announcement, D-035)."
+            echo
+            echo "The Windows installer and the portable zip are the supported packages; the Linux AppImage and the"
+            echo "macOS disk image build green but are not supported (D-116). The packages are not signed (U-11):"
+            echo "Windows SmartScreen asks before the first start (More info, Run anyway); on macOS open Esses.app"
+            echo "with right-click, Open. sha256sums.txt lists the checksum of every file; the *.cdx.json and *.spdx"
+            echo "files are the SBOMs. The Qt and docking-library source archives are added by the maintainer (NOTICES.md)."
+          } > notes.md
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft --verify-tag --title "Esses ${TAG#v}" \
+            --notes-file notes.md dist/*

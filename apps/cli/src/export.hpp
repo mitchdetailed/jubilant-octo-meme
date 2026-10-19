@@ -21,6 +21,9 @@
 
 #include "app_context.hpp"
 
+#include <esses/model/layer.hpp>
+#include <esses/model/range.hpp>
+
 #include <filesystem>
 #include <iosfwd>
 #include <optional>
@@ -45,5 +48,10 @@ struct ExportOptions {
 };
 
 int runExport(AppContext& ctx, const ExportOptions& options, std::ostream& out, std::ostream& err);
+
+// "Outings:Laps/3": the enabled range numbered 3 of the group, else the third range of the group; `path` gets
+// the group path. Null when the spec has no "/<number>", the group is missing or has no such range (export
+// and convert, D-181 (d)).
+const model::Range* findRange(const model::DataLayer& layer, const std::string& spec, std::string& path);
 
 } // namespace esses::cli

@@ -3,15 +3,24 @@
 //
 // esses: the GUI application (06 sections 18-19). Start-up order (01 section 5.3 rule 11): QApplication, then
 // the AppRuntime (pool, cache, dispatcher; the GUI thread marked NoBlock), then the MainWindow (settings,
-// shipped defaults, keymap, commands, the session's dock layout); then -w <project> (its own layout and its
-// recovery prompt), then every -l <log> in order (with a project: after the prompt, through SessionRestore).
-// After exec() returns the window is destroyed (it writes the layout), rt.shutdown() runs, and only then the
-// runtime and the application.
-//   esses [-w <project folder>] [-l <log file>]... [--offscreen] [--dump-commands] [--version] [<file>...]
+// shipped defaults, keymap, commands, the session's dock layout); then --scheme and --keymap, -w <project>
+// (its own layout and its recovery prompt), then every -l <log> in order (with a project: after the prompt,
+// through SessionRestore). After exec() returns the window is destroyed (it writes the layout), rt.shutdown()
+// runs, and only then the runtime and the application.
+//   esses [-w <project folder>] [-l <log file>]... [--new-instance] [--scheme <name>] [--keymap <name|file>]
+//         [--offscreen] [--dump-commands] [--version] [--help] [<file>...]
 // Bare arguments (06 section 19 item 3): a folder containing project.json, or a project.json, is -w; any
-// other file is -l (the importer registry decides whether it can open it).
-// On Windows esses is a GUI-subsystem executable; ParentConsole makes its console output visible in the
-// terminal that started it (08 section 3.10).
+// other file is -l (the importer registry decides whether it can open it). launch_request.hpp parses the
+// line. Single instance (06 section 18 step 1, D-113, D-212; instance_channel.hpp): unless --new-instance is
+// given or the run only prints, a launch first hands its files to a running Esses of the same user and
+// settings folder and exits 0; otherwise it listens itself, so later launches reach it. --version prints
+// widgets::versionReport() (version, commit, Qt, build date, dock library, source; AC-M4-09). On Windows
+// esses is a GUI-subsystem executable; ParentConsole makes its console output visible in the terminal that
+// started it (08 section 3.10).
+
+#include "instance_channel.hpp"
+#include "launch.hpp"
+#include "launch_request.hpp"
 
 #include <esses/base/config.hpp>
 #include <esses/base/paths.hpp>
@@ -22,14 +31,13 @@
 #include <esses/widgets/shell/main_window.hpp>
 
 #include <QApplication>
-#include <QCommandLineParser>
-#include <QFileInfo>
+#include <QDir>
+#include <QIcon>
+#include <QSize>
 #include <QTextStream>
 #include <cstdio>
 #include <cstring>
-#include <filesystem>
 #include <memory>
-#include <vector>
 
 #if defined(ESSES_OS_WINDOWS)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -101,20 +109,31 @@ struct ParentConsole {
 };
 #endif
 
-std::filesystem::path toPath(const QString& s) {
-    return std::filesystem::path(s.toStdWString());
+// The window icon (the application icon of tools/packaging/icons, compiled in by resources/esses.qrc).
+QIcon applicationIcon() {
+    QIcon icon;
+    for (const int n : {16, 32, 48, 64, 128, 256, 512}) {
+        icon.addFile(QStringLiteral(":/esses/icons/esses-%1.png").arg(n), QSize(n, n));
+    }
+    return icon;
 }
 
-bool isProject(const QString& arg) {
-    const QFileInfo info(arg);
-    return (info.isDir() && QFileInfo::exists(info.filePath() + QStringLiteral("/project.json"))) ||
-           info.fileName() == QLatin1String("project.json");
+// Hands the request to the instance on `name`; true when it took it.
+bool forwarded(const QString& name, const esses::app::LaunchRequest& request) {
+    QString detail;
+    const esses::app::ForwardResult r =
+        esses::app::forwardToInstance(name, request.toMessage(), esses::app::kForwardTimeoutMs, &detail);
+    if (r == esses::app::ForwardResult::Failed) {
+        QTextStream(stderr) << "esses: the running instance did not take the files (" << detail
+                            << "); starting a new one\n";
+    }
+    return r == esses::app::ForwardResult::Delivered;
 }
 
 } // namespace
 
 int main(int argc, char** argv) {
-    // Before anything can print: QApplication's own warnings, the parser's --help and errors, --version.
+    // Before anything can print: QApplication's own warnings, --help, the parser's errors, --version.
     ParentConsole console;
     // --offscreen must act before the QApplication picks its platform plugin (06 section 19 item 4).
     for (int i = 1; i < argc; ++i) {
@@ -130,55 +149,44 @@ int main(int argc, char** argv) {
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("Esses"));
     QApplication::setOrganizationDomain(QStringLiteral("esses.invalid"));
+    QApplication::setWindowIcon(applicationIcon());
 
-    QCommandLineParser parser;
-    parser.setApplicationDescription(QStringLiteral("Esses motorsport data analysis"));
-    parser.addHelpOption();
-    const QCommandLineOption versionOption(QStringLiteral("version"),
-                                           QStringLiteral("Print the version and exit."));
-    const QCommandLineOption projectOption(QStringList{QStringLiteral("w"), QStringLiteral("workspace")},
-                                           QStringLiteral("Open the project folder <project>."),
-                                           QStringLiteral("project"));
-    const QCommandLineOption logOption(QStringList{QStringLiteral("l"), QStringLiteral("log")},
-                                       QStringLiteral("Open the log file <log> (repeatable)."),
-                                       QStringLiteral("log"));
-    const QCommandLineOption dumpOption(QStringLiteral("dump-commands"),
-                                        QStringLiteral("Print the command registry as JSON and exit."));
-    const QCommandLineOption offscreenOption(QStringLiteral("offscreen"),
-                                             QStringLiteral("Run without a display (tests)."));
-    parser.addOption(versionOption);
-    parser.addOption(projectOption);
-    parser.addOption(logOption);
-    parser.addOption(dumpOption);
-    parser.addOption(offscreenOption);
-    parser.addPositionalArgument(QStringLiteral("files"),
-                                 QStringLiteral("Project folders (with project.json) or log files."),
-                                 QStringLiteral("[<file>...]"));
-    parser.process(app);
-
-    if (parser.isSet(versionOption)) {
-        // AC-M4-09: the fields of widgets::versionReport() (M4 packaging package, about_dialog.hpp; D-206).
+    esses::app::CommandLine commandLine;
+    switch (commandLine.parse(QApplication::arguments(), QDir::currentPath())) {
+    case esses::app::CommandLine::Outcome::Help:
+        QTextStream(stdout) << commandLine.helpText();
+        return 0;
+    case esses::app::CommandLine::Outcome::Error:
+        QTextStream(stderr) << "esses: " << commandLine.errorText() << "\n(esses --help lists the options)\n";
+        return 1;
+    case esses::app::CommandLine::Outcome::Version:
+        // AC-M4-09: version, commit, Qt version, build date (widgets::versionReport, about_dialog.hpp;
+        // D-212).
         QTextStream(stdout) << esses::widgets::versionReport() << '\n';
         return 0;
+    case esses::app::CommandLine::Outcome::Run:
+        break;
     }
+    const esses::app::LaunchRequest& request = commandLine.request();
 
     auto paths = esses::Paths::resolve();
     if (!paths) {
         QTextStream(stderr) << QString::fromStdString(paths.error().toString()) << '\n';
         return 2;
     }
-    if (!parser.isSet(dumpOption)) {
-        console.release(); // the GUI from here on: nothing more is printed for the terminal
-    }
 
-    QString project = parser.value(projectOption);
-    QStringList logs = parser.values(logOption);
-    for (const QString& arg : parser.positionalArguments()) {
-        if (isProject(arg) && project.isEmpty()) {
-            project = arg;
-        } else {
-            logs << arg;
+    // Single instance (06 section 18 step 1, D-113): hand the files over and stop, else be the instance later
+    // launches reach. Listening may fail when another instance started at the same moment: try it once more.
+    esses::app::InstanceServer server;
+    if (!request.dumpCommands) {
+        const QString name = esses::app::instanceName(paths->configDir());
+        if (esses::app::shouldForward(request) && forwarded(name, request)) {
+            return 0;
         }
+        if (!server.listen(name) && esses::app::shouldForward(request) && forwarded(name, request)) {
+            return 0;
+        }
+        console.release(); // the GUI from here on: nothing more is printed for the terminal
     }
 
     esses::qt::AppRuntimeOptions options;
@@ -189,24 +197,21 @@ int main(int argc, char** argv) {
     int rc = 0;
     {
         esses::widgets::MainWindow window(rt, *paths);
-        if (parser.isSet(dumpOption)) {
+        if (request.dumpCommands) {
             window.setSaveLayoutOnExit(false);
             QTextStream(stdout) << window.commands().dumpJson();
         } else {
-            // 06 section 18 steps 3-6: with a project, its recovery prompt comes first, then the -l logs
-            // (else its previous data) and the last selection; without one (or when it does not open), the
-            // logs.
-            std::vector<std::filesystem::path> logPaths;
-            for (const QString& log : logs) {
-                logPaths.push_back(toPath(log));
-            }
-            if (project.isEmpty() || !window.openProject(toPath(project), logPaths)) {
-                for (const std::filesystem::path& log : logPaths) {
-                    window.openLog(log);
-                }
-            }
+            esses::app::applyStartOptions(window, request); // --scheme, --keymap (problems go to Messages)
+            esses::app::openRequestedFiles(window, request, esses::app::LaunchKind::Start);
+            QObject::connect(&server, &esses::app::InstanceServer::requestReceived, &window,
+                             [&window](const esses::app::LaunchRequest& forwardedRequest) {
+                                 esses::app::openRequestedFiles(window, forwardedRequest,
+                                                                esses::app::LaunchKind::Forwarded);
+                                 esses::app::bringToFront(window);
+                             });
             window.show();
             rc = QApplication::exec();
+            server.close(); // no request reaches a window that is going away
         }
     }
     rt.shutdown();

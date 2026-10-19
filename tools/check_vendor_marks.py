@@ -3,15 +3,22 @@
 # SPDX-License-Identifier: MIT
 """Vendor-mark lint (D-003, D-125; 00_OVERVIEW.md section 8; 08_REPO_AND_BUILD.md section 5).
 
-Two scans, both outside the allow-list (tools/vendor_marks_allowlist.txt):
+Two scans of the source tree, both outside the allow-list (tools/vendor_marks_allowlist.txt):
   1. Words: (?i)\\bmotec\\b | \\bi2\\b | i2pro | \\bi2w(kb|sp)\\b in string literals, comments, JSON values, and
-     file and asset names under libs/ apps/ plugins/ sdk/ data/ schemas/ tests/ui/ tools/packaging/.
+     file and asset names under libs/ apps/ plugins/ sdk/ data/ schemas/ tests/ui/ tools/packaging/ (the
+     installer script, the desktop entry, the Info.plist template, the icons) and in the package workflow.
   2. Identifiers (C/C++, CMake, Python, JSON keys) and file stems under libs/ apps/ plugins/ sdk/: a
      case-insensitive substring "motec", or a token equal to i2, i2pro, i2wkb, i2wsp or mtc after splitting at
      '_', '-', '.' and case changes (I2MathsImporter, xI2 and IMtcMathPlugin are caught; kPi2 is not).
+--tree DIR scans a release tree instead (AC-M4-08, D-212; tools/packaging/package.py runs it on every staged
+package before it is archived): the words in every file and folder name, in every text file (by extension, and
+files without one that read as UTF-8 text, such as AppRun) and in the strings of our own programs (esses,
+esses-cli, esses-render; for binaries only the long marks, motec, i2pro and i2wkb/i2wsp, since two printable
+bytes "i2" occur by chance). Third-party binaries (Qt, the docking library, the C++ runtime) are checked by name
+only. The allow-list's literals and path patterns apply as in the source tree.
 
-Standard library only. Run with `python -I tools/check_vendor_marks.py [--root DIR]`; `--self-test` checks the
-scanner itself. Exit status: 0 clean, 1 findings, 2 usage error.
+Standard library only. Run with `python -I tools/check_vendor_marks.py [--root DIR | --tree DIR]`; `--self-test`
+checks the scanner itself. Exit status: 0 clean, 1 findings, 2 usage error.
 """
 from __future__ import annotations
 
@@ -28,11 +35,19 @@ WORD_RE = re.compile(r"(?i)\bmotec\b|\bi2\b|i2pro|\bi2w(?:kb|sp)\b")
 IDENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 TOKEN_RE = re.compile(r"[A-Z]+[0-9]*(?=[A-Z][a-z])|[A-Z]?[a-z]+(?:[0-9]+[a-z]*)*|[A-Z]+[0-9]*|[0-9]+")
 BAD_TOKENS = {"i2", "i2pro", "i2wkb", "i2wsp", "mtc"}
-WORD_SCOPE = ("libs/", "apps/", "plugins/", "sdk/", "data/", "schemas/", "tests/ui/", "tools/packaging/")
+WORD_SCOPE = ("libs/", "apps/", "plugins/", "sdk/", "data/", "schemas/", "tests/ui/", "tools/packaging/",
+              ".github/workflows/package.yml")
 IDENT_SCOPE = ("libs/", "apps/", "plugins/", "sdk/")
 CPP_EXT = {".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx", ".inl", ".ipp"}
 TEXT_EXT = CPP_EXT | {".in", ".cmake", ".txt", ".py", ".json", ".md", ".yml", ".yaml", ".toml", ".ini", ".qrc",
-                      ".ui", ".xml", ".svg", ".css", ".qss", ".lua", ".csv"}
+                      ".ui", ".xml", ".svg", ".css", ".qss", ".lua", ".csv",
+                      # release metadata (AC-M4-08): installer, Windows resources, desktop entry, bundle, scripts
+                      ".iss", ".isl", ".rc", ".manifest", ".desktop", ".plist", ".entitlements", ".sh", ".ps1",
+                      ".cmd", ".bat", ".conf", ".appdata", ".metainfo"}
+# --tree: the long marks only in binaries; our own programs' file names.
+BINARY_RE = re.compile(rb"(?i)\bmotec\b|i2pro|\bi2w(?:kb|sp)\b")
+OUR_PROGRAM = re.compile(r"^esses(-cli|-render)?(\.exe)?$")
+STRINGS_RE = re.compile(rb"[\x20-\x7e]{4,}|(?:[\x20-\x7e]\x00){4,}")
 SKIP_DIRS = {".git", "build", "out", "third_party", "__pycache__", ".vs", "node_modules"}
 
 
@@ -209,6 +224,86 @@ def scan(root: pathlib.Path, allow: Allowlist, files: list[str] | None = None) -
     return findings
 
 
+def binary_strings(data: bytes) -> list[bytes]:
+    """The printable runs of at least four characters of a binary, ASCII and UTF-16LE (as `strings -e S -e l`)."""
+    return [m.group(0).replace(b"\x00", b"") if b"\x00" in m.group(0) else m.group(0)
+            for m in STRINGS_RE.finditer(data)]
+
+
+def scan_tree(tree: pathlib.Path, allow: Allowlist) -> list[str]:
+    """A release tree (AC-M4-08): names, text files, the strings of our programs."""
+    findings: list[str] = []
+    literals = [lit.encode("utf-8") for lit in allow.literals]
+    for path in sorted(tree.rglob("*"), key=lambda p: p.as_posix()):
+        rel = path.relative_to(tree).as_posix()
+        name_text = allow.strip_literals(rel)
+        for m in WORD_RE.finditer(name_text):
+            findings.append(f"{rel}: file name contains '{m.group(0)}'")
+        if not path.is_file() or path.is_symlink() or allow.path_allowed(rel):
+            continue
+        suffix = path.suffix.lower()
+        try:
+            data = path.read_bytes()
+        except OSError:
+            continue
+        text = None
+        if suffix in TEXT_EXT or path.name == "CMakeLists.txt":
+            text = data.decode("utf-8", errors="replace")
+        elif suffix == "" and len(data) < (1 << 20) and b"\x00" not in data:
+            try:
+                text = data.decode("utf-8")
+            except UnicodeDecodeError:
+                text = None
+        if text is not None:
+            for lineno, line in enumerate(allow.strip_literals(text).splitlines(), 1):
+                for m in WORD_RE.finditer(line):
+                    findings.append(f"{rel}:{lineno}: word '{m.group(0)}'")
+        elif OUR_PROGRAM.match(path.name):
+            for run in binary_strings(data):
+                for lit in literals:
+                    run = run.replace(lit, b" " * len(lit))
+                for m in BINARY_RE.finditer(run):
+                    findings.append(f"{rel}: string '{run.decode('ascii', 'replace')[:80]}' contains "
+                                    f"'{m.group(0).decode('ascii', 'replace')}'")
+    return findings
+
+
+def self_test_tree(allow: Allowlist) -> bool:
+    files = {
+        "esses.exe": b"MZ\x00\x00motec.ld\x00MoTeC CSV File\x00\x00ordinary string\x00",  # allowed literals only
+        "esses-render.exe": b"\x00\x00a MoTeC export\x00",                                 # a mark in our program
+        "esses-cli": "workbook i2wkb".encode("utf-16-le"),                                  # UTF-16 strings too
+        "Qt6Core.dll": b"\x00MoTeC\x00",                                                    # third party: name only
+        "share/esses/NOTICES.md": "the MoTeC i2 formats\n",                                 # allowed prose
+        "share/applications/esses.desktop": "[Desktop Entry]\nName=Esses for i2 users\n",   # a mark in metadata
+        "Contents/Info.plist": "<string>Esses</string>\n",                                  # clean
+        "AppRun": "#!/bin/sh\n# runs i2pro\n",                                              # text without extension
+        "icons/motec.png": b"\x89PNG",                                                       # a mark in a name
+    }
+    expected = {
+        "esses-render.exe: string 'a MoTeC export' contains 'MoTeC'",
+        "esses-cli: string 'workbook i2wkb' contains 'i2wkb'",
+        "share/applications/esses.desktop:2: word 'i2'",
+        "AppRun:2: word 'i2pro'",
+        "icons/motec.png: file name contains 'motec'",
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        root = pathlib.Path(tmp)
+        for rel, content in files.items():
+            p = root / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            if isinstance(content, str):
+                p.write_text(content, encoding="utf-8", newline="\n")
+            else:
+                p.write_bytes(content)
+        found = set(scan_tree(root, allow))
+    for item in sorted(expected - found):
+        print(f"self-test (tree): missed {item}")
+    for item in sorted(found - expected):
+        print(f"self-test (tree): unexpected {item}")
+    return found == expected
+
+
 def self_test(allowlist_path: pathlib.Path) -> int:
     allow = Allowlist.load(allowlist_path)
     cases = {
@@ -230,6 +325,10 @@ def self_test(allowlist_path: pathlib.Path) -> int:
         "data/dictionaries/motec.ld.json": "{}\n",  # allowed importer id in a file name
         "docs/notes.md": "MoTeC i2 prose is fine here\n",
         "tools/other.py": "i2 = 'MoTeC'  # out of scope\n",
+        "tools/packaging/windows/setup.iss": "AppName=Esses for i2\n",       # installer strings (AC-M4-08)
+        "tools/packaging/linux/app.desktop": "Comment=no marks here\n",
+        ".github/workflows/package.yml": "name: MoTeC package\n",
+        ".github/workflows/other.yml": "name: MoTeC\n",                      # out of scope
     }
     expected = {
         "libs/x/src/a.cpp:2: identifier 'I2MathsImporter'",
@@ -240,6 +339,8 @@ def self_test(allowlist_path: pathlib.Path) -> int:
         "libs/x/src/a.cpp:10: word 'MoTeC'",
         "libs/y/I2Thing.hpp: file name token 'I2Thing'",
         "data/foo.json:1: word 'i2pro'",
+        "tools/packaging/windows/setup.iss:1: word 'i2'",
+        ".github/workflows/package.yml:1: word 'MoTeC'",
     }
     with tempfile.TemporaryDirectory() as tmp:
         root = pathlib.Path(tmp)
@@ -248,7 +349,7 @@ def self_test(allowlist_path: pathlib.Path) -> int:
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(content, encoding="utf-8", newline="\n")
         found = set(scan(root, allow, sorted(cases)))
-    ok = found == expected
+    ok = found == expected and self_test_tree(allow)
     for item in sorted(expected - found):
         print(f"self-test: missed {item}")
     for item in sorted(found - expected):
@@ -267,10 +368,17 @@ def main() -> int:
     parser.add_argument("--root", type=pathlib.Path, default=here.parent, help="repository root")
     parser.add_argument("--allowlist", type=pathlib.Path, default=here / "vendor_marks_allowlist.txt")
     parser.add_argument("--self-test", action="store_true", help="test the scanner on built-in cases")
+    parser.add_argument("--tree", type=pathlib.Path, help="scan a release tree (a staged package) instead")
     args = parser.parse_args()
     if args.self_test:
         return self_test(args.allowlist)
-    findings = scan(args.root.resolve(), Allowlist.load(args.allowlist))
+    if args.tree is not None:
+        if not args.tree.is_dir():
+            print(f"check_vendor_marks: {args.tree} is not a directory")
+            return 2
+        findings = scan_tree(args.tree.resolve(), Allowlist.load(args.allowlist))
+    else:
+        findings = scan(args.root.resolve(), Allowlist.load(args.allowlist))
     for f in findings:
         print(f)
     print(f"check_vendor_marks: {len(findings)} finding(s)")

@@ -167,8 +167,8 @@ TEST_CASE("keymap: hotkey batch 1 is implemented in M1, M2 and M3 rows as they l
         CHECK_FALSE(b.doc.empty());
         switch (b.status) {
         case KeymapStatus::Implemented:
-            // A closed milestone (M1-M3) or the one in progress (M4), whose rows turn implemented as they
-            // land (tools/check_keymap_coverage.py); a menu-only or mouse row of M2/M3 may have no key (06
+            // A closed milestone (M1-M4; tools/check_keymap_coverage.py raised its current milestone to M4
+            // when the last M4 row landed, D-216); a menu-only or mouse row of M2-M4 may have no key (06
             // section 14.3).
             CHECK((b.milestone == "M1" || b.milestone == "M2" || b.milestone == "M3" || b.milestone == "M4"));
             if (b.milestone == "M1") {
@@ -178,8 +178,8 @@ TEST_CASE("keymap: hotkey batch 1 is implemented in M1, M2 and M3 rows as they l
             }
             break;
         case KeymapStatus::Planned:
-            // At or before the current milestone (M3, AC-M3-01) means implemented (06 section 14.5).
-            CHECK((b.milestone == "M4" || b.milestone == "v1.0" || b.milestone == "later"));
+            // At or before the current milestone (M4, AC-M4-01 item 9) means implemented (06 section 14.5).
+            CHECK((b.milestone == "v1.0" || b.milestone == "later"));
             break;
         case KeymapStatus::Reserved:
             CHECK(b.milestone.empty());

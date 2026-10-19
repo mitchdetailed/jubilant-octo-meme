@@ -710,9 +710,10 @@ per package in a fixed order (`BudgetShell`, `ReloadShell`, `HiDpiShell`, `Follo
 `component_widget.cpp` is the followups package's), `DockHost::windowOf` (final), `MessagesWindow::invokeAltAction`/
 `showPerformance`/`performanceText` (`src/docks/m4_budget/`), `AboutDialog`, `BuildInfo`/`buildInfo` (final but
 `dockLibrary`), `versionReport` (what `esses --version` prints), `qtLicenceNotice`, `sourceUrl`
-(`src/shell/m4_about/`). Help > About is registered (a menu command without a keymap row); everything else is
-an `M4-STUB` (`grep -rn "M4-STUB" libs`). Test: `tests/shell/tst_m4_contract.cpp` (`widgets.tst_m4_contract`); the
-packages' tests go to `tests/m4_<package>/`.
+(`src/shell/m4_about/`). Help > About is a menu command without a keymap row. Every M4 member is implemented by its
+package as the sections below describe (no contract stub is left; D-216). Test: `tests/shell/tst_m4_contract.cpp`
+(`widgets.tst_m4_contract`: the extensions in order, every M4 keymap row implemented, Help > About, the build
+identification, `windowOf`, the signatures); the packages' tests are in `tests/m4_<package>/`.
 
 ## M4 budget: the warning, the Performance field and the Stats line (AC-M4-02; D-207)
 
@@ -807,3 +808,38 @@ the shell).
 - Tests: `tests/m4_followups/tst_followups_units.cpp` (`widgets.tst_followups_units`),
   `tests/m4_followups/tst_followups_view.cpp` (`widgets.tst_followups_view`), the helper
   `tests/m4_followups/legacy_csv_support.hpp` (the legacy layout read by 05 §6, not by the writer).
+
+## M4 docs: Help Contents (F1; D-215)
+
+`DocsShell` (`shell/docs_shell.hpp`, `src/shell/main_window_m4_docs.cpp`) registers `help.contents` ("Help
+Contents", Help menu, F1, Global; the keymap row is implemented). The command (`openContents`) hands the installed
+start page of the user guide to the URL opener: the first regular file of `<data dir>/../docs/user/index.md` and
+`<exe dir>/docs/user/index.md` (`installedStartPage`; `contentsUrl()` is its file URL, empty when not installed),
+so the packages install `docs/user/` beside the shipped `data/` (Windows `<install dir>\docs\user\`, Linux
+`share/esses/docs/user/`, macOS `Contents/Resources/docs/user/`). Without an installed page, or when the opener
+refuses it, the online page (`onlineUrl(version)`: the public repository at `v<version>` for a tagged build, else
+`main`) is opened; when neither opens, a Messages warning (System, source "Help", code `help.not_opened`) names both
+places and the Messages dock is shown. `setUrlOpener` replaces the default `QDesktopServices::openUrl` (an empty
+opener restores it), so tests never start a browser. Tests: `tests/m4_docs/tst_docs_shell.cpp`
+(`widgets.tst_docs_shell`) and the `help.contents` entry of `tests/ui/keymap/keymap_m4_docs_cases.hpp`.
+
+## M4 packaging: Help > About and the build identification (AC-M4-06, AC-M4-09; D-212)
+
+`about_dialog.hpp` (`src/shell/m4_about/about_dialog.cpp`): `buildInfo()` fills the version, commit and build date
+stamped by `cmake/version.cmake` (`esses::versionInfo`), the Qt version run against and built against, the docking
+library in use (`ADS <version>` from ADS's own `ads_version.h`, which this file includes only for the version macros,
+or `QDockWidget`; `DockHost::defaultBackendName()` decides) and the release tag. `versionReport()` is what
+`esses --version` prints: `esses <version>`, then `commit:`, `Qt: <runtime> (built with <build>)`, `build date:`,
+`dock library:` and `source:`. `qtLicenceNotice()` states "This application uses Qt <version> under the GNU LGPL v3"
+(08 §9 item 2), where the licence texts are, that Qt may be replaced, and the exact source archive of the Qt in use
+(`qtSourceArchiveUrl`); `dockLibraryNotice()` the same for ADS (LGPL-2.1-or-later, its tag URL). `sourceUrl()` is the
+source of this build (`sourceUrlFor(tag, commit)`): the public repository's `tree/<tag>` in a release build
+(`ESSES_RELEASE_TAG`, defined for `about_dialog.cpp` only by `tools/packaging/CMakeLists.txt` when a release is
+configured with `-DESSES_RELEASE_TAG=v<version>`), else `commit/<sha>`, else the repository (`kRepositoryUrl`).
+`noticesUrl(paths)` links the NOTICES.md installed beside the data folder, else the repository's copy. `AboutDialog`
+(Help > About, `AboutShell` opens it window-modal with the window's `Paths`) shows the version report, the Qt and ADS
+notices with their links, the MIT notice with the source link, the notices link and the settings folder (marked
+portable when `portable.marker` is beside the program); Copy puts `text()` on the clipboard. Tests:
+`tests/m4_about/tst_about_dialog.cpp` (`widgets.tst_about_dialog`: the report's fields against `versionInfo()` and
+Qt, the docking library against `third_party/qtads/CMakeLists.txt`, the URL rule by hand, the notices, the links,
+the installed NOTICES.md, the portable settings folder, Copy, Help > About in the shell).

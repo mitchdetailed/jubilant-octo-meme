@@ -73,12 +73,15 @@
 #include <esses/widgets/properties_shell/properties_dialog.hpp>
 #include <esses/widgets/properties_shell/shell_dialogs.hpp>
 #include <esses/widgets/properties_shell/zoom_summary_bar.hpp>
+// M4 (the docs package's help.contents row, keymap_m4_docs_cases.hpp)
+#include <esses/widgets/shell/docs_shell.hpp>
 
 #include <QAction>
 #include <QApplication>
 #include <QClipboard>
 #include <QComboBox>
 #include <QDialog>
+#include <QFileInfo>
 #include <QIdentityProxyModel>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -95,6 +98,7 @@
 #include <QTest>
 #include <QTreeView>
 #include <QUndoStack>
+#include <QUrl>
 #include <QWheelEvent>
 #include <algorithm>
 #include <cmath>

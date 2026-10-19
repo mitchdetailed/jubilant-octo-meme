@@ -21,6 +21,12 @@
 # CMakePresets.json). tools/bench_compare.py (08 section 6.9) reads that directory: `--limits bench/workloads.md`
 # for the gate, `--baseline <file> --tolerance 0.30` for the alarm, `--accept` to rewrite a baseline at a
 # milestone tag. Until bench/CMakeLists.txt exists both jobs stop after a notice.
+#
+# - soak (M4, AC-M4-03; 07 section 7.1 "Soak"; 08 sections 4.1 and 6.10; D-213), a third job and no benchmark: the
+#   Saturday soak of tests/soak under ASan + UBSan with LeakSanitizer on GitHub-hosted ubuntu-24.04, nightly for 30
+#   minutes and on manual dispatch for the duration given (120 minutes on the release candidate,
+#   docs/milestones/M4.md section 6.5). It needs no secret and never runs on a pull request; its logs are uploaded as
+#   the artefact soak-logs.
 name: bench
 
 on:
@@ -29,7 +35,12 @@ on:
     tags: ["v*"]
   schedule:
     - cron: "30 3 * * *" # nightly
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      soak_minutes:
+        description: "The soak job's duration in minutes (30 nightly; 120 on the release candidate, AC-M4-03)"
+        required: false
+        default: "30"
 
 concurrency:
   group: bench-${{ github.ref }}
@@ -166,3 +177,104 @@ jobs:
           path: build/bench-results/
           if-no-files-found: ignore
           retention-days: 90
+
+  # The Saturday soak (AC-M4-03; tests/soak/README.md; D-213). Built as ci.yml's sanitize job builds (the
+  # linux-clang-asan preset: Clang, Debug, ESSES_SANITIZE=address,undefined) with the Qt layers on, against the
+  # same Qt 6.12.0 from the same aqtinstall commit as ci.yml (AQT_SOURCE there), with every tool pinned. Steps:
+  # the suppression rules and the leak classifier's self-test; the leak pipeline's own check (a deliberate esses
+  # leak made inside a Qt timer callback must be reported by LeakSanitizer through lsan.supp and counted by
+  # lsan_check.py); the soak itself (ESSES_SOAK_SECONDS); lsan_check.py's verdict over the sanitizer logs, the Qt
+  # Test result and the exit status (an ASan or UBSan error, a failed test, or a leak with an esses frame fails;
+  # a leak without one is a warning). The logs, the per-cycle samples and the summary are uploaded.
+  soak:
+    name: soak (ASan + UBSan, LeakSanitizer)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 200 # the 2 h run, the build (about 25 min) and the checks; 08 section 4.1 budget <= 2.5 h of soak
+    env:
+      QT_QPA_PLATFORM: offscreen
+      QT_VERSION_SOAK: "6.12.0" # as ci.yml's QT_VERSION
+      AQT_SOURCE: "git+https://github.com/miurahr/aqtinstall.git@076e1659807d0b362a3ed684d54c2e9c775eb9c7"
+      SOAK_MINUTES: ${{ github.event_name == 'workflow_dispatch' && inputs.soak_minutes || '30' }}
+      BUILD_DIR: build/linux-clang-soak
+      LOGS: ${{ github.workspace }}/soak-logs
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with: { submodules: false }
+      - name: Tools (pinned) and the Qt kit (aqtinstall at ci.yml's commit)
+        shell: bash
+        run: |
+          [[ "$SOAK_MINUTES" =~ ^[0-9]+$ ]] || { echo "::error::soak_minutes must be a whole number"; exit 1; }
+          sudo apt-get update
+          deps=(libgl-dev libegl-dev libglx-dev libopengl-dev libxkbcommon-dev libfontconfig1-dev libfreetype-dev
+                libdbus-1-3 libxcb1-dev clang-18 llvm-18)
+          sudo apt-get install -y --no-install-recommends "${deps[@]}"
+          python3 -m venv "$RUNNER_TEMP/tools"
+          tools=("cmake==3.31.4" "ninja==1.11.1.1" "py7zr==1.1.3" "aqtinstall @ $AQT_SOURCE")
+          "$RUNNER_TEMP/tools/bin/pip" install --disable-pip-version-check "${tools[@]}"
+          echo "$RUNNER_TEMP/tools/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/tools/bin/aqt" install-qt linux desktop "$QT_VERSION_SOAK" linux_gcc_64 --outputdir "$RUNNER_TEMP/Qt"
+          echo "QT_ROOT_DIR=$RUNNER_TEMP/Qt/$QT_VERSION_SOAK/gcc_64" >> "$GITHUB_ENV"
+          echo "ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-18/bin/llvm-symbolizer" >> "$GITHUB_ENV"
+      - name: Configure (linux-clang-asan with the Qt layers, assertions on)
+        shell: bash
+        run: |
+          args=(--preset linux-clang-asan -B "$BUILD_DIR" -DCMAKE_C_COMPILER=clang-18 -DCMAKE_CXX_COMPILER=clang++-18
+                -DESSES_BUILD_QT=ON -DESSES_FORCE_ASSERTS=ON "-DCMAKE_PREFIX_PATH=$QT_ROOT_DIR")
+          cmake "${args[@]}"
+      - name: Build the soak
+        id: build
+        run: cmake --build "$BUILD_DIR" --target esses_soak_tst_saturday --parallel 4
+      - name: Suppression rules and the leak classifier (lsan_check.py --self-test)
+        run: python3 -I tests/soak/lsan_check.py --self-test --suppressions tests/soak/lsan.supp
+      - name: The leak pipeline finds a deliberate esses leak
+        shell: bash
+        env:
+          ESSES_SOAK_SELFTEST: leak
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:log_path=${{ github.workspace }}/soak-logs/pipeline/asan
+          LSAN_OPTIONS: suppressions=${{ github.workspace }}/tests/soak/lsan.supp:print_suppressions=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1:log_path=${{ github.workspace }}/soak-logs/pipeline/ubsan
+        run: |
+          mkdir -p "$LOGS/pipeline"
+          set +e
+          "$BUILD_DIR/bin/esses_soak_tst_saturday" selfTestChild -o "$LOGS/pipeline/selftest.txt,txt"
+          status=$?
+          set -e
+          echo "the deliberate leak's run exited with $status (LeakSanitizer's report makes it non-zero)"
+          check=(--logs "$LOGS/pipeline" --source-root "$GITHUB_WORKSPACE" --qtest "$LOGS/pipeline/selftest.txt"
+                 --expect-esses-leak esses::soak::leakOnPurpose --github)
+          python3 -I tests/soak/lsan_check.py "${check[@]}"
+      # It runs even when the pipeline check failed (the crash, thread and growth checks still hold); the job is
+      # red then all the same.
+      - name: Soak (${{ env.SOAK_MINUTES }} min, 10 files)
+        id: soak
+        if: always() && steps.build.outcome == 'success'
+        shell: bash
+        env:
+          ESSES_SOAK_LOG_DIR: ${{ github.workspace }}/soak-logs
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:handle_abort=1:quarantine_size_mb=64:log_path=${{ github.workspace }}/soak-logs/run/asan
+          LSAN_OPTIONS: suppressions=${{ github.workspace }}/tests/soak/lsan.supp:print_suppressions=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1:log_path=${{ github.workspace }}/soak-logs/run/ubsan
+        run: |
+          mkdir -p "$LOGS/run"
+          export ESSES_SOAK_SECONDS=$(( SOAK_MINUTES * 60 ))
+          set +e
+          # The soak function only: the guard's own tests (run by ctest in ci.yml's qt-app) make a QObject on a
+          # pool worker and kill child processes on purpose.
+          "$BUILD_DIR/bin/esses_soak_tst_saturday" saturday -o "$LOGS/saturday.txt,txt" -o -,txt
+          echo "status=$?" >> "$GITHUB_OUTPUT"
+      - name: Verdict (lsan_check.py over the logs, the test result and the exit status)
+        if: always() && steps.soak.outcome == 'success'
+        shell: bash
+        run: |
+          check=(--logs "$LOGS/run" --qtest "$LOGS/saturday.txt" --exit-status "${{ steps.soak.outputs.status }}"
+                 --suppressions tests/soak/lsan.supp --source-root "$GITHUB_WORKSPACE" --github)
+          python3 -I tests/soak/lsan_check.py "${check[@]}"
+      - name: Upload the soak logs
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: soak-logs
+          path: soak-logs/
+          if-no-files-found: ignore
+          retention-days: 30

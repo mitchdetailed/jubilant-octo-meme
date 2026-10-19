@@ -71,6 +71,13 @@ foreach(_case IN LISTS _esses_cfg_cases)
   set_tests_properties(lint.configure_check.${_case} PROPERTIES LABELS "lint" TIMEOUT 120)
 endforeach()
 
+# The version and commit stamp of cmake/version.cmake (08 section 3.10; AC-M4-09: a build exactly at a tag names
+# its commit, a modified tree at a tag is not a pre-release; D-216 (a)).
+add_test(NAME lint.version_stamp
+         COMMAND "${CMAKE_COMMAND}" "-DSOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+                 -P "${CMAKE_CURRENT_SOURCE_DIR}/check_version_stamp.cmake")
+set_tests_properties(lint.version_stamp PROPERTIES LABELS "lint" TIMEOUT 60)
+
 # Self-tests of the stdlib-only lint scripts (01 section 11 items 3 and 11).
 find_package(Python3 3.8 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)

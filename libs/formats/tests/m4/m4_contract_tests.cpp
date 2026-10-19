@@ -3,8 +3,8 @@
 //
 // The final parts of the esses_formats M4 contract (D-206, docs/milestones/M4.md section 2):
 // ResidentEstimate's sum and accumulation, the SourceFileState names, and the signatures the budget and
-// reload packages implement (their behaviour is tested by those packages, tests/m4/budget_*.cpp and
-// tests/m4/reload_*.cpp).
+// reload packages implemented (D-207, D-208; no contract stub is left, D-216); their behaviour is tested by
+// those packages, tests/m4/budget_*.cpp and tests/m4/reload_*.cpp.
 
 #include <esses/formats/resident_estimate.hpp>
 #include <esses/formats/source_file_check.hpp>

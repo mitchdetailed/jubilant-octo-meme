@@ -1,11 +1,12 @@
 // SPDX-FileCopyrightText: 2026 the Esses contributors
 // SPDX-License-Identifier: MIT
 //
-// AboutShell (M4 wave 2, packaging package; D-206; 06 section 2.2 Help > About; AC-M4-06): registers kCommand
-// in the Help menu (a menu command without a keymap row, as help.keyboard_shortcuts, D-203 (ah)) and opens
-// the AboutDialog (about_dialog.hpp) window-modal. Wave 2 also owns the portable mode's shell side (settings
-// beside the executable when portable.marker is there: esses::Paths since M0, 07 section 7.5 last line).
-// M4-STUB: the dialog's texts are placeholders.
+// AboutShell (M4 wave 2, packaging package; D-206, D-212; 06 section 2.2 Help > About; AC-M4-06): registers
+// kCommand in the Help menu (a menu command without a keymap row, as help.keyboard_shortcuts, D-203 (ah)) and
+// opens the AboutDialog (about_dialog.hpp) window-modal with the window's Paths, so it links the installed
+// NOTICES.md and names the settings folder. The portable mode itself (settings beside the executable when
+// portable.marker is there) is esses::Paths since M0 (D-055); the dialog says when a run is portable (07
+// section 7.5 last line).
 #pragma once
 
 #include <esses/widgets/shell/shell_extension.hpp>

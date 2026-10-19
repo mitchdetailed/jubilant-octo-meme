@@ -215,7 +215,8 @@ Deviations (D-167, D-168; details in `docs/formats/text.md`):
   open source's file for every importer (02 §1 behaviour 5, AC-M4-10). The reload package also owns the
   providers' own checks (`src/importer_chunk_provider.*`, `src/ld/ld_chunk_provider.*`).
 - Tests: `tests/m4/**` is one Catch2 executable (`formats_m4.<test>`); `m4_contract_tests.cpp` covers what is
-  final, `budget_*.cpp` and `reload_*.cpp` belong to the packages.
+  final, `budget_*.cpp` and `reload_*.cpp` belong to the packages. Every member above is implemented (D-207, D-208;
+  the sections below); no contract stub is left (D-216).
 
 ## M4 budget: the open-time resident estimate (AC-M4-02; D-207)
 

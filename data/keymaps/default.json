@@ -353,10 +353,10 @@
     {
       "command": "help.contents",
       "context": "global",
-      "doc": "Open the user documentation.",
+      "doc": "Open the user documentation: the installed start page, else the online one.",
       "keys": ["F1"],
       "milestone": "M4",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "file.unload_device",

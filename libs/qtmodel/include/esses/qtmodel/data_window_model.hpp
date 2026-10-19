@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 //
 // DataWindowModel (06 section 6): the tree behind the Data window (F8). Level 1 = source rows (details
-// template, stale badge later), level 2 = outings when the linked view has more than one, level 3 = the
+// template, stale badge since M4), level 2 = outings when the linked view has more than one, level 3 = the
 // ranges of the worksheet's linkTo view in start-time order. Columns: M (red dot on Main), O (Overlay 0), 1
 // (overlay number), Name (italic when untrusted), Time (lap time), Delta Fastest (analysis::fastestLap rule),
 // Offset, Trusted (checkbox -> DataSelectionModel::setTrusted), Local maths. M1: selection slots, lap time,

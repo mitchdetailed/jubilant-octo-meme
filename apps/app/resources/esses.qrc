@@ -1,0 +1,16 @@
+<!-- SPDX-FileCopyrightText: 2026 the Esses contributors -->
+<!-- SPDX-License-Identifier: MIT -->
+<!-- The window icon of esses (main.cpp applicationIcon): the application icon drawn by
+     tools/packaging/icons/make_icons.py (D-212). -->
+<!DOCTYPE RCC>
+<RCC version="1.0">
+  <qresource prefix="/esses">
+    <file alias="icons/esses-16.png">../../../tools/packaging/icons/esses-16.png</file>
+    <file alias="icons/esses-32.png">../../../tools/packaging/icons/esses-32.png</file>
+    <file alias="icons/esses-48.png">../../../tools/packaging/icons/esses-48.png</file>
+    <file alias="icons/esses-64.png">../../../tools/packaging/icons/esses-64.png</file>
+    <file alias="icons/esses-128.png">../../../tools/packaging/icons/esses-128.png</file>
+    <file alias="icons/esses-256.png">../../../tools/packaging/icons/esses-256.png</file>
+    <file alias="icons/esses-512.png">../../../tools/packaging/icons/esses-512.png</file>
+  </qresource>
+</RCC>

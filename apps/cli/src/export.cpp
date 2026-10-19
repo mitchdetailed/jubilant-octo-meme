@@ -151,7 +151,17 @@ Result<ProjectDocs> loadProject(const std::filesystem::path& where, const units:
     return d;
 }
 
-// "Outings:Laps/3": the enabled range numbered 3, else the third range of the group.
+// The --rate grid: exact (parseRate, D-008) and at most 1 MHz.
+Result<Rate> parseGridRate(std::string_view text) {
+    Result<Rate> rate = parseRate(text);
+    if (rate && Rate{1'000'000, 1} < *rate) {
+        return fail(ErrorCode::Invalid, "the grid is at most 1 MHz");
+    }
+    return rate;
+}
+
+} // namespace
+
 const model::Range* findRange(const model::DataLayer& layer, const std::string& spec, std::string& path) {
     const std::size_t slash = spec.rfind('/');
     if (slash == std::string::npos) {
@@ -179,17 +189,6 @@ const model::Range* findRange(const model::DataLayer& layer, const std::string& 
     return nullptr;
 }
 
-// The --rate grid: exact (parseRate, D-008) and at most 1 MHz.
-Result<Rate> parseGridRate(std::string_view text) {
-    Result<Rate> rate = parseRate(text);
-    if (rate && Rate{1'000'000, 1} < *rate) {
-        return fail(ErrorCode::Invalid, "the grid is at most 1 MHz");
-    }
-    return rate;
-}
-
-} // namespace
-
 int runExport(AppContext& ctx, const ExportOptions& o, std::ostream& out, std::ostream& err) {
     if (o.inputs.empty() || o.inputs.size() > 2) {
         err << "esses-cli export: give [<project>] <log>\n";
@@ -200,7 +199,8 @@ int runExport(AppContext& ctx, const ExportOptions& o, std::ostream& out, std::o
         return 2;
     }
     if (o.format != "csv" && o.format != formats::kLegacyCsvWriterId) {
-        err << "esses-cli export: --format is csv or " << formats::kLegacyCsvWriterId << "\n";
+        err << "esses-cli export: --format is csv or " << formats::kLegacyCsvWriterId
+            << " (logged channels to motec.ld: esses-cli convert)\n";
         return 2;
     }
     std::optional<Rate> gridRate; // checked before the log is opened

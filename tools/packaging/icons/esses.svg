@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 the Esses contributors -->
+<!-- SPDX-License-Identifier: MIT -->
+<!-- Written by tools/packaging/icons/make_icons.py; edit the geometry there. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b5c8a"/>
+      <stop offset="1" stop-color="#163455"/>
+    </linearGradient>
+  </defs>
+  <rect x="16.00" y="16.00" width="224.00" height="224.00" rx="51.20" fill="url(#tile)"/>
+  <path d="M 161.64 75.19 A 37.12 37.12 0 1 0 128.00 128.00 A 37.12 37.12 0 1 1 94.36 180.81" fill="none" stroke="#ffffff" stroke-width="29.44" stroke-linecap="round"/>
+  <circle cx="161.64" cy="75.19" r="19.20" fill="#f28c28"/>
+</svg>

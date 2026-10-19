@@ -9,9 +9,11 @@ Esses is a clean-room, MIT-licensed reimplementation of a motorsport data-analys
 application over a Qt-free C++20 core. Status: M0 (foundations) is complete, M1 (walking skeleton) passed its
 acceptance run, and M2 (channels, maths, persistence) is merged and tagged `v0.1.0-m2`
 (`docs/milestones/M2.md`). M3 (the 80 % components) is merged and tagged `v0.1.0-m3`
-(`docs/milestones/M3.md`). M4 (hardening and 0.1) is in progress in packages that each own their files
-(`docs/milestones/M4.md` §3; the shell is wired through `ShellExtension`, D-206). See `docs/milestones/`
-for what each milestone actually built and where it departs from the design.
+(`docs/milestones/M3.md`). M4 (hardening and 0.1) is built and integrated on branch `m4-hardening` (waves 1 and 2,
+D-206 to D-216): its automated criteria pass here or wait for CI, and the maintainer's steps of
+`docs/milestones/M4.md` §6 (the VMs, the SMB share, the mixed-DPI check, the reference bench, the 2 h soak, the
+`v0.1.0` tag) close it. See `docs/milestones/` for what each milestone actually built and where it departs from
+the design.
 
 ## 1. Ground rules
 
@@ -200,6 +202,9 @@ New behaviour comes with tests; a bug fix comes with a regression test.
   `check_importlog_codes.py`; each has `--self-test`.
 - **Sanitizers:** ASan + UBSan run every Qt-free test; TSan runs the `base`, `store`, `maths` and `plotcore`
   tests (Linux CI only).
+- **Soak** (M4, D-213, D-216): `soak.tst_saturday` (label `soak`, minutes in an MSVC Debug build) is left out of the
+  normal runs (`ctest -LE soak`, as CI's qt-app); run it with `ctest -L soak` or the executable
+  (`tests/soak/README.md`). CI runs it nightly under ASan + UBSan with LeakSanitizer (bench.yml's `soak` job).
 - **Benchmarks** (D-042, `.github/workflows/bench.yml`): budgets are absolute limits, median of at least 5
   runs on the reference machine; hosted runners give a non-blocking +-30 % alarm. The contract for the first
   benchmark (header of `bench.yml`): each benchmark is a ctest entry labelled `bench` that repeats
@@ -230,14 +235,18 @@ Layout and `fixture-1` are defined in 05 §9.1; `fixtures/README.md` lists the f
 | Job | Runs | Notes |
 |---|---|---|
 | `core` | ubuntu-24.04, windows-2022, macos-14, no Qt | all Qt-free tests, `DrawList` goldens, fixture verification |
-| `qt-app` | windows-2022 and ubuntu-24.04 on every PR and push; macos-14 nightly and on manual dispatch | Qt 6.12.0 via install-qt-action; every test offscreen; pixel goldens (authoritative on ubuntu); layering with the Qt layers; golden diffs uploaded on failure |
-| `lint` | ubuntu-24.04 | clang-format, clang-tidy, vendor marks, schemas, keymap coverage, forbidden paths, layering, `reuse lint`, schema validation, Import Log codes |
+| `qt-app` | windows-2022 and ubuntu-24.04 on every PR and push; macos-14 nightly and on manual dispatch | Qt 6.12.0 via install-qt-action; every test offscreen but the soak (`-LE soak`); the Saturday walkthrough as a step of its own (AC-M4-01); pixel goldens (authoritative on ubuntu); layering with the Qt layers; golden diffs uploaded on failure |
+| `lint` | ubuntu-24.04 | clang-format, clang-tidy, vendor marks (the sources and the installed Qt-free release tree, `--tree`), schemas, keymap coverage, forbidden paths, layering, `reuse lint`, schema validation, Import Log codes |
 | `sanitize` | ubuntu-24.04 | ASan + UBSan; TSan on base, store, maths, plotcore |
 | `fuzz-smoke`, `fuzz-smoke-windows` | ubuntu-24.04, windows-2022 | 60 s per fuzz target |
 
-`.github/workflows/bench.yml` holds the nightly hosted benchmark alarm and the reference-machine gate (a
-self-hosted runner, enabled by the repository variable `ESSES_REFERENCE_RUNNER`). Required checks for `main`:
-`core` x3, `qt-app` on Windows and Linux, `lint`, `sanitize`, `fuzz-smoke` (08 §4.4).
+`core` runs `ctest -L cli` (the esses-cli golden tests, AC-M4-01 item 11) as a step of its own.
+`.github/workflows/bench.yml` holds the nightly hosted benchmark alarm, the reference-machine gate (a
+self-hosted runner, enabled by the repository variable `ESSES_REFERENCE_RUNNER`) and the Saturday soak (`soak`:
+ASan + UBSan + LeakSanitizer, 30 min nightly, `soak_minutes` on dispatch; AC-M4-03). `.github/workflows/package.yml`
+builds and smoke-tests the packages on the three OSes (tags, dispatch, pull requests touching the packaging) and
+drafts the release on a `v*` tag (D-212). Required checks for `main`: `core` x3, `qt-app` on Windows and Linux,
+`lint`, `sanitize`, `fuzz-smoke` (08 §4.4); `package` and `bench` are not required.
 
 ## 8. Working alongside other agents
 

@@ -4,8 +4,8 @@
 // The final parts of the esses_qtmodel M4 contract (D-206, docs/milestones/M4.md section 2): the budget
 // setting's key and floor, OpenBudgetCheck::exceeds, PerformanceMonitor's sampling, timer and signal, the
 // SourceLoader M4 signals and its budget gate pointer, the alternate action of a Messages row, and the Data
-// window model's stale query and role. The behaviour behind the stubs is tested by the packages that
-// replace them (budget, reload, followups).
+// window model's stale query and role. Every M4 member is implemented (D-216: no contract stub is left); the
+// behaviour is tested by the packages that built it (budget D-207, reload D-208, followups D-210).
 
 #include <esses/qtmodel/app_runtime.hpp>
 #include <esses/qtmodel/data_selection_model.hpp>

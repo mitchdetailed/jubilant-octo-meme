@@ -17,9 +17,9 @@ All notable changes are recorded here, newest first. The project follows semanti
   `summariesReady`; `Message::altAction` and `MessagesModel::AltActionRole`; `DataWindowModel::StaleRole` and its
   stale query; `DprWatcher`, `ComponentWidget::recheckDevicePixelRatio`, `DockHost::windowOf`;
   `MessagesWindow::invokeAltAction`/`showPerformance`; `AboutDialog`, `buildInfo`, `versionReport` (what
-  `esses --version` prints, unchanged so far). Help > About opens a placeholder About dialog; nothing else
-  changes behaviour yet. The keymap's two M4 rows (`file.reload_source`, `help.contents`) stay planned until their
-  packages implement them; the top-level CMake adds `tests/soak/` and `tools/packaging/` once they exist, and
+  `esses --version` prints). The packages below replaced every stub (Help > About and the keymap's two M4 rows,
+  `file.reload_source` and `help.contents`, among them); the top-level CMake adds `tests/soak/` and
+  `tools/packaging/` once they exist, and
   `libs/formats/tests/m4/**` is one Catch2 executable (`formats_m4`). Contract tests: `formats_m4.m4 contract: ...`,
   `qtmodel.tst_m4_contract`, `widgets.tst_m4_contract`.
 - The memory budget warns before a file is loaded (AC-M4-02, 07 §7.1, 01 §7.2; D-207). Opening a log whose
@@ -99,6 +99,101 @@ All notable changes are recorded here, newest first. The project follows semanti
   pass ends (`summariesReady` through `FollowupsShell`). Tests: `plotcore.followups D-211: ...` (6),
   `analysis.followups D-211: ...` (2), `widgets.tst_followups_units`, `widgets.tst_followups_view`; the export
   tests of the gauges, the outing and time/distance graphs and the shell read the legacy layout.
+- The user guide and Help Contents (07 §7.1 "Docs", 06 §2.2, §14.4; D-215). `docs/user/` holds the 0.1 guide
+  in plain Markdown: `index.md` (the start page), `install.md` (the Windows installer and portable zip, the AppImage
+  and the DMG with their "builds green, not supported" labels, the Visual C++ runtime, the command line),
+  `open-files.md` (`.ld`/`.ldx`, `motec.csv`, generic CSV, the Import Log, the Mapping panel, projects, changed files
+  and Reload, the memory budget warning), `selection.md` (the Data window, Main and overlays, filters, trust and
+  their keys), `graph.md` (workbooks, worksheets, the ten components, time and distance, zoom, cursor and datum,
+  HiDPI), `maths.md` (the language in brief, the Maths Editor, local and transient maths, Channel Status, aliases
+  and mappings), `troubleshooting.md` (the Messages window, where the files are, resetting settings, portable mode,
+  reporting a problem without private data) and `relinking.md` (replacing the Qt libraries, the LGPL right). Help >
+  Help Contents (`help.contents`, F1; keymap row implemented) opens the installed start page
+  (`<data dir>/../docs/user/index.md`, else `<exe dir>/docs/user/index.md`), else, or when no program opens it, the
+  start page in the public repository at the build's tag (`main` for an untagged build); when nothing opens, a
+  Messages warning (`help.not_opened`) names both places (`DocsShell::openContents`, `installedStartPage`,
+  `onlineUrl`, the injectable `setUrlOpener`). `CLEANROOM.md` gains 23 rows that complete the record for 0.1 (the key
+  assignments, the Data window and selection, workbooks and docks, the time/distance core and values, rendering,
+  corrected speed and distance, laps, channels, the command line, schemes, the project folder, the runtime, the D-211
+  follow-ups, the M4 behaviours, the CLI, packaging, the dictionaries, the guide) and a coverage table from 07 §2.2's twelve items to
+  the rows. Tests: `widgets.tst_docs_shell` (the lookup, the online URL per version, the Help menu and F1 row, the
+  installed and online pages, the fallback, the warning, the default opener through `QDesktopServices` URL
+  handlers), the `help.contents` rows of `ui.tst_keymap` (F1 from a component and from the Data window, and the
+  palette).
+- Packages, Help > About and the start of an instance (AC-M4-04 automated part, AC-M4-06, AC-M4-08, AC-M4-09; 07
+  §7.1 "Packaging" and "Release", 06 §§18-19; D-212). `esses --version` prints the version, the commit, the Qt
+  version run against and built against, the build date, the docking library and the exact source URL (the public
+  repository's tag in a release build, configured with `-DESSES_RELEASE_TAG=v<version>`, which must match the stamped
+  version; else the commit). Help > About shows the same with "This application uses Qt <version> under the GNU LGPL
+  v3", the Qt source archive, the docking library's LGPL notice and tag, the source of this build, the installed
+  NOTICES.md and the settings folder (marked portable), with Copy. A second launch hands its files to the running
+  Esses of the same user and settings folder (a named pipe on Windows, a Unix socket in a private directory
+  elsewhere; no Qt Network) and exits; `--new-instance` opens a window of its own; `--scheme <name>` and
+  `--keymap <name|file>` choose the start's scheme and keymap. `tools/packaging/`: every install rule (components
+  `app` and `cli`), `package.py` (windeployqt, linuxdeploy, macdeployqt, notices, SBOM, vendor-mark check of the
+  tree, deterministic archives, checksums), the Inno Setup installer (`.ld` association task, `-w`/`-l`, the C++
+  runtime check: an old runtime is updated or the install refused, a per-user install carries the runtime), the
+  portable zip (`portable.marker`, the runtime, `.ld` association scripts), the AppImage (desktop entry, `.ld` MIME
+  type, icon) and the DMG (Info.plist, universal, ad hoc signed), `esses-cli` in every package and standalone;
+  `gen_third_party.py` writes each package's THIRD_PARTY_LICENSES.md and CycloneDX SBOM from what it contains;
+  `smoke.py` tests each package; our own application icon. `NOTICES.md` covers every shipped component (Qt with the
+  source offer and how to replace it, ADS, the vendored libraries, the MSVC runtime, the AppImage's system libraries);
+  the Qt licence texts ship as `licenses/LGPL-3.0-only.txt` and `GPL-3.0-only.txt`. `check_vendor_marks.py --tree`
+  scans a release tree (names, text, the strings of our programs) and the source scan covers the installer, desktop
+  and plist files and `package.yml`. New workflow `.github/workflows/package.yml` (tags, manual dispatch, pull
+  requests touching `tools/packaging` or `apps/app`): the packages on windows-2022, ubuntu-24.04 and macos-14 with Qt
+  6.12, their smoke tests, artefacts with checksums, a draft release on tags. Tests: `widgets.tst_about_dialog`,
+  `app.tst_launch_request`, `app.tst_instance_channel`, `app.tst_launch_options`, `app.tst_portable`,
+  `packaging.*` (the tools' self-tests, the icons, the manifest's consistency).
+- The Saturday soak (AC-M4-03, 07 §7.1 "Soak", 08 §6.10; D-213). `tests/soak/tst_saturday` (ctest
+  `soak.tst_saturday`, labels `qt;soak`) drives the real shell offscreen with ten logs open, eight `.ld` + `.ldx`
+  sessions on two venues and two CSV exports written at test time (once per build tree, never committed), through
+  the day in a loop for `ESSES_SOAK_SECONDS` (under ctest 60 s and at least two cycles; `ctest -L soak`, not in the
+  normal runs since the integration, D-216): a restart with the session
+  restore; opens through the memory-budget gate answered by Continue and by Cancel; the selection from the Data
+  window's keys and from the model; every worksheet with the graph's zoom, pan, cursor and datum keys, the reports
+  and the Track Map dock; a maths module edited and recalculated; undo and redo, a journal entry by autosave and a
+  save; a reload after a rename-over writer; closes and Close All. It fails on a crash; on a `Dispatcher` thread
+  violation (the Dispatcher's GUI-thread check, the GUI thread's NoBlock checks, every other `ESSES_ASSERT` and Qt's
+  thread-affinity warnings abort at once); on work that never drains; on growth of the heap, the resident set, the
+  chunk cache, the shell's widgets and objects or the peaks of queued tasks and Dispatcher closures, judged once per
+  cycle in the same state; and on a chunk cache that keeps a byte once every log is closed. The new job `soak` of
+  `bench.yml` builds it with the `linux-clang-asan` preset and the Qt layers and runs it under ASan + UBSan with
+  LeakSanitizer, 30 minutes nightly and for `soak_minutes` on manual dispatch (120 on the release candidate):
+  `tests/soak/lsan.supp` suppresses only Qt, fontconfig and glib code that never calls back into the application, and
+  `tests/soak/lsan_check.py` fails the run on a sanitizer error, a failed test or a leak with an esses frame (a leak
+  without one is a warning), after proving the pipeline on a deliberate leak. Tests: `soak.tst_saturday`,
+  `soak.guard` (the guard's rules, a recorded violation of each kind and the fatal path in a child process),
+  `soak.lsan_check.self_test`.
+- The Saturday walkthrough of 0.1 and the command line's golden tests (AC-M4-01, 07 §2.2; D-214).
+  `ui.tst_walkthrough_saturday` drives the real shell offscreen through command ids and keys, one test function per
+  0.1 item (`item01_...` to `item10_...`: opening `.ld` + `.ldx` and both CSV dialects with the Mapping panel; the
+  project, journal, `backup/`, reopen, Options, the two schemes and the workbook; the Data window and its hotkeys;
+  workbooks, worksheets, placement, Layout Editor and zoom summary; the ten components and animation; channels,
+  overrides, aliases, mappings, Channel Status, Values and Track Map; maths; corrected speed, lap stretching and the
+  Lap, Details and Track editors; the hotkey table and palette; 20 traces at DPR 1 and 2) plus the demo of 07 §7.5
+  without the installer, over a day's logs the test writes, every expected value from their formulas. New
+  `esses-cli convert <input> --format csv|motec.csv|motec.ld -o <out> [--channels] [--range] [--rate]` (05 §9.2;
+  `--to` as an alias): a log's channels through the built-in writers; a whole `.ld` is written from its stored bytes
+  (read, write, read bit-exact), `--range` cuts a lap out of a `.ld`, and the input, its `.ldx` and its sidecar are
+  never overwritten. `ctest -L cli` gains `cli.golden.info`, `.channels`, `.laps`, `.eval`, `.convert`, `.export`,
+  `.validate` and `.fixture` (expectations from the fixtures, `tools/ld_ref_decode.py` and the schema examples).
+  The shipped circuit workbook's Overview gauges now sit on the 1 % grid; the schemes and the keymap were checked
+  against 06 §14.4, §16 and §20 and are unchanged.
+- The M4 integration (D-216). A build exactly at a tag now names its commit in `esses --version`, About and the
+  package metadata, and a modified tree at a tag is `<version>.dirty` instead of a pre-release (`cmake/version.cmake`
+  with `cmake/version_parse.cmake`; ctest `lint.version_stamp`); a release is built from a clean checkout of its tag.
+  CI: qt-app runs the Saturday walkthrough as a step of its own (Windows and Linux on every pull request, macOS
+  nightly; ctest TIMEOUT 1,500 s) and leaves the soak out (`-LE soak`; the soak is bench.yml's nightly job, the
+  guard's tests stay in as `soak.guard`); core runs `ctest -L cli` as a step of its own; lint installs the Qt-free
+  release tree (`tools/packaging/` now also configures without Qt) and scans it with `check_vendor_marks.py --tree`,
+  and runs `reuse lint` 5.0.2; qt-app's timeout is 60 minutes. `esses_add_qt_test` gains `ARGS` and
+  `esses_add_qt_test_entry`. Every M4 keymap row is implemented and the keymap checker's milestone is M4
+  (`widgets.tst_m4_contract` `everyM4RowIsImplemented`); no contract stub is left. Help Contents and About share one
+  repository URL. New test `app.tst_demo_command_line`: a real `esses --new-instance -w <project> -l <log>` opens the
+  project and the log (the command line of the demo of 07 §7.5); the application's tests read a child's
+  `settings.json` through `esses::readWholeFile`. The soak no longer fails at its 17th cycle, a restart right after
+  Close All, where it looked for a Main that was not there.
 
 ## Unreleased (M3)
 

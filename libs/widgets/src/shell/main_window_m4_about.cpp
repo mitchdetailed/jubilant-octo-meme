@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: MIT
 //
 // AboutShell (about_shell.hpp): the M4 packaging package's shell wiring (wave 2; docs/milestones/M4.md
-// section 3): Help > About opens the AboutDialog window-modal. Final apart from the dialog's texts.
+// section 3; D-212): Help > About opens the AboutDialog window-modal with the window's Paths.
 
 #include "main_window_impl.hpp"
 
 #include <esses/qtmodel/command_registry.hpp>
+#include <esses/qtmodel/project_session.hpp>
 #include <esses/widgets/shell/about_dialog.hpp>
 #include <esses/widgets/shell/about_shell.hpp>
 
@@ -36,7 +37,7 @@ void AboutShell::registerCommands() {
             self->dialog_->raise();
             return;
         }
-        auto* dialog = new AboutDialog(&self->window());
+        auto* dialog = new AboutDialog(self->window().session().paths(), &self->window());
         dialog->setAttribute(Qt::WA_DeleteOnClose);
         self->dialog_ = dialog;
         dialog->open();

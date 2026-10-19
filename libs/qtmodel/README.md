@@ -314,8 +314,9 @@ No `M2-STUB` is left in this library.
 - `Message::altAction`/`altActionArgs` and `MessagesModel::AltActionRole` (final): a row's second action.
 - `DataWindowModel`: `StaleRole`, `setStaleQuery`/`isStale` (final), `refreshStale`
   (`src/m4_reload/data_window_model_stale.cpp`).
-- Test: `tests/m4/tst_m4_contract.cpp` (`qtmodel.tst_m4_contract`); the packages' tests go to
-  `tests/m4_<package>/`.
+- Test: `tests/m4/tst_m4_contract.cpp` (`qtmodel.tst_m4_contract`); the packages' tests are in
+  `tests/m4_<package>/`. Every member above is implemented by its package (D-207, D-208, D-210; the sections below);
+  no contract stub is left (D-216).
 
 ## M4 budget: the open-time warning and the Stats (AC-M4-02; D-207; 07 §7.1 row 1, 01 §7.2)
 

@@ -3,7 +3,11 @@
 #
 # CI (08_REPO_AND_BUILD.md section 4). Jobs: core (3 OSes, no Qt), lint, sanitize, fuzz-smoke (plus an MSVC
 # variant) and, from M1 (D-150), qt-app: Windows and Linux on every pull request and push, macOS nightly and on
-# manual dispatch only, never merge-blocking (D-124, 08 section 4.4). The benchmarks are in bench.yml (D-042).
+# manual dispatch only, never merge-blocking (D-124, 08 section 4.4). The benchmarks are in bench.yml (D-042), with
+# the Saturday soak of M4 (AC-M4-03, its job `soak`, nightly); the packages are package.yml's (D-212). M4 (D-216):
+# core runs the esses-cli golden tests as a step of their own (`ctest -L cli`, AC-M4-01 item 11), qt-app the Saturday
+# walkthrough (ui.tst_walkthrough_saturday, AC-M4-01 items 1-10) and leaves the soak out (`-LE soak`), lint stages
+# the release tree of the Qt-free build and scans it for vendor marks (AC-M4-08) and runs a pinned `reuse lint`.
 # The build itself uses only code vendored in third_party/ (pugixml, xxHash, nlohmann-json, json-schema-validator,
 # CLI11, fast_float, Catch2 v3 and, in qt-app, the Qt Advanced Docking System built as a shared library through its
 # own CMake project; see third_party/README.md); CI fetches nothing but the toolchain (actions, apt packages, the
@@ -61,11 +65,21 @@ jobs:
       - name: Configure (ESSES_BUILD_QT=OFF, no Qt on the runner)
         run: cmake --preset ${{ matrix.preset }}
       - name: Build
+        id: build
         run: cmake --build --preset ${{ matrix.preset }}
       # Includes the DrawList JSON goldens of the M1 worksheet cases, the strict cross-platform half of AC-M1-04
       # (plotcore.*, tests/golden/drawlist/), and the BeaconPairRule laps goldens of AC-M1-07 (fixtures.laps_golden).
+      # Everything but the label cli, which the next step runs.
       - name: Test
-        run: ctest --preset ${{ matrix.preset }} --parallel 4
+        shell: bash
+        run: ctest --preset ${{ matrix.preset }} --parallel 4 -LE '^cli$'
+      # AC-M4-01 item 11 (D-214): the golden-JSON test of each esses-cli subcommand (cli.golden.info, channels, laps,
+      # eval, convert, export, validate, fixture) with the earlier cli.* entries; ctest runs fixtures.generate_inputs
+      # first for those that need the generated inputs. It runs even when the step above failed.
+      - name: esses-cli golden tests (AC-M4-01 item 11, ctest -L cli)
+        if: always() && steps.build.outcome == 'success'
+        shell: bash
+        run: ctest --preset ${{ matrix.preset }} --parallel 4 -L '^cli$'
       # ctest above already ran fixtures.generate_inputs and fixtures.verify_public; this step repeats the fixture
       # verification visibly (AC-M0-01..03). The synthetic inputs are generated, not committed (05 section 9.1).
       - name: Fixture corpus (AC-M0-01..03)
@@ -132,7 +146,9 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.qt-matrix.outputs.include) }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    # 60, not 45: M4 adds the Saturday walkthrough (about 3 minutes in MSVC Debug on the reference machine) and the
+    # other M4 suites to the MSVC Debug run, whose shell suites already take several minutes each.
+    timeout-minutes: 60
     env:
       QT_QPA_PLATFORM: offscreen
       ESSES_TEST_FONT_DIR: ${{ github.workspace }}/tests/golden/fonts # Noto Sans only (D-127)
@@ -167,6 +183,7 @@ jobs:
         shell: bash
         run: cmake --preset ${{ matrix.preset }} -DCMAKE_PREFIX_PATH="${QT_ROOT_DIR//\\//}"
       - name: Build
+        id: build
         run: cmake --build --preset ${{ matrix.preset }}
       - name: Docking library beside the executables (D-026, 08 section 3.7.5)
         shell: bash
@@ -174,8 +191,19 @@ jobs:
           bin=build/${{ matrix.preset }}/bin
           ls "$bin" | grep -E '^(lib)?qtadvanceddocking-qt6d?[.0-9]*\.(dll|so|dylib)' \
             || { echo "::error::the ADS shared library is not in $bin"; exit 1; }
+      # Every test but the soak (label soak: soak.tst_saturday, about 5.5 minutes in MSVC Debug; it is bench.yml's
+      # soak job, nightly under ASan + UBSan; its guard's tests, soak.guard, stay here) and the walkthrough, which the
+      # next step runs (D-216 (b)).
       - name: Test (offscreen)
-        run: ctest --preset ${{ matrix.preset }} --parallel 4
+        shell: bash
+        run: ctest --preset ${{ matrix.preset }} --parallel 4 -LE '^soak$' -E '^ui\.tst_walkthrough_saturday$'
+      # AC-M4-01 items 1-10 and the offscreen demo of 07 section 7.5 (D-214): one test function per item, so a
+      # failure names the item; required with qt-app on Windows and Linux, nightly on macOS. It runs even when the
+      # step above failed.
+      - name: Saturday walkthrough (AC-M4-01 items 1-10, ui.tst_walkthrough_saturday)
+        if: always() && steps.build.outcome == 'success'
+        shell: bash
+        run: ctest --preset ${{ matrix.preset }} -R '^ui\.tst_walkthrough_saturday$'
       # The lint job's layering check sees only the Qt-free targets (ESSES_BUILD_QT=OFF); this one adds the Qt layers
       # and their allowed Qt modules (01 section 2.2 rule 4).
       - name: Layering with the Qt layers (01 section 2.3)
@@ -256,8 +284,18 @@ jobs:
         run: python3 -I tools/check_layering.py --self-test && python3 -I tools/check_layering.py --build-dir build/ci-linux-lint
       - name: Qt-free and layer-check negative tests (AC-M0-07)
         run: ctest --preset ci-linux-lint
+      # The same reuse release as package.yml (AC-M4-06).
       - name: REUSE / SPDX
-        run: pipx run reuse lint
+        run: pipx run --spec "reuse==5.0.2" reuse lint
+      # AC-M4-08: the release tree, not only the sources. The Qt-free build installs what tools/packaging/CMakeLists.txt
+      # gives a Linux package without Qt (esses-cli, the data, NOTICES.md, the licence texts, the user guide, the
+      # desktop entry, the MIME type and the icons; D-216 (c)); check_vendor_marks.py --tree scans its file names,
+      # text files and the strings of esses-cli. The application's tree with Qt is scanned by package.yml on each OS
+      # before it is archived (D-212).
+      - name: Vendor marks of the release tree (AC-M4-08)
+        run: |
+          cmake --install build/ci-linux-lint --prefix build/release-tree
+          python3 -I tools/check_vendor_marks.py --tree build/release-tree
       - name: Schema validation of data/, fixtures/, tests/maths/ and schemas/ (08 section 5, AC-M0-10, AC-M2-08)
         shell: bash
         run: ./build/ci-linux-lint/bin/esses-cli validate --all --root .

@@ -1,17 +1,19 @@
 // SPDX-FileCopyrightText: 2026 the Esses contributors
 // SPDX-License-Identifier: MIT
 //
-// The final parts of the esses_widgets M4 contract (D-206, docs/milestones/M4.md section 2): the one shell
-// hook (one ShellExtension per M4 package, children of the window in the contract's order, found with
-// shellExtension<T>, deleted with the window before its widgets), the planned M4 rows untouched by the stubs
-// (file.reload_source and help.contents stay "planned for M4"), Help > About (wave 2's placeholder dialog),
-// the build identification behind `esses --version`, DockHost::windowOf, and the signatures the packages
-// implement (ComponentWidget::recheckDevicePixelRatio, MessagesWindow's M4 members, DprWatcher). The
-// behaviour behind the stubs is tested by the packages that replace them.
+// The final parts of the esses_widgets M4 contract (D-206, docs/milestones/M4.md section 2), as built at the
+// integration of wave 2 (D-216): the one shell hook (one ShellExtension per M4 package, children of the
+// window in the contract's order, found with shellExtension<T>, deleted with the window before its widgets),
+// every M4 keymap row implemented (file.reload_source by the reload package, D-208; help.contents by the docs
+// package, D-215), Help > About opening the About dialog, the build identification behind `esses --version`,
+// DockHost::windowOf, and the signatures the packages implemented (ComponentWidget::recheckDevicePixelRatio,
+// MessagesWindow's M4 members, DprWatcher, ReloadShell::checkNow). The behaviour itself is tested by the
+// packages (tests/m4_<package>/, tests/ui).
 
 #include "properties_shell/shell_test_support.hpp"
 
 #include <esses/base/version.hpp>
+#include <esses/project/keymap.hpp>
 #include <esses/qtmodel/command_registry.hpp>
 #include <esses/widgets/docks/messages_window.hpp>
 #include <esses/widgets/shell/about_dialog.hpp>
@@ -31,7 +33,9 @@
 #include <QPointer>
 #include <QTemporaryDir>
 #include <QTest>
+#include <string>
 #include <type_traits>
+#include <vector>
 
 using namespace esses;
 using namespace esses::widgets;
@@ -114,19 +118,35 @@ private Q_SLOTS:
         QVERIFY(about.isNull());
     }
 
-    // The keymap's M4 rows stay planned until their package implements them (the generic row of 06 section
-    // 14.5 keeps covering them); file.reload_source is implemented by the reload package (D-208),
-    // help.contents waits for the docs package of wave 2.
-    void plannedM4RowsStayPlanned() {
+    // Every M4 row of the shipped keymap is implemented (AC-M4-01 item 9): exactly file.reload_source (D-208)
+    // and help.contents (D-215), each registered by its package without the generic row's "planned for M4"
+    // note (06 section 14.5); Help Contents is enabled, Reload File only while a source is stale (none here).
+    void everyM4RowIsImplemented() {
+        std::vector<std::string> log;
+        const auto keymap =
+            project::Keymap::load(cmptest::repoRoot() / "data" / "keymaps" / "default.json", log);
+        QVERIFY(keymap.ok());
+        QStringList m4;
+        if (keymap.ok()) {
+            for (const project::KeyBinding& b : keymap->bindings) {
+                if (b.milestone == "M4") {
+                    QVERIFY2(b.status == project::KeymapStatus::Implemented, b.command.c_str());
+                    m4 << QString::fromStdString(b.command);
+                }
+            }
+        }
+        QCOMPARE(m4, (QStringList{QStringLiteral("file.reload_source"), QStringLiteral("help.contents")}));
+
         Shell sh;
         QVERIFY(sh.start());
-        for (const QString& id : {QStringLiteral("help.contents")}) {
+        for (const QString& id : m4) {
             QVERIFY2(sh.w->commands().find(id) != nullptr, qPrintable(id));
-            QVERIFY2(!sh.w->commands().isEnabled(id), qPrintable(id));
             QAction* action = sh.w->actions().action(id);
-            QVERIFY2(action != nullptr && action->toolTip().contains(QStringLiteral("planned for M4")),
+            QVERIFY2(action != nullptr && !action->toolTip().contains(QStringLiteral("planned for M4")),
                      qPrintable(id));
         }
+        QVERIFY(sh.w->commands().isEnabled(QString::fromLatin1(DocsShell::kCommand)));
+        QVERIFY(!sh.w->commands().isEnabled(QString::fromLatin1(ReloadShell::kCommand)));
     }
 
     // Help > About (wave 2): a Help-menu command without a keymap row that opens the About dialog.
