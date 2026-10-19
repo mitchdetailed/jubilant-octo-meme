@@ -19,8 +19,9 @@
 // reset() afterwards. M3 (keymap_m3_cases.hpp, AC-M3-01): the rows of the properties/shell work; a summary
 // row focuses a scatter component, a row may replace the key by a mouse gesture (zoom.extend), and the file
 // rows get their answers from MainWindow::setPrompts (a project folder of the fixture, the third log, an
-// export file). plannedAndReservedRows is the generic row of 06 section 14.5 for the planned (v1.0 and later)
-// and reserved rows: registered, disabled, the milestone or "reserved" in the tool tip.
+// export file). M4 (D-206): the packages' rows in keymap_m4_<package>_cases.hpp. plannedAndReservedRows is
+// the generic row of 06 section 14.5 for the planned (M4 until implemented, v1.0 and later) and reserved
+// rows: registered, disabled, the milestone or "reserved" in the tool tip.
 
 #include "../../../libs/qtmodel/tests/qtmodel_test_support.hpp"
 
@@ -424,12 +425,18 @@ void backToFirstWorkbook(Fixture& f) {
 }
 
 #include "keymap_m3_cases.hpp" // inside this anonymous namespace: addM3Cases(table)
+// M4 (D-206, docs/milestones/M4.md section 3): one file per package that implements a keymap row.
+#include "keymap_m4_docs_cases.hpp"   // addM4DocsCases(table): help.contents (wave 2)
+#include "keymap_m4_reload_cases.hpp" // addM4ReloadCases(table): file.reload_source
 
 const std::map<QString, Case>& cases() {
     static const std::map<QString, Case> table = [] {
         using F = Fixture;
         std::map<QString, Case> m3;
         addM3Cases(m3);
+        std::map<QString, Case> m4;
+        addM4ReloadCases(m4);
+        addM4DocsCases(m4);
         std::map<QString, Case> rows{
             // ---- views and windows ----
             {KEYMAP_TEST("view.data_window"),
@@ -1039,6 +1046,7 @@ const std::map<QString, Case>& cases() {
               {}}},
         };
         rows.merge(m3);
+        rows.merge(m4);
         return rows;
     }();
     return table;

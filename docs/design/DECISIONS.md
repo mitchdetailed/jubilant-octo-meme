@@ -838,6 +838,12 @@ Rewritten on 2026-10-10 after the review. The list is deduplicated across this d
 | D-203 | The M3 fix pass: the review findings fixed, rejected or deferred (gCorrection's slip reference, the report engine's pairing, trust and units, the histogram's closed last band, the track-sections origin rule for stretched and unfinished laps, loop closure and the GPS seam, idle hidden worksheets, the shell's add, context menus and asynchronous export, heading pickers, rename and move without a rebuild, D-127 (a) amended, the deferrals) (refines D-194, D-195, D-197, D-198, D-199, D-200, D-201, D-202; amends D-127 (a), 04 §7.2 item 8, §8.2 item 4, §12 item 6, 06 §13.5 item 4, §14.4) | no | M3 fix pass, AC-M3-01 to AC-M3-12 |
 | D-204 | The Track Sections pass keyed by the identity of its lap indexes: a stretch published at the same index count runs it again, the dedupe is against the layer's latest run, only the latest run publishes, a closed source's runs are forgotten (refines D-195, D-199 (e); reads 02 §4.4 rule 13) | no | PR #4 review, AC-M3-04 |
 | D-205 | Track-map file names that keep the venue's identity: a readable slug and a hash of the exact venue, a file read only for the venue it holds, a write refused over another venue's file, the names of earlier builds read and moved (refines D-195 (e), D-199 (c); reads 02 §6.9 `trackmaps/<venue>.track.json`, amends outline §4) | no | PR #4 review, AC-M3-04 |
+| D-206 | The M4 contracts: one shell hook with an extension per package, frozen shared headers with per-package nested state and hook calls, the open-time budget check at publication with Continue and Cancel as a Messages row's two actions, a polled PerformanceMonitor, the re-stat check of every source, the Data window's stale query, DprWatcher and DockHost::windowOf, no new keymap rows, the wave-2 placeholders (refines D-011, D-043, D-193 (f); reads 07 §7.1, 01 §7.2, 02 §1 behaviour 5, 06 §6 and §17; amends 06 §2.2, §11, outline §4) | no | M4 contracts, AC-M4-02/-07/-09/-10 |
+| D-207 | The memory budget as built: the estimate as the upper bound of every chunk, Continue as the held open's own publication, Cancel releasing only an unshared decode log, the warning row's alternate action on SHIFT and in a row menu, Continue and Cancel enabled while an open waits, the setting floored and given back, the Options field in GB, the Performance field and the Stats line, the resident row as the peak resident set of a fresh process (refines D-011, D-043, D-206 (c)-(e); reads 07 §7.1, §7.2 AC-M4-02, §12, 01 §7.1-§7.2, §8.3, 06 §2.1, §11; amends 06 §11, outline §4) | no | M4 budget, AC-M4-02 |
+| D-208 | Changed source files as built: E-5's answer on NTFS (the POSIX-semantics, ReplaceFileW and rename-aside writers pass, a classic MoveFileExW replace is refused whatever the share mode, so the sharing policy stays), the stale mark sticky until reload or close, the Messages row added by connectSourceReload, Reload as a close then an open with the selection parked by the close, the command enabled while a source is stale, a fault-injection seam in the .ld provider and ld.io_fault once per source (refines D-206 (f); reads 02 §1 behaviour 5, §8 AC-4a, 06 §5.6, §6, §14.4, E-5; amends 06 §6 "Changed files", outline §4) | no | M4 reload, AC-M4-10 |
+| D-209 | HiDPI as built: per-monitor DPR through a watcher of every top-level window with a re-check after dock moves, crisp axis-aligned strokes on whole device pixels at a fractional DPR drawn by the backend, every layer painted from a whole device pixel, the definitions of crisp and no drift, the offscreen DPR sweep and its goldens (refines D-025, D-206 (g); reads 04 §6.6, 06 §1, §17, 07 §7.1 row 3, §7.2 AC-M4-07; amends 04 §6.6 items 1, 3 and 4, outline §4) | no | M4 hidpi, AC-M4-07 |
+| D-210 | The M3 follow-ups of esses_qtmodel and the Qt-free libraries as built: track-map files on the pool, summariesReady, the channel report's "ignore interpolated data", ReportModel's in-place refresh, the Track Sections pass keyed by its bound map, the missing report and variance tests (refines D-195, D-197, D-199 (c) and (e), D-203 (n), D-204; reads 01 §5.3 rules 3-4, 02 §3.2 rule 10, 04 §12 items 2-3 and 8, §13 item 5; amends 04 §12 items 2 and 8, outline §4) | no | M4 followups, M3.md §6 items 18, 23, 25, 29-32 |
+| D-211 | The M3 follow-ups of esses_widgets as built: a channel's default display unit (a fraction in %), display units of the scatter and channel report channels, unit pickers in the Properties pages, the Track Editor's speed class and Corr Dist unit, Export Data in the legacy dialect, the time_distance group headings, component links honoured, summariesReady reaching the components (refines D-010, D-177 (e), D-195, D-198 (e), D-200, D-201, D-203 (af) and (m), D-210 (b); reads 03 §9.1 item 6, 04 §2.4, §7.2 item 8, §8.2 item 4, 05 §6, 06 §12, §13.5 item 4; amends 04 §7.2 item 8's reading in D-198 (e), outline §4) | no | M4 followups (widgets), M3.md §6 items 18-19, 21-22, 24, 26-27 |
 
 ### A.1 Review amendments
 
@@ -2266,4 +2272,419 @@ write`, and `qtmodel.tst_track_map_service` `venuesOfOneSlugKeepTheirOwnMaps` (t
 `setMap`, a restart and `venues()`, the legacy file, the binding copy and the refused overwrite). Not chosen: a
 numeric suffix on a clash (the name would depend on what the folder held when it was written, and the file
 would still not say whose map it is) and the hash alone (unreadable names). No golden changes.
+**User must confirm:** no.
+
+### A.15 M4 (proposed, 2026-10-18)
+
+#### D-206 The M4 contracts: one shell hook with an extension per package, frozen shared headers with per-package nested state and hook calls, the open-time budget check at publication with Continue and Cancel as a Messages row's two actions, a polled PerformanceMonitor, the re-stat check of every source, the Data window's stale query, DprWatcher and DockHost::windowOf, no new keymap rows, the wave-2 placeholders (refines D-011, D-043, D-193 (f); reads 07 §7.1, 01 §7.2, 02 §1 behaviour 5, 06 §6 and §17; amends 06 §2.2, §11, outline §4)
+**Context.** M4 (07 §7) runs as several workflows: wave 1 builds the budget warning, changed-file detection and
+reload, the HiDPI work and the M3 follow-ups in parallel, wave 2 packaging, the soak, the Saturday walkthrough and
+the user docs. Every one of them touches the shell, and three of them `SourceLoader`; `main_window.cpp`,
+`main_window_m3.cpp`, `main_window_impl.hpp` and `source_loader.cpp` would otherwise be edited by several agents
+at once. The design text leaves open where the open-time budget check sits and what it compares ("the probe
+estimate (raw + pyramids) exceeds the budget", 07 §7.1; "with continue or cancel", 01 §7.2) while a Messages row
+carries one action (06 §11); how the Stats reach the GUI when the cache's own hook runs on workers; how a source
+whose importer keeps no mapping (the text importers) is checked for a change on disk (02 §1 behaviour 5 names
+`MappedFile::changedOnDisk()`); where the stale state lives; how a DPR change reaches the components of a
+floating dock (06 §17 items 3-4); and whether the M4 commands without a row in 06 §14.4 get keymap rows.
+**Decision.** (a) **One shell hook.** `ShellExtension` (`shell_extension.hpp`): `MainWindow` creates one per M4
+package in a fixed order (budget, reload, hidpi, followups, about, docs; `main_window_m4.cpp`) as direct
+`QObject` children named `m4.<key>` and calls `buildWidgets(central)`, `registerCommands()` (before the planned
+rows), `buildMenus()`, `windowReady()`, `worksheetActivated(i)` and `teardown()` (first thing in the destructor;
+the extensions are then deleted, before any widget or model) at fixed points; an extension reaches the window's
+private state through `impl()` (`MainWindow` befriends the base) and the window's `hint` and `showEditor`. The
+shell files listed in `docs/milestones/M4.md` §3 are frozen for the packages. (b) **Frozen shared headers.**
+`source_loader.hpp` gets one marked section per package; each package defines its section's members in its own
+file and keeps its private state in a nested struct (`SourceLoader::M4Budget`, `M4Reload`: members of the class,
+so they reach its private members without a header edit), created on first use behind a `shared_ptr`. The
+contract puts the hook calls into `source_loader.cpp` (`published()`: `budgetHolds` before anything else is done
+with the source, `reloadPublished` at the end; `close()`: `budgetForget`, `reloadForget`; `cancelOpens()`:
+`budgetDropPending`), and the followups package, which owns that file, keeps them. (c) **The open-time budget
+check** happens at publication (step 8, GUI thread), before the source is registered with the maths and before
+the summary pass, so no chunk of it is decoded; it compares `formats::estimateResident` of the opened source
+(every logged channel at its storage dtype and size, in the chunk layout of `esses_store`: samples, the factor-4
+pyramid, a bitmap per chunk as the upper bound, headers) with the cache's budget: `OpenBudgetCheck::exceeds()`
+is estimate > budget, and the resident bytes are reported, not added (07 §7.1's comparison). The "probe
+estimate" is read as this estimate from the probe's channel sizes and dtypes (`estimateResident(const
+ProbeResult&)` gives the same from a probe, for the CLI). The check is off unless the shell sets the gate
+(`setBudgetGate(&runtime.cache())`), so headless opens never wait. The budget setting is
+`memory.chunkCacheBudgetBytes` (02 §6.9), applied only when the key is present (the runtime's default, or a test
+runtime's small budget, stays otherwise) and raised to 1 GiB. (d) **Continue and Cancel** are the two actions of
+one Messages row (Budget, Warning): `qt::Message` gains `altAction`/`altActionArgs` (`MessagesModel::
+AltActionRole`), run by `MessagesWindow::invokeAltAction`; the commands are `file.continue_open` and
+`file.cancel_open` with the pending id, without a keymap row or a menu (06 §11: an action is a command id with
+arguments; no modal dialog for a diagnostic). (e) **Stats**: `qt::PerformanceMonitor` polls `ChunkCache::stats()`,
+the budget and `TaskPool::stats()` on a GUI timer (1 s by default) instead of a push from the cache, whose hook
+runs on workers; the status bar's Performance field is `statusField("performance")`, the Messages dock's Stats
+line `MessagesWindow::showPerformance`. (f) **Changed files.** `formats::checkSourceFile` re-stats a source's
+path against the size and mtime of its provenance for every importer (the text importers keep no mapping; the
+`.ld` provider's own check before each decode batch stays as built); `SourceLoader` holds the stale state
+(`checkChangedFiles`, `isStale`, `staleSources`, `staleChanged`), its Import Warning row `open.file_changed`
+carries `file.reload_source` with the source id, `reload()` is a close then an open through the pipeline with the
+selection restored on publication (`sourceReloaded`), and the Data window's model asks a stale query
+(`DataWindowModel::setStaleQuery`, `StaleRole`). (g) **HiDPI.** `DprWatcher` follows the device pixel ratio of
+the main window and of every floating dock window and asks the components under it to re-check theirs
+(`ComponentWidget::recheckDevicePixelRatio`: the rebuild `QEvent::DevicePixelRatioChange` already queues);
+`DockHost::windowOf(id)` names a dock's top-level window. (h) **Keymap.** No keymap row is added:
+`file.reload_source` and `help.contents` stay `planned` M4 until their package implements them (each package adds
+its `KEYMAP_TEST` entry to its own `tests/ui/keymap/keymap_m4_<package>_cases.hpp`), and the menu or action
+commands 06 §14.4 does not list (`help.about`, `file.continue_open`, `file.cancel_open`) get none, as
+`help.keyboard_shortcuts` (D-203 (ah)). (i) **Wave-2 placeholders.** `AboutShell` registers `help.about` in the
+Help menu and opens `AboutDialog` (06 §2.2 Help > About); `buildInfo()` and `versionReport()` are what
+`esses --version` prints (`main.cpp` prints `versionReport()`, whose first line stays "esses <version>");
+`DocsShell` will register `help.contents`; portable mode stays `esses::Paths`' `portable.marker`; the top-level
+`CMakeLists.txt` adds `tests/soak/` and `tools/packaging/` when they exist. (j) `SourceLoader::summariesReady`
+(M3.md §6 item 18) is declared for the followups package. (k) The Qt-free M4 tests of `esses_formats` are one
+globbed executable over `tests/m4/**` (`formats_m4.<test>`).
+**Consequences.** The packages edit disjoint files (`docs/milestones/M4.md` §3) and replace `M4-STUB`s; nothing of
+M4's behaviour exists yet: every hook is a no-op and every stub inert, so the application behaves as at M3 except
+that Help has an About entry. Final and tested now (`formats_m4.m4 contract: ...`, `qtmodel.tst_m4_contract`,
+`widgets.tst_m4_contract`): `ResidentEstimate`'s sum, the state names, the setting key and floor,
+`OpenBudgetCheck::exceeds`, `PerformanceMonitor`, the M4 signals, the alternate action, the stale query, the
+extension list, `DockHost::windowOf`, Help > About and `buildInfo()`. A later change of a frozen declaration is a
+coordinator edit together with its consumers. Names added: outline §4 "Names added by the M4 contracts". No
+golden changes.
+**User must confirm:** no.
+
+#### D-207 The memory budget as built: the estimate as the upper bound of every chunk, Continue as the held open's own publication, Cancel releasing only an unshared decode log, the warning row's alternate action on SHIFT and in a row menu, Continue and Cancel enabled while an open waits, the setting floored and given back, the Options field in GB, the Performance field and the Stats line, the resident row as the peak resident set of a fresh process (refines D-011, D-043, D-206 (c)-(e); reads 07 §7.1, §7.2 AC-M4-02, §12, 01 §7.1-§7.2, §8.3, 06 §2.1, §11; amends 06 §11, outline §4)
+**Context.** D-206 put the open-time check at publication and made Continue and Cancel a Messages row's two
+actions. It left open how a held open is published on Continue without meeting the gate again, what Cancel frees,
+how the alternate action is reached (06 §11 gives a row one action, run on double-click or ENTER), what the two
+commands do without a pending id (the command palette lists every enabled command), how the budget setting behaves
+below its floor, when the key goes away and when the runtime outlives the window, how the Options field shows a
+budget the user never set, which units the texts use, and what "resident" means in 07 §12's row "Resident memory,
+RW-2 + 20 maths channels <= 1 GB" (the chunk cache's count, the process's private bytes or its resident set) and how
+`bench/open_bench` measures it.
+**Decision.** (a) **The estimate** counts every chunk as `ChunkBuilder::allocate` lays it out with a validity bitmap,
+the upper bound: an AllValid chunk carries none, so once every chunk is resident the estimate exceeds
+`ChunkCache::Stats::residentBytes` by exactly the bitmaps of the AllValid chunks, and equals it when every chunk
+carries one; an I64 time column counts its samples and header only; a column several channels share counts once
+(`Column::id`); the probe estimate adds an I64 time column per timestamped channel. The texts use 1 KB = 2^10, 1 MB =
+2^20 and 1 GB = 2^30 bytes: whole KB, one decimal below 10 MB, whole MB, then GB with one decimal. (b) **The gate.**
+A held open waits in `SourceLoader::M4Budget` with its snapshot and its Import Log; Continue hands the same snapshot
+to `published()`, which lets it through once, so a second open of the file published meanwhile makes it
+`open.already_open` (06 §19 item 6), and only then are its Import Log rows posted, its maths registered and its
+summary pass started. A held open is not counted by `pendingOpens()`. Cancel and `cancelOpens()` post
+`open.budget_cancelled` (Import, Info) and release the registry's decode log only when no open source and no other
+waiting open has the same id; closing a source keeps the waiting opens of its file. (c) **The row**: Budget,
+Warning, code `budget.open_estimate`, the file as its source, the text "needs about <estimate> of memory once
+loaded, above the <budget> memory budget (<resident> in use). Continue to open it anyway, or Cancel."; action
+`file.continue_open`, alternate action `file.cancel_open`, both with the pending id. The Messages dock is shown and
+the status bar's message area says so. 06 §11 is amended: a row's alternate action is a second link-coloured suffix
+run with SHIFT+double-click or SHIFT+ENTER, and a row's context menu lists both actions with their enabled state.
+(d) **The commands** "Continue Opening" and "Cancel Opening" (Global, no menu, no keymap row, D-206 (h)) are enabled
+while an open waits; with the pending id they answer that open, without one (the palette) the newest open still
+waiting; an id that no longer waits leaves the hint "That open is no longer waiting". (e) **The setting** is applied
+at `windowReady` and on every `SettingsStore::changed` of its key: an integer or a double above 0, raised to 1 GiB
+(above SIZE_MAX: SIZE_MAX); absent or not a positive number, the runtime's budget of `windowReady`
+(`BudgetShell::runtimeBudget`) comes back, and `teardown` gives the runtime its own budget back when the setting had
+changed it (a runtime can outlive its window, as in the tests). Options > General "Memory budget": GB of 2^30 bytes
+with one decimal from 1.0 to 4096.0, showing the applied value, or `ChunkCache::defaultBudgetBytes()` while the key
+is absent; it is written, as an integer byte count, only when the user changes it. (f) **Stats**: the
+`PerformanceMonitor` samples every second and at `windowReady`, at a change of the setting and at Continue; the
+status bar's "performance" field shows `performanceLine` ("Resident 412 MB of 4.0 GB", " (over budget)" above it)
+with `performanceDetails` as its tool-tip, and a click shows the Messages dock (06 §2.1); the dock's Stats line above
+the list shows `performanceDetails`, hidden until the first snapshot. (g) **The resident row**
+`open.resident_rw2_20maths` (07 §12, AC-M4-02): RW-2 as `bench/workloads.md` defines it (the channel set of the maths
+readiness set), written once as a `.ld` with an `.ldx` holding a beacon every 90 s through the motec.ld writer; then
+each run is a fresh process (the bench started with `--resident-run`): `SourceLoader::open` with the circuit rules,
+the built-in maths and the lap indexes, the 20 expressions of the readiness set as one global module, every output
+evaluated, every chunk of every logged channel and of every output resident, the pool idle. "Resident" is read as
+the strictest figure, the process's peak resident set (Windows: the peak working set, which includes the mapped
+file's pages; Linux and macOS: `ru_maxrss`); the row is its median over the runs against 1 GB = 2^30 bytes, with the
+chunk cache's resident bytes and the private bytes recorded beside it. A byte row is written under "memory" in the
+JSON, not into the "benchmarks" array of timings. The bench reaches the writer through `formats::ImporterRegistry`
+as `SourceLoader`'s header exposes it (`open_bench` declares no `esses_formats` dependency in `bench/CMakeLists.txt`).
+**Consequences.** AC-M4-02's automated half passes (`ui.tst_budget_warning`, `qtmodel.tst_memory_budget`,
+`formats_m4.budget: ...`, `widgets.tst_budget_shell`, `widgets.tst_options_dialog`). On the reference machine of
+`bench/workloads.md` (Release, Qt 6.7.2, median of 5) RW-2 + 20 maths channels peak at 863,617,024 bytes resident
+(823.6 MiB), the chunk cache holding 552,863,744 bytes (527.3 MiB, 1,328 chunks) and the peak private bytes at
+619,896,832 (591.2 MiB). `SessionRestore` (a file of the followups package) does not wait for an open held at the
+gate, so a project's restored selection misses a file the user continues later. No golden changes, no keymap rows.
+New names: outline §4 "Names added by the M4 budget package".
+**User must confirm:** no.
+
+#### D-208 Changed source files as built: E-5's answer on NTFS (the POSIX-semantics, ReplaceFileW and rename-aside writers pass, a classic MoveFileExW replace is refused whatever the share mode, so the sharing policy stays), the stale mark sticky until reload or close, the Messages row added by connectSourceReload, Reload as a close then an open with the selection parked by the close, the command enabled while a source is stale, a fault-injection seam in the .ld provider and ld.io_fault once per source (refines D-206 (f); reads 02 §1 behaviour 5, §8 AC-4a, 06 §5.6, §6, §14.4, E-5; amends 06 §6 "Changed files", outline §4)
+**Context.** 02 §1 behaviour 5 and §8 AC-4a expect a writer that replaces a mapped log by rename-over to succeed
+while the view keeps the old bytes, and E-5 asks whether it does on NTFS, on older Windows 10 builds and on SMB.
+D-206 (f) left open where the stale source's Messages row is made (an Import Log entry carries no action, and
+`connectSourceLoader` lives in a file another package owns), how a reload keeps the selection when the close that
+starts it drops the source's slots (06 §5.2 closeSource), what "disabled unless the source is stale" means for a
+command the Messages row runs with an argument, and how the "a fault inside `guarded()` seals the chunk
+`AllInvalid`" half of AC-4a is tested where the system refuses the truncation that would cause a real fault.
+**Decision.** (a) **E-5 on NTFS** (measured on Windows 11 build 26300; the same Catch2 cases run on windows-2022):
+the sharing policy (`FILE_SHARE_READ | FILE_SHARE_DELETE`, never `FILE_SHARE_WRITE`) stays. A writer that replaces
+the file with POSIX semantics (`SetFileInformationByHandle(FileRenameInfoEx, REPLACE_IF_EXISTS |
+POSIX_SEMANTICS)`, what `AtomicFile` does), with `ReplaceFileW`, or by renaming the old file aside and moving the
+new one in succeeds, and the view keeps the old bytes; every in-place writer that opens the file for writing
+(`CREATE_ALWAYS`, `TRUNCATE_EXISTING`, `OPEN_EXISTING`, `OPEN_ALWAYS`, `std::ofstream`) gets
+`ERROR_SHARING_VIOLATION`. A classic `MoveFileExW(MOVEFILE_REPLACE_EXISTING)` (and MSVC's `std::filesystem::rename`,
+which uses it) is refused with `ERROR_ACCESS_DENIED` while any handle holds the target open, whatever that handle's
+share mode (an unmapped `FILE_SHARE_DELETE` reader too), so no share mode admits it: such a writer fails cleanly and
+changes nothing, and the user closes the log or the writer retries. The tests pin the writers that must pass and,
+for the classic one, the invariant (refused: nothing changed; replaced: the old bytes kept) with its outcome
+reported. SMB stays the maintainer's (`docs/milestones/M4.md` §6.2); the same cases run on a share through
+`ESSES_TEST_SMB_DIR`. (b) **The stale mark** is the loader's (`checkChangedFiles`, run on application focus):
+Changed or Missing marks a source once and stays until the source is reloaded or closed (a file that comes back
+unchanged stays stale); it is not taken from the providers' DecodeLog, whose own check before each decode batch is
+unchanged. (c) **The Messages row** (Import, Warning, `open.file_changed`, "file changed on disk ...", the action
+`file.reload_source` with the source id as 32 hex digits) is appended by the new `qt::connectSourceReload`
+(`source_reload.hpp`) on `staleChanged(id, true)`, which the shell calls beside `connectSourceLoader`; a missing
+file has its own text. (d) **Reload** is a close then an open (D-206 (f)). `DataSelectionModel::closeSource` parks
+what it takes from the selection for the eight newest closes (`kParkedCloses`): the source's slots with their
+positions and each range's lap number and class, its own filter, the source that followed it in the Data window,
+and the range it moved into Main with the slot that range held; `sourceReloaded(previous, source)` gives it back:
+each slot by RangeId, else by lap number and class (06 §5.6), else dropped with a hint, the moved Main back to its
+slot, the source before its old successor. Two reloads in flight hand Main over between their parked closes, so
+either publication order restores both; `closeAllSources` clears the parking. A reload ends without a publication
+when its open fails, is cancelled or finds the file already open (the loader's own `openFailed` and Import Log
+codes), and `pendingReloads()` drops it. (e) **`file.reload_source`** ("Reload File", File menu, data_window, no
+key) is enabled while any source is stale; with an argument (the Messages row, the Data window's Reload File,
+enabled on a stale row) it reloads that source, without one the highlighted source when it is stale, else the first
+stale source in Data-window order. The keymap row is implemented. (f) **The fault test.**
+`LdChunkProvider::setDecoder` (a private header of `esses_formats`) replaces `decodeConverted` so that the Windows
+test raises an in-page error inside `MappedFile::guarded()`; on POSIX the fault is real (the mapped file is
+truncated after a file of the same size and time took its name). `ld.io_fault` is logged once per source (the
+source's DecodeLog), as behaviour 5 says, no longer once per chunk; the check and the add are one step under a lock,
+so channels of a source faulting together on several workers still log it once. (g) **The badge** is an amber disc with an
+exclamation mark before the filter icon, with a tool-tip line; the row's text is unchanged.
+**Consequences.** The automated half of AC-M4-10 passes on NTFS and in its POSIX form; the SMB case and E-5's
+older-Windows-10 question stay on the VM checklist. A writer that replaces files with a classic `MoveFileExW`
+cannot replace a log Esses has open (the release note says so). Flipping the keymap row changes two tests outside
+this package: `widgets.tst_m4_contract` `plannedM4RowsStayPlanned` (no longer `file.reload_source`) and
+`project.keymap: hotkey batch 1 ...` (an implemented row of the milestone in progress, M4). New names: outline §4
+"Names added by the M4 reload package". No golden changes.
+**User must confirm:** no.
+#### D-209 HiDPI as built: per-monitor DPR through a watcher of every top-level window with a re-check after dock moves, crisp axis-aligned strokes on whole device pixels at a fractional DPR drawn by the backend, every layer painted from a whole device pixel, the definitions of crisp and no drift, the offscreen DPR sweep and its goldens (refines D-025, D-206 (g); reads 04 §6.6, 06 §1, §17, 07 §7.1 row 3, §7.2 AC-M4-07; amends 04 §6.6 items 1, 3 and 4, outline §4)
+**Context.** 07 §7.1 asks for a sweep at DPR 1, 1.25, 1.5 and 2, mixed-DPI floating docks and a relayout on a
+per-monitor DPR change, with the goldens at 1 and 2 staying authoritative (D-025); AC-M4-07 asks that a floating
+time_distance dragged between a DPR 1 and a DPR 2 monitor re-render with no blur and no layout drift. As built at M3,
+a component rebuilt on Qt's `DevicePixelRatioChange` and `ScreenChangeInternal` widget events (04 §6.6 item 3 names
+the `QWindow` signals), but Qt sends no such event to widgets moved into another window (a dock floated or docked
+back). At a fractional DPR the builders' widths of logical x DPR (1.25, 1.5 or round(DPR) = 2 px) on pixel centres or
+data positions were drawn antialiased over a pixel more than their width (soft grid lines, ticks, cursor and
+outlines), and a widget at a fractional device position painted its Dynamic and Chrome lists a fraction of a pixel
+off the Static image, which the raster engine blits at the rounded position. "No blur" and "no layout drift" had no
+testable definition.
+**Decision.** (a) **The watcher.** `DprWatcher` follows top-level windows through an event filter on the top-level
+widget (`DevicePixelRatioChange`, `ScreenChangeInternal`, `Show`; no `QWindow` is forced into existence) and runs one
+coalesced check per window on the next event-loop turn: every `ComponentWidget` under it re-checks its DPR
+(`recheckDevicePixelRatio`: laid out at another DPR than its window's, it queues the `Size | Scheme` rebuild a DPR
+event queues, at most once) and every `WorksheetCanvas` applies its 1 % placement again (`refreshGeometry`, new: the
+coalesced relayout and a repaint); a changed window DPR is counted and announced (`dprChanged`). `HiDpiShell` watches
+the main window from `windowReady` and each dock's window (`DockHost::windowOf`) on every `DockHost::stateChanged`,
+and re-checks every watched window one turn after a dock change (the reparent gap). Qt's widget events stay the
+first path (04 §6.6 item 3 is read as "on the window's screen or DPR change", which Qt delivers as those events); the
+watcher never rebuilds a component Qt already rebuilt. (b) **Crisp strokes at a fractional DPR.** `RasterBackend`
+draws a `Polyline` or `Lines` command of a list whose DPR is not whole, wider than 1 px and made only of horizontal
+and vertical segments `lround(width)` px wide (at least 1) on whole device pixels: across a segment its centre c
+covers the W pixels from floor(c + (1 - W) / 2), along it a free end goes to the pixel edge ceil(e - 1/2), and a
+polyline's corners snap both ways and are mitred. The rounding is the backend's, at draw time, not the builders'
+(04 §6.6 items 1 and 4 have widths of logical x DPR rounded at emission): the `DrawList` is unchanged, both raster
+paths draw the same pixels, slanted strokes, dots and text stay antialiased, and DPR 1 and 2 are drawn exactly as
+before, so every golden at 1 and 2 (pixel and `DrawList` JSON) is unchanged and stays authoritative. (c)
+**Whole-pixel painting.** `LayerCache::paint` moves the painter by the fraction between its device origin and the
+nearest whole device pixel when there is one (a fractional DPR only), so the Dynamic and Chrome lists land on the
+pixels of the Static image and a widget shows `composite()` pixel for pixel. (d) **What the tests hold.** *No blur*:
+what a widget paints equals its layer composite pixel for pixel, in the widget and in its window at the device
+rectangle Qt gives it (no image of another DPR scaled into place); the layers and lists are at the window's DPR and
+the Static image is lround(logical x DPR) device pixels; at a fractional DPR the opaque axis-aligned geometry
+(clears, scissors, opaque rectangles and axis-aligned quads, solid axis-aligned strokes) covers whole device pixels
+(reported, not enforced, at 1 and 2). *No layout drift*: the canvas places a component at the same logical rectangle
+at every DPR; its own layout (the time_distance caption, key column, trace area and x axis, every panel scissor, the
+table rows and columns) stays within 3 logical px of DPR 1 in the widgets (two roundings and one hinted text line)
+and within 2 in the builders with fixed metrics; back at the first DPR the layout and the pixels are identical. (e)
+**The offscreen sweep.** Four screens of the offscreen platform's screen configuration at 96, 120, 144 and 192
+logical dpi over 96 give DPR 1, 1.25, 1.5 and 2, as Windows reports 100 to 200 % monitors; a window moved between
+them changes screen and DPR as a drag does. The offscreen platform keeps a window's native size across the move where
+Windows keeps its logical size (`WM_DPICHANGED`), so `ui.tst_dpr_switch` sets the logical size again; a scale
+changed in place cannot be simulated there and is a step of the manual check. (f) **AC-M4-07's floating
+time_distance.** The shell has no dock that holds a time_distance (worksheets live in the central widget, 06 §1):
+`ui.tst_dpr_switch` floats one in a dock of its own on both dock backends, and the manual check
+(`docs/milestones/M4.md` §6.3) drags the main window's graph and the floating Track Map dock. (g) **Goldens.** New and
+exact on every OS: the builders' `DrawList` JSON of the seven drawn MVP types at DPR 1.25 and 1.5
+(`tests/golden/images/dpr_sweep/<type>/<case>@<dpr>x.json`, with 04 §6.6 item 5's time_distance at 1.5); new and
+provisional (`"generatedOn": "windows"`, report mode): values_list at DPR 1.5 (`tests/golden/images/dpr_sweep/
+values_list/`, its table text exact against the DPR-free table goldens); re-rendered: the geometry-only reference
+`geometry_scene@1.5x.png` of `esses_qtrender` (its axis-aligned strokes now on whole pixels).
+**Consequences.** AC-M4-07's automated half passes offscreen (`ui.tst_dpr_switch`, `widgets.tst_dpr_sweep`,
+`widgets.tst_dpr_watcher`, `widgets.tst_dpr_values_list`, `golden.tst_dpr_goldens`, `qtrender.tst_crisp_strokes`);
+the two-monitor drag and a display scale changed in place are the maintainer's (§6.3), and 07 §7.6 lets mixed-DPI
+floating docks slip with the limitation documented if they fail there. At DPR 2 the builders' 2 px lines on pixel
+centres stay drawn over three device columns (50/100/50 %) as the authoritative goldens show; making them crisp is a
+builder change with new DPR 2 goldens (`docs/milestones/M4.md` §10). Tables drawn by Qt (values_list, the reports)
+keep Qt's own rendering at a fractional DPR. New names: outline §4 "Names added by the M4 hidpi package".
+**User must confirm:** no.
+#### D-210 The M3 follow-ups of esses_qtmodel and the Qt-free libraries as built: track-map files on the pool, summariesReady, the channel report's "ignore interpolated data", ReportModel's in-place refresh, the Track Sections pass keyed by its bound map, the missing report and variance tests (refines D-195, D-197, D-199 (c) and (e), D-203 (n), D-204; reads 01 §5.3 rules 3-4, 02 §3.2 rule 10, 04 §12 items 2-3 and 8, §13 item 5; amends 04 §12 items 2 and 8, outline §4)
+**Context.** `docs/milestones/M4.md` §5.1 gives the followups package M3.md §6 items 18, 23, 25 and 29-32 for the
+Qt-free libraries and `esses_qtmodel` (the widgets follow-ups are a package of their own, D-211). Item 23: a cache
+miss of `TrackMapService` read the track file on the GUI thread and every edit wrote it there. Item 18: the
+loader's summary pass announced nothing, so a component built before it kept the extents of incomplete
+pyramids. Item 25: the channel report had no "ignore interpolated data" switch; the research names the switch and
+nothing more. Item 30: `ReportModel` reset the model on every delivery, so a refresh lost the table's selection.
+Item 31: a Venue detail edit did not run the Track Sections pass again, and the phase-2 key held a global map
+generation rather than which map the source is bound to. Items 29 and 32: tests the M3 engine review asked for.
+**Decision.** (a) **Track maps on the pool** (item 23). With a `MathsService` and a `Dispatcher` (the
+application's service) every read, write and scan of `trackmaps/` runs on `MathsService::pool()` at Interactive
+and none on the GUI thread. `map(venue)` on a cache miss returns null at once and reads the venue's own file
+(D-205) on a worker (`isLoading`); when it lands the result is cached, found or not, and `mapChanged(venue)`
+fires; a project change drops the reads in flight. `setMap` validates and replaces the cached map and announces
+it at once, as before, and queues the write: one write per venue file is in flight, the next one is held and
+merged (the newest map, backed up when any merged edit asked), so the file always ends as the last edit left it.
+A write that fails is a `logMessage` row, the venue's map is read back from its file, and the `TrackMapCommand`s
+whose edits it carried are marked failed and obsolete, so `QUndoStack` drops them at their next undo or redo
+without running them: D-203 (n)'s "no step that did not happen stays on the stack", reached when the failure is
+known instead of inside `push` (an invalid map is still refused at once). A parent command (the Track Editor's
+rename) is not marked; its undo writes both files back. Writes still queued when the service is destroyed are
+made by the destructor, on that thread, behind the slot mutex that orders them (SourceLoader's sidecar rule,
+D-190). `venues()` answers from the cache and the last scan of the folder, which the first call after a project
+change starts on a worker (`venuesChanged`). A map from `generate()` reaches `onGui` only once the venue's own
+map is known (read, or set meanwhile), so the shell's auto-generation, which generates while `mapFor()` is null
+and writes when it is still null, never writes over a file that was still being read. New members:
+`asynchronous()`, `isLoading()`, `mapStamp()` (the identity of the cached map, unique within the service),
+`pendingIo()`, the signal `venuesChanged()`. Without a Dispatcher (headless tools, the M3 tests) every operation
+stays synchronous. A local event loop around the write (D-198 (e)'s Export Data wait) was rejected: the shell's
+auto-generation writes from inside a Dispatcher closure, and a nested loop there breaks the FIFO drain of 01 §5.3
+rule 3. (b) **`summariesReady`** (item 18). The summary pass is one `summary/<sourceId>/<first column id>` task
+(the column id is process-unique, so the pass of a file closed and opened again never joins the closed source's
+cancelled run under the shared `summary/` key; `close()` still cancels by the `summary/<sourceId>` prefix); when it
+has run, `summariesReady(id)` is posted, after `sourcePublished`, and emitted only while the source is open with
+the columns it summarised. A source a `sourcePublished` listener closed again gets no pass. The components'
+rebuild on the signal is the widgets' (their Data path). (c) **`options.ignoreInterpolated`** (item 25,
+`ReportOptions::ignoreInterpolated`, default false). Esses' statistics read the channel's own samples (D-197 (a)),
+so the one interpolated value a channel report can show is the range-edge value of `interpolateBoundaries`; with
+the switch on, `start`, `end` and `change` take the range's samples (the probe still applies) whatever
+`interpolateBoundaries` says, and the cells share the StatCache key of `interpolateBoundaries` off (they are
+equal). A maths output evaluated above an input's rate holds that input's up-sampled values as its own samples;
+0.1 keeps no per-sample provenance, so the switch does not reach them (a v1.0 question). JSON: `channel_report-1`
+gains the optional boolean, written by `ReportSpec::toJson` only when true, so every M3 body reads and writes back
+unchanged (no schema version); the Properties dialog's Report page binds it ("Ignore interpolated values").
+(d) **The Track Sections pass keyed by its bound map** (items 31, 32). While the pass is on, the phase-2 key
+holds `/t<setTrackMaps generation>-<mapStamp of the source's venue>` instead of a generation every map change
+bumped, so an edited, reloaded or another venue's map changes the key and a change of one venue's map no longer
+changes every other source's key; no run starts while the venue's map is still being read (its `mapChanged`
+starts the pass, so the groups never drop to "no map" in between); a sidecar edit that changes the Venue detail
+starts the pass for every layer of the source. D-204 (d)'s serial guard gets its test without a hook: the test
+lets run A finish on the pool while holding the event loop, starts run B, and checks that A's result never
+publishes. (e) **`ReportModel`'s in-place refresh** (item 30). A delivery or a display change (highlight, time
+format) whose table has the same header labels, row labels and row kinds as the one on display is one
+`dataChanged` over the table instead of a reset, so a view's selection and current cell survive; any other table
+resets. The widgets' `ReportTable` re-measures its columns on `dataChanged` as it does on a reset. (f) **Tests**
+(item 29): `analysis.report_time: TrackSectionsRule output reaches the eclectic without the in lap's cut-off
+section` (the time report fed from `RuleRunner::runPhase2` with the track-sections rule: the in lap's section that
+would be cut at the lap end is absent, so the eclectic takes its complete section and nothing short, with untrusted
+laps included) and `plotcore.variance: the table equals what the traces' DomainMapper::xOf shows (M3 item 29)` (both
+domains, two overlay pairs with offsets and stretch, blank columns included; the expectation inverts `xOf` by
+bisection, never `DistanceIndex::timeAt`).
+**Consequences.** The GUI thread does no track-map I/O in the application; a track-map edit is on disk once the
+pool has run it (milliseconds) rather than when `setMap` returns, and its failure is a Messages row and a dropped
+undo step instead of a refusal; the Track Editor's tests wait for the files (`widgets.tst_track_editor`). Components
+can rebuild their extents when the pyramids exist. The channel report has the switch of the research list. A
+report refresh keeps the selection. A Venue detail edit moves the Track Sections to the new venue's map, or
+removes them without one. The frozen `source_loader.hpp` comment still describes the M3 key form (`/t<map
+generation>`); the coordinator refreshes it. Regression tests: `qtmodel.tst_track_map_io` (5 functions),
+`qtmodel.tst_summaries_ready` (3), `qtmodel.tst_track_sections_pass` `aVenueEditRunsThePassForTheNewVenue` and
+`aSupersededRunNeverPublishes`, `qtmodel.tst_report_model` `aRefreshOfTheSameShapeKeepsTheSelection`,
+`analysis.report_stats: ignoreInterpolated ...`, `analysis.report_cells: ignoreInterpolated ...`,
+`analysis.report_spec: options.ignoreInterpolated ...`, the two of (f). No golden changes.
+**User must confirm:** no.
+
+#### D-211 The M3 follow-ups of esses_widgets as built: a channel's default display unit (a fraction in %), display units of the scatter and channel report channels, unit pickers in the Properties pages, the Track Editor's speed class and Corr Dist unit, Export Data in the legacy dialect, the time_distance group headings, component links honoured, summariesReady reaching the components (refines D-010, D-177 (e), D-195, D-198 (e), D-200, D-201, D-203 (af) and (m), D-210 (b); reads 03 §9.1 item 6, 04 §2.4, §7.2 item 8, §8.2 item 4, 05 §6 "Writer", 06 §12, §13.5 item 4; amends 04 §7.2 item 8's reading in D-198 (e), outline §4)
+**Context.** `docs/milestones/M4.md` §5.1 gives the followups package M3.md §6 items 19, 21, 22, 24, 26 and 27 for
+`esses_widgets` (with the body schemas and `esses_plotcore` where they need it; the Qt-free and `esses_qtmodel`
+items are D-210). Item 19: samples are stored in the SI base unit of their quantity (D-010), so a logged
+percentage stored as a ratio showed as 0-1 wherever no display unit was named, and `scatter-1` and
+`channel_report-1` had no per-channel display unit. Item 21: 04 §8.2 item 4's group headings (drag to reorder,
+double-click for Group Properties) were not built and no `GroupHeading` hit was registered. Item 22: the Track
+Editor had no speed-class column (`TrackSection` and `track-1` had no member) and edited its bounds in metres.
+Item 24: a component's Export Data wrote the plain time-and-channels table of D-198 (e), not the legacy dialect of
+04 §7.2 item 8 that `esses-cli export --format motec.csv` writes. Item 26: display units were free text in the
+Properties pages. Item 27: `links.zoom`, `links.cursor` and `links.datum` were stored and edited but not honoured
+(D-203 (m)). D-210 (b) left the components' rebuild on `SourceLoader::summariesReady` (item 18) to the widgets.
+**Decision.** (a) **The default display unit** (item 19). Where a component names no display unit (a trace's,
+row's, gauge's or channel's `displayUnit`, or one that is not a unit of the channel's quantity), a channel is shown
+in its quantity's default display unit, `plot::defaultDisplayUnit` (`esses_plotcore` `display_units.hpp`): the
+stored unit, except that a fraction stored in the Ratio base unit `ratio` is shown in `%` (a throttle, brake or
+duty reads 0-100). The reference product shows a channel in its logged unit; that is the better default, but it
+needs the channel descriptor to keep the file's unit (05 `ChannelInfo::vendorUnit` reaches no model type) and is
+left to v1.0; until then only Ratio's base unit is not a reading unit, so only it gets another default (every
+other quantity's SI base unit is a real reading unit, and a broader table would change what M1-M3 show).
+`RenderService`'s channel resolution applies it, so the graphs, gauges, scatter, histogram, track view, the Values
+window and model, the reports (their columns, D-197 (g)) and Export Data all agree; `plot::ResolvedChannel` gains
+`displayUnitId` (the unit `toDisplay` converts to). The Channel Editor's Unit cell without an override shows the
+same default (amends D-177 (e)'s "the stored unit"), and so do the Maths Editor's channel insertion (`'Duty'
+[%]`) and the unit CTRL+SHIFT+O and CTRL+SHIFT+Z write their offset in (the unit of the value on screen, D-186).
+The project's channel override display units still reach only the Channel Editor (as in M2-M3). `scatter-1` gains
+the optional `xDisplayUnit`, `traces[].displayUnit` and `colourChannel.displayUnit`, `channel_report-1`
+`report.channels[].displayUnit` (`analysis::ReportChannel::displayUnit`); all are written only when set, so every
+M3 body reads and writes back unchanged (no schema version). The shipped workbook names `G` for the Corners
+scatter's lateral and longitudinal G and `km/h` for the Reports worksheet's Corr Speed; M1's Overlay worksheet,
+unchanged, now reads its throttle and brake in % (AC-M1-05's render parity holds: both sides resolve alike).
+(b) **Unit pickers** (item 26). `FieldKind::Unit` is an editable combo of the unit symbols of the quantity of the
+channel its sibling Channel field names (`FieldRow::unitOf`; `setUnitOf`, `linkUnitPickers`, `setUnitChoices`,
+`unitChoices` in `field_editors.hpp`): `""` (the default display unit) first, then the quantity's units without the
+compat ones (06 §13.1 item 1's rule); it follows a change of the channel field and of the open sources (the
+dialog's channel choices); free text stays allowed (an alias). Every `displayUnit` row uses it: the
+time_distance and outing traces, the scatter's x, y and colour channels, the channel report's channels, the
+values list's rows and the two gauges. `UnitValue` units (limits, bands) stay free text. (c) **The Track Editor**
+(item 22). `TrackSection::speedClass` is `""` (none), `slow` or `fast` (`TrackMap::kSpeedClasses`; the classes of
+the parity panel's proposal, nothing more being known), `track-1`'s optional `sections[].speedClass` (written only
+when set, so earlier maps are written unchanged; `validate()` refuses another value at its pointer); the editor
+has a Speed class column and field, `addSection`/`editSection` take it (an edit without one keeps the section's).
+The bounds are shown and edited in the Corr Dist display unit, `plot::corrDistDisplayUnit`: the project's Corr
+Dist override when it is a length, else following Corr Speed's override display unit (km/h -> km, mph -> mi, 03
+§9.1 item 6), else m; the table's headers and cells, the fields' suffix and decimals (enough for 0.1 m) follow,
+and change when the overrides change; the editor's API and the file stay in metres. The graphs' distance axis
+stays in metres (unchanged). (d) **Export Data in the legacy dialect** (item 24). The time-series exports (the
+time_distance and outing graphs, the gauges) write 05 §6's legacy CSV through `formats::makeLegacyCsvWriter`, the
+writer of `esses-cli export --format motec.csv`: a source of their own holding the component's Main-slot channels
+under the component's names (maths outputs included; repeats left out), the Main source's details with `Export
+Range` (the Main range's name) and `Export Worksheet` (the worksheet's name; no workbook is known), the span of the
+export range, each channel in its display unit (the writer's `csv.units`), one grid at the highest uniform rate
+capped at 1 kHz, Time from 0. The writer writes files only, so the bytes pass through a temporary file (read back
+with `readWholeFile` and removed) on the worker the export already runs on (D-203 (x)). This supersedes D-198
+(e)'s plain table for those components; the scatter's sets and the histogram's bins (D-198 (e)) and the reports'
+tables are derived tables, not channels over time, and stay as they are. No second format is offered (the shell's
+export prompts are frozen in M4, D-206). (e) **Group headings** (item 21). A group's heading is its part of the
+key column (`TdGroupLayout::key`): the Static build registers it as a `GroupHeading` hit beneath the group's label,
+value and measurement hits, so nothing new is drawn and no golden changes; an open-hand pointer shows over it
+(hover events, mouse tracking unchanged). Dragging a heading 4 logical px or more shows a dashed line where the
+group would go (between the keys, across the key column and the panels; `groupDropIndex`); the release moves it
+there, `TimeDistanceGraph::moveGroup`: one undoable spec edit "Move group <name>", the group's traces, its unknown
+members (the body's `rest`, which `toJson` merges by index) and its vertical zoom going along; panels laid out by
+explicit `edges` keep their heights, stacked again from the first top in the new order; overlapped `lo`/`hi`
+regions are kept. A double-click opens Group Properties: the Properties dialog with the group's record selected
+on the Channels tab (name, scale, limits, lines, edges, Lo/Hi; `PropertiesDialog::focusRecord`,
+`openGroupProperties`). (f) **Links** (item 27, 04 §2.4). `ComponentWidget` keeps the own zoom, cursor and datum
+of the parts whose link is off, taken from the worksheet's when the component is created or the link is switched
+off, never persisted; `viewState()` is the worksheet's state with them in place (its version the worksheet's
+plus the own changes), and it is what `onViewChanged` receives; a worksheet change of an unlinked part is not
+delivered; switching a link on again delivers the worksheet's. `domain` and `offsetAxis` stay the worksheet's; on
+F9 an own zoom restarts from the worksheet's zoom converted into the new domain (an own zoom has no domain rule of
+its own). The outing graph's zoom is always linked (04 §9 item 2). The components' own edits go through
+`setViewCursor`, `setViewZoom`, `viewPanBy` and `viewZoomFull` (their mouse: clicks, drags, the wheel, the rubber
+band, band and scrollbar double-clicks; the scatter's point stepping): the worksheet's when linked, else the own
+state, an own zoom clamped to the Main outing (`mainMapper`). The worksheet keyboard rows the shell offers the
+focused component (`cursor.*`, `zoom.in`/`out`/`default_range`/`datum_main`, `pan.*`, `datum.*`) act on its
+unlinked parts in `ComponentWidget::handleCommand`'s default, by the WorksheetViewModel's rules on the own state: a
+cursor step is one device pixel of the component's width, at least one sample period of the worksheet's active
+period; zoom x0.5 / x2 about the own cursor; W `[0, |Main|)`; Z the cursor-datum span; pan 10 % and 90 % of the
+span; H centres; SPACE, D and X on the own datum (X only when cursor and datum are both the component's own).
+Rows the shell does not offer components (F2 and the like) act on the worksheet only. The values list reads its
+values at its own cursor and datum (`ValuesModel::setViewSource`); a zoom-linked channel report clips to its own
+zoom when `links.zoom` is off. The Properties dialog's link tooltips say so. (g) **`summariesReady`** (item 18,
+D-210 (b)). `FollowupsShell` gives every component of the window, shown or kept hidden, `onDataChanged(source,
+0)` when the loader's summary pass of a source has run, so one built while the source's SummaryPyramids were
+incomplete rebuilds its extents; the other `FollowupsShell` virtuals stay the base's (nothing else needs shell
+wiring).
+**Consequences.** New public names: outline §4 "Names added by the M4 followups of esses_widgets". Tests:
+`plotcore.followups D-211: ...` (6: the default and named display units against data/units.json, the Corr Dist
+unit rule, the scatter members, the report channels' units, the GroupHeading regions), `analysis.followups D-211:
+...` (2: the speed class, the report channel's unit), `widgets.tst_followups_units` (the default in the Values
+model, the scatter inputs and the channel report; the unit pickers of six types; the Track Editor's speed class and
+units; the legacy export's layout and display units), `widgets.tst_followups_view` (the heading drag, Group
+Properties, explicit heights and members; the links of a graph, the outing graph and a values list; summariesReady
+through the shell); the export expectations of `widgets.tst_gauges`, `tst_outing_graph`, `tst_time_distance_m3`
+and `tst_shell_m3` follow (d), and `widgets.tst_channel_editor` and `tst_active_channel` follow (a). No DrawList or
+pixel golden changes.
 **User must confirm:** no.

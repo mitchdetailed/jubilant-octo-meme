@@ -5,14 +5,18 @@
 // D-204): the pass runs again whenever a lap index it reads changes, also when the number of lap indexes
 // stays the same (a lap stretch published by LapStretchService replaces every index by a stretched copy), its
 // dedupe is against the layer's latest run only (inputs that come back to an earlier run's run again), and a
-// file closed and opened again is annotated afresh. Expectations come from the synthetic source's speed model
-// (qtmodel_test_support.cpp) and the oval's geometry, never from the code under test.
+// file closed and opened again is annotated afresh. M4 (D-210 (d)): a Venue detail edit binds the new venue's
+// map and runs the pass again (M3 item 31), and a run superseded after it finished never publishes (M3 item
+// 32). Expectations come from the synthetic source's speed model (qtmodel_test_support.cpp) and the ovals'
+// geometry, never from the code under test.
 
 #include "../qtmodel_test_support.hpp"
 #include "../reports/report_track_fixtures.hpp"
 
 #include <esses/analysis/rule_runner.hpp>
+#include <esses/base/taskpool.hpp>
 #include <esses/qtmodel/app_runtime.hpp>
+#include <esses/qtmodel/dispatcher.hpp>
 #include <esses/qtmodel/distance_service.hpp>
 #include <esses/qtmodel/lap_stretch_service.hpp>
 #include <esses/qtmodel/maths_service.hpp>
@@ -20,9 +24,13 @@
 #include <esses/qtmodel/track_map_service.hpp>
 
 #include <QTest>
+#include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <numbers>
 #include <optional>
+#include <thread>
+#include <vector>
 
 using namespace esses;
 using namespace esses::qt;
@@ -55,6 +63,26 @@ double lapTimeAtDistance(double d, double lengthM, double periodS) {
 // Within 0.1 s of `want`.
 bool closeTo(std::optional<double> got, double want) {
     return got && std::abs(*got - want) < 0.1;
+}
+
+bool poolIdle(AppRuntime& rt) {
+    const TaskPool::Stats s = rt.pool().stats();
+    std::size_t queued = 0;
+    for (const std::size_t q : s.queued) {
+        queued += q;
+    }
+    return queued == 0 && s.parked == 0 && s.running == 0;
+}
+
+// Every task has completed and every result it posted was delivered.
+bool quiet(AppRuntime& rt) {
+    return poolIdle(rt) && rt.dispatcher().pending() == 0;
+}
+
+// An oval of a 2000 m lap (the synthetic lap length) with straights of `straightM`.
+std::shared_ptr<const analysis::TrackMap> ovalOf(const std::string& venue, double straightM) {
+    const double radius = (2000.0 - 2.0 * straightM) / (2.0 * std::numbers::pi);
+    return std::make_shared<const analysis::TrackMap>(ovalMap(venue, straightM, radius));
 }
 
 // A SourceLoader with the circuit rules and the Track Sections rule over "Test Oval", an oval of exactly the
@@ -212,6 +240,85 @@ private Q_SLOTS:
         QCOMPARE(rig.latest->id, id);
         QVERIFY(QTest::qWaitFor(
             [&] { return rig.everyLapHasSections() && closeTo(rig.turn1Start(1), flying); }, 60000));
+        rig.loader.closeAll();
+    }
+
+    // M3 item 31 (D-210 (d)): a Venue detail edit (a sidecar edit, as the Details Editor commits it) binds
+    // the new venue's map and runs the pass again; a venue without a map removes the groups. "Long Oval" has
+    // straights of 600 m on the same 2000 m lap, so the first flying lap's Turn 1 starts at 300 m of it
+    // instead of 342.92 m. Without the bound map's identity in the phase-2 key, the run the edit starts would
+    // be deduplicated against the previous venue's run (same marker set, Corr Speed and indexes).
+    void aVenueEditRunsThePassForTheNewVenue() {
+        SectionsRig rig;
+        QVERIFY(rig.configure());
+        QVERIFY(rig.maps.setMap("Long Oval", ovalOf("Long Oval", 600.0)).ok());
+        rig.loader.open(rig.writeSource("tsp-venue"));
+        const double oval = 40.0 + lapTimeAtDistance(SectionsRig::kStraight / 2.0, 2000.0, 50.0);
+        const double longer = 40.0 + lapTimeAtDistance(600.0 / 2.0, 2000.0, 50.0);
+        QVERIFY(std::abs(oval - longer) > 0.5); // the check below tells the two apart
+        QVERIFY(QTest::qWaitFor([&] { return rig.everyLapHasSections() && closeTo(rig.turn1Start(1), oval); },
+                                60000));
+
+        model::SidecarDocument doc = rig.latest->sidecar;
+        doc.setDetail("Normal", textDetail("Venue", "Long Oval"));
+        QVERIFY(rig.loader.commitSidecar(rig.latest, doc).ok());
+        QCOMPARE(TrackMapService::venueOf(*rig.latest), std::string("Long Oval"));
+        QVERIFY2(QTest::qWaitFor(
+                     [&] { return rig.everyLapHasSections() && closeTo(rig.turn1Start(1), longer); }, 60000),
+                 qPrintable(QStringLiteral("lap 1 Turn 1 at %1 s, expected %2 s (the old venue's %3 s)")
+                                .arg(rig.turn1Start(1).value_or(-1.0))
+                                .arg(longer)
+                                .arg(oval)));
+
+        // A venue without a map: the pass runs without one and removes the stale groups.
+        doc = rig.latest->sidecar;
+        doc.setDetail("Normal", textDetail("Venue", "Nowhere"));
+        QVERIFY(rig.loader.commitSidecar(rig.latest, doc).ok());
+        QVERIFY(QTest::qWaitFor([&] { return rig.group("Outings:Laps:Track Sections:Default") == nullptr; },
+                                60000));
+        rig.loader.closeAll();
+    }
+
+    // M3 item 32 (D-204 (d)): only the latest run of a layer publishes. Run A (the venue's map replaced by an
+    // oval with 600 m straights) runs to its end on the pool; before its result reaches this thread the map
+    // is replaced again (run B, 650 m straights). A's result is then dropped by the serial guard: no snapshot
+    // ever shows A's sections, and B's arrive. The test holds the event loop between the two edits, so A has
+    // finished (not been cancelled) when B starts.
+    void aSupersededRunNeverPublishes() {
+        SectionsRig rig;
+        QVERIFY(rig.configure());
+        rig.loader.open(rig.writeSource("tsp-serial"));
+        const double oval = 40.0 + lapTimeAtDistance(SectionsRig::kStraight / 2.0, 2000.0, 50.0);
+        QVERIFY(QTest::qWaitFor(
+            [&] { return rig.everyLapHasSections() && closeTo(rig.turn1Start(1), oval) && quiet(rig.rt); },
+            60000));
+        std::vector<double> seen; // lap 1's Turn 1 in every replacement published from here
+        QObject::connect(&rig.loader, &SourceLoader::sourceReplaced, &rig.loader,
+                         [&](const std::shared_ptr<const model::DataSource>&) {
+                             if (const std::optional<double> t = rig.turn1Start(1)) {
+                                 seen.push_back(*t);
+                             }
+                         });
+        const double timeA = 40.0 + lapTimeAtDistance(300.0, 2000.0, 50.0);
+        const double timeB = 40.0 + lapTimeAtDistance(325.0, 2000.0, 50.0);
+        QVERIFY(std::abs(timeA - timeB) > 0.3 && std::abs(timeA - oval) > 0.3);
+
+        QVERIFY(rig.maps.setMap("Test Oval", ovalOf("Test Oval", 600.0)).ok()); // run A starts
+        const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(60);
+        while (!poolIdle(rig.rt) && std::chrono::steady_clock::now() < until) {
+            std::this_thread::yield(); // no event loop: A's result stays in the Dispatcher
+        }
+        QVERIFY(poolIdle(rig.rt));
+        QVERIFY(rig.rt.dispatcher().pending() > 0); // A ran to its end and posted its result
+        QVERIFY(rig.maps.setMap("Test Oval", ovalOf("Test Oval", 650.0)).ok()); // run B supersedes it
+
+        QVERIFY2(QTest::qWaitFor([&] { return closeTo(rig.turn1Start(1), timeB) && quiet(rig.rt); }, 60000),
+                 qPrintable(QStringLiteral("lap 1 Turn 1 at %1 s, expected %2 s")
+                                .arg(rig.turn1Start(1).value_or(-1.0))
+                                .arg(timeB)));
+        QVERIFY(rig.everyLapHasSections());
+        QVERIFY(std::none_of(seen.begin(), seen.end(), [&](double t) { return closeTo(t, timeA); }));
+        QVERIFY(std::any_of(seen.begin(), seen.end(), [&](double t) { return closeTo(t, timeB); }));
         rig.loader.closeAll();
     }
 };

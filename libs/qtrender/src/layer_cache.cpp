@@ -141,6 +141,20 @@ void LayerCache::paint(QPainter& widgetPainter, const QRegion& exposed) const {
     }
     widgetPainter.save();
     widgetPainter.setClipRegion(exposed, widgetPainter.hasClipping() ? Qt::IntersectClip : Qt::ReplaceClip);
+    // M4 hidpi (D-209; 04 section 6.6 items 2 and 4): at a fractional DPR a widget's logical position in its
+    // window maps to a fractional device position (x 1.25 of 605 is 756.25). The raster engine blits the
+    // Static image 1:1 at the rounded position, but the Dynamic and Chrome lists, painted directly, would
+    // land a fraction of a pixel off it (a cursor one column off its traces, glyphs at other subpixel offsets
+    // than in composite()). Every layer is painted from that same whole device pixel instead (no change where
+    // the position is whole, as at DPR 1 and 2), so the widget shows composite() pixel for pixel.
+    if (const QTransform device = widgetPainter.deviceTransform();
+        device.type() <= QTransform::TxScale && device.m11() > 0.0 && device.m22() > 0.0) {
+        const qreal fx = std::floor(device.dx() + 0.5) - device.dx();
+        const qreal fy = std::floor(device.dy() + 0.5) - device.dy();
+        if (fx != 0.0 || fy != 0.0) {
+            widgetPainter.translate(fx / device.m11(), fy / device.m22());
+        }
+    }
     if (!static_.isNull()) {
         widgetPainter.setCompositionMode(QPainter::CompositionMode_SourceOver);
         widgetPainter.drawImage(QPointF(0.0, 0.0), static_);

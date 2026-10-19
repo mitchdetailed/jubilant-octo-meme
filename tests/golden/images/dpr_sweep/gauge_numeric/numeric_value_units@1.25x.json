@@ -1,0 +1,14 @@
+{"case":"numeric_value_units","type":"gauge_numeric","dpr":1.25,
+"static":{"w":300,"h":175,"dpr":1.25,"cmds":[
+{"k":"clear","c":"#ffffff"},
+{"k":"polyline","c":"#a0a4a8","w":1,"d":"solid","v":[5.5,28.5,294.5,28.5,294.5,169.5,5.5,169.5,5.5,28.5]}
+]}
+,"dynamic":{"w":300,"h":175,"dpr":1.25,"cmds":[
+{"k":"text","t":"180.2","x":8,"y":99,"style":"gauge","anchor":"middleLeft","c":"#202124","maxw":244,"scale":3.05},
+{"k":"text","t":"km/h","x":260,"y":99,"style":"gaugeUnits","anchor":"middleLeft","c":"#202124"}
+]}
+,"chrome":{"w":300,"h":175,"dpr":1.25,"cmds":[
+{"k":"rect","c":"#e8eaed","r":[0,0,300,23]},
+{"k":"text","t":"Corr Speed","x":5,"y":11.5,"style":"caption","anchor":"middleLeft","c":"#202124","maxw":290}
+]}
+}

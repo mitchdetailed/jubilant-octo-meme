@@ -151,3 +151,20 @@ scale 1 takes the M1 path unchanged, so no layer and no golden changed. `LayerCa
 scaled run through the same bounds. Tested by `qtrender.tst_text_scale` (ink growing with the scale, elision and
 the background box at the scaled size, the Dynamic damage covering the scaled ink, the JSON form) and through
 the numeric gauges of `golden.tst_golden_plots`.
+
+## M4 hidpi: crisp strokes and whole-pixel painting at a fractional DPR (AC-M4-07; D-209)
+
+At DPR 1.25 and 1.5 a builder's line of logical width x DPR is 1.25, 1.5 or 2 device px wide and lies on a pixel
+centre or a data position, which antialiasing spreads over a pixel more than its width. `RasterBackend` draws a
+`Polyline` or `Lines` command of a list at a fractional DPR that is wider than 1 px and made only of horizontal and
+vertical segments `lround(width)` px wide on whole device pixels (`raster_backend.hpp` item 7), the same on both paths
+(the Static span rasteriser and `paintList`). Slanted strokes, dots, text, every list at DPR 1 and 2 and the `DrawList`
+itself are unchanged, so no golden at 1 or 2 and no `DrawList` JSON golden changed. `LayerCache::paint` paints the
+Dynamic and Chrome lists from the whole device pixel where the raster engine blits the Static image, so a widget at
+a fractional device position shows `composite()` pixel for pixel. The geometry-only reference
+`tests/reference/geometry_scene@1.5x.png` was re-rendered for the crisp grid lines and segments (the 1x and 2x
+references are unchanged). Tests: `tests/tst_crisp_strokes.cpp` (`qtrender.tst_crisp_strokes`: pixel sets computed
+from the rule at 1.25 and 1.5 on both paths, DPR 1 and 2 as before, `paint` from a fractional origin) and
+`tests/golden/images/tst_dpr_goldens.cpp` (`golden.tst_dpr_goldens`: the `DrawList` JSON goldens of the seven drawn
+MVP types at DPR 1.25 and 1.5 in `tests/golden/images/dpr_sweep/<type>/`, exact on every OS, with the whole-pixel
+check and the drift from DPR 1).

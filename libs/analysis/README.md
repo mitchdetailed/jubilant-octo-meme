@@ -295,3 +295,23 @@ unit, the cache, chunks prefetched on a pool giving the same table), `report_tim
 untrusted laps and across a gap, total, bands), `report_spec_tests.cpp` (the schema examples, error pointers, the LRU
 and concurrent use); shared fixtures in `report_test_support.hpp`. `bench/report_bench` measures the 07 §12 row
 (`bench/workloads.md`).
+
+## M4 followups (D-210; `docs/milestones/M4.md` §5.1)
+
+- `ReportOptions::ignoreInterpolated` (JSON `options.ignoreInterpolated`, written only when true; M3 item 25):
+  every statistic reads the channel's own samples only, so `start`/`end`/`change` never take the edge value of
+  `interpolateBoundaries` (the probe still applies); the other statistics read samples only in any case
+  (D-197 (a)), and a cell computed with it shares the cache key of `interpolateBoundaries` off. A maths output
+  evaluated above an input's rate holds that input's up-sampled values as its own samples: there is no
+  per-sample provenance in 0.1, so the option does not reach them. Tests: `report_stats_tests.cpp`,
+  `report_cells_tests.cpp`, `report_spec_tests.cpp`.
+- M3 item 29: `report_time_sections_tests.cpp` feeds `TimeReportEngine` from `TrackSectionsRule` output (the
+  in lap's cut-off section is absent, so the eclectic takes the in lap's complete sections and nothing short).
+
+## M4 followups of the widgets (D-211)
+
+- `TrackSection::speedClass` (`""`, `slow` or `fast`; `TrackMap::kSpeedClasses`): `track-1`'s optional
+  `sections[].speedClass`, written only when set, refused by `validate()` at its pointer when it is another value.
+- `ReportChannel::displayUnit`: `channel_report-1`'s optional `report.channels[].displayUnit`, written by
+  `ReportSpec::toJson` only when set.
+- Tests: `tests/m4_widgets_followups_tests.cpp` (`analysis.followups D-211: ...`, 2 cases).

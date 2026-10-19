@@ -11,8 +11,10 @@
 #include <QFileDialog>
 #include <QHBoxLayout>
 #include <QKeyEvent>
+#include <QLabel>
 #include <QLineEdit>
 #include <QListView>
+#include <QMenu>
 #include <QPalette>
 #include <QSaveFile>
 #include <QSortFilterProxyModel>
@@ -101,10 +103,12 @@ public:
                            QStringLiteral("  ") +
                            (source.isEmpty() ? QString() : source + QStringLiteral(": ")) +
                            s.data(Qt::DisplayRole).toString();
-            const QString action = s.data(M::ActionRole).toString();
-            if (!action.isEmpty()) {
-                const qt::CommandSpec* spec = commands_.find(action);
-                line += QStringLiteral("  [") + (spec != nullptr ? spec->title : action) + QLatin1Char(']');
+            // The action, then the alternate action (M4: the budget warning's Continue and Cancel).
+            for (const int actionRole :
+                 {static_cast<int>(M::ActionRole), static_cast<int>(M::AltActionRole)}) {
+                if (const QString action = s.data(actionRole).toString(); !action.isEmpty()) {
+                    line += QStringLiteral("  [") + titleOf(action) + QLatin1Char(']');
+                }
             }
             return line;
         }
@@ -133,11 +137,23 @@ public:
             if (const QString code = s.data(M::CodeRole).toString(); !code.isEmpty()) {
                 tip += QStringLiteral(" ") + code;
             }
-            return tip + QLatin1Char('\n') + s.data(Qt::DisplayRole).toString();
+            tip += QLatin1Char('\n') + s.data(Qt::DisplayRole).toString();
+            if (const QString action = s.data(M::ActionRole).toString(); !action.isEmpty()) {
+                tip += QStringLiteral("\nDouble-click or Enter: ") + titleOf(action);
+            }
+            if (const QString alt = s.data(M::AltActionRole).toString(); !alt.isEmpty()) {
+                tip += QStringLiteral("\nShift+double-click or Shift+Enter: ") + titleOf(alt);
+            }
+            return tip;
         }
         default:
             return QSortFilterProxyModel::data(index, role);
         }
+    }
+
+    QString titleOf(const QString& action) const {
+        const qt::CommandSpec* spec = commands_.find(action);
+        return spec != nullptr ? spec->title : action;
     }
 
 private:
@@ -193,11 +209,21 @@ MessagesWindow::MessagesWindow(qt::MessagesModel& model, qt::CommandRegistry& co
     list_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     list_->setSelectionMode(QAbstractItemView::ExtendedSelection);
     list_->installEventFilter(this);
+    list_->setContextMenuPolicy(Qt::CustomContextMenu);
+    // M4 budget: the Stats line (D-011), shown from the first snapshot the shell hands over.
+    stats_ = new QLabel(this);
+    stats_->setObjectName(QStringLiteral("messagesStats"));
+    stats_->setAccessibleName(tr("Memory and task statistics"));
+    stats_->setWordWrap(true);
+    stats_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    stats_->setContentsMargins(4, 2, 4, 2);
+    stats_->hide();
 
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
     layout->addLayout(bar);
+    layout->addWidget(stats_);
     layout->addWidget(list_);
     setFocusProxy(list_);
 
@@ -214,8 +240,15 @@ MessagesWindow::MessagesWindow(qt::MessagesModel& model, qt::CommandRegistry& co
             saveAs(path);
         }
     });
-    connect(list_, &QListView::doubleClicked, this,
-            [this](const QModelIndex& index) { invokeAction(index); });
+    connect(list_, &QListView::doubleClicked, this, [this](const QModelIndex& index) {
+        // SHIFT+double-click runs the alternate action (M4: the budget warning's Cancel).
+        runAction(index, QGuiApplication::keyboardModifiers().testFlag(Qt::ShiftModifier));
+    });
+    connect(list_, &QWidget::customContextMenuRequested, this, [this](const QPoint& pos) {
+        if (QMenu* menu = rowMenu(list_->indexAt(pos))) {
+            menu->popup(list_->viewport()->mapToGlobal(pos));
+        }
+    });
     connect(&model_, &QAbstractItemModel::rowsInserted, this, [this] {
         updateCounts();
         list_->scrollToBottom();
@@ -294,6 +327,11 @@ bool MessagesWindow::saveAs(const QString& path, QString* error) const {
 }
 
 bool MessagesWindow::invokeAction(const QModelIndex& index) {
+    return runAction(index, false);
+}
+
+// The action (or with `alternate` the alternate action) of a row of the list (proxy index).
+bool MessagesWindow::runAction(const QModelIndex& index, bool alternate) {
     if (!index.isValid()) {
         return false;
     }
@@ -302,16 +340,21 @@ bool MessagesWindow::invokeAction(const QModelIndex& index) {
         return false;
     }
     const qt::Message& m = model_.at(s.row());
-    return !m.action.isEmpty() && commands_.invoke(m.action, m.actionArgs);
+    // Copies: the command may append rows (the model's cap then drops the oldest, this one included).
+    const QString action = alternate ? m.altAction : m.action;
+    const QVariantList args = alternate ? m.altActionArgs : m.actionArgs;
+    return !action.isEmpty() && commands_.invoke(action, args);
 }
 
-// ENTER on a row with an action runs it (the list ignores ENTER, so the key reaches this filter first).
+// ENTER on a row with an action runs it, SHIFT+ENTER its alternate action (the list ignores ENTER, so the key
+// reaches this filter first).
 bool MessagesWindow::eventFilter(QObject* watched, QEvent* event) {
     if (watched == list_ && event->type() == QEvent::KeyPress) {
         auto* key = static_cast<QKeyEvent*>(event);
+        const Qt::KeyboardModifiers mods = key->modifiers() & ~Qt::KeypadModifier;
         if ((key->key() == Qt::Key_Return || key->key() == Qt::Key_Enter) &&
-            (key->modifiers() & ~Qt::KeypadModifier) == Qt::NoModifier) {
-            if (invokeAction(list_->currentIndex())) {
+            (mods == Qt::NoModifier || mods == Qt::ShiftModifier)) {
+            if (runAction(list_->currentIndex(), mods == Qt::ShiftModifier)) {
                 key->accept();
                 return true;
             }

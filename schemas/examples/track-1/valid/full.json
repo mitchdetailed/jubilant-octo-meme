@@ -60,7 +60,8 @@
         "unit": "m"
       },
       "category": "corner",
-      "userDefined": false
+      "userDefined": false,
+      "speedClass": "slow"
     },
     {
       "id": "u1",

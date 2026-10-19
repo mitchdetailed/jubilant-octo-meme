@@ -2,12 +2,16 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "urn:esses:components/scatter-1",
   "title": "scatter component body",
-  "description": "The body of a scatter component (04 section 10.2): one X channel, Y traces with a delay, optional colour and gating channels, layout, style and trend, interval average, scales, density mode.",
+  "description": "The body of a scatter component (04 section 10.2): one X channel, Y traces with a delay, optional colour and gating channels, layout, style and trend, interval average, scales, density mode; the X, Y and colour channels may name their display unit (D-211).",
   "type": "object",
   "additionalProperties": false,
   "properties": {
     "xChannel": {
       "$ref": "#/definitions/channelName"
+    },
+    "xDisplayUnit": {
+      "description": "The unit the X channel is shown in; absent or \"\": the channel's default display unit (D-211).",
+      "$ref": "#/definitions/unitSymbolOrEmpty"
     },
     "traces": {
       "type": "array",
@@ -25,6 +29,10 @@
           "yDelayUs": {
             "description": "Y relative to X in microseconds (positive = Y later).",
             "type": "integer"
+          },
+          "displayUnit": {
+            "description": "The unit the Y channel is shown in; absent or \"\": the channel's default display unit (D-211).",
+            "$ref": "#/definitions/unitSymbolOrEmpty"
           }
         }
       }
@@ -35,6 +43,10 @@
       "properties": {
         "channel": {
           "$ref": "#/definitions/channelName"
+        },
+        "displayUnit": {
+          "description": "The unit the colour channel is shown in (its bands and legend); absent or \"\": the channel's default display unit (D-211).",
+          "$ref": "#/definitions/unitSymbolOrEmpty"
         },
         "axis": {
           "$ref": "#/definitions/bandAxis"

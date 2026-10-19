@@ -127,13 +127,20 @@ if(ESSES_BUILD_QT)
     endif()
   endforeach()
   # Qt Test suites that span the Qt layers (07 section 4.2: tests/ui walkthrough, F9, render parity; tests/golden
-  # pixel goldens). Added after every library and application so their targets exist.
+  # pixel goldens; M4: tests/soak, the Saturday soak of 07 section 7.1, added when the soak package creates it,
+  # D-206). Added after every library and application so their targets exist.
   if(ESSES_BUILD_TESTS)
-    foreach(_esses_qt_test_dir tests/ui tests/golden)
+    foreach(_esses_qt_test_dir tests/ui tests/golden tests/soak)
       if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_esses_qt_test_dir}/CMakeLists.txt")
         add_subdirectory(${_esses_qt_test_dir})
       endif()
     endforeach()
+  endif()
+  # M4 (D-206): tools/packaging/ (windeployqt, the Inno Setup installer, the portable zip, the AppImage and DMG
+  # scripts, the third-party manifest; 07 section 7.1 "Packaging", 08 sections 2 and 7), added when the packaging
+  # package gives it a CMakeLists.txt.
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/packaging/CMakeLists.txt")
+    add_subdirectory(tools/packaging)
   endif()
 endif()
 

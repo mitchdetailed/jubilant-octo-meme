@@ -74,10 +74,10 @@ TEST_CASE("m3 contract: value-type defaults follow the design", "[unit]") {
 TEST_CASE("m3 contract: TrackMap::sectionSets lists Default first, then first appearance", "[unit]") {
     TrackMap map;
     CHECK(map.sectionSets().empty());
-    map.sections.push_back(TrackSection{"u1", "Driver Notes", "Back", 0.0, 20.0, "Fast", true});
-    map.sections.push_back(TrackSection{"t1", "Default", "Turn 1", 20.0, 40.0, "corner", false});
-    map.sections.push_back(TrackSection{"u2", "Braking", "T1 entry", 15.0, 30.0, "corner", true});
-    map.sections.push_back(TrackSection{"s1", "Default", "Straight 1", 0.0, 20.0, "straight", false});
+    map.sections.push_back(TrackSection{"u1", "Driver Notes", "Back", 0.0, 20.0, "Fast", true, ""});
+    map.sections.push_back(TrackSection{"t1", "Default", "Turn 1", 20.0, 40.0, "corner", false, ""});
+    map.sections.push_back(TrackSection{"u2", "Braking", "T1 entry", 15.0, 30.0, "corner", true, ""});
+    map.sections.push_back(TrackSection{"s1", "Default", "Straight 1", 0.0, 20.0, "straight", false, ""});
     CHECK(map.sectionSets() == std::vector<std::string>{"Default", "Driver Notes", "Braking"});
     CHECK(map.sections[1].lengthM() == 20.0);
 }

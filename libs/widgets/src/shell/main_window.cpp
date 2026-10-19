@@ -31,6 +31,7 @@
 #include <esses/widgets/shell/layout_file.hpp>
 #include <esses/widgets/shell/main_window.hpp>
 #include <esses/widgets/shell/recovery_dialog.hpp>
+#include <esses/widgets/shell/shell_extension.hpp>
 #include <esses/widgets/shell/worksheet_canvas.hpp>
 
 #include <QAction>
@@ -209,6 +210,7 @@ MainWindow::MainWindow(qt::AppRuntime& runtime, Paths paths, QWidget* parent)
                  .arg(QString::fromStdString(r.error().toString())));
     }
     wireModels();
+    createM4Extensions(); // M4 (D-206): the packages' shell extensions, called at the points below
     buildWidgets();
     registerShellCommands();
     qt::registerSelectionCommands(*d.commands, *d.selection);
@@ -230,6 +232,7 @@ MainWindow::MainWindow(qt::AppRuntime& runtime, Paths paths, QWidget* parent)
     qt::registerLapStretchCommand(*d.commands, *d.stretch);
     registerEditorCommands();
     registerM3Commands(); // M3: replaces file.open_log and registers the M3 rows (main_window_m3.cpp)
+    forEachM4Extension([](ShellExtension& e) { e.registerCommands(); }); // M4: before the planned rows
     registerPlannedCommands();
     const QStringList rejected = d.keymap->setKeymap(d.session->keymap());
     // Keys a component handles itself follow the user's keymap (D-203 (o)).
@@ -254,6 +257,7 @@ MainWindow::MainWindow(qt::AppRuntime& runtime, Paths paths, QWidget* parent)
     }
     d.actions->populateMenuBar(*menuBar(), order, withArgs);
     buildM3Menus(); // Data > Animation Rate (M3)
+    forEachM4Extension([](ShellExtension& e) { e.buildMenus(); });
     // The Main toolbar (06 section 2.1): open, save | time/distance, overlays, single colour, lap stretch |
     // the scheme selector (when Options > Colours shows it) | undo, redo.
     d.actions->populateToolBar(
@@ -309,10 +313,12 @@ MainWindow::MainWindow(qt::AppRuntime& runtime, Paths paths, QWidget* parent)
     // The worksheet has the keyboard when the window comes up (not whichever dock the dock manager touched
     // last while the docks were placed).
     d.canvas->setFocus(Qt::OtherFocusReason);
+    forEachM4Extension([](ShellExtension& e) { e.windowReady(); });
 }
 
 MainWindow::~MainWindow() {
     Impl& d = *impl_;
+    destroyM4Extensions();                // M4 (D-206): teardown() and gone before any widget, dock or model
     ComponentWidget::setKeysProvider({}); // the keymap goes with the window (D-203 (o))
     if (d.saveLayoutOnExit && !d.layoutSaved) {
         saveLayout();
@@ -624,6 +630,7 @@ void MainWindow::buildWidgets() {
                                     on);
     });
     buildM3Widgets(d.central);
+    forEachM4Extension([&d](ShellExtension& e) { e.buildWidgets(*d.central); });
 }
 
 void MainWindow::registerShellCommands() {
@@ -1019,6 +1026,7 @@ void MainWindow::rebuildWorksheets() {
     disconnect(d.cursorInfo);
     // M3 followers of the active worksheet let go of it before its view model and context go.
     followWorksheetM3(-1);
+    forEachM4Extension([](ShellExtension& e) { e.worksheetActivated(-1); });
     d.canvas->clear();
     d.valuesWindow->setWorksheet(nullptr);
     d.contexts.clear();
@@ -1124,6 +1132,7 @@ void MainWindow::selectWorksheet(int index) {
         returnFocus();
     }
     followWorksheetM3(index);
+    forEachM4Extension([index](ShellExtension& e) { e.worksheetActivated(index); });
     d.actions->refresh();
     Q_EMIT worksheetActivated(index);
 }

@@ -130,6 +130,8 @@ ReportTable::ReportTable(QAbstractItemModel* model, QWidget* parent)
             &QScrollBar::setValue);
     connect(proxy_, &QAbstractItemModel::modelReset, this, &ReportTable::relayoutColumns);
     connect(proxy_, &QAbstractItemModel::layoutChanged, this, &ReportTable::relayoutColumns);
+    // ReportModel updates a table of the same shape in place (D-210 (e)): its texts may need other widths.
+    connect(proxy_, &QAbstractItemModel::dataChanged, this, &ReportTable::relayoutColumns);
 
     caption_->setObjectName(QStringLiteral("reportCaption"));
     caption_->setContentsMargins(4, 1, 4, 1);

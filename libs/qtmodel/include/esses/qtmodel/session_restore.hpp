@@ -11,7 +11,8 @@
 // SessionRestore: after a project opens, start() opens the given logs (the -l arguments) or, with none and
 // options.general.loadPreviousData on, the project's recentSources (paths relative to the project folder),
 // each through the SourceLoader pipeline (the Mapping panel when needed); once every open has published or
-// failed and no Mapping panel is pending, the selection is restored from the lastSelection captured at
+// failed and neither a Mapping panel nor a memory budget warning (M4, D-207: Continue or Cancel) is pending,
+// the selection is restored from the lastSelection captured at
 // start() (06 section 5.5: by (hash, layer, groupPath, startMarker), then (path, layer, groupPath, name);
 // unresolved keys are dropped with an info row). The Data-window filters and the single-colour state are
 // restored by DataSelectionModel itself. GUI thread only. Added to the outline in M2.

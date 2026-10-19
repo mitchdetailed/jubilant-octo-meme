@@ -15,10 +15,10 @@
 
 #include <esses/base/config.hpp>
 #include <esses/base/paths.hpp>
-#include <esses/base/version.hpp>
 #include <esses/qtmodel/app_runtime.hpp>
 #include <esses/qtmodel/command_registry.hpp>
 #include <esses/widgets/components/component_widget.hpp>
+#include <esses/widgets/shell/about_dialog.hpp>
 #include <esses/widgets/shell/main_window.hpp>
 
 #include <QApplication>
@@ -122,6 +122,11 @@ int main(int argc, char** argv) {
             qputenv("QT_QPA_PLATFORM", "offscreen");
         }
     }
+    // HiDPI (06 section 17 item 1, 04 section 6.6, D-025): a monitor at 125 % or 150 % gives a DPR of 1.25 or
+    // 1.5, not one rounded to 1 or 2; the layout stays in logical pixels and the layers render at device
+    // pixels. Qt 6's default; set before the QApplication exists so nothing else can change it
+    // (QT_SCALE_FACTOR_ROUNDING_POLICY still overrides it for diagnosis).
+    QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("Esses"));
     QApplication::setOrganizationDomain(QStringLiteral("esses.invalid"));
@@ -152,8 +157,8 @@ int main(int argc, char** argv) {
     parser.process(app);
 
     if (parser.isSet(versionOption)) {
-        QTextStream(stdout) << "esses " << QString::fromStdString(std::string(esses::versionString()))
-                            << '\n';
+        // AC-M4-09: the fields of widgets::versionReport() (M4 packaging package, about_dialog.hpp; D-206).
+        QTextStream(stdout) << esses::widgets::versionReport() << '\n';
         return 0;
     }
 

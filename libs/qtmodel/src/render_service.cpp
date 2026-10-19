@@ -12,6 +12,7 @@
 #include <esses/maths/channel_key.hpp>
 #include <esses/model/resolver.hpp>
 #include <esses/plotcore/component_bodies.hpp>
+#include <esses/plotcore/display_units.hpp>
 #include <esses/plotcore/time_distance_builder.hpp>
 #include <esses/qtmodel/data_selection_model.hpp>
 #include <esses/qtmodel/dispatcher.hpp>
@@ -113,10 +114,24 @@ plot::ResolvedChannel resolveChannel(MathsService& maths, const model::DataSourc
         const units::UnitId base = rc.descriptor->unit;
         if (registry != nullptr && registry->contains(base)) {
             rc.displayUnit = registry->unit(base).label();
+            rc.displayUnitId = base;
+            bool named = false;
             if (!request.displayUnit.empty()) {
                 if (const auto id = registry->find(request.displayUnit, registry->quantityOf(base))) {
                     rc.toDisplay = registry->fromBase(*id);
                     rc.displayUnit = registry->unit(*id).label();
+                    rc.displayUnitId = *id;
+                    named = true;
+                }
+            }
+            // No unit of the channel's quantity named: its quantity's default display unit (D-211 (a): a
+            // fraction stored in "ratio" shows in %).
+            const units::UnitId shown = plot::defaultDisplayUnit(*registry, base);
+            if (!named && shown != base) {
+                if (Result<units::Converter> c = registry->converter(base, shown)) {
+                    rc.toDisplay = *c;
+                    rc.displayUnit = registry->unit(shown).label();
+                    rc.displayUnitId = shown;
                 }
             }
         }

@@ -91,6 +91,8 @@ protected:
     void onFocusChanged(bool focused) override;
     int captionHeight() const override;
     void paintEvent(QPaintEvent* event) override;
+    // M4 (D-211 (f)): the Main slot's mapping of the prepared inputs (an unlinked part's own view).
+    std::optional<plot::DomainMapper> mainMapper() const override;
     void showEvent(QShowEvent* event) override;
     void hideEvent(QHideEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;

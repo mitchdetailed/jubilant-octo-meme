@@ -203,3 +203,48 @@ Deviations (D-167, D-168; details in `docs/formats/text.md`):
   `IImporter::open`; `ImporterRegistry` sets it.
 - Dictionary bitfields are read and written but not expanded into Bool channels yet (05 §8.3; no shipped
   dictionary has one).
+
+## M4 contract (07 §7.1; `docs/milestones/M4.md` §2-3; D-206)
+
+- `resident_estimate.hpp` (budget package, `src/m4_budget/`): `ResidentEstimate` (final: the byte counts,
+  `total()`, `+=`), `estimateChannel`, `estimateResident(ProbeResult)` and
+  `estimateResident(DataSource)`: the resident bytes of a source's logged channels in the chunk layout of
+  `esses_store`, what `SourceLoader`'s open-time budget gate compares with the budget (AC-M4-02).
+- `source_file_check.hpp` (reload package, `src/m4_reload/`): `SourceFileState` and `sourceFileStateName` (final),
+  `checkSourceFile(path, size, mtime)` and `checkSourceFile(SourceProvenance)`: the re-stat of an
+  open source's file for every importer (02 §1 behaviour 5, AC-M4-10). The reload package also owns the
+  providers' own checks (`src/importer_chunk_provider.*`, `src/ld/ld_chunk_provider.*`).
+- Tests: `tests/m4/**` is one Catch2 executable (`formats_m4.<test>`); `m4_contract_tests.cpp` covers what is
+  final, `budget_*.cpp` and `reload_*.cpp` belong to the packages.
+
+## M4 budget: the open-time resident estimate (AC-M4-02; D-207)
+
+- `estimateChannel`, `estimateResident(ProbeResult)` and `estimateResident(DataSource)`
+  (`src/m4_budget/resident_estimate.cpp`) count every chunk as `store::ChunkBuilder::allocate` lays it out with a
+  validity bitmap: samples padded to 64 bytes, the bitmap, the factor-4 pyramid of float pairs, the rounding of the
+  layout to 64 bytes and the 64-byte header (`overheadBytes`); an I64 time column has no bitmap and no pyramid. It is
+  the upper bound of what `ChunkCache::Stats::residentBytes` reports once every chunk of the source is resident
+  (equal when every chunk carries a bitmap, the bitmaps above it when they are AllValid). The source form counts the
+  logged channels only, a column several channels share once (`Column::id`), a timestamped channel's time column
+  too; the probe form adds an I64 time column per timestamped channel. Nothing is decoded.
+- Tests: `tests/m4/budget_resident_estimate_tests.cpp` (`formats_m4.budget: ...`): hand-worked chunk sizes of 01
+  §7.1 for every dtype, full and partial chunks, a probe and a source, and the estimate held against the cache's
+  resident bytes after every chunk of a synthetic source is materialised.
+
+## M4 reload: changed source files (AC-M4-10; D-208)
+
+- `checkSourceFile` (`src/m4_reload/source_file_check.cpp`): `esses::statFile` of the provenance's path against its
+  size and mtime: Changed when either differs, Missing when the path cannot be stat'ed, Unchanged otherwise and for
+  a source without a path. It never reads the file.
+- The providers' own check before each decode batch is as built (`ld.source_changed` from `LdChunkProvider`,
+  `text.source_changed` from the text engine's decode): no further chunk is decoded from a changed file. Every
+  built-in reader supplies its own provider; `ImporterChunkProvider` (a reader without one) holds no mapping and
+  stays unchanged.
+- `LdChunkProvider` seals a chunk `AllInvalid` on a page fault and logs `ld.io_fault` once per source (its
+  DecodeLog; it was once per fault), also when channels of the source fault together on several workers (the check
+  and the add under one lock). `setDecoder` (private header) lets the AC-4a test raise an in-page error inside
+  `MappedFile::guarded()` on Windows, where the truncation that would cause a real fault is refused; on POSIX the
+  test's fault is real.
+- Tests: `tests/m4/reload_source_file_check_tests.cpp`, `tests/m4/reload_provider_tests.cpp`
+  (`formats_m4.reload: ...`) with `tests/m4/reload_test_support.hpp`; `ld provider: a file changed on disk ...`
+  moves the mtime through the attributes only.

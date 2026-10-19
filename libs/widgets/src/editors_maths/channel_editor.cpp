@@ -10,6 +10,7 @@
 #include <esses/model/channel.hpp>
 #include <esses/model/layer.hpp>
 #include <esses/model/source.hpp>
+#include <esses/plotcore/display_units.hpp>
 #include <esses/project/channel_overrides.hpp>
 #include <esses/qtmodel/channels_model.hpp>
 #include <esses/qtmodel/maths_service.hpp>
@@ -133,7 +134,9 @@ public:
 
     Effective effective(const ChannelRow& r) const {
         Effective e;
-        e.displayUnit = r.unit;
+        // Without an override, the unit the components show the channel in (D-211 (a): a fraction stored in
+        // "ratio" shows in %).
+        e.displayUnit = r.unitKnown && units_ != nullptr ? plot::defaultDisplayUnit(*units_, r.unit) : r.unit;
         e.dps = r.dps;
         e.colour = r.colour;
         e.interp = qs(store::interpName(r.interp));

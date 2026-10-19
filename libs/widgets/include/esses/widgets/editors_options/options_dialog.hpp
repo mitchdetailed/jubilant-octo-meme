@@ -5,8 +5,10 @@
 // D-032). Tabs:
 //   General   save on exit, autosave interval (minutes, 0 = off), load previous data with the project, select
 //             the fastest lap on load, loose channel-name search, auto-show Messages on error, reduce CPU
-//             during animation (project options.general.*), language (user setting "language"; English only
-//             in 0.1)
+//             during animation (project options.general.*), the memory budget (user setting
+//             memory.chunkCacheBudgetBytes in GB of 2^30 bytes, one decimal, at least 1 GB; shown as the
+//             shell applies it, else the default of a quarter of the RAM; M4 budget package), language (user
+//             setting "language"; English only in 0.1)
 //   Analysis  autoscale with untrusted and with overlay data, axis time format and lap-time format, fast-lap
 //             tolerance %, lap-distance stretching tolerance %, maths precision (single = F32, double = F64)
 //             and "unary minus above power" (project options autoscale.*, timeFormat, lapTimeFormat,

@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: MIT
 //
 // MainWindow's private state (main_window.cpp, main_window_m3.cpp): the workspace's qtmodel objects, the
-// shell widgets and, since M3, the summary bar, palette, animation, Track Map dock and the M3 dialogs.
-// Internal to src/shell/.
+// shell widgets and, since M3, the summary bar, palette, animation, Track Map dock and the M3 dialogs; since
+// M4 the list of the packages' shell extensions (main_window_m4.cpp, D-206). Internal to src/shell/; the M4
+// packages read it through ShellExtension::impl() (with `auto&`: the type is private to MainWindow) and never
+// edit it.
 #pragma once
 
 #include <esses/base/paths.hpp>
@@ -202,6 +204,9 @@ struct MainWindow::Impl {
     Prompts prompts;
     QString lastHint;
     std::map<std::string, int> pasteCounts; // worksheet id + clipboard text hash -> pastes so far
+    // M4 (main_window_m4.cpp, D-206): the packages' shell extensions in makeM4Extensions order (children of
+    // the window, deleted by destroyM4Extensions before any widget or model).
+    std::vector<ShellExtension*> extensions;
 };
 
 } // namespace esses::widgets

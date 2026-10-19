@@ -332,7 +332,7 @@
       "doc": "Reload the highlighted stale source through the open pipeline; disabled unless the source is stale.",
       "keys": [],
       "milestone": "M4",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "file.save_project",

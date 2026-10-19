@@ -53,8 +53,8 @@ TrackMap square() {
     m.venue = "Square";
     m.lengthM = 40.0;
     m.centre = {{0, 0, 0}, {10, 0, 10}, {10, 10, 20}, {0, 10, 30}, {0, 0, 40}};
-    m.sections = {TrackSection{"s1", "Default", "Straight 1", 0.0, 20.0, "straight", false},
-                  TrackSection{"t1", "Default", "Turn 1", 20.0, 40.0, "corner", false}};
+    m.sections = {TrackSection{"s1", "Default", "Straight 1", 0.0, 20.0, "straight", false, ""},
+                  TrackSection{"t1", "Default", "Turn 1", 20.0, 40.0, "corner", false, ""}};
     return m;
 }
 
@@ -100,7 +100,7 @@ TEST_CASE("track map: the canonical document round-trips and keeps unknown membe
     m.direction = TrackDirection::CounterClockwise;
     m.generatedFrom = TrackGeneratedFrom{TrackMethod::SpeedLatG, "xxh3:ab", "lap-1"};
     m.inner = {{1, 1, 0}, {9, 1, 10}};
-    m.sections.push_back(TrackSection{"u1", "Driver Notes", "Back half", 20.0, 40.0, "Fast", true});
+    m.sections.push_back(TrackSection{"u1", "Driver Notes", "Back half", 20.0, 40.0, "Fast", true, ""});
     const JsonDoc doc = m.toJson();
     REQUIRE(doc.isObject());
     CHECK(doc.schemaId() == "urn:esses:track-1");
@@ -217,8 +217,8 @@ TEST_CASE("track map: validate() names the offending member", "[unit]") {
     CHECK(validateDetail(m) == "/rotationDeg");
     // Overlapping sections of a user set are allowed.
     m = square();
-    m.sections.push_back(TrackSection{"u1", "Braking", "A", 5.0, 30.0, "corner", true});
-    m.sections.push_back(TrackSection{"u2", "Braking", "B", 15.0, 40.0, "corner", true});
+    m.sections.push_back(TrackSection{"u1", "Braking", "A", 5.0, 30.0, "corner", true, ""});
+    m.sections.push_back(TrackSection{"u2", "Braking", "B", 15.0, 40.0, "corner", true, ""});
     CHECK(m.validate());
 }
 

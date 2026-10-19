@@ -93,17 +93,21 @@ struct Page {
         font = new OptionalEditor(
             QStringLiteral("own font"),
             new FieldForm(
-                {FieldRow{QStringLiteral("/family"), FieldKind::Text, QStringLiteral("family"), {}, {}},
-                 FieldRow{QStringLiteral("/size"), FieldKind::Number, QStringLiteral("size"), {}, {}}},
+                {FieldRow{QStringLiteral("/family"), FieldKind::Text, QStringLiteral("family"), {}, {}, {}},
+                 FieldRow{QStringLiteral("/size"), FieldKind::Number, QStringLiteral("size"), {}, {}, {}}},
                 &schema, QStringLiteral("/font"), &host),
             QJsonObject{{QStringLiteral("family"), QStringLiteral("Noto Sans")}}, &host);
         binder.bind(QStringLiteral("/font"), FieldKind::Custom, font, QStringLiteral("font"));
         list = new RecordListEditor(
             [this](QWidget* parent) -> FieldEditor* {
                 return new FieldForm(
-                    {FieldRow{
-                         QStringLiteral("/channel"), FieldKind::Channel, QStringLiteral("channel"), {}, {}},
-                     FieldRow{QStringLiteral("/on"), FieldKind::Bool, QStringLiteral("on"), {}, {}}},
+                    {FieldRow{QStringLiteral("/channel"),
+                              FieldKind::Channel,
+                              QStringLiteral("channel"),
+                              {},
+                              {},
+                              {}},
+                     FieldRow{QStringLiteral("/on"), FieldKind::Bool, QStringLiteral("on"), {}, {}, {}}},
                     &schema, QStringLiteral("/list/0"), parent);
             },
             QJsonObject{{QStringLiteral("channel"), QString()}}, {}, &host);

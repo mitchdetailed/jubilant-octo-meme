@@ -64,6 +64,11 @@
 // the graph's value copy) are offered to the focused component (ComponentWidget::handleCommand) and stay
 // planned.
 //
+// M4 wiring (07 section 7.1; D-206; docs/milestones/M4.md sections 2-3): one ShellExtension per M4 package
+// (shell_extension.hpp; BudgetShell, ReloadShell, HiDpiShell, FollowupsShell, AboutShell in
+// src/shell/main_window_m4_<package>.cpp) reached through the hook of main_window_m4.cpp; this header,
+// main_window.cpp, main_window_m3.cpp and main_window_impl.hpp are not edited by the packages.
+//
 // Placement note: 01 section 2.1 and the outline put MainWindow in esses_app; 06 section 1 splits it
 // ("MainWindow building blocks" in esses_widgets, the assembly in esses_app) and 07 section 4.1 lists it
 // under esses_widgets. The class lives here so the tests/ui walkthrough can construct it; apps/app only
@@ -138,6 +143,7 @@ class MessagesWindow;
 class OptionsDialog;
 class RecoveryDialog;
 class SchemeSelector;
+class ShellExtension;
 class ValuesWindow;
 class WorksheetCanvas;
 
@@ -306,6 +312,13 @@ private:
     void openLogDialogNow();
     bool newProjectNow();
     bool closeProjectNow();
+    // M4 (main_window_m4.cpp; D-206, docs/milestones/M4.md section 2): the M4 packages' shell extensions
+    // (shell_extension.hpp), created before buildWidgets and called at the fixed points listed there. The
+    // packages wire the shell through them and never edit this header.
+    friend class ShellExtension;
+    void createM4Extensions();
+    void forEachM4Extension(const std::function<void(ShellExtension&)>& run);
+    void destroyM4Extensions();
     std::unique_ptr<Impl> impl_;
 };
 

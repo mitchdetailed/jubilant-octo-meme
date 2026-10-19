@@ -46,6 +46,8 @@
 //   end      the range's last sample when it is valid, else the last valid sample at most probeSeconds before
 //            `end`; with interpolateBoundaries the value at exactly `end` by `interp` when valid
 //   change   end - start
+// options.ignoreInterpolated (M4, D-210 (c)) turns interpolateBoundaries off: every statistic then reads the
+// channel's own samples only, and its cells share the cache key of interpolateBoundaries off.
 // A range without a valid sample (or without a probe hit) gives StatValue::valid == false.
 // AC-M3-03: cells equal hand-computed fixtures for every statistic incl. the probe and untrusted exclusion;
 // 50 laps x 30 channels x 8 stats cold <= 300 ms (bench/report_bench).

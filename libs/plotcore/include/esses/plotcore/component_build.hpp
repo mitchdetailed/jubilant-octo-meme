@@ -53,6 +53,9 @@ struct ResolvedChannel {
     // leaves them unset; the time_distance widget fills them from the project's channel overrides.
     std::optional<double> limitMin;
     std::optional<double> limitMax;
+    // Added by M4 (D-211 (a)): the unit toDisplay converts to (display_units.hpp: the component's
+    // displayUnit, else the channel's default display unit); kNoUnit while no descriptor resolved.
+    units::UnitId displayUnitId = units::kNoUnit;
 };
 
 struct SlotData {

@@ -10,6 +10,7 @@
     ],
     "options": {
       "excludeOverlays": false,
+      "ignoreInterpolated": false,
       "includeUntrusted": false,
       "interpolateBoundaries": false,
       "probeSeconds": 5,

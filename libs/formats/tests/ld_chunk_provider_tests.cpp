@@ -7,6 +7,7 @@
 #include "ld/ld_chunk_provider.hpp"
 #include "ld/ld_codes.hpp"
 #include "ld_test_support.hpp"
+#include "m4/reload_test_support.hpp"
 
 #include <esses/store/store.hpp>
 
@@ -144,8 +145,9 @@ TEST_CASE("ld provider: a file changed on disk fails the chunk with Io", "[unit]
     auto log = std::make_shared<DecodeLog>();
     LdChunkProvider p(*f, 0, log);
     materialise(p, 0);
-    // Another writer touched the file (changing the timestamp needs no write access to the mapped data).
-    std::filesystem::last_write_time(path, std::filesystem::last_write_time(path) - std::chrono::hours(1));
+    // Another writer touched the file (changing the timestamp needs no write access to the mapped data;
+    // through the attributes only, so every standard library can do it while the file is mapped).
+    REQUIRE(reload_test::shiftMtime(path, -std::chrono::hours(1)));
     store::ChunkBuilder builder;
     const auto r = p.materialise(2, builder, {});
     REQUIRE_FALSE(r.ok());

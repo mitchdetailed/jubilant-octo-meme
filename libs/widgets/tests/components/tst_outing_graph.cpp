@@ -10,6 +10,7 @@
 // delivered while the latest one is shown (01 section 5.4 rule 2).
 
 #include "components/plots_test_support.hpp"
+#include "m4_followups/legacy_csv_support.hpp"
 
 #include <esses/base/taskpool.hpp>
 #include <esses/widgets/components/outing_graph.hpp>
@@ -296,14 +297,18 @@ private Q_SLOTS:
         QVERIFY(waitQuiet(*rig.c));
         MemorySink sink;
         QVERIFY(rig.c->exportData(sink, ExportOptions{}));
-        const QList<QByteArray> lines = csvLines(sink.bytes);
-        QCOMPARE(lines.front(), QByteArray("Time [s],\"Wheel Speed FL [m/s]\",\"Throttle [%]\""));
-        QCOMPARE(lines.size(), 1 + 50 * 50);
+        // The legacy dialect (M4, D-211 (d); 05 section 6 "Writer"): names and units rows, Time from 0 at the
+        // range start, F32 channels at float precision.
+        namespace lc = legacycsv;
+        const QList<QByteArray> lines = lc::lines(sink.bytes);
+        QCOMPARE(lines[lc::kNamesRow], QByteArray("\"Time\",\"Wheel Speed FL\",\"Throttle\""));
+        QCOMPARE(lines[lc::kUnitsRow], QByteArray("\"s\",\"m/s\",\"%\""));
+        QCOMPARE(lines.size(), lc::kLinesBeforeData + 50 * 50);
         const SourceShape shape;
-        const QList<QByteArray> first = lines[1].split(',');
-        QCOMPARE(first[0].toDouble(), 40.0);
-        QVERIFY(std::abs(first[1].toDouble() - shape.wheelFl(2000)) < 1e-9);
-        QVERIFY(std::abs(first[2].toDouble() - shape.throttle(2000)) < 1e-9);
+        const QList<QByteArray> first = lc::fields(lines[lc::kFirstDataRow]);
+        QCOMPARE(first[0].toDouble(), 0.0);
+        QCOMPARE(static_cast<float>(first[1].toDouble()), static_cast<float>(shape.wheelFl(2000)));
+        QCOMPARE(static_cast<float>(first[2].toDouble()), static_cast<float>(shape.throttle(2000)));
     }
 };
 

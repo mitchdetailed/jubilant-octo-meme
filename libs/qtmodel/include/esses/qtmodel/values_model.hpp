@@ -26,6 +26,7 @@
 #include <QString>
 #include <QStringList>
 #include <QVariant>
+#include <functional>
 #include <vector>
 
 class QTimer;
@@ -57,6 +58,12 @@ public:
     bool allChannels() const noexcept { return allChannels_; }
     // The worksheet whose ViewState (domain, cursor) the values follow; null = none.
     void setWorksheet(WorksheetViewModel* worksheet);
+    // Added by M4 (D-211 (f)): the ViewState the values are read at instead of the worksheet's (a
+    // values_list component with links.cursor or links.datum off keeps its own cursor and datum; the
+    // worksheet still gives the DistanceService); empty: the worksheet's. The caller refreshes on its own
+    // changes.
+    using ViewSource = std::function<plot::ViewState()>;
+    void setViewSource(ViewSource source);
     // Recomputes the visible rows (Cursor/Datum/Selection/Data bits).
     void refresh(esses::plot::ChangeMask what);
     // Text of a cell as displayed ("..." while pending) - for tests.
@@ -74,6 +81,7 @@ private:
     DataSelectionModel& selection_;
     MathsService& maths_;
     WorksheetViewModel* worksheet_ = nullptr;
+    ViewSource viewSource_;
     QMetaObject::Connection worksheetConnection_;
     QMetaObject::Connection destroyedConnection_;
     QStringList channels_;

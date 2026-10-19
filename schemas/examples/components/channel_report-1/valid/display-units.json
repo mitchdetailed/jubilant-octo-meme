@@ -1,0 +1,22 @@
+{
+  "report": {
+    "scope": "selectedRanges",
+    "headers": ["Outings:Laps"],
+    "channels": [
+      {
+        "name": "Corr Speed",
+        "stats": ["max", "avg"],
+        "displayUnit": "km/h"
+      },
+      {
+        "name": "Throttle Pos",
+        "stats": ["avg"]
+      },
+      {
+        "name": "Brake Pres",
+        "stats": ["max"],
+        "displayUnit": ""
+      }
+    ]
+  }
+}

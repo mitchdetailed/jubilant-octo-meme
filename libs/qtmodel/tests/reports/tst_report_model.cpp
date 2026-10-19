@@ -4,7 +4,8 @@
 // ReportModel (04 sections 12-13; AC-M3-03 display part; D-199): the channel report's scope, headings,
 // statistics, min/max highlight, delta vs Overlay 0, both layouts, untrusted rows, zoom link, pending maths
 // cells and export quoting; the time report's section times, summaries, bands, time formats and missing
-// sections. Every expected cell is computed by hand from the fixture's closed-form channels
+// sections; M4 (D-210 (e), M3 item 30): a refresh of the same shape updates the cells in place and keeps a
+// view's selection. Every expected cell is computed by hand from the fixture's closed-form channels
 // (report_track_fixtures.hpp: Speed sample i = i at 10 Hz, so a lap [a, b) s averages 10 (a + b) / 2 - 0.5).
 
 #include "../qtmodel_test_support.hpp"
@@ -16,6 +17,7 @@
 #include <esses/qtmodel/maths_service.hpp>
 #include <esses/qtmodel/report_model.hpp>
 
+#include <QItemSelectionModel>
 #include <QSignalSpy>
 #include <QTest>
 
@@ -68,7 +70,7 @@ QString header(const ReportModel& m, int column) {
 
 analysis::ReportSpec speedSpec(std::vector<analysis::ReportStat> stats) {
     analysis::ReportSpec spec;
-    spec.channels.push_back(analysis::ReportChannel{"Speed", std::move(stats)});
+    spec.channels.push_back(analysis::ReportChannel{"Speed", std::move(stats), ""});
     return spec;
 }
 
@@ -254,9 +256,9 @@ private Q_SLOTS:
         // The widget refreshes on Data; here the test does.
         connect(&w.maths, &MathsService::channelReady, &m, &ReportModel::refresh);
         analysis::ReportSpec spec;
-        spec.channels.push_back(analysis::ReportChannel{"Corr Speed", {analysis::ReportStat::Max}});
-        spec.channels.push_back(analysis::ReportChannel{"Throttle", {analysis::ReportStat::Max}});
-        spec.channels.push_back(analysis::ReportChannel{"No Such Channel", {analysis::ReportStat::Max}});
+        spec.channels.push_back(analysis::ReportChannel{"Corr Speed", {analysis::ReportStat::Max}, ""});
+        spec.channels.push_back(analysis::ReportChannel{"Throttle", {analysis::ReportStat::Max}, ""});
+        spec.channels.push_back(analysis::ReportChannel{"No Such Channel", {analysis::ReportStat::Max}, ""});
         m.setChannelReport(spec, QStringLiteral("cr-6"));
         QVERIFY(settle(m, 0));
         QVERIFY(QTest::qWaitFor([&] { return !m.busy() && m.pendingCells() == 0; }, 20000));
@@ -290,7 +292,7 @@ private Q_SLOTS:
         w.selection.setMain(refOf(*src, kLaps, "Lap 1"));
         ReportModel m(w.rt.pool(), w.rt.dispatcher(), w.selection, w.maths, nullptr);
         analysis::ReportSpec spec;
-        spec.channels.push_back(analysis::ReportChannel{"Load", {analysis::ReportStat::Avg}});
+        spec.channels.push_back(analysis::ReportChannel{"Load", {analysis::ReportStat::Avg}, ""});
         m.setChannelReport(spec, QStringLiteral("cr-7"));
         QVERIFY(settle(m, 0));
         // Load is in %, so the unit makes the label a quoted field.
@@ -390,6 +392,61 @@ private Q_SLOTS:
         QVERIFY(settle(m, 1));
         QCOMPARE(m.rowCount(), 1);
         QCOMPARE(m.columnCount(), 3);
+    }
+
+    // M3 item 30 (D-210 (e)): a delivery or a display change that keeps the table's rows and columns updates
+    // the cells in place (one dataChanged, no reset), so a view's selection and current cell survive; a table
+    // of another shape resets the model (and the selection with it).
+    void aRefreshOfTheSameShapeKeepsTheSelection() {
+        World w;
+        const auto src = w.threeLaps();
+        w.selection.setMain(refOf(*src, kLaps, "Lap 1"));
+        w.selection.toggleOverlay0(refOf(*src, kLaps, "Lap 3"));
+        ReportModel m(w.rt.pool(), w.rt.dispatcher(), w.selection, w.maths, nullptr);
+        analysis::ReportSpec spec = speedSpec({analysis::ReportStat::Avg, analysis::ReportStat::Max});
+        m.setChannelReport(spec, QStringLiteral("cr-30"));
+        QVERIFY(settle(m, 0));
+        QCOMPARE(m.rowCount(), 2);
+        QCOMPARE(m.columnCount(), 3);
+        QItemSelectionModel view(&m);
+        const QModelIndex picked = m.index(1, 2); // Speed max of Lap 3 (Overlay 0)
+        view.setCurrentIndex(picked, QItemSelectionModel::ClearAndSelect);
+        QVERIFY(view.isSelected(picked));
+        QSignalSpy resets(&m, &QAbstractItemModel::modelReset);
+        QSignalSpy changes(&m, &QAbstractItemModel::dataChanged);
+
+        // A display change: the same rows and columns, new tints.
+        m.setHighlight(ReportModel::Highlight{0x2060FFFFU, 0xFF3030FFU});
+        QCOMPARE(resets.count(), 0);
+        QCOMPARE(changes.count(), 1);
+        QCOMPARE(changes.at(0).at(0).toModelIndex(), m.index(0, 0));
+        QCOMPARE(changes.at(0).at(1).toModelIndex(), m.index(1, 2));
+        QCOMPARE(m.data(picked, ReportModel::BackgroundRgbaRole).toUInt(),
+                 0xFF3030FFU); // Lap 3 holds the max
+        QVERIFY(view.isSelected(picked));
+
+        // New values, the same shape: the first 5 s of each range (zoom-linked), delivered in place.
+        spec.options.zoomLinked = true;
+        plot::ViewState zoom;
+        zoom.zoom = plot::XSpan{0.0, 5.0e6};
+        m.setZoom(zoom);
+        m.setChannelReport(spec, QStringLiteral("cr-30"));
+        QVERIFY(settle(m, 1));
+        QCOMPARE(resets.count(), 0);
+        QCOMPARE(cell(m, 0, 1), QStringLiteral("24.50"));  // samples 0..49
+        QCOMPARE(cell(m, 1, 2), QStringLiteral("249.00")); // samples 200..249
+        QVERIFY(view.isSelected(picked));
+        QCOMPARE(view.currentIndex(), picked);
+        QCOMPARE(view.selectedIndexes().size(), 1);
+
+        // Another shape (Lap 2 as an overlay, untrusted rows included: a column more): a reset.
+        w.selection.toggleOverlay(refOf(*src, kLaps, "Lap 2"));
+        spec.options.includeUntrusted = true;
+        m.setChannelReport(spec, QStringLiteral("cr-30"));
+        QVERIFY(settle(m, 2));
+        QCOMPARE(m.columnCount(), 4);
+        QVERIFY(resets.count() >= 1);
+        QVERIFY(view.selectedIndexes().isEmpty());
     }
 
     void newerRunsReplaceOlderOnes() {

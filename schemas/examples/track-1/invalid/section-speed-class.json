@@ -1,0 +1,22 @@
+{
+  "$schema": "urn:esses:track-1",
+  "schemaVersion": 1,
+  "lines": {
+    "centre": []
+  },
+  "sections": [
+    {
+      "id": "t1",
+      "name": "Turn 1",
+      "startDist": {
+        "v": 20,
+        "unit": "m"
+      },
+      "endDist": {
+        "v": 40,
+        "unit": "m"
+      },
+      "speedClass": "medium"
+    }
+  ]
+}

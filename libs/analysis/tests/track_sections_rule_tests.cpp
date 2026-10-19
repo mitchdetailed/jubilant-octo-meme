@@ -46,10 +46,10 @@ TrackMap track300() {
     TrackMap m;
     m.lengthM = 300.0;
     m.centre = {{0, 0, 0}, {300, 0, 300}};
-    m.sections = {TrackSection{"s1", "Default", "Straight 1", 0.0, 100.0, "straight", false},
-                  TrackSection{"t1", "Default", "Turn 1", 100.0, 150.0, "corner", false},
-                  TrackSection{"s2", "Default", "Straight 2", 150.0, 300.0, "straight", false},
-                  TrackSection{"u1", "Driver Notes", "Fast bit", 50.0, 200.0, "Fast", true}};
+    m.sections = {TrackSection{"s1", "Default", "Straight 1", 0.0, 100.0, "straight", false, ""},
+                  TrackSection{"t1", "Default", "Turn 1", 100.0, 150.0, "corner", false, ""},
+                  TrackSection{"s2", "Default", "Straight 2", 150.0, 300.0, "straight", false, ""},
+                  TrackSection{"u1", "Driver Notes", "Fast bit", 50.0, 200.0, "Fast", true, ""}};
     return m;
 }
 

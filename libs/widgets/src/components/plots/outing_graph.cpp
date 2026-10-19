@@ -222,7 +222,7 @@ bool OutingGraph::handleCommand(const QString& id, const QVariantList& args) {
             return false;
         }
         const int notches = args.isEmpty() ? 1 : args.front().toInt();
-        plots::zoomAboutCursor(context_, liveInputs(), std::pow(kWheelZoomIn, notches));
+        plots::zoomAboutCursor(*this, liveInputs(), std::pow(kWheelZoomIn, notches));
         return true;
     }
     if (id == QLatin1String("zoom.outing_rect")) {
@@ -234,7 +234,7 @@ bool OutingGraph::handleCommand(const QString& id, const QVariantList& args) {
         if (!(b != a)) {
             return false;
         }
-        context_.view.zoomTo(plot::XSpan{std::min(a, b), std::max(a, b)});
+        setViewZoom(plot::XSpan{std::min(a, b), std::max(a, b)});
         return true;
     }
     if (id == plots::kCycleStyle) {
@@ -247,7 +247,7 @@ bool OutingGraph::handleCommand(const QString& id, const QVariantList& args) {
 // ---- outing coordinates
 
 const OutingGraph::Geometry& OutingGraph::geometry() const {
-    const plot::ViewState& view = context_.view.state();
+    const plot::ViewState view = viewState();
     if (geometry_.revision == inputsRevision() && geometry_.zoom == view.zoom &&
         geometry_.domain == view.domain) {
         return geometry_;
@@ -342,13 +342,13 @@ bool OutingGraph::zoomToLap(int index) {
         return false;
     }
     const plot::DomainMapper map = worksheetMainMapper(liveInputs());
-    if (context_.view.state().domain == plot::Domain::Distance && !map.hasDistance()) {
+    if (viewState().domain == plot::Domain::Distance && !map.hasDistance()) {
         return false;
     }
     const Lap& lap = laps[static_cast<std::size_t>(index)];
     const double a = map.xOf(lap.start);
     const double b = map.xOf(lap.end);
-    context_.view.zoomTo(plot::XSpan{std::min(a, b), std::max(a, b)});
+    setViewZoom(plot::XSpan{std::min(a, b), std::max(a, b)});
     return true;
 }
 
@@ -359,7 +359,7 @@ void OutingGraph::setCursorAtLogicalX(double logicalX) {
     }
     const plot::ComponentBuildInputs in = liveInputs();
     const plot::DomainMapper map = worksheetMainMapper(in);
-    context_.view.setCursor(map.timeAt(*x) - in.slots.front().range.start, qt::CursorSource::Click);
+    setViewCursor(map.timeAt(*x) - in.slots.front().range.start, qt::CursorSource::Click);
 }
 
 // ---- rubber band (the worksheet zoom)
@@ -410,7 +410,7 @@ void OutingGraph::mousePressEvent(QMouseEvent* event) {
         bandStart_.reset();
         setMouseTracking(false);
         if (end && *end != start) {
-            context_.view.zoomTo(plot::XSpan{std::min(start, *end), std::max(start, *end)});
+            setViewZoom(plot::XSpan{std::min(start, *end), std::max(start, *end)});
         }
         rebuildDynamic(); // removes the band
         return;
@@ -418,7 +418,7 @@ void OutingGraph::mousePressEvent(QMouseEvent* event) {
     const plot::HitResult hit = hitAt(p);
     switch (hit.kind) {
     case plot::HitKind::ZoomSpan:
-        dragStartZoom_ = context_.view.state().zoom;
+        dragStartZoom_ = viewState().zoom;
         dragStartX_ = worksheetXAt(p.x()).value_or(0.0);
         drag_ = hit.handleKind == plot::HandleKind::ZoomStart ? Drag::ZoomStart
                 : hit.handleKind == plot::HandleKind::ZoomEnd ? Drag::ZoomEnd
@@ -463,14 +463,14 @@ void OutingGraph::mouseMoveEvent(QMouseEvent* event) {
     const plot::XSpan z = dragStartZoom_;
     switch (drag_) {
     case Drag::ZoomStart:
-        context_.view.zoomTo(plot::XSpan{std::min(*x, z.b - minSpan), z.b});
+        setViewZoom(plot::XSpan{std::min(*x, z.b - minSpan), z.b});
         break;
     case Drag::ZoomEnd:
-        context_.view.zoomTo(plot::XSpan{z.a, std::max(*x, z.a + minSpan)});
+        setViewZoom(plot::XSpan{z.a, std::max(*x, z.a + minSpan)});
         break;
     case Drag::ZoomPan: {
         const double d = *x - dragStartX_;
-        context_.view.zoomTo(plot::XSpan{z.a + d, z.b + d}); // constant span; the view model clamps
+        setViewZoom(plot::XSpan{z.a + d, z.b + d}); // constant span; the view model clamps
         break;
     }
     default:
@@ -524,8 +524,8 @@ void OutingGraph::wheelEvent(QWheelEvent* event) {
     }
     // The worksheet zoom x0.8 / x1.25 per notch about the pointer (the outing graph is not zoomable itself).
     const double f = std::pow(kWheelZoomIn, notches);
-    const plot::XSpan z = context_.view.state().zoom;
-    context_.view.zoomTo(plot::XSpan{*xp - (*xp - z.a) * f, *xp + (z.b - *xp) * f});
+    const plot::XSpan z = viewState().zoom;
+    setViewZoom(plot::XSpan{*xp - (*xp - z.a) * f, *xp + (z.b - *xp) * f});
 }
 
 void OutingGraph::keyPressEvent(QKeyEvent* event) {
@@ -547,7 +547,10 @@ ComponentWidget::ExportJob OutingGraph::exportJob(const ExportOptions& options) 
     for (std::size_t i = 0; i < body_.channelNames().size(); ++i) {
         channels.push_back(i);
     }
-    return [in, channels](const CancelToken& cancel) { return plots::timeSeriesCsv(in, channels, cancel); };
+    const plots::LegacyExportInfo info{context_.view.definition().name};
+    return [in, channels, info](const CancelToken& cancel) {
+        return plots::legacyCsv(in, channels, info, cancel);
+    };
 }
 
 bool OutingGraph::exportData(ExportSink& sink, const ExportOptions& options) const {

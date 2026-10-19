@@ -6,10 +6,23 @@
 
 #include <esses/base/assert.hpp>
 
+#include <mutex>
 #include <utility>
 #include <vector>
 
 namespace esses::formats::ld {
+
+namespace {
+
+// Makes "ld.io_fault once per source" hold when two channels of a source fault at the same time on two
+// workers: their check of the shared DecodeLog and the add are one step. Faults are rare, so one lock for
+// every source is enough.
+std::mutex& ioFaultLogMutex() {
+    static std::mutex m;
+    return m;
+}
+
+} // namespace
 
 Result<void> decodeConverted(const LdFile& file, std::uint32_t ch, std::uint64_t first, std::uint64_t count,
                              store::Dtype outDtype, const std::optional<LdConversion>& conversion,
@@ -116,18 +129,23 @@ Result<void> LdChunkProvider::materialise(store::SampleIdx chunkNo, store::Chunk
         return r;
     }
     const std::span<std::byte> samples = out.sampleBytes();
-    if (auto r = decodeConverted(*file_, channel_, first, count, outDtype, conversion_, samples); !r) {
+    if (auto r = decoder_(*file_, channel_, first, count, outDtype, conversion_, samples); !r) {
         if (r.error().code != ErrorCode::Io) {
             return r;
         }
-        // Page fault inside the mapping (05 section 3.11): seal this chunk AllInvalid, keep the process.
+        // Page fault inside the mapping (05 section 3.11): seal this chunk AllInvalid, keep the process, and
+        // log it once for the source (its channels share the DecodeLog; 02 section 1 behaviour 5).
         if (log_) {
-            ImportLogEntry::Context ctx;
-            ctx.channel = c.loggedName;
-            ctx.offset = c.enc.dataOffset;
-            log_->add(ImportLogEntry::Level::Warning, std::string(code::kIoFault),
-                      "page fault while decoding chunk " + std::to_string(chunkNo) + "; chunk marked invalid",
-                      std::move(ctx));
+            const std::scoped_lock once(ioFaultLogMutex());
+            if (!log_->contains(code::kIoFault)) {
+                ImportLogEntry::Context ctx;
+                ctx.channel = c.loggedName;
+                ctx.offset = c.enc.dataOffset;
+                log_->add(ImportLogEntry::Level::Warning, std::string(code::kIoFault),
+                          "page fault while decoding chunk " + std::to_string(chunkNo) +
+                              "; chunk marked invalid",
+                          std::move(ctx));
+            }
         }
         out.markAllInvalid();
         return ok();

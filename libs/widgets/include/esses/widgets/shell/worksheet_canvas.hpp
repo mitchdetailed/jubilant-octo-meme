@@ -10,7 +10,8 @@
 // item 13), maximises and restores a component (caption double-click, not persisted), coalesces relayouts
 // to 30 Hz (the first resize of a burst lays out at once, the final size always lands) and is the worksheet
 // hotkey scope. DPR changes reach the components through Qt (QEvent::DevicePixelRatioChange, handled by
-// ComponentWidget as Size|Scheme); the canvas relayouts and repaints its background.
+// ComponentWidget as Size|Scheme); the canvas relayouts and repaints its background. Where Qt sends no DPR
+// event (a canvas moved into another window), M4's DprWatcher calls refreshGeometry() (D-209).
 // Worksheet switches (04 section 6.2, D-058): the components of a worksheet that is switched away from are
 // hidden, not destroyed; switching back to it (same key, same definition, same context) shows the same
 // widgets again, so a quick flip reuses their Static images (a hidden component releases its Static image
@@ -99,6 +100,11 @@ public:
     bool restoreMaximised(); // ESC / the same action; false when nothing was maximised
     // Re-applies a scheme to the canvas background and every component (Options > Colours).
     void applyScheme(const project::Scheme& scheme);
+    // M4 (hidpi package, D-209): what a DPR event does here, for a canvas Qt did not notify (DprWatcher, e.g.
+    // after its dock moved to another window): the 1 % grid placement is applied again (logical pixels, so
+    // the same rectangles: no drift) through the coalesced relayout, and the background and the selection
+    // overlay repaint at the window's DPR.
+    void refreshGeometry();
 
     // The logical rectangle of a fractional rectangle inside `content` (the OffscreenRenderer rounding).
     static QRect placement(const project::Rect& rect, const QRect& content);

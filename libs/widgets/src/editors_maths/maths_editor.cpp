@@ -15,6 +15,7 @@
 #include <esses/model/layer.hpp>
 #include <esses/model/resolver.hpp>
 #include <esses/model/source.hpp>
+#include <esses/plotcore/display_units.hpp>
 #include <esses/qtmodel/live_diagnostics.hpp>
 #include <esses/qtmodel/maths_service.hpp>
 #include <esses/qtmodel/project_session.hpp>
@@ -2619,7 +2620,8 @@ QStringList MathsEditor::channelNames() const {
 
 void MathsEditor::insertChannel(const QString& name) {
     QString text = QLatin1Char('\'') + name + QLatin1Char('\'');
-    // The unit the channel is displayed in (its override), else the stored unit; nothing for unitless data.
+    // The unit the channel is displayed in (its override), else its default display unit (the stored unit;
+    // "%" for a fraction stored in "ratio", D-211 (a)); nothing for unitless data.
     QString unit;
     if (const project::ChannelOverrides::Entry* o = session_.overrides().find(us(name));
         o != nullptr && o->displayUnit) {
@@ -2633,6 +2635,9 @@ void MathsEditor::insertChannel(const QString& name) {
             if (const model::Channel* c = layer->find(us(name))) {
                 id = c->desc.unit;
             }
+        }
+        if (const units::UnitRegistry* reg = maths_.units().get(); reg != nullptr) {
+            id = plot::defaultDisplayUnit(*reg, id);
         }
         unit = d_->unitText(id);
     }

@@ -6,6 +6,7 @@
 
 #include "plots_common.hpp"
 
+#include <esses/qtmodel/worksheet_view_model.hpp>
 #include <esses/widgets/components/numeric_gauge.hpp>
 
 #include <utility>
@@ -104,7 +105,8 @@ ComponentWidget::ExportJob NumericGauge::exportJob(const ExportOptions& options)
         return {};
     }
     const plot::ComponentBuildInputs in = plots::exportInputs(liveInputs(), options.range);
-    return [in](const CancelToken& cancel) { return plots::timeSeriesCsv(in, {0}, cancel); };
+    const plots::LegacyExportInfo info{context_.view.definition().name};
+    return [in, info](const CancelToken& cancel) { return plots::legacyCsv(in, {0}, info, cancel); };
 }
 
 bool NumericGauge::exportData(ExportSink& sink, const ExportOptions& options) const {

@@ -29,6 +29,10 @@
 // filterKindName/parseFilterKind, defaultFilter, session, setSelectFastestOnLoad, setSidecarCommit; M3 (the
 // time_distance completion): commitSidecar hands any sidecar edit of an open source (the marker band's
 // annotation Edit / Remove) to the same hook with its undo text (sidecarCommitText, read by the hook).
+// M4 reload (06 section 6 "Changed files", AC-M4-10; D-208): closeSource parks what it takes from the
+// selection (the source's slots, its own filter, its Data-window position, and which range it moved into
+// Main) for the most recent closes, and sourceReloaded(previous, source) gives it to the reopened file
+// (SourceLoader::reload, wired by connectSourceReload).
 #pragma once
 
 #include <esses/model/ids.hpp>
@@ -134,6 +138,8 @@ public:
     static std::optional<std::vector<std::pair<int, int>>> parseLapNumbers(std::string_view text);
     // The filter editor's message for text that does not parse ("expected a lap number at 4"), else "".
     static std::string lapNumbersError(std::string_view text);
+    // M4 reload: how many of the newest closes are parked for sourceReloaded.
+    static constexpr std::size_t kParkedCloses = 8;
 
 public Q_SLOTS:
     void setMain(const model::RangeRef& r);
@@ -155,6 +161,13 @@ public Q_SLOTS:
     void closeSource(const model::SourceId& source);
     void closeAllSources();
     void restore(const project::SelectionKeys& keys);
+    // M4 reload: `source` is the reopened file of `previous`, closed by closeSource (SourceLoader::reload;
+    // the id differs when the content changed). The slots, the filter and the Data-window position the close
+    // took from `previous` go to `source`: each slot by RangeId, else by the same lap number and class (06
+    // section 5.6, as sourceReplaced), else it is dropped with a hint; a range the close moved into Main goes
+    // back to the slot it had. Publishes `source` first when the list does not hold it; nothing else happens
+    // when no close of `previous` is parked (closeAllSources since, or more than kParkedCloses closes later).
+    void sourceReloaded(const model::SourceId& previous, std::shared_ptr<const model::DataSource> source);
 
 Q_SIGNALS:
     void changed(const esses::plot::SelectionSnapshot& snapshot, esses::qt::DataSelectionModel::Changes what);
@@ -166,6 +179,31 @@ Q_SIGNALS:
     void hint(const QString& text);
 
 private:
+    // M4 reload: a slot a close took, with what the lap-number fallback needs from its old range.
+    struct ParkedSlot {
+        model::RangeRef ref;
+        model::RangeKind kind = model::RangeKind::Outing;
+        model::LapClass lapClass = model::LapClass::None;
+        int number = 0;
+    };
+    // What closeSource took from the selection for one source (sourceReloaded gives it back).
+    struct ParkedClose {
+        enum class From : std::uint8_t { None, Overlay0, Overlay };
+        model::SourceId id;
+        std::optional<ParkedSlot> main;
+        std::optional<ParkedSlot> overlay0;
+        std::vector<std::pair<std::size_t, ParkedSlot>> overlays; // with their position among the overlays
+        std::optional<FilterSpec> filter;                         // the source's own filter (filters_)
+        std::optional<model::SourceId> before; // the source after it in the Data window (none: it was last)
+        // The range this close moved into Main, and the slot it held before.
+        std::optional<model::RangeRef> fallbackMain;
+        From fallbackFrom = From::None;
+        std::size_t fallbackIndex = 0;
+    };
+    static ParkedSlot parkedSlot(const model::DataSource& src, const model::RangeRef& r);
+    std::optional<model::RangeRef> reResolveParked(const model::DataSource& src,
+                                                   const ParkedSlot& slot) const;
+
     struct Candidates; // fastest-lap candidates of a source (analysis::fastestLap rule)
     void commit(Changes what);
     void checkInvariants() const;
@@ -196,6 +234,8 @@ private:
     QString sidecarCommitText_;
     // selectionKeys: the project.json path of a source per (source id, source path, project folder).
     mutable std::map<std::string, std::string> relativePaths_;
+    // M4 reload: the newest closes, oldest first (at most kParkedCloses).
+    std::vector<ParkedClose> parked_;
 };
 
 } // namespace esses::qt

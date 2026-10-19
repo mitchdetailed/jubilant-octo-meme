@@ -117,7 +117,7 @@ void ChannelReport::applyBody() {
     model_->setHighlight(h);
     model_->setTimeFormat(body.value(QStringLiteral("timeFormat")).toString(QStringLiteral("project")));
     zoomLinked_ = report.options.zoomLinked;
-    model_->setZoom(zoomLinked_ ? std::optional<plot::ViewState>(context_.view.state()) : std::nullopt);
+    model_->setZoom(zoomLinked_ ? std::optional<plot::ViewState>(viewState()) : std::nullopt);
     model_->setChannelReport(report, spec_.id.isNil() ? QString() : QString::fromStdString(spec_.id.str()));
     table_->setCaption(spec_.caption.autoText || spec_.caption.text.empty()
                            ? tr("Channel Report")

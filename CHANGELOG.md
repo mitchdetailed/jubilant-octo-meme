@@ -2,6 +2,104 @@
 
 All notable changes are recorded here, newest first. The project follows semantic versioning from 0.1.
 
+## Unreleased (M4)
+
+- The M4 contracts (D-206, `docs/milestones/M4.md` §2-3): the headers and `M4-STUB`s of the wave-1 packages
+  (budget, reload, hidpi, followups) and the wave-2 placeholders (about, docs, soak, packaging), with a file
+  ownership table so parallel work never edits the same file. The shell's M4 wiring goes through one hook:
+  `MainWindow` creates a `ShellExtension` per package (`BudgetShell`, `ReloadShell`, `HiDpiShell`,
+  `FollowupsShell`, `AboutShell`, `DocsShell`) and calls it at fixed points of its life; `SourceLoader` gains a
+  marked section per package with private hooks in `published()`, `close()` and `cancelOpens()` and nested
+  per-package state. New names: `formats::ResidentEstimate`/`estimateResident`/`estimateChannel` and
+  `SourceFileState`/`checkSourceFile`; `qt::OpenBudgetCheck`, `PerformanceSnapshot`, `PerformanceMonitor`,
+  `budgetFromSettings`, `budgetWarningText`, `performanceLine`/`performanceDetails`; the `SourceLoader` budget gate,
+  stale-source and reload members with the signals `budgetExceeded`, `staleChanged`, `sourceReloaded` and
+  `summariesReady`; `Message::altAction` and `MessagesModel::AltActionRole`; `DataWindowModel::StaleRole` and its
+  stale query; `DprWatcher`, `ComponentWidget::recheckDevicePixelRatio`, `DockHost::windowOf`;
+  `MessagesWindow::invokeAltAction`/`showPerformance`; `AboutDialog`, `buildInfo`, `versionReport` (what
+  `esses --version` prints, unchanged so far). Help > About opens a placeholder About dialog; nothing else
+  changes behaviour yet. The keymap's two M4 rows (`file.reload_source`, `help.contents`) stay planned until their
+  packages implement them; the top-level CMake adds `tests/soak/` and `tools/packaging/` once they exist, and
+  `libs/formats/tests/m4/**` is one Catch2 executable (`formats_m4`). Contract tests: `formats_m4.m4 contract: ...`,
+  `qtmodel.tst_m4_contract`, `widgets.tst_m4_contract`.
+- The memory budget warns before a file is loaded (AC-M4-02, 07 §7.1, 01 §7.2; D-207). Opening a log whose
+  resident estimate (`formats::estimateResident`: every logged channel in the chunk layout, raw samples, the
+  factor-4 pyramid and a bitmap per chunk) exceeds the chunk cache's budget stops before anything of it is decoded:
+  the Messages dock shows a Budget warning with the estimate, the budget and what is in use, with Continue Opening
+  (the row's action) and Cancel Opening (its alternate action, SHIFT+ENTER, SHIFT+double-click or the row's context
+  menu; `file.continue_open`, `file.cancel_open`, no keymap rows). Continue publishes the file as any open; Cancel
+  drops it (`open.budget_cancelled`). The budget is Options > General "Memory budget" (settings.json
+  `memory.chunkCacheBudgetBytes`, at least 1 GB; default a quarter of the RAM). The status bar gains a Performance
+  field ("Resident 412 MB of 4.0 GB"; click for Messages) and the Messages dock a Stats line (resident and pinned
+  bytes, chunks, hits, misses, the pool's queues), both from `qt::PerformanceMonitor`. `bench/open_bench` gains
+  `open.resident_rw2_20maths`: RW-2 + the 20 maths channels of the readiness set peak at 823.6 to 831.9 MiB
+  resident (median of 5, two sessions; chunk cache 527.3 MiB) against 1 GB. Tests: `formats_m4.budget: ...`,
+  `qtmodel.tst_memory_budget`, `widgets.tst_budget_shell`, `widgets.tst_options_dialog`, `ui.tst_budget_warning`.
+- Changed source files are detected and reloaded (AC-M4-10, 02 §8 AC-4a, E-5; D-208). When the application
+  becomes active the shell re-stats every open log (`formats::checkSourceFile`); a file changed on disk or gone
+  marks its source stale: an amber badge on its Data-window row, a Messages row (`open.file_changed`) whose action
+  is the new File > Reload File (`file.reload_source`, keymap row implemented; also in the Data window's context
+  menu), and no further chunk decoded from it (the providers' own check). Reload closes the source and opens it
+  again through the open pipeline: the sidecar is re-applied and the selection comes back by RangeId, with its slot
+  positions, the source's filter and its Data-window place (`SourceLoader::reload`, `sourceReloaded`,
+  `DataSelectionModel::sourceReloaded`, `qt::connectSourceReload`). E-5 on NTFS: the sharing policy
+  (`FILE_SHARE_READ | FILE_SHARE_DELETE`) lets POSIX-semantics, `ReplaceFileW` and rename-aside writers replace a
+  mapped log while the view keeps the old bytes and refuses every in-place writer; a classic
+  `MoveFileExW(MOVEFILE_REPLACE_EXISTING)` replace is refused (`ERROR_ACCESS_DENIED`) while the log is open, whatever
+  the share mode, and changes nothing. `ld.io_fault` is logged once per source. Tests: `base.mapped file: AC-4a ...`
+  (an SMB variant through `ESSES_TEST_SMB_DIR`), `formats_m4.reload: ...`, `qtmodel.tst_source_reload`,
+  `ui.tst_reload_source`, the keymap row.
+- HiDPI per monitor (AC-M4-07, 07 §7.1, 04 §6.6, 06 §17; D-209). A window or floating dock moved to a monitor
+  of another scale, or a display whose scale changes, re-lays out and re-renders its components at the new DPR:
+  `HiDpiShell` watches the main window and every dock window with a `DprWatcher` and re-checks the windows after a
+  dock floats or docks back, a move Qt announces to no widget (`ComponentWidget::recheckDevicePixelRatio`,
+  `WorksheetCanvas::refreshGeometry`). At a fractional DPR (125 %, 150 %) `RasterBackend` draws axis-aligned
+  strokes wider than 1 px on whole device pixels and `LayerCache::paint` paints every layer from a whole device
+  pixel, so grid lines, ticks, cursor and outlines stay crisp; DPR 1 and 2 render exactly as before and their
+  goldens stay authoritative. The application sets the `PassThrough` rounding policy explicitly. New goldens: the
+  `DrawList` JSON of the seven drawn MVP types at DPR 1.25 and 1.5 (`tests/golden/images/dpr_sweep/`, exact) and
+  values_list at DPR 1.5 (provisional PNGs); the geometry-only reference `geometry_scene@1.5x.png` re-rendered.
+  Tests: `ui.tst_dpr_switch` (the main window and a floating time_distance across monitors of DPR 1, 1.25, 1.5 and
+  2, both dock backends), `widgets.tst_dpr_sweep` (the ten MVP types at the four DPRs), `widgets.tst_dpr_watcher`,
+  `widgets.tst_dpr_values_list`, `golden.tst_dpr_goldens`, `qtrender.tst_crisp_strokes`. The two-monitor check
+  is the maintainer's (`docs/milestones/M4.md` §6.3).
+- The M3 follow-ups of `esses_qtmodel` and the Qt-free libraries (D-210; M3.md §6 items 18, 23, 25, 29-32).
+  `TrackMapService` reads, writes and scans track-map files on the pool, never on the GUI thread: a read lands
+  with `mapChanged`, writes follow the edits in order (merged behind one in flight, backed up as asked), a write
+  that fails is a Messages row with the venue read back from its file and its undo step dropped, writes still
+  queued are made when the service goes, and a generated map is handed over only once the venue's own file is
+  known (new `asynchronous`, `isLoading`, `mapStamp`, `pendingIo`, `venuesChanged`; synchronous without a
+  Dispatcher). `SourceLoader` announces the end of its summary pass (`summariesReady`), keys the Track Sections
+  pass by the identity of the source's bound map and runs it again when a Venue detail edit binds another one.
+  The channel report gains `options.ignoreInterpolated` (start, end and change from the range's own samples
+  even with `interpolateBoundaries`; `channel_report-1` member written only when true, the Properties page binds
+  it). `ReportModel` updates a table of the same shape in place (`dataChanged`, so the selection survives a
+  refresh) and `ReportTable` re-measures its columns on it. A project's selection is restored only once the
+  opens held at the memory budget warning are answered (`SessionRestore`; Continue restores it with the held
+  file). New tests: `qtmodel.tst_track_map_io`, `qtmodel.tst_summaries_ready`, `qtmodel.tst_restore_budget`, the
+  venue-edit and superseded-run cases of `qtmodel.tst_track_sections_pass`, the selection case of
+  `qtmodel.tst_report_model`, a time report fed from `TrackSectionsRule` output (`analysis.report_time: ...`)
+  and a variance case checked against `DomainMapper::xOf` (`plotcore.variance: ...`); `widgets.tst_track_editor`
+  waits for the files the pool writes.
+- The M3 follow-ups of `esses_widgets` (D-211; M3.md §6 items 18-19, 21-22, 24, 26-27). A channel without a
+  named display unit shows in its quantity's default (`plot::defaultDisplayUnit`): a fraction stored in `ratio`
+  (a logged throttle, brake or duty) reads 0-100 % everywhere, in the graphs, gauges, scatter, Values window,
+  reports and exports, the Channel Editor and the Maths Editor; `scatter-1` gains `xDisplayUnit`,
+  `traces[].displayUnit` and `colourChannel.displayUnit`, `channel_report-1` `report.channels[].displayUnit`
+  (written only when set), and the shipped workbook names G and km/h where it reads them. The Properties pages
+  pick display units from a combo of the units of the channel's quantity, following the channel field. The
+  Track Editor gains a Speed class column (`track-1` `sections[].speedClass`: slow or fast) and shows and edits
+  section bounds in the Corr Dist display unit (its override, else km for km/h and mi for mph, else m). Export
+  Data of the graphs and gauges writes the legacy CSV dialect of `esses-cli export --format motec.csv`
+  (metadata with the range and worksheet, display units). A time_distance group's key column is its heading:
+  dragging it moves the group (one undo step, panel heights kept), a double-click opens Group Properties.
+  `links.zoom`, `links.cursor` and `links.datum` are honoured: an unlinked component keeps its own zoom, cursor
+  or datum, moved by its own mouse and, when focused, the cursor, zoom, pan and datum keys (the outing graph's
+  zoom stays linked; a values list reads at its own cursor). The components rebuild when the loader's summary
+  pass ends (`summariesReady` through `FollowupsShell`). Tests: `plotcore.followups D-211: ...` (6),
+  `analysis.followups D-211: ...` (2), `widgets.tst_followups_units`, `widgets.tst_followups_view`; the export
+  tests of the gauges, the outing and time/distance graphs and the shell read the legacy layout.
+
 ## Unreleased (M3)
 
 - Distinct venues never share a track-map file (PR #4 review, Codex P2; D-205). `TrackMapFile::fileNameFor`

@@ -189,6 +189,11 @@ void ValuesModel::setWorksheet(WorksheetViewModel* worksheet) {
     recompute();
 }
 
+void ValuesModel::setViewSource(ViewSource source) {
+    viewSource_ = std::move(source);
+    recompute();
+}
+
 void ValuesModel::refresh(plot::ChangeMask) {
     recompute();
 }
@@ -197,7 +202,9 @@ void ValuesModel::recompute() {
     bool pending = false;
     const plot::SelectionSnapshot& snap = selection_.snapshot();
     const bool live = worksheet_ != nullptr && selection_.hasMain();
-    const plot::ViewState view = live ? worksheet_->state() : plot::ViewState{};
+    const plot::ViewState view = !live         ? plot::ViewState{}
+                                 : viewSource_ ? viewSource_()
+                                               : worksheet_->state();
     DistanceService* distance = live ? &worksheet_->distanceService() : nullptr;
 
     // The mapper of a slot (04 section 3.2): its range geometry with offsets, outing and chain.

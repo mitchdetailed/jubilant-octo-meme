@@ -1392,6 +1392,7 @@
             "tileCols": 0,
             "traces": [
               {
+                "displayUnit": "G",
                 "visible": true,
                 "yChannel": "G Force Long",
                 "yDelayUs": 0
@@ -1404,7 +1405,8 @@
               "throughZero": false,
               "type": "none"
             },
-            "xChannel": "G Force Lat"
+            "xChannel": "G Force Lat",
+            "xDisplayUnit": "G"
           },
           "caption": {
             "auto": true,
@@ -1494,6 +1496,7 @@
             "report": {
               "channels": [
                 {
+                  "displayUnit": "km/h",
                   "name": "Corr Speed",
                   "stats": ["avg", "min", "max"]
                 },

@@ -397,6 +397,63 @@ Registered under the §10 rule when the M3 headers were laid down (`docs/milesto
   `WorksheetCanvas`'s selection, geometry, z-order and lock members with `componentSpecApplied`/`layoutEdited`/
   `selectionChanged` (D-200).
 
+### Names added by the M4 contracts (2026-10-18, D-206)
+
+Registered under the §10 rule when the M4 headers were laid down (`docs/milestones/M4.md` §2); each name's header
+says which package owns it and which members are still `M4-STUB`s.
+- `esses_formats`: `ResidentEstimate`, `estimateChannel`, `estimateResident` (from a `ProbeResult` and from a
+  `DataSource`); `SourceFileState`, `sourceFileStateName`, `SourceFileCheck`, `checkSourceFile`.
+- `esses_qtmodel`: `kBudgetSettingKey`, `kMinBudgetBytes`, `budgetFromSettings`, `OpenBudgetCheck`,
+  `budgetWarningText`, `formatBytes`, `PerformanceSnapshot`, `performanceLine`, `performanceDetails`,
+  `PerformanceMonitor`; `SourceLoader::setBudgetGate`/`budgetGate`/`continueOverBudget`/`cancelOverBudget`/
+  `pendingBudgetOpens`/`pendingBudgetCheck`/`checkChangedFiles`/`isStale`/`staleSources`/`reload`/`pendingReloads`
+  and the signals `budgetExceeded`, `staleChanged`, `sourceReloaded`, `summariesReady`; `Message::altAction`/
+  `altActionArgs`, `MessagesModel::AltActionRole`; `DataWindowModel::StaleRole`/`StaleQuery`/`setStaleQuery`/
+  `isStale`/`refreshStale`.
+- `esses_widgets`: `ShellExtension`, `shellExtension<T>`, `BudgetShell`, `ReloadShell`, `HiDpiShell`,
+  `FollowupsShell`, `AboutShell`, `DocsShell`, `DprWatcher`, `AboutDialog`, `BuildInfo`, `buildInfo`,
+  `versionReport`, `qtLicenceNotice`, `sourceUrl`; `ComponentWidget::recheckDevicePixelRatio`, `DockHost::windowOf`,
+  `MessagesWindow::invokeAltAction`/`showPerformance`/`performanceText`.
+
+### Names added by the M4 budget package (2026-10-18, D-207)
+
+- `esses_widgets`: `BudgetShell::kWarningCode` (`budget.open_estimate`, the Messages row of the open-time warning),
+  `BudgetShell::runtimeBudget`; `MessagesWindow::rowMenu` (a row's context menu with its action and alternate
+  action).
+- Import Log code `open.budget_cancelled` (`SourceLoader`: an open held at the budget gate was cancelled).
+- Bench row `open.resident_rw2_20maths` (`bench/open_bench`, AC-M4-02, 07 §12).
+
+### Names added by the M4 reload package (2026-10-18, D-208)
+
+- `esses_qtmodel`: `source_reload.hpp` with `connectSourceReload`, `staleSourceMessage`, `sourceIdArgument`,
+  `parseSourceIdArgument`, `kReloadSourceCommand`, `kFileChangedCode`; `DataSelectionModel::sourceReloaded` and
+  `DataSelectionModel::kParkedCloses`.
+
+### Names added by the M4 hidpi package (2026-10-18, D-209)
+
+- `esses_widgets`: `WorksheetCanvas::refreshGeometry`; `HiDpiShell::dockRefreshes`/`dockRefreshRebuilds`.
+
+### Names added by the M4 followups of esses_qtmodel and the Qt-free libraries (2026-10-18, D-210)
+
+- `esses_analysis`: `ReportOptions::ignoreInterpolated` (`channel_report-1` `options.ignoreInterpolated`).
+- `esses_qtmodel`: `TrackMapService::asynchronous`/`isLoading`/`mapStamp`/`pendingIo` and the signal
+  `venuesChanged`.
+
+### Names added by the M4 followups of esses_widgets (2026-10-18, D-211)
+
+- `esses_plotcore`: `display_units.hpp` with `defaultDisplayUnit`, `displayUnitFor`, `corrDistDisplayUnit`;
+  `ResolvedChannel::displayUnitId`; `ScatterBody::xDisplayUnit`/`colourDisplayUnit`, `ScatterTrace::displayUnit`
+  (`scatter-1` `xDisplayUnit`, `traces[].displayUnit`, `colourChannel.displayUnit`).
+- `esses_analysis`: `ReportChannel::displayUnit` (`channel_report-1` `report.channels[].displayUnit`);
+  `TrackSection::speedClass`, `TrackMap::kSpeedClasses` (`track-1` `sections[].speedClass`).
+- `esses_qtmodel`: `ValuesModel::ViewSource`/`setViewSource`.
+- `esses_widgets`: `ComponentWidget::zoomLinked`/`cursorLinked`/`datumLinked`/`viewState`/`setViewCursor`/
+  `setViewZoom`/`viewPanBy`/`viewZoomFull`/`mainMapper`/`mainMapperOf`; `FieldKind::Unit`, `FieldRow::unitOf`,
+  `setUnitOf`, `linkUnitPickers`, `setUnitChoices`, `unitChoices`; `PropertiesDialog::focusRecord`;
+  `TimeDistanceGraph::moveGroup`/`openGroupProperties`/`groupDropIndex`; `TrackEditor::distanceUnit`/
+  `startField`/`endField`/`speedClassField` and the `speedClass` parameters of `addSection`/`editSection`;
+  `FollowupsShell::lastSummaryDeliveries`.
+
 ---
 
 ## 5. Persisted files and schemas

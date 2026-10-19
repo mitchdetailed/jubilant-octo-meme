@@ -102,8 +102,8 @@ private Q_SLOTS:
                  QStringLiteral("Maths"));
         QCOMPARE(cell(editor, QStringLiteral("Throttle"), Col::CategoryCol), QStringLiteral("Logged"));
         QCOMPARE(cell(editor, QStringLiteral("Throttle"), Col::RateCol), QStringLiteral("50 Hz"));
-        QCOMPARE(cell(editor, QStringLiteral("Throttle"), Col::UnitCol),
-                 QStringLiteral("ratio")); // the stored unit
+        // No override: the default display unit, % for a fraction stored in ratio (D-211 (a)).
+        QCOMPARE(cell(editor, QStringLiteral("Throttle"), Col::UnitCol), QStringLiteral("%"));
         QCOMPARE(cell(editor, QStringLiteral("Throttle"), Col::TypeCol), QStringLiteral("F32 Real"));
         QCOMPARE(cell(editor, QStringLiteral("Throttle"), Col::ColourCol), QStringLiteral("Auto"));
 

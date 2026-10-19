@@ -281,3 +281,21 @@ the outing widget derives its zoom handles from `zoomRect()`, the plots componen
   golden changed with the datum columns). `td_m3_cases.hpp` decorates the synthetic sources with a Normal layer
   (laps, track sections with categories, beacons, device events, Bitfield/Bool status channels), sidecar
   annotations and an `analysis::DistanceIndex` per lap.
+
+## M4 followups (D-210)
+
+- M3 item 29: `tests/variance_mapper_tests.cpp` checks `analysis::VarianceTable` against `DomainMapper::xOf` (the
+  mapping a slot's trace is drawn with, offsets and stretch applied) in both domains, blank columns included.
+
+## M4 followups of the widgets (D-211)
+
+- `display_units.hpp` (`src/display_units.cpp`): `defaultDisplayUnit` (the stored unit; `%` for a fraction stored
+  in the Ratio base unit `ratio`), `displayUnitFor` (a named unit of the quantity, else the default) and
+  `corrDistDisplayUnit` (the Corr Dist override when a length, else km for km/h and mi for mph, else m). The logged
+  unit as the default is v1.0's (the descriptor keeps no file unit). `ResolvedChannel::displayUnitId` is the unit
+  `toDisplay` converts to.
+- `ScatterBody::xDisplayUnit`, `ScatterTrace::displayUnit`, `ScatterBody::colourDisplayUnit` (written only when
+  set) reach `componentChannelUses`, as does the channel report channels' `displayUnit`.
+- The time_distance Static build registers each group's key column as its `HitKind::GroupHeading`, beneath the
+  group's labels, values and measurement cells (no new drawing; no golden changes).
+- Tests: `tests/m4_widgets_followups_tests.cpp` (`plotcore.followups D-211: ...`, 6 cases).

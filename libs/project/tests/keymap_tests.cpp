@@ -167,10 +167,10 @@ TEST_CASE("keymap: hotkey batch 1 is implemented in M1, M2 and M3 rows as they l
         CHECK_FALSE(b.doc.empty());
         switch (b.status) {
         case KeymapStatus::Implemented:
-            // A closed milestone (M1, M2) or the one in progress (M3), whose rows turn implemented as they
+            // A closed milestone (M1-M3) or the one in progress (M4), whose rows turn implemented as they
             // land (tools/check_keymap_coverage.py); a menu-only or mouse row of M2/M3 may have no key (06
             // section 14.3).
-            CHECK((b.milestone == "M1" || b.milestone == "M2" || b.milestone == "M3"));
+            CHECK((b.milestone == "M1" || b.milestone == "M2" || b.milestone == "M3" || b.milestone == "M4"));
             if (b.milestone == "M1") {
                 implemented.insert(b.command);
                 CHECK(batch1Areas.count(b.command.substr(0, b.command.find('.'))) == 1);

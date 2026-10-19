@@ -144,9 +144,9 @@ TEST_CASE("track map file: user sections persist in trackmaps/<venue>.track.json
     f.map = loop();
     REQUIRE(analysis::SectionDetector::defaults(f.map));
     f.map.sections.push_back(
-        analysis::TrackSection{"u1", "Driver Notes", "T1 entry", 280.0, 330.0, "Braking", true});
+        analysis::TrackSection{"u1", "Driver Notes", "T1 entry", 280.0, 330.0, "Braking", true, ""});
     f.map.sections.push_back(
-        analysis::TrackSection{"u2", "Driver Notes", "Back", 500.0, 800.0, "Fast", true});
+        analysis::TrackSection{"u2", "Driver Notes", "Back", 500.0, 800.0, "Fast", true, ""});
     const std::filesystem::path path = project.path() / std::string(TrackMapFile::kDirectory) /
                                        pathFromUtf8(TrackMapFile::fileNameFor(f.map.venue));
     CHECK(pathToUtf8(path.filename()).starts_with("test-ring-"));

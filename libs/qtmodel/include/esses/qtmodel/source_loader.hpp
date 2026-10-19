@@ -31,10 +31,10 @@
 // each lap measured forward from a BCN start or backwards from its end beacon) and merges them into the
 // newest snapshot with the same marker set; it runs again when the venue's map changes
 // (TrackMapService::mapChanged), when more lap indexes are ready (DistanceService::distanceReady) and when
-// setRangeStretch publishes new lap-stretch factors. Its task key gains /t<map generation>/i<indexed
-// laps>-<digest of the indexes' D-140 keys> while a map is bound, so a replaced index (a new stretch, a newer
-// Corr Dist) changes it at the same count. A layer's request is deduplicated against its latest run only, and
-// only the latest run publishes (D-204).
+// setRangeStretch publishes new lap-stretch factors. Its task key gains /t<map generation>-<the bound map's
+// stamp>/i<indexed laps>-<digest of the indexes' D-140 keys> while a map is bound, so a replaced index (a new
+// stretch, a newer Corr Dist) or a venue bound to another map (D-210) changes it at the same count. A layer's
+// request is deduplicated against its latest run only, and only the latest run publishes (D-204).
 //
 // M2 (07 section 5.1, 05 sections 2 and 8.1, 06 section 13.8): the MappingPanel hand-off. With the hand-off
 // on, open() submits task A through ImporterRegistry::load with a MappingHook; an open whose step 4 leaves
@@ -49,6 +49,14 @@
 // token of every open in flight (the text importers' pass 1 stops at its next check) and drops its result
 // and every open waiting for the Mapping panel; closeAll() and a project change (connectProjectSession) call
 // it, so an open started for one project never publishes, or writes its mapping, into the next.
+//
+// M4 contract (D-206, docs/milestones/M4.md section 2): three marked sections below, one per M4 package. The
+// contract froze this header: each package implemented its section in its own file (budget
+// src/m4_budget/source_loader_budget.cpp, reload src/m4_reload/source_loader_reload.cpp) and keeps
+// its private state in its nested struct (M4Budget, M4Reload: members of SourceLoader, so they reach its
+// private members without a header edit); the followups package owns source_loader.cpp and
+// source_loader_m2.cpp and keeps the hook calls the contract put there (published(): budgetHolds first and
+// reloadPublished last; close(): budgetForget and reloadForget; cancelOpens(): budgetDropPending).
 #pragma once
 
 #include <esses/analysis/rule_runner.hpp>
@@ -63,6 +71,7 @@
 #include <esses/model/resolver.hpp>
 #include <esses/model/sidecar.hpp>
 #include <esses/model/source.hpp>
+#include <esses/qtmodel/memory_budget.hpp>
 #include <esses/units/unit_registry.hpp>
 
 #include <QObject>
@@ -168,6 +177,37 @@ public:
     bool setRangeStretch(const model::SourceId& source, std::string_view layer,
                          const std::map<model::RangeId, double>& stretch);
 
+    // ---- M4 budget (package budget; src/m4_budget/source_loader_budget.cpp) -------------------------
+    // The open-time budget warning (07 section 7.1, AC-M4-02; 01 section 7.2 "a warning at open, with
+    // continue or cancel"). With a gate set, an open whose resident estimate (formats::estimateResident of
+    // the opened source) exceeds the cache's budget stops before publication, so no chunk of it is decoded
+    // and no maths is registered: budgetExceeded(pendingId, check) announces it, continueOverBudget publishes
+    // it as any open, cancelOverBudget drops it (an Import Log row, open.budget_cancelled). cancelOpens()
+    // drops the waiting ones too. nullptr (the default) turns the check off: headless opens never wait.
+    void setBudgetGate(const store::ChunkCache* cache);
+    const store::ChunkCache* budgetGate() const noexcept { return budgetGate_; }
+    void continueOverBudget(int pendingId);
+    void cancelOverBudget(int pendingId);
+    int pendingBudgetOpens() const;
+    // The check of a waiting open, or nullptr.
+    const OpenBudgetCheck* pendingBudgetCheck(int pendingId) const;
+
+    // ---- M4 reload (package reload; src/m4_reload/source_loader_reload.cpp) -------------------------
+    // Changed files (06 section 6 "Changed files", 02 section 1 behaviour 5, AC-M4-10; E-5: until AC-M4-10
+    // passes, a changed file is detected and marked stale). checkChangedFiles() runs formats::checkSourceFile
+    // for every open source (the shell calls it when the application becomes active; the providers check
+    // before each decode batch on their own); a changed or missing file marks its source stale:
+    // staleChanged(id, true) and one Import Warning row (code open.file_changed, "file changed on disk")
+    // whose action is file.reload_source with the source id. reload() closes the source (its sidecar flushed
+    // first) and opens its path again through open(); when it publishes, sourceReloaded(previous id, source)
+    // fires and the selection slots, filters and Data-window state that named the old source are restored by
+    // RangeId where the ranges still exist (06 section 5.6 sourceReplaced).
+    std::vector<model::SourceId> checkChangedFiles(); // the sources newly marked stale
+    bool isStale(const model::SourceId& source) const;
+    std::vector<model::SourceId> staleSources() const;
+    Result<void> reload(const model::SourceId& source);
+    int pendingReloads() const;
+
 Q_SIGNALS:
     void sourcePublished(std::shared_ptr<const esses::model::DataSource> source);
     void sourceReplaced(std::shared_ptr<const esses::model::DataSource> source);
@@ -176,8 +216,34 @@ Q_SIGNALS:
     void importLog(const QString& path, const std::vector<esses::formats::ImportLogEntry>& entries);
     // M2: an open waits for the MappingPanel (setMappingHandOff(true)).
     void mappingRequired(int pendingId, const esses::formats::PendingResolution& pending);
+    // M4 budget: an open waits for Continue or Cancel (setBudgetGate).
+    void budgetExceeded(int pendingId, const esses::qt::OpenBudgetCheck& check);
+    // M4 reload: a source became stale (or fresh again: false, when it was reloaded or closed).
+    void staleChanged(const esses::model::SourceId& source, bool stale);
+    // M4 reload: reload() published the reopened file (its id differs when the content changed).
+    void sourceReloaded(const esses::model::SourceId& previous,
+                        std::shared_ptr<const esses::model::DataSource> source);
+    // M4 followups (M3.md section 6 item 18): the summary/<sourceId> pass finished, so every logged channel
+    // of the source has its SummaryPyramid; components built before it rebuild their extents. Emitted by the
+    // followups package (source_loader.cpp); never before sourcePublished of the source.
+    void summariesReady(const esses::model::SourceId& source);
 
 private:
+    // ---- M4 contract: the packages' hooks (called from source_loader.cpp) and private state ----
+    struct M4Budget; // src/m4_budget/source_loader_budget.cpp
+    struct M4Reload; // src/m4_reload/source_loader_reload.cpp
+    // published(): true when the budget gate holds the open (it publishes later or never).
+    bool budgetHolds(const std::filesystem::path& path,
+                     const std::shared_ptr<const model::DataSource>& source,
+                     const std::vector<formats::ImportLogEntry>& log);
+    void budgetDropPending();                                                     // cancelOpens()
+    void budgetForget(const model::SourceId& id);                                 // close()
+    void reloadPublished(const std::shared_ptr<const model::DataSource>& source); // end of published()
+    void reloadForget(const model::SourceId& id);                                 // close()
+    const store::ChunkCache* budgetGate_ = nullptr;
+    std::shared_ptr<M4Budget> m4Budget_; // created by the budget package on first use
+    std::shared_ptr<M4Reload> m4Reload_; // created by the reload package on first use
+
     struct InFlight {
         CancelSource cancel;
         std::filesystem::path path;
@@ -220,7 +286,7 @@ private:
     MathsService* maths_ = nullptr;
     DistanceService* distance_ = nullptr;
     TrackMapService* trackMaps_ = nullptr;
-    std::uint64_t trackGeneration_ = 1; // bumps on every map change: part of the phase-2 key
+    std::uint64_t trackGeneration_ = 1; // bumps on every map change (phase-2 key, with the map's stamp)
     bool useSidecars_ = true;
     int pending_ = 0;
     std::vector<std::shared_ptr<const model::DataSource>> open_; // open order

@@ -39,6 +39,8 @@ QVariant MessagesModel::data(const QModelIndex& index, int role) const {
         return m.action;
     case TimestampRole:
         return m.timestamp;
+    case AltActionRole: // M4 (D-206)
+        return m.altAction;
     default:
         return {};
     }
@@ -52,6 +54,7 @@ QHash<int, QByteArray> MessagesModel::roleNames() const {
     names.insert(CodeRole, "code");
     names.insert(ActionRole, "action");
     names.insert(TimestampRole, "timestamp");
+    names.insert(AltActionRole, "altAction");
     return names;
 }
 

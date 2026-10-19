@@ -314,7 +314,7 @@ struct ReportModel::Impl {
                         continue;
                     }
                     const plot::ResolvedChannel rc = detail::resolveChannel(
-                        maths, *s.source, s.layer, ChannelRequest{c.name, {}, std::nullopt},
+                        maths, *s.source, s.layer, ChannelRequest{c.name, c.displayUnit, std::nullopt},
                         Priority::Background);
                     analysis::ReportChannelData data;
                     data.series = rc.series;
@@ -486,10 +486,10 @@ void ReportModel::deliver(std::uint64_t serial, const std::shared_ptr<const Run>
 
 void ReportModel::rebuildGrid() {
     Impl& d = *impl_;
-    beginResetModel();
-    d.headers.clear();
-    d.grid.clear();
-    d.rowKinds.clear();
+    // Built aside, then published (M3 item 30, D-210 (e)): see the end.
+    QStringList headers;
+    std::vector<std::vector<Impl::Cell>> grid;
+    std::vector<int> rowKinds;
     const auto cellOf = [&d](const analysis::ReportCell& c, const analysis::ReportColumn& col) {
         Impl::Cell out;
         out.state = static_cast<int>(c.state);
@@ -555,7 +555,7 @@ void ReportModel::rebuildGrid() {
         }
         const QString headingTitle = levels.isEmpty() ? tr("Range") : levels.join(QStringLiteral(" / "));
         if (t.transposed) { // channelsInColumns: a row per heading
-            d.headers << headingTitle << columnLabels;
+            headers << headingTitle << columnLabels;
             for (std::size_t r = 0; r < t.rows.size(); ++r) {
                 std::vector<Impl::Cell> row;
                 Impl::Cell label;
@@ -567,11 +567,11 @@ void ReportModel::rebuildGrid() {
                     cell.italic = cell.italic || !t.rows[r].trusted;
                     row.push_back(std::move(cell));
                 }
-                d.grid.push_back(std::move(row));
-                d.rowKinds.push_back(0);
+                grid.push_back(std::move(row));
+                rowKinds.push_back(0);
             }
         } else { // channelsInRows: a row per (channel, stat)
-            d.headers << tr("Channel") << rowLabels;
+            headers << tr("Channel") << rowLabels;
             for (std::size_t c = 0; c < t.columns.size(); ++c) {
                 std::vector<Impl::Cell> row;
                 Impl::Cell label;
@@ -582,8 +582,8 @@ void ReportModel::rebuildGrid() {
                     cell.italic = cell.italic || !t.rows[r].trusted;
                     row.push_back(std::move(cell));
                 }
-                d.grid.push_back(std::move(row));
-                d.rowKinds.push_back(0);
+                grid.push_back(std::move(row));
+                rowKinds.push_back(0);
             }
         }
     } else if (d.given != nullptr && d.given->kind == Kind::Time && d.outcome.time) {
@@ -591,11 +591,11 @@ void ReportModel::rebuildGrid() {
         const analysis::TimeReportSpec& spec = d.given->timeSpec;
         int decimals = 3;
         const plot::TimeFormat format = timeFormatOf(d.timeFormat, d.projectTimeFormat, decimals);
-        d.headers << tr("Lap");
+        headers << tr("Lap");
         for (const std::string& s : t.sections) {
-            d.headers << fromUtf8(s);
+            headers << fromUtf8(s);
         }
-        d.headers << tr("Lap Time");
+        headers << tr("Lap Time");
         const std::size_t columns = t.sections.size() + 1;
         const auto addRow = [&](const analysis::TimeReportRow& r, int kind) {
             std::vector<Impl::Cell> row;
@@ -623,8 +623,8 @@ void ReportModel::rebuildGrid() {
                 }
                 row.push_back(std::move(cell));
             }
-            d.grid.push_back(std::move(row));
-            d.rowKinds.push_back(kind);
+            grid.push_back(std::move(row));
+            rowKinds.push_back(kind);
         };
         for (const analysis::TimeReportRow& r : t.rows) {
             addRow(r, 0);
@@ -639,6 +639,33 @@ void ReportModel::rebuildGrid() {
             addRow(*t.total, 3);
         }
     }
+    // The same rows and columns (header labels, row labels, row kinds) as on display: the cells change in
+    // place (dataChanged over the whole table, every role), so a view keeps its selection and current cell
+    // across a refresh; any other table resets the model.
+    const auto sameRows = [&grid, &d] {
+        if (grid.size() != d.grid.size()) {
+            return false;
+        }
+        for (std::size_t r = 0; r < grid.size(); ++r) {
+            const std::vector<Impl::Cell>& a = grid[r];
+            const std::vector<Impl::Cell>& b = d.grid[r];
+            if (a.size() != b.size() || (!a.empty() && a.front().text != b.front().text)) {
+                return false;
+            }
+        }
+        return true;
+    };
+    if (headers == d.headers && rowKinds == d.rowKinds && sameRows()) {
+        d.grid = std::move(grid);
+        if (!d.grid.empty() && !d.headers.isEmpty()) {
+            Q_EMIT dataChanged(index(0, 0), index(rowCount() - 1, columnCount() - 1));
+        }
+        return;
+    }
+    beginResetModel();
+    d.headers = std::move(headers);
+    d.grid = std::move(grid);
+    d.rowKinds = std::move(rowKinds);
     endResetModel();
 }
 

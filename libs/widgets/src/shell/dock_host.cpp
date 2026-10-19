@@ -212,6 +212,17 @@ QWidget* DockHost::content(const QString& id) const {
     return backend_->content(id);
 }
 
+QWidget* DockHost::windowOf(const QString& id) const {
+    if (!registered_.contains(id)) {
+        return nullptr;
+    }
+    QWidget* frame = backend_->container(id);
+    if (frame == nullptr) {
+        frame = backend_->content(id);
+    }
+    return frame != nullptr ? frame->window() : &host_;
+}
+
 // Records the last visible state (the target of toggle/focus from Closed) and announces visibility changes.
 void DockHost::announce(const QString& id) {
     const auto it = registered_.find(id);
