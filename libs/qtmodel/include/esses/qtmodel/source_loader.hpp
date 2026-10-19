@@ -66,6 +66,7 @@
 #include <esses/formats/import_log.hpp>
 #include <esses/formats/mapping.hpp>
 #include <esses/formats/registry.hpp>
+#include <esses/formats/source_file_check.hpp>
 #include <esses/formats/unit_mapping_profile.hpp>
 #include <esses/model/ids.hpp>
 #include <esses/model/resolver.hpp>
@@ -198,15 +199,30 @@ public:
     // for every open source (the shell calls it when the application becomes active; the providers check
     // before each decode batch on their own); a changed or missing file marks its source stale:
     // staleChanged(id, true) and one Import Warning row (code open.file_changed, "file changed on disk")
-    // whose action is file.reload_source with the source id. reload() closes the source (its sidecar flushed
-    // first) and opens its path again through open(); when it publishes, sourceReloaded(previous id, source)
-    // fires and the selection slots, filters and Data-window state that named the old source are restored by
-    // RangeId where the ranges still exist (06 section 5.6 sourceReplaced).
+    // whose action is file.reload_source with the source id. checkChangedFilesInBackground() is the same pass
+    // with the re-stats on the TaskPool and the result posted back (the shell's activation check: a stat of
+    // an unreachable share never blocks the GUI thread; D-217); fileChecksPending() counts the passes in
+    // flight. The DecodeLog of every open source is read on a GUI timer (1 s): its new entries reach
+    // importLog (the Messages dock), and ld.io_fault, ld.source_changed or text.source_changed marks the
+    // source stale (Missing for a fault, Changed otherwise), so a source a share dropped under can be
+    // reloaded (D-217). reload() keeps the source until its file is open again (D-217): it is refused while
+    // the file cannot be read (Missing) or the source's edits cannot be written next to it; otherwise the
+    // sidecar is flushed and the path opened again through open() beside the stale source. When the reopen
+    // publishes, the stale source is closed, sourceReloaded(previous id, source) fires and the selection
+    // slots, filters and Data-window state that named the old source are restored by RangeId where the ranges
+    // still exist (06 section 5.6 sourceReplaced); a reopen that fails or is cancelled leaves the stale
+    // source as it was.
     std::vector<model::SourceId> checkChangedFiles(); // the sources newly marked stale
+    void checkChangedFilesInBackground();
+    int fileChecksPending() const;
     bool isStale(const model::SourceId& source) const;
+    // What the check found for a stale source (Changed or Missing); Unchanged when it is not stale.
+    formats::SourceFileState staleState(const model::SourceId& source) const;
     std::vector<model::SourceId> staleSources() const;
     Result<void> reload(const model::SourceId& source);
     int pendingReloads() const;
+    // Tests: the re-stat the background check runs on the pool (formats::checkSourceFile by default).
+    void setFileCheckForTest(std::function<formats::SourceFileCheck(const model::SourceProvenance&)> check);
 
 Q_SIGNALS:
     void sourcePublished(std::shared_ptr<const esses::model::DataSource> source);
@@ -276,7 +292,13 @@ private:
     // the destructor; `report` emits sidecar.write_failed rows).
     std::shared_ptr<SidecarSlot> slotFor(const model::SourceId& source);
     void writeDueSidecars();
-    void flushSidecar(const model::SourceId& source, bool report);
+    // False when a document was due and could not be written; with `keepOnFailure` it stays due (a reload
+    // that is then refused loses no edit, D-217).
+    bool flushSidecar(const model::SourceId& source, bool report, bool keepOnFailure = false);
+    // M4 reload (D-217): the reopen of a stale source has the same content id; it replaces the stale source
+    // (closed first, its decode log kept for the reopen). True when `source` is such a reopen.
+    bool reloadSameContent(const std::filesystem::path& path, const model::SourceId& source);
+    bool keepDecodeLogOnClose_ = false;
 
     TaskPool& pool_;
     Dispatcher& dispatcher_;

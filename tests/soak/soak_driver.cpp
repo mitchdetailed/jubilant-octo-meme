@@ -901,8 +901,9 @@ void SaturdayDriver::reloadOne(int k) {
         variantOnDisk_[index] = !variantOnDisk_[index];
     }
     // Coming back to the application marks it stale; the reload reopens it with its selection.
-    Q_EMIT qApp->applicationStateChanged(Qt::ApplicationActive);
-    QVERIFY2(win.loader().isStale(*before), "reload: the replaced log is not stale");
+    Q_EMIT qApp->applicationStateChanged(Qt::ApplicationActive); // the re-stats run on the pool (D-217)
+    SOAK_WAIT(win.loader().isStale(*before) && win.loader().fileChecksPending() == 0,
+              "reload: the replaced log is not stale", static_cast<int>(options_.settleTimeoutMs));
     QVERIFY(win.commands().isEnabled(QString::fromLatin1(widgets::ReloadShell::kCommand)));
     bool fromMessages = false;
     if (k % 2 == 0) {

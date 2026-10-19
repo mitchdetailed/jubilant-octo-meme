@@ -64,7 +64,9 @@ bool ReloadShell::reloadSource(const std::optional<model::SourceId>& source) {
     const std::shared_ptr<const model::DataSource> src = d.loader->source(*target);
     const QString name =
         src == nullptr ? QString() : QString::fromStdString(pathToUtf8(src->prov.path.filename()));
-    if (!d.loader->reload(*target).ok()) {
+    if (const Result<void> r = d.loader->reload(*target); !r) {
+        // The source stays open and stale (D-217): say why.
+        hint(tr("%1 cannot be reloaded now: %2").arg(name, QString::fromStdString(r.error().message)));
         return false;
     }
     hint(tr("Reloading %1").arg(name));
@@ -130,7 +132,11 @@ void ReloadShell::windowReady() {
         connections_.push_back(connect(qGuiApp, &QGuiApplication::applicationStateChanged, this,
                                        [this](Qt::ApplicationState state) {
                                            if (state == Qt::ApplicationActive) {
-                                               static_cast<void>(checkNow());
+                                               // The re-stats on the pool: a share that dropped never
+                                               // freezes the window (D-217).
+                                               if (auto& w = impl(); w.loader != nullptr) {
+                                                   w.loader->checkChangedFilesInBackground();
+                                               }
                                            }
                                        }));
     }

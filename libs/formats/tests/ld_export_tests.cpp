@@ -327,6 +327,30 @@ TEST_CASE("ld export: an in-memory source is quantised with its encodings", "[un
     CHECK_FALSE(fs::exists(dir.path() / "nounits.ld"));
 }
 
+// Regression (PR #5 review E2, D-217): an export that writes no companion leaves no other companion beside
+// the .ld (an earlier export to the same name, another file's), which the reader would merge into it.
+TEST_CASE("ld export: a companion already beside the output goes when none is written", "[unit][ld_export]") {
+    ld::test::TempDir dir("export-stale-ldx");
+    const fs::path in = dir.path() / "in.ld";
+    writeLd(in, mixedInput(), fixedIdentity());
+    const auto reg = ImporterRegistry::withBuiltins(&shippedUnits());
+    auto opened = reg->open(in, {}, context(&shippedUnits()));
+    REQUIRE(opened.ok());
+    const fs::path out = dir.path() / "out.ld";
+    writeText(dir.path() / "out.ldx", richLdx()); // markers and details of another file
+    ExportView view;
+    view.source = opened->source;
+    auto rep = reg->writer("motec.ld")->write(out, view, {}, {}, {});
+    REQUIRE(rep.ok());
+    REQUIRE(rep->files.size() == 1); // the .ld alone: nothing of this source needs a companion
+    CHECK_FALSE(fs::exists(dir.path() / "out.ldx"));
+    auto back = reg->open(out, {}, context(&shippedUnits()));
+    REQUIRE(back.ok());
+    for (const model::Marker& m : back->source->layers[0].markers) {
+        CHECK(m.prov != model::Provenance::Companion);
+    }
+}
+
 TEST_CASE("ld export: options, dialects and errors", "[unit][ld_export]") {
     ld::test::TempDir dir("export-options");
     const fs::path in = dir.path() / "in.ld";

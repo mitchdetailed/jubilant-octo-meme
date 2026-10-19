@@ -51,8 +51,9 @@ ReportSlotRole roleOf(plot::SlotKind kind) {
     return ReportSlotRole::Main;
 }
 
-// The channel table of one run: (source, canonical layer, name) -> what the lookup returns.
-using ChannelKey = std::tuple<const model::DataSource*, std::string, std::string>;
+// The channel table of one run: (source, canonical layer, name, display unit) -> what the lookup returns; the
+// display unit is part of the key, so one channel listed twice in two units resolves twice (D-217).
+using ChannelKey = std::tuple<const model::DataSource*, std::string, std::string, std::string>;
 using ChannelMap = std::map<ChannelKey, analysis::ReportChannelData>;
 
 plot::TimeFormat timeFormatOf(const QString& component, const QString& project, int& decimals) {
@@ -309,7 +310,7 @@ struct ReportModel::Impl {
         if (run.kind == Kind::Channel) {
             for (const analysis::ReportSource& s : run.inputs.sources) {
                 for (const analysis::ReportChannel& c : run.channelSpec.channels) {
-                    ChannelKey key{s.source.get(), s.layer, c.name};
+                    ChannelKey key{s.source.get(), s.layer, c.name, c.displayUnit};
                     if (table->contains(key)) {
                         continue;
                     }
@@ -329,8 +330,8 @@ struct ReportModel::Impl {
         }
         run.units = maths.units();
         run.inputs.units = run.units.get();
-        run.inputs.channels = [table](const analysis::ReportSource& s, std::string_view name) {
-            const auto it = table->find(ChannelKey{s.source.get(), s.layer, std::string(name)});
+        run.inputs.channels = [table](const analysis::ReportSource& s, const analysis::ReportChannel& c) {
+            const auto it = table->find(ChannelKey{s.source.get(), s.layer, c.name, c.displayUnit});
             return it != table->end() ? it->second : analysis::ReportChannelData{};
         };
     }

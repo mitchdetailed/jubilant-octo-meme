@@ -99,8 +99,10 @@ struct ReportChannelData {
     std::string displayUnit;
     int dps = 2;
 };
+// The spec's own entry is passed (its name and display unit), so that one channel listed twice with two
+// display units resolves twice (D-217).
 using ReportChannelLookup =
-    std::function<ReportChannelData(const ReportSource& source, std::string_view name)>;
+    std::function<ReportChannelData(const ReportSource& source, const ReportChannel& channel)>;
 
 struct ReportInputs {
     std::vector<ReportSource> sources;

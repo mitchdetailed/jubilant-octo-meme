@@ -15,14 +15,20 @@ Each command takes a package that package.py made, starts what is inside the way
 Commands:
   windows-installer --installer <setup.exe> [--runtime-test <setup-runtime-test.exe>]  silent install into a
         temporary folder with the .ld association task, the uninstall entry's DisplayVersion, the association, the
-        programs, uninstall; with --runtime-test: an administrative install that requires a runtime no machine
-        has is refused (exit code 7, nothing installed) and a per-user one installs the runtime DLLs beside
-        esses.exe (08 section 7.1, the installer's runtime check)
-  windows-portable --zip <portable.zip>     unzip, settings beside the program, nothing under %APPDATA%\\esses,
-        associate-ld.cmd and unassociate-ld.cmd (--no-registry leaves them out, on a developer's machine)
+        programs; an upgrade over it (files an earlier package had and this one has not, app-local runtime DLLs
+        included, are gone; a .ld association another program took meanwhile stays; D-217), uninstall; with
+        --runtime-test: an administrative install that requires a runtime no machine has is refused (exit code 7,
+        nothing installed) and a per-user one installs the runtime DLLs beside esses.exe (08 section 7.1, the
+        installer's runtime check), and its uninstall leaves a .ld association another program owns
+  windows-portable --zip <portable.zip>     unzip into a folder whose name holds & and %, settings beside the
+        program, nothing written under %APPDATA%\\esses (compared file by file when the folder exists already;
+        D-217), associate-ld.cmd and unassociate-ld.cmd (--no-registry leaves them out, on a developer's machine)
   appimage --appimage <file>                --version and an offscreen start (APPIMAGE_EXTRACT_AND_RUN), the
         extracted tree
-  dmg --dmg <file>                          mounted read-only (hdiutil), Info.plist, the bundle, the programs
+  dmg --dmg <file> [--macos-minimum <x.y>]  mounted read-only (hdiutil), the bundle, the programs, Info.plist: the
+        executable, the version, LSMinimumSystemVersion = --macos-minimum (the deployment target package.yml
+        builds for, 14.0 by default), .ld as an alternate handler of the log type the bundle exports (not
+        imports; D-217)
   cli --archive <zip or tar.gz>             the standalone esses-cli
 Common: --version <version> [--tag <vX.Y.Z>] [--fixture <a log file>]. --self-test checks the checks.
 Standard library only. Exit status: 0 passed, 1 a check failed, 2 usage error.
@@ -162,6 +168,40 @@ def notices_files(share: str) -> list[str]:
             f"{share}licenses/LGPL-2.1-or-later.txt", f"{share}licenses/MIT.txt", f"{share}data/keymaps/default.json"]
 
 
+# ---- macOS -------------------------------------------------------------------------------------------------------
+
+def info_plist_problems(plist: dict, version: str, minimum: str) -> list[str]:
+    """What is wrong with Esses.app's Info.plist (tools/packaging/macos/Info.plist.in, D-212, D-217)."""
+    problems = []
+    if plist.get("CFBundleExecutable") != "esses":
+        problems.append(f"CFBundleExecutable '{plist.get('CFBundleExecutable')}' is not 'esses'")
+    m = re.match(r"\d+\.\d+\.\d+", version)
+    numeric = m.group(0) if m else version
+    if plist.get("CFBundleShortVersionString") != numeric:
+        problems.append(f"CFBundleShortVersionString '{plist.get('CFBundleShortVersionString')}' is not '{numeric}'")
+    if plist.get("LSMinimumSystemVersion") != minimum:
+        problems.append(f"LSMinimumSystemVersion '{plist.get('LSMinimumSystemVersion')}' is not the deployment "
+                        f"target '{minimum}'")
+    handlers = [d for d in plist.get("CFBundleDocumentTypes", []) if "ld" in d.get("CFBundleTypeExtensions", [])]
+    if not handlers or any(d.get("LSHandlerRank") != "Alternate" for d in handlers):
+        problems.append(".ld is not opened as an alternate handler (LSHandlerRank Alternate)")
+
+    def declares_ld(declarations: list) -> list[str]:
+        return [d.get("UTTypeIdentifier", "") for d in declarations
+                if "ld" in d.get("UTTypeTagSpecification", {}).get("public.filename-extension", [])]
+
+    exported = declares_ld(plist.get("UTExportedTypeDeclarations", []))
+    if len(exported) != 1:
+        problems.append(f"{len(exported)} exported type declarations of .ld instead of 1 (the log type is Esses's own)")
+    if declares_ld(plist.get("UTImportedTypeDeclarations", [])):
+        problems.append("the .ld type is imported (it is Esses's own, so it is exported)")
+    for d in handlers:
+        if exported and exported[0] not in d.get("LSItemContentTypes", []):
+            problems.append(f"the .ld handler's LSItemContentTypes {d.get('LSItemContentTypes', [])} do not name the "
+                            f"exported type '{exported[0]}'")
+    return problems
+
+
 # ---- Windows ----------------------------------------------------------------------------------------------------
 
 def reg_get(root, path: str, name: str = "") -> str | None:
@@ -184,6 +224,50 @@ def wait_gone(path: pathlib.Path, seconds: float) -> bool:
 
 def appdata_settings() -> pathlib.Path:
     return pathlib.Path(os.environ["APPDATA"]) / "esses" / "settings.json"
+
+
+def folder_snapshot(folder: pathlib.Path) -> dict[str, tuple[int, int]] | None:
+    """Every file under `folder` with its size and modification time (ns); None when there is no folder."""
+    if not folder.is_dir():
+        return None
+    out: dict[str, tuple[int, int]] = {}
+    for f in folder.rglob("*"):
+        try:
+            if f.is_file():
+                st = f.stat()
+                out[f.relative_to(folder).as_posix()] = (st.st_size, st.st_mtime_ns)
+        except OSError:
+            continue
+    return out
+
+
+def snapshot_changes(before: dict[str, tuple[int, int]] | None,
+                     after: dict[str, tuple[int, int]] | None) -> list[str]:
+    """What a run wrote into a folder: the folder created, files added, changed or removed (D-217)."""
+    if after is None:
+        return [] if before is None else ["the folder was removed"]
+    if before is None:
+        return ["the folder was created"] + sorted(after)
+    return sorted([f"added {k}" for k in after.keys() - before.keys()] +
+                  [f"changed {k}" for k in after.keys() & before.keys() if after[k] != before[k]] +
+                  [f"removed {k}" for k in before.keys() - after.keys()])
+
+
+def reg_set_default(root, path: str, value: str | None) -> None:
+    """Sets (or, with None, deletes) the default value of a key (the smoke test's stand-in .ld owner)."""
+    import winreg
+    if value is None:
+        try:
+            with winreg.OpenKey(root, path, 0, winreg.KEY_SET_VALUE | winreg.KEY_WOW64_64KEY) as key:
+                winreg.DeleteValue(key, "")
+        except OSError:
+            pass
+        return
+    with winreg.CreateKeyEx(root, path, 0, winreg.KEY_SET_VALUE | winreg.KEY_WOW64_64KEY) as key:
+        winreg.SetValueEx(key, "", 0, winreg.REG_SZ, value)
+
+
+OTHER_OWNER = "Esses.SmokeOtherProgram"  # a ProgId that stands for another program owning .ld
 
 
 def windows_installer(report: Report, args) -> None:
@@ -213,6 +297,25 @@ def windows_installer(report: Report, args) -> None:
         r = subprocess.run([str(target / "esses-cli.exe"), "--version"], capture_output=True, text=True, timeout=120)
         report.check(r.returncode == 0 and args.version in r.stdout, "esses-cli --version names the version")
         offscreen_start(report, [str(exe)], args.fixture, appdata_settings())
+        # An upgrade over it (D-217): what an earlier package had and this one has not goes (app-local runtime DLLs
+        # of an earlier per-user install on an old runtime, a Qt plugin or module no longer deployed), and a .ld
+        # association that another program took after the first install is not taken back (no /MERGETASKS).
+        stale = [target / "msvcp140.dll", target / "vcruntime140_1.dll", target / "platforms" / "qstale.dll",
+                 target / "Qt6Stale.dll"]
+        for f in stale:
+            f.write_bytes(b"stale")
+        ld_key = r"Software\Classes\.ld"
+        reg_set_default(winreg.HKEY_LOCAL_MACHINE, ld_key, OTHER_OWNER)
+        r = subprocess.run([str(args.installer), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", f"/DIR={target}",
+                            f"/LOG={pathlib.Path(tmp) / 'upgrade.log'}"], timeout=900)
+        report.check(r.returncode == 0, f"a silent upgrade over it exits 0 (got {r.returncode})")
+        left = [f.relative_to(target).as_posix() for f in stale if f.exists()]
+        report.check(not left, "the upgrade removes what this package does not install" +
+                     (f" (left: {', '.join(left)})" if left else ""))
+        report.check((target / "platforms").is_dir() and exe.exists(), "the upgrade installs the package again")
+        report.check(reg_get(winreg.HKEY_LOCAL_MACHINE, ld_key) == OTHER_OWNER,
+                     "the upgrade leaves .ld with the program that took it")
+        reg_set_default(winreg.HKEY_LOCAL_MACHINE, ld_key, "Esses.LogFile")
         subprocess.run([str(target / "unins000.exe"), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"], timeout=300)
         report.check(wait_gone(exe, 300), "uninstall removes esses.exe")
         report.check(reg_get(winreg.HKEY_LOCAL_MACHINE, uninstall_key, "DisplayVersion") is None,
@@ -247,18 +350,28 @@ def runtime_test(report: Report, args) -> None:
         report.check(reg_get(winreg.HKEY_CURRENT_USER, key, "DisplayVersion") == args.version,
                      "the per-user uninstall entry names the version")
         if (user / "unins000.exe").exists():
+            # Another program owns .ld when Esses is uninstalled: its association stays (D-217).
+            ld_key = r"Software\Classes\.ld"
+            previous = reg_get(winreg.HKEY_CURRENT_USER, ld_key)
+            reg_set_default(winreg.HKEY_CURRENT_USER, ld_key, OTHER_OWNER)
             subprocess.run([str(user / "unins000.exe"), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"], timeout=300)
             report.check(wait_gone(user / "esses.exe", 300), "the per-user uninstall removes esses.exe")
+            report.check(reg_get(winreg.HKEY_CURRENT_USER, ld_key) == OTHER_OWNER,
+                         "the uninstall leaves a .ld association another program owns")
+            reg_set_default(winreg.HKEY_CURRENT_USER, ld_key, previous)
 
 
 def windows_portable(report: Report, args) -> None:
     import winreg
     appdata = appdata_settings().parent
-    existed = appdata.exists()
+    before = folder_snapshot(appdata)  # compared file by file afterwards, also when the folder exists (D-217)
     with tempfile.TemporaryDirectory() as tmp:
+        # A folder name with & and % (a user's "R&D 100% tools"): the association scripts quote the path (D-217).
+        unzip = pathlib.Path(tmp) / "R&D 100% tools"
+        unzip.mkdir()
         with zipfile.ZipFile(args.zip) as z:
-            z.extractall(tmp)
-        roots = [p for p in pathlib.Path(tmp).iterdir() if p.is_dir()]
+            z.extractall(unzip)
+        roots = [p for p in unzip.iterdir() if p.is_dir()]
         report.check(len(roots) == 1, "the zip holds one folder")
         root = roots[0]
         report.check(root.name == f"esses-{args.version}-win64-portable", f"the folder is named for the version")
@@ -269,16 +382,19 @@ def windows_portable(report: Report, args) -> None:
         exe = root / "esses.exe"
         run_version(report, [str(exe)], args.version, args.tag)
         offscreen_start(report, [str(exe)], args.fixture, root / "config" / "settings.json", cwd=root)
-        if not existed:
-            report.check(not appdata.exists(), f"the portable run wrote nothing to {appdata}")
+        changes = snapshot_changes(before, folder_snapshot(appdata))
+        report.check(not changes, f"the portable run wrote nothing to {appdata}" +
+                     (f" ({'; '.join(changes[:5])})" if changes else
+                      "" if before is None else f" (compared with the {len(before)} file(s) there before)"))
         if args.no_registry:
             print("skipped  the association scripts (--no-registry: this machine's associations stay as they are)")
             return
-        r = subprocess.run(["cmd", "/c", str(root / "associate-ld.cmd")], capture_output=True, text=True, timeout=60)
+        # As Explorer runs a script (cmd /c ""<path>""): quoted whole, whatever the folder's name.
+        r = subprocess.run(f'cmd /d /c ""{root / "associate-ld.cmd"}""', capture_output=True, text=True, timeout=60)
         command = reg_get(winreg.HKEY_CURRENT_USER, r"Software\Classes\Esses.LogFile\shell\open\command")
         report.check(r.returncode == 0 and command == f'"{exe}" -l "%1"',
                      f"associate-ld.cmd associates .ld with this esses.exe (got {command})")
-        subprocess.run(["cmd", "/c", str(root / "unassociate-ld.cmd")], capture_output=True, text=True, timeout=60)
+        subprocess.run(f'cmd /d /c ""{root / "unassociate-ld.cmd"}""', capture_output=True, text=True, timeout=60)
         report.check(reg_get(winreg.HKEY_CURRENT_USER, r"Software\Classes\Esses.LogFile\shell\open\command") is None
                      and reg_get(winreg.HKEY_CURRENT_USER, r"Software\Classes\.ld") != "Esses.LogFile",
                      "unassociate-ld.cmd removes it")
@@ -328,13 +444,11 @@ def dmg(report: Report, args) -> None:
             report.check((mount / "Applications").is_symlink(), "the DMG links /Applications")
             with open(app / "Contents" / "Info.plist", "rb") as f:
                 plist = plistlib.load(f)
-            numeric = re.match(r"\d+\.\d+\.\d+", args.version).group(0)
-            report.check(plist.get("CFBundleExecutable") == "esses", "Info.plist: CFBundleExecutable esses")
-            report.check(plist.get("CFBundleShortVersionString") == numeric,
-                         f"Info.plist: CFBundleShortVersionString {numeric}")
-            types = plist.get("CFBundleDocumentTypes", [])
-            report.check(any("ld" in d.get("CFBundleTypeExtensions", []) and d.get("LSHandlerRank") == "Alternate"
-                             for d in types), "Info.plist: .ld as an alternate handler")
+            for p in info_plist_problems(plist, args.version, args.macos_minimum):
+                report.check(False, f"Info.plist: {p}")
+            if not info_plist_problems(plist, args.version, args.macos_minimum):
+                report.check(True, f"Info.plist: the executable, the version, LSMinimumSystemVersion "
+                                   f"{args.macos_minimum}, .ld as an alternate handler of the exported log type")
             v = subprocess.run(["codesign", "--verify", "--deep", "--strict", str(app)], capture_output=True, text=True,
                                timeout=300)
             report.check(v.returncode == 0, f"the bundle's (ad hoc) signature verifies ({v.stderr.strip()[:200]})")
@@ -373,8 +487,41 @@ def cli_archive(report: Report, args) -> None:
 
 # ---- driver -------------------------------------------------------------------------------------------------------
 
+def association_script_problems(script: pathlib.Path, folder_name: str) -> list[str]:
+    """associate-ld.cmd run from a folder named `folder_name`, as Explorer runs it (cmd /c ""<path>""), with every
+    `reg add` turned into an echo (nothing reaches the registry): what is wrong with the commands it would run
+    (D-217: a folder name with & or % split them)."""
+    problems: list[str] = []
+    with tempfile.TemporaryDirectory() as tmp:
+        folder = pathlib.Path(tmp) / folder_name
+        folder.mkdir()
+        (folder / "esses.exe").write_bytes(b"MZ")
+        text = script.read_text(encoding="utf-8").replace("reg add ", "echo REG-ADD ").replace(" >nul ||", " ||")
+        copy = folder / "associate-ld-echo.cmd"
+        copy.write_text(text, encoding="utf-8", newline="\r\n")
+        r = subprocess.run(f'cmd /d /c ""{copy}""', capture_output=True, text=True, timeout=60)
+        exe = str(folder / "esses.exe")
+        lines = [line for line in r.stdout.splitlines() if line.startswith("REG-ADD ")]
+        if r.returncode != 0 or r.stderr.strip():
+            problems.append(f"exit {r.returncode}, stderr '{r.stderr.strip()[:200]}'")
+        if len(lines) != 5:
+            problems.append(f"{len(lines)} reg commands instead of 5")
+        if not any(f'\\"{exe}\\",0' in line for line in lines):
+            problems.append(f"no DefaultIcon of the whole path ({lines[1:2]})")
+        if not any(f'\\"{exe}\\" -l \\"%1\\"' in line for line in lines):
+            problems.append(f"no open command of the whole path ({lines[2:3]})")
+    return problems
+
+
 def self_test() -> int:
     ok = True
+    if os.name == "nt":  # the portable zip's association script, from awkward folder names (D-217)
+        script = HERE / "windows" / "associate-ld.cmd"
+        for name in ("Esses portable", "R&D 100% (tools)", "a^b (c) !d"):
+            problems = association_script_problems(script, name)
+            for problem in problems:
+                print(f"self-test: associate-ld.cmd from '{name}': {problem}")
+            ok &= not problems
     good = ("esses 0.1.0\ncommit: 56d8065\nQt: 6.12.0 (built with 6.12.0)\nbuild date: 2026-10-19\n"
             "dock library: ADS 5.1.1\nsource: https://github.com/mitchdetailed/jubilant-octo-meme/tree/v0.1.0\n")
     ok &= version_problems(good, "0.1.0", "v0.1.0") == []
@@ -385,6 +532,48 @@ def self_test() -> int:
     dev = good.replace("/tree/v0.1.0", "/commit/56d8065").replace("esses 0.1.0", "esses 0.1.0+3-g56d8065")
     ok &= version_problems(dev, "0.1.0+3-g56d8065") == []
     ok &= any("first line" in p for p in version_problems(dev, "0.1.0"))
+    # The Info.plist checks of dmg (D-217) over the template as CMake configures it, then broken copies.
+    values = {"MACOSX_BUNDLE_EXECUTABLE_NAME": "esses", "MACOSX_BUNDLE_ICON_FILE": "esses.icns",
+              "MACOSX_BUNDLE_GUI_IDENTIFIER": "com.github.mitchdetailed.esses", "MACOSX_BUNDLE_BUNDLE_NAME": "Esses",
+              "MACOSX_BUNDLE_SHORT_VERSION_STRING": "0.1.0", "MACOSX_BUNDLE_BUNDLE_VERSION": "0.1.0.0",
+              "MACOSX_BUNDLE_LONG_VERSION_STRING": "0.1.0", "MACOSX_BUNDLE_COPYRIGHT": "the Esses contributors",
+              "ESSES_MACOS_MINIMUM": "14.0"}
+    template = (HERE / "macos" / "Info.plist.in").read_text(encoding="utf-8")
+    configured = re.sub(r"\$\{(\w+)\}", lambda m: values.get(m.group(1), "UNSET-" + m.group(1)), template)
+    ok &= "UNSET-" not in configured
+    plist = plistlib.loads(configured.encode("utf-8"))
+    problems = info_plist_problems(plist, "0.1.0", "14.0")
+    for problem in problems:
+        print(f"self-test: Info.plist.in: {problem}")
+    ok &= problems == []
+    ok &= info_plist_problems(plist, "0.1.0+3-g56d8065", "14.0") == []
+    ok &= any("CFBundleShortVersionString" in p for p in info_plist_problems(plist, "0.2.0", "14.0"))
+    ok &= any("LSMinimumSystemVersion" in p for p in info_plist_problems(plist, "0.1.0", "15.0"))
+    ok &= any("LSMinimumSystemVersion" in p
+              for p in info_plist_problems({k: v for k, v in plist.items() if k != "LSMinimumSystemVersion"},
+                                           "0.1.0", "14.0"))
+    imported = {k: v for k, v in plist.items() if k != "UTExportedTypeDeclarations"}
+    imported["UTImportedTypeDeclarations"] = plist["UTExportedTypeDeclarations"]  # the type before D-217
+    ok &= len(info_plist_problems(imported, "0.1.0", "14.0")) == 2  # not exported, and imported
+    owner = plistlib.loads(configured.replace("<string>Alternate</string>", "<string>Owner</string>").encode("utf-8"))
+    ok &= any("alternate" in p for p in info_plist_problems(owner, "0.1.0", "14.0"))
+    other = plistlib.loads(configured.encode("utf-8"))
+    other["CFBundleDocumentTypes"][0]["LSItemContentTypes"] = ["public.data"]
+    ok &= any("LSItemContentTypes" in p for p in info_plist_problems(other, "0.1.0", "14.0"))
+    with tempfile.TemporaryDirectory() as tmp:  # the %APPDATA% comparison of windows-portable (D-217)
+        folder = pathlib.Path(tmp) / "esses"
+        ok &= snapshot_changes(None, folder_snapshot(folder)) == []
+        folder.mkdir()
+        (folder / "settings.json").write_text("{}", encoding="utf-8")
+        (folder / "layout.json").write_text("{}", encoding="utf-8")
+        before = folder_snapshot(folder)
+        ok &= snapshot_changes(before, folder_snapshot(folder)) == []
+        (folder / "settings.json").write_text('{"recent": []}', encoding="utf-8")
+        (folder / "new.json").write_text("{}", encoding="utf-8")
+        (folder / "layout.json").unlink()
+        ok &= snapshot_changes(before, folder_snapshot(folder)) == [
+            "added new.json", "changed settings.json", "removed layout.json"]
+        ok &= snapshot_changes(None, folder_snapshot(folder))[0] == "the folder was created"
     with tempfile.TemporaryDirectory() as tmp:
         t = pathlib.Path(tmp)
         settings = t / "settings.json"
@@ -420,6 +609,8 @@ def main() -> int:
     parser.add_argument("--zip", type=pathlib.Path)
     parser.add_argument("--appimage", type=pathlib.Path)
     parser.add_argument("--dmg", type=pathlib.Path)
+    parser.add_argument("--macos-minimum", default="14.0",
+                        help="dmg: the LSMinimumSystemVersion expected (the build's CMAKE_OSX_DEPLOYMENT_TARGET)")
     parser.add_argument("--archive", type=pathlib.Path)
     parser.add_argument("--no-registry", action="store_true",
                         help="windows-portable: leave the association scripts out (a developer's machine)")

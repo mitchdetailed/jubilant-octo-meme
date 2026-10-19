@@ -375,10 +375,16 @@ No `M2-STUB` is left in this library.
 
 - `SourceLoader` (`src/m4_reload/source_loader_reload.cpp`): `checkChangedFiles()` runs `formats::checkSourceFile`
   for every open source not yet stale; a Changed or Missing file marks it stale (until it is reloaded or closed)
-  and `staleChanged(id, true)` follows, once, after the pass. `reload(id)` closes the source (its sidecar written
-  first; `staleChanged(id, false)`) and opens its path again through `open()`; the reopen is found by its path
-  when it publishes (`sourceReloaded(previous, source)`), and a reload whose open fails, is cancelled or finds the
-  file already open ends there (`pendingReloads()`).
+  and `staleChanged(id, true)` follows, once, after the pass. `checkChangedFilesInBackground()` (the shell's
+  activation check since D-217 (g)) runs the same re-stats on the pool and marks on the GUI thread
+  (`fileChecksPending()`; `staleState(id)` says Changed or Missing). `reload(id)` (D-217 (e), amends D-208) keeps
+  the source open: it writes its sidecar first (a failed write refuses the reload with `Io` and keeps the source)
+  and refuses a Missing file (`NotFound`); it opens the path again beside the stale source, and when the new open
+  publishes (`sourceReloaded(previous, source)`) the previous source is closed; a reload whose open fails or is
+  cancelled leaves the stale source as it was (`pendingReloads()`). A reload of an unchanged file
+  (`reloadSameContent`) is the same path. Every second the loader reads each open source's DecodeLog (D-217 (f)):
+  new entries go out as `importLog` (Messages), and `ld.io_fault` marks the source Missing, `ld.source_changed` or
+  `text.source_changed` Changed, at once rather than at the next activation.
 - `source_reload.hpp` (new): `connectSourceReload(loader, selection, messages)` appends the stale source's Messages
   row (`staleSourceMessage`: Import, Warning, `open.file_changed`, the action `file.reload_source` with the id as
   32 hex digits, `sourceIdArgument`/`parseSourceIdArgument`) and restores the selection on `sourceReloaded`; the

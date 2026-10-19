@@ -88,7 +88,8 @@
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "ESSES_BUILD_BENCH": "ON", "ESSES_BUILD_TESTS": "OFF" }
     },
     { "name": "linux-gcc-bench", "displayName": "Linux GCC with Qt, Release, benchmarks (hosted alarm, D-042)",
-      "inherits": ["bench", "linux-gcc-qt"] },
+      "inherits": ["bench", "linux-gcc-qt"],
+      "cacheVariables": { "ESSES_BENCH_GATE": "OFF" } },
     { "name": "win-msvc-bench",  "displayName": "Windows MSVC with Qt 6.7.2 (C:/Qt), Release, benchmarks (reference machine, D-042)",
       "inherits": ["bench", "win-msvc-qt-kit"] },
     { "name": "ci-win-msvc-core",   "inherits": ["win-msvc-core", "ci"] },

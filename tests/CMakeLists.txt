@@ -77,6 +77,21 @@ add_test(NAME lint.version_stamp
          COMMAND "${CMAKE_COMMAND}" "-DSOURCE_ROOT=${CMAKE_SOURCE_DIR}"
                  -P "${CMAKE_CURRENT_SOURCE_DIR}/check_version_stamp.cmake")
 set_tests_properties(lint.version_stamp PROPERTIES LABELS "lint" TIMEOUT 60)
+# The same on a scratch repository of its own (D-217): a release build is stamped from its own tag when another v*
+# tag shares the commit; a modified tree or a later commit is not the release. Registered only where git exists.
+find_package(Git QUIET)
+if(GIT_FOUND)
+  add_test(NAME lint.version_git
+           COMMAND "${CMAKE_COMMAND}" "-DSOURCE_ROOT=${CMAKE_SOURCE_DIR}" "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
+                   "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/version_git"
+                   -P "${CMAKE_CURRENT_SOURCE_DIR}/check_version_git.cmake")
+  set_tests_properties(lint.version_git PROPERTIES LABELS "lint" TIMEOUT 120)
+endif()
+# The hosted bench alarm runs without the reference machine's gates (D-042, D-217).
+add_test(NAME lint.bench_presets
+         COMMAND "${CMAKE_COMMAND}" "-DSOURCE_ROOT=${CMAKE_SOURCE_DIR}"
+                 -P "${CMAKE_CURRENT_SOURCE_DIR}/check_bench_presets.cmake")
+set_tests_properties(lint.bench_presets PROPERTIES LABELS "lint" TIMEOUT 60)
 
 # Self-tests of the stdlib-only lint scripts (01 section 11 items 3 and 11).
 find_package(Python3 3.8 COMPONENTS Interpreter QUIET)

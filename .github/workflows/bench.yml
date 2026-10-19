@@ -68,7 +68,7 @@ jobs:
       QT_QPA_PLATFORM: offscreen
       ESSES_TEST_FONT_DIR: ${{ github.workspace }}/tests/golden/fonts
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
         with: { submodules: false }
       - name: Benchmark sources present?
         id: probe
@@ -81,10 +81,10 @@ jobs:
             echo "::notice::bench/CMakeLists.txt does not exist yet; nothing to measure"
           fi
       - if: steps.probe.outputs.present == 'true'
-        uses: lukka/get-cmake@latest
+        uses: lukka/get-cmake@v3.31.6
       - name: Install Qt ${{ env.QT_VERSION }} (aqtinstall)
         if: steps.probe.outputs.present == 'true'
-        uses: jurplel/install-qt-action@v4
+        uses: jurplel/install-qt-action@v4.1.1
         with:
           version: ${{ env.QT_VERSION }}
           arch: ${{ matrix.qtarch }}
@@ -102,11 +102,13 @@ jobs:
       - name: Build
         if: steps.probe.outputs.present == 'true'
         run: cmake --build --preset ${{ matrix.preset }}
+      # The hosted preset registers the entries without --gate (ESSES_BENCH_GATE=OFF, D-217): a hosted runner is no
+      # reference machine, so the absolute limits of 07 section 12 are not its verdict; the comparison below is.
       - name: Run (one benchmark at a time, label bench)
         if: steps.probe.outputs.present == 'true'
         run: ctest --preset ${{ matrix.preset }}
       - name: Compare with the hosted baseline (+-30 %, warning only)
-        if: steps.probe.outputs.present == 'true'
+        if: always() && steps.probe.outputs.present == 'true'
         shell: bash
         run: |
           results=build/bench-results/${{ matrix.preset }}
@@ -121,7 +123,7 @@ jobs:
             || echo "::warning::hosted benchmarks moved by more than 30 % against $baseline (D-042 alarm)"
       - name: Upload results
         if: always() && steps.probe.outputs.present == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: bench-hosted-${{ matrix.os }}
           path: build/bench-results/
@@ -134,7 +136,7 @@ jobs:
     runs-on: [self-hosted, windows, x64, esses-reference]
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
         with: { submodules: false }
       - name: Benchmark sources present?
         id: probe
@@ -171,7 +173,7 @@ jobs:
           python -I tools\bench_compare.py --results build\bench-results\win-msvc-bench --limits bench\workloads.md
       - name: Upload results
         if: always() && steps.probe.outputs.present == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: bench-reference
           path: build/bench-results/

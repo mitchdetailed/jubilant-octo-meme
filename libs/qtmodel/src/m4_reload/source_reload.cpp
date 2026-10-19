@@ -79,10 +79,10 @@ void connectSourceReload(SourceLoader& loader, DataSelectionModel& selection, Me
                 if (!stale || src == nullptr) {
                     return;
                 }
-                // The state now (the loader keeps only that the file differs).
-                formats::SourceFileState state = formats::checkSourceFile(src->prov).state;
+                // What the check found (no second stat on the GUI thread, D-217).
+                formats::SourceFileState state = l->staleState(id);
                 if (state == formats::SourceFileState::Unchanged) {
-                    state = formats::SourceFileState::Changed; // changed back since: still stale
+                    state = formats::SourceFileState::Changed;
                 }
                 messages->append(staleSourceMessage(*src, state));
             });

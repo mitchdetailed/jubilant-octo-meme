@@ -16,12 +16,25 @@
 //       bindings; settings and the user's keymap.json are not touched).
 //   * bringToFront(): a forwarded request shows the window (restored when minimised), raises and
 //     activates it.
+//   * RequestQueue (D-217): forwarded requests are applied only at the top of the event loop. One that
+//   arrives
+//     while a modal dialog, a menu or any other nested event loop runs (a file prompt holding a component,
+//     "Save the changes?") waits until it has ended, and requests are applied one at a time (a request's own
+//     prompt never runs the next one inside it).
+//   * A forwarded project switch the user cancels ("Save the changes?" answered Cancel) opens none of its
+//   logs
+//     into the project that stays (an Info row says so; D-217).
+//   * reportNoInstanceChannel(): a window that could not listen for later launches says so in Messages
+//     (Warning, code "launch.instance"; D-217): those launches open windows of their own.
 #pragma once
 
 #include "launch_request.hpp"
 
 #include <QString>
 #include <QStringList>
+#include <QTimer>
+#include <deque>
+#include <functional>
 
 class QWidget;
 
@@ -41,5 +54,37 @@ QString applyKeymap(widgets::MainWindow& window, const QString& nameOrFile);
 QStringList applyStartOptions(widgets::MainWindow& window, const LaunchRequest& request);
 
 void bringToFront(QWidget& window);
+
+void reportNoInstanceChannel(widgets::MainWindow& window, const QString& detail);
+
+class RequestQueue {
+public:
+    using Apply = std::function<void(const LaunchRequest&)>;
+    using Busy = std::function<bool()>;
+    static constexpr int kRetryMs = 200;
+
+    // `topLevel`: the event-loop level of the application's own loop (1 inside QApplication::exec; a test
+    // without exec runs at 0). `busy` replaces the check of a modal widget, a popup or a deeper loop (tests).
+    explicit RequestQueue(Apply apply, int topLevel = 1, Busy busy = {});
+    RequestQueue(const RequestQueue&) = delete;
+    RequestQueue& operator=(const RequestQueue&) = delete;
+
+    void enqueue(LaunchRequest request);
+    int pending() const { return static_cast<int>(queue_.size()); }
+    int applied() const { return applied_; }
+    // A modal widget, an open popup (a menu), or an event loop deeper than `topLevel`.
+    static bool guiBusy(int topLevel);
+
+private:
+    void tryApply();
+
+    Apply apply_;
+    int topLevel_;
+    Busy busy_;
+    std::deque<LaunchRequest> queue_;
+    bool applying_ = false;
+    int applied_ = 0;
+    QTimer retry_;
+};
 
 } // namespace esses::app

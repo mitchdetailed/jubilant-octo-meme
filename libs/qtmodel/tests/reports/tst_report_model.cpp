@@ -118,6 +118,26 @@ private Q_SLOTS:
         QCOMPARE(m.pendingCells(), 0);
     }
 
+    // Regression (PR #5 review E11, D-217): one channel listed twice with two display units shows each in its
+    // own unit (the resolution is keyed by the unit too); 49.5 m/s is 178.2 km/h.
+    void aChannelTwiceInTwoUnits() {
+        World w;
+        const auto src = w.threeLaps("rm-units");
+        w.selection.setMain(refOf(*src, kLaps, "Lap 1"));
+        ReportModel m(w.rt.pool(), w.rt.dispatcher(), w.selection, w.maths, nullptr);
+        analysis::ReportSpec spec;
+        spec.channels.push_back(analysis::ReportChannel{"Speed", {analysis::ReportStat::Avg}, ""});
+        spec.channels.push_back(analysis::ReportChannel{"Speed", {analysis::ReportStat::Avg}, "km/h"});
+        m.setChannelReport(spec, QStringLiteral("cr-units"));
+        QVERIFY(settle(m, 0));
+        QCOMPARE(m.lastError(), QString());
+        QCOMPARE(m.rowCount(), 2);
+        QCOMPARE(cell(m, 0, 0), QStringLiteral("Speed avg [m/s]"));
+        QCOMPARE(cell(m, 0, 1), QStringLiteral("49.50"));
+        QCOMPARE(cell(m, 1, 0), QStringLiteral("Speed avg [km/h]"));
+        QCOMPARE(cell(m, 1, 1), QStringLiteral("178.20"));
+    }
+
     void channelsInColumnsAndTheDeltaVsOverlay0() {
         World w;
         const auto src = w.threeLaps();

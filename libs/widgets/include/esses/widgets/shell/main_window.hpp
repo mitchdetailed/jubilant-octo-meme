@@ -161,6 +161,9 @@ public:
     // recovery prompt is answered, `logs` (the -l arguments) are opened, else the project's previous data
     // when options.general.loadPreviousData is on, and the last selection is restored (SessionRestore).
     bool openProject(const std::filesystem::path& folder, std::vector<std::filesystem::path> logs = {});
+    // True when the last openProject() returned false because leaving the open project was cancelled (not
+    // because the project could not be opened); a forwarded launch then drops its logs (D-217).
+    bool projectOpenCancelled() const;
 
     // The answer to "Save changes to the project?" when a dirty project is left (exit or another project)
     // with options.general.saveOnExit off (or its save failed). The default asks with a QMessageBox.

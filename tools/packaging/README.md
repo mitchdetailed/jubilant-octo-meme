@@ -42,6 +42,10 @@ python -I tools\packaging\package.py --build build\release --out build\dist --no
 python -I tools\packaging\smoke.py windows-portable --zip build\dist\esses-<v>-win64-portable.zip --version <v> --no-registry
 ```
 
+`<v>` is the stamped version (`cmake/version.cmake`, D-216 (a), D-217 (i)): `0.1.0` for the tag build,
+`0.1.0-m3+<n>-g<sha>` for a commit `<n>` after the nearest tag `v0.1.0-m3`, `0.1.0+g<sha>` where no version tag is
+reachable (a shallow clone), each with `.dirty` for a modified tree.
+
 `--no-registry` leaves out the association scripts' check, which writes to the user's registry (CI runs it). The
 installer's smoke test installs and uninstalls for real: run it on a VM or a CI runner, not on a working machine.
 ctest runs the tools' self-tests, the icon check and the manifest's consistency (label `packaging`).
@@ -68,7 +72,17 @@ deterministic (sorted entries, the time of `SOURCE_DATE_EPOCH`, else 2026-01-01;
 - **Associations.** Windows: the installer's task `assocld` (preselected unless another program owns `.ld`; silent:
   `/MERGETASKS="assocld"`) and the portable zip's `associate-ld.cmd`; `.csv` is only offered in "Open with".
   Linux: `esses.desktop` with `MimeType=application/x-esses-log;` (needs the desktop's integration of the
-  AppImage). macOS: `CFBundleDocumentTypes` for `ld`, `LSHandlerRank Alternate`.
+  AppImage). macOS: `CFBundleDocumentTypes` for `ld`, `LSHandlerRank Alternate`, and the type exported
+  (`UTExportedTypeDeclarations`); `LSMinimumSystemVersion` is the build's deployment target (14.0 in `package.yml`).
+  `smoke.py dmg` checks these on the built bundle (`--macos-minimum`, the job's `MACOS_DEPLOYMENT_TARGET`).
+  `associate-ld.cmd` hands the folder's path to `reg` through delayed expansion, so a folder named with `&`, `%` or
+  `!` works.
+- **Upgrade and uninstall (Windows, D-217 (l)).** An upgrade first removes what the installer and earlier packages
+  put into `{app}` (`[InstallDelete]`: the runtime DLLs, the Qt modules and the plugin folders) and does not take
+  the previous install's tasks (`UsePreviousTasks=no`), so the association is offered as on a first install. The
+  uninstaller removes `.ld`'s default only while it is still `Esses.LogFile`: another program's association
+  stays. `smoke.py` checks both (an upgrade over the installed package, an uninstall that leaves another
+  program's `.ld`) and compares `%APPDATA%\esses` file by file around the portable run.
 - **Vendor marks.** `package.py` runs `tools/check_vendor_marks.py --tree` on every staged tree (file names, text
   files, the strings of our programs) before it is archived (AC-M4-08).
 

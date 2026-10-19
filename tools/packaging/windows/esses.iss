@@ -24,7 +24,12 @@
 ; Tasks: assocld associates .ld log files (ProgId Esses.LogFile, "esses.exe" -l "%1"; 06 section 19 item 5); it is
 ; preselected in the wizard unless another program owns .ld (an existing installation of the reference product
 ; keeps its association unless the user opts in); a silent install associates only with /MERGETASKS="assocld".
-; .ldx is not associated; .csv only offers Esses in "Open with" (never the default).
+; An upgrade does not take the earlier install's tasks again (UsePreviousTasks=no), so a silent upgrade never takes
+; .ld back from a program that took it meanwhile; the uninstaller removes .ld's default only while it is
+; Esses.LogFile (D-217). .ldx is not associated; .csv only offers Esses in "Open with" (never the default).
+; Upgrades: [InstallDelete] first removes what Setup puts into {app} and an earlier package may have had that this
+; one has not (app-local runtime DLLs of an earlier per-user install on an old runtime, Qt modules and plugin
+; folders), so the files of the version installed are the ones it ships (D-217).
 
 #ifndef AppVersion
   #error Define AppVersion (/DAppVersion=<version>)
@@ -87,6 +92,7 @@ OutputDir={#OutputDir}
 OutputBaseFilename=esses-{#AppVersion}-win64-setup{#OutputSuffix}
 WizardStyle=modern
 ChangesAssociations=yes
+UsePreviousTasks=no
 Compression=lzma2/max
 SolidCompression=yes
 
@@ -96,6 +102,27 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
 Name: "assocld"; Description: "Associate .ld log files with Esses"; Flags: unchecked
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+
+[InstallDelete]
+; Before [Files] (D-217): what this or an earlier package put into {app}, so that an upgrade keeps nothing the new
+; package does not ship. The runtime DLLs come back only where NeedAppLocalRuntime says so.
+Type: files; Name: "{app}\msvcp140*.dll"
+Type: files; Name: "{app}\vcruntime140*.dll"
+Type: files; Name: "{app}\concrt140.dll"
+Type: files; Name: "{app}\vccorlib140.dll"
+Type: files; Name: "{app}\Qt6*.dll"
+Type: files; Name: "{app}\qtadvanceddocking*.dll"
+Type: files; Name: "{app}\d3dcompiler_*.dll"
+Type: files; Name: "{app}\opengl32sw.dll"
+Type: filesandordirs; Name: "{app}\platforms"
+Type: filesandordirs; Name: "{app}\imageformats"
+Type: filesandordirs; Name: "{app}\iconengines"
+Type: filesandordirs; Name: "{app}\styles"
+Type: filesandordirs; Name: "{app}\generic"
+Type: filesandordirs; Name: "{app}\tls"
+Type: filesandordirs; Name: "{app}\networkinformation"
+Type: filesandordirs; Name: "{app}\platforminputcontexts"
+Type: filesandordirs; Name: "{app}\translations"
 
 [Files]
 Source: "{#StageDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
@@ -116,7 +143,8 @@ Root: HKA; Subkey: "Software\Classes\Esses.LogFile"; ValueType: string; ValueNam
 Root: HKA; Subkey: "Software\Classes\Esses.LogFile\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: """{app}\esses.exe"",0"
 Root: HKA; Subkey: "Software\Classes\Esses.LogFile\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\esses.exe"" -l ""%1"""
 Root: HKA; Subkey: "Software\Classes\.ld\OpenWithProgids"; ValueType: string; ValueName: "Esses.LogFile"; ValueData: ""; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\.ld"; ValueType: string; ValueName: ""; ValueData: "Esses.LogFile"; Flags: uninsdeletevalue; Tasks: assocld
+; No uninsdeletevalue: the uninstaller removes .ld's default only while it is still Esses.LogFile (CurUninstallStepChanged).
+Root: HKA; Subkey: "Software\Classes\.ld"; ValueType: string; ValueName: ""; ValueData: "Esses.LogFile"; Tasks: assocld
 ; CSV files: a secondary handler only (in "Open with"), never the default.
 Root: HKA; Subkey: "Software\Classes\Esses.CsvFile"; ValueType: string; ValueName: ""; ValueData: "CSV file (Esses)"; Flags: uninsdeletekey
 Root: HKA; Subkey: "Software\Classes\Esses.CsvFile\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: """{app}\esses.exe"",0"
@@ -266,4 +294,21 @@ begin
     if not LdOwnedElsewhere() then
       WizardSelectTasks('assocld');
   end;
+end;
+
+{ Uninstall (D-217): .ld's default handler is removed only while it is Esses's own; another program that took .ld
+  after Esses was installed keeps it. HKA is HKLM for an administrative install, HKCU for a per-user one. }
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  Root: Integer;
+  ProgId: String;
+begin
+  if CurUninstallStep <> usPostUninstall then
+    exit;
+  if IsAdminInstallMode() then
+    Root := HKLM64
+  else
+    Root := HKCU;
+  if RegQueryStringValue(Root, 'Software\Classes\.ld', '', ProgId) and (ProgId = 'Esses.LogFile') then
+    RegDeleteValue(Root, 'Software\Classes\.ld', '');
 end;

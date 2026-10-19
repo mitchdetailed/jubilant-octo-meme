@@ -20,6 +20,8 @@
 #include <esses/widgets/components/track_editor.hpp>
 
 #include <QCoreApplication>
+#include <QDoubleSpinBox>
+#include <QPushButton>
 #include <QSignalSpy>
 #include <QTableWidget>
 #include <QTest>
@@ -146,6 +148,42 @@ private Q_SLOTS:
         e.session.undoStack().redo();
         QTRY_VERIFY_WITH_TIMEOUT(std::filesystem::exists(path), 30000);
         QCOMPARE(editor.sectionsTable()->rowCount(), static_cast<int>(map->sections.size()));
+    }
+
+    // Regression (PR #5 review U6, D-217): Apply on the section that ends at the track's end (its end is the
+    // centreline's last distance, no round number) keeps that end: the field shows it rounded, which would
+    // leave the track (refused) or shrink the section. A field edited past the end is kept on the track.
+    void applyKeepsTheBoundTheFieldShows() {
+        EditorWorld e("te-apply-end");
+        TrackEditor editor(e.session, e.w.selection, e.w.maths, e.maps);
+        QVERIFY(generated(editor));
+        editor.accept();
+        const auto map = editor.currentMap();
+        QVERIFY(map != nullptr);
+        const auto last = std::max_element(map->sections.begin(), map->sections.end(),
+                                           [](const auto& a, const auto& b) { return a.endM < b.endM; });
+        QVERIFY(last != map->sections.end());
+        QCOMPARE(last->endM, map->lengthM);
+        const int row = static_cast<int>(last - map->sections.begin());
+        editor.sectionsTable()->setCurrentCell(row, 0);
+        QCOMPARE(editor.endField()->value(),
+                 QString::number(map->lengthM, 'f', editor.endField()->decimals()).toDouble());
+        auto* apply = editor.findChild<QPushButton*>(QStringLiteral("trackEditorApply"));
+        QVERIFY(apply != nullptr);
+        const int before = e.session.undoStack().count();
+        apply->click();
+        QVERIFY2(editor.lastError().isEmpty(), qPrintable(editor.lastError()));
+        QCOMPARE(e.session.undoStack().count(), before + 1);
+        const analysis::TrackSection& kept = editor.currentMap()->sections[static_cast<std::size_t>(row)];
+        QCOMPARE(kept.endM, map->lengthM); // exactly the stored end, not the field's rounding
+        QCOMPARE(kept.startM, last->startM);
+        // An end typed beyond the track is the track's end.
+        editor.sectionsTable()->setCurrentCell(row, 0);
+        editor.endField()->setValue(editor.endField()->maximum());
+        editor.startField()->setValue(editor.startField()->value() - 1.0);
+        apply->click();
+        QVERIFY2(editor.lastError().isEmpty(), qPrintable(editor.lastError()));
+        QVERIFY(editor.currentMap()->sections[static_cast<std::size_t>(row)].endM <= map->lengthM);
     }
 
     void userSectionsPersistAndReload() {

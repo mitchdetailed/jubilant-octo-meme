@@ -175,6 +175,7 @@ struct MainWindow::Impl {
     bool restoreQueued = false;                     // SessionRestore waits for the recovery answer
     bool recoveryDeferred = false;                  // "Later": the journal stays until the next open
     bool opening = false;                           // inside openProject: syncDocuments waits for its rebuild
+    bool projectOpenCancelled = false; // the last openProject stopped at "Save the changes?" (D-217)
     std::function<ExitAnswer()> exitPrompt;
     // M2 editors: the panel and the Channel Status window live with the window, the dialogs from first use.
     MappingPanel* mappingPanel = nullptr;

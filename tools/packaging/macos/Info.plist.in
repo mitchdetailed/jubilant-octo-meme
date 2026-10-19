@@ -4,7 +4,8 @@
 <!-- SPDX-License-Identifier: MIT -->
 <!-- The Info.plist of Esses.app (08 section 7.2, 06 section 19 item 5; D-212): apps/app/CMakeLists.txt names this
      file as MACOSX_BUNDLE_INFO_PLIST and sets the MACOSX_BUNDLE_* values; .ld log files open with Esses as an
-     alternate handler (LSHandlerRank Alternate: another application keeps its role). -->
+     alternate handler (LSHandlerRank Alternate: another application keeps its role). The log type is Esses's own,
+     so it is exported; LSMinimumSystemVersion is the build's deployment target (D-217). -->
 <plist version="1.0">
 <dict>
   <key>CFBundleDevelopmentRegion</key>
@@ -31,6 +32,8 @@
   <string>${MACOSX_BUNDLE_BUNDLE_NAME} ${MACOSX_BUNDLE_LONG_VERSION_STRING}</string>
   <key>NSHumanReadableCopyright</key>
   <string>${MACOSX_BUNDLE_COPYRIGHT}</string>
+  <key>LSMinimumSystemVersion</key>
+  <string>${ESSES_MACOS_MINIMUM}</string>
   <key>NSHighResolutionCapable</key>
   <true/>
   <key>NSPrincipalClass</key>
@@ -56,7 +59,7 @@
       </array>
     </dict>
   </array>
-  <key>UTImportedTypeDeclarations</key>
+  <key>UTExportedTypeDeclarations</key>
   <array>
     <dict>
       <key>UTTypeIdentifier</key>

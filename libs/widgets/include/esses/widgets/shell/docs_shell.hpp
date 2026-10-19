@@ -16,13 +16,16 @@
 //     directory (the tests, a --data-dir at a checkout) finds the repository's pages.
 //   * Not installed (a build tree, whose data directory is <build>/bin/data): the start page in the public
 //     repository, onlineUrl(): kRepositoryUrl + "/blob/<ref>/docs/user/index.md" with <ref> the build's tag
-//     ("v" + the version when the version is exactly a tag: "0.1.0", "0.1.0-m4") and "main" otherwise (a
-//     build after a tag, "0.1.0+3-gabc1234", a dirty build, an unexpected form).
-//   * openContents() (what the command runs) hands the installed page's file URL to the URL opener, then
-//     the online page when there is no installed page or the opener could not open it (no program for .md
-//     files); when neither opens, a Messages warning (origin System, source "Help", code kNotOpenedCode)
-//     names both places, the Messages dock is shown and the status bar says so. Tests replace the opener
-//     (setUrlOpener), so no test ever starts a browser.
+//     ("v" + the version when the version is exactly a tag: "0.1.0", "0.1.0-m4", "0.1.0-beta-1") and "main"
+//     otherwise (a build after a tag, "0.1.0+3-gabc1234", "0.1.0+gabc1234" without a tag, a dirty build, an
+//     unexpected form).
+//   * openContents() (what the command runs) hands the installed page's file URL to the URL opener when a
+//     program opens .md files (hasDefaultHandler; on Windows the association, since the shell otherwise shows
+//     its "How do you want to open this file?" chooser and reports success; D-217), else, or when the opener
+//     could not open it, the online page; when neither opens, a Messages warning (origin System, source
+//     "Help", code kNotOpenedCode) names both places, the Messages dock is shown and the status bar says so.
+//     Tests replace the opener (setUrlOpener) and the handler query (setHandlerQuery), so no test ever starts
+//     a browser.
 // The command has the keymap row help.contents (implemented in M4; its KEYMAP_TEST is in
 // tests/ui/keymap/keymap_m4_docs_cases.hpp). Files of the package (docs/milestones/M4.md section 3):
 // src/shell/main_window_m4_docs.cpp, this header, tests/m4_docs/, docs/user/, CLEANROOM.md.
@@ -54,12 +57,19 @@ public:
     static constexpr const char* kNotOpenedCode = "help.not_opened";
     // Opens a URL (the default: QDesktopServices::openUrl); false when it could not.
     using UrlOpener = std::function<bool(const QString& url)>;
+    // Whether a program opens files of `suffix` (".md"); the default is hasDefaultHandler.
+    using HandlerQuery = std::function<bool(const QString& suffix)>;
 
     explicit DocsShell(MainWindow& window);
     ~DocsShell() override;
 
     // Replaces the URL opener; an empty one restores the default.
     void setUrlOpener(UrlOpener opener);
+    // Replaces the handler query; an empty one restores the default.
+    void setHandlerQuery(HandlerQuery query);
+    // Windows: whether `suffix` has an open command (AssocQueryString); elsewhere true (the platform's opener
+    // reports a missing handler itself).
+    static bool hasDefaultHandler(const QString& suffix);
     // The installed start page as a file URL (fully encoded); empty when it is not installed.
     QString contentsUrl() const;
     // Opens the documentation as the command does: the URL that opened, or empty when none did.
@@ -76,6 +86,7 @@ private:
     bool open(const QString& url) const;
 
     UrlOpener opener_;
+    HandlerQuery handlerQuery_;
 };
 
 } // namespace esses::widgets

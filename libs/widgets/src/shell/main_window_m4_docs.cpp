@@ -23,7 +23,20 @@
 #include <QUrl>
 #include <QVariantList>
 #include <array>
+#include <string>
 #include <utility>
+
+#if defined(Q_OS_WIN)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+// windows.h first
+#include <shlwapi.h>
+#endif
 
 namespace esses::widgets {
 
@@ -53,6 +66,23 @@ DocsShell::DocsShell(MainWindow& window) : ShellExtension(window, kKey) {}
 
 DocsShell::~DocsShell() = default;
 
+void DocsShell::setHandlerQuery(HandlerQuery query) {
+    handlerQuery_ = std::move(query);
+}
+
+bool DocsShell::hasDefaultHandler(const QString& suffix) {
+#if defined(Q_OS_WIN)
+    const std::wstring extension = suffix.toStdWString();
+    DWORD size = 0;
+    const HRESULT hr = AssocQueryStringW(ASSOCF_INIT_IGNOREUNKNOWN | ASSOCF_NOTRUNCATE, ASSOCSTR_COMMAND,
+                                         extension.c_str(), L"open", nullptr, &size);
+    return (hr == S_OK || hr == S_FALSE) && size > 1;
+#else
+    static_cast<void>(suffix);
+    return true;
+#endif
+}
+
 void DocsShell::setUrlOpener(UrlOpener opener) {
     opener_ = std::move(opener);
 }
@@ -77,7 +107,7 @@ std::optional<std::filesystem::path> DocsShell::installedStartPage(const Paths& 
 QString DocsShell::onlineUrl(const QString& version) {
     // Exactly a tag: MAJOR.MINOR.PATCH with an optional pre-release ("0.1.0-m4"); cmake/version.cmake adds
     // "+N-gHASH" after a tag and ".dirty" (or, at a tag, "-dirty") to a modified tree.
-    static const QRegularExpression tag(QStringLiteral("^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.]+)?$"));
+    static const QRegularExpression tag(QStringLiteral("^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$"));
     const bool exact = tag.match(version).hasMatch() && !version.contains(QLatin1String("dirty"));
     const QString ref = exact ? QStringLiteral("v") + version : QStringLiteral("main");
     return QString::fromLatin1(kRepositoryUrl) + QStringLiteral("/blob/") + ref + QLatin1Char('/') +
@@ -98,7 +128,11 @@ bool DocsShell::open(const QString& url) const {
 
 QString DocsShell::openContents() {
     const std::optional<std::filesystem::path> page = installedStartPage(impl().paths);
-    if (page) {
+    // No program for .md files: the shell would show its chooser and report success (D-217), so straight
+    // online.
+    const bool handled =
+        handlerQuery_ ? handlerQuery_(QStringLiteral(".md")) : hasDefaultHandler(QStringLiteral(".md"));
+    if (page && handled) {
         const QString local = fileUrl(*page);
         if (open(local)) {
             hint(tr("Opening the user documentation"));
@@ -107,7 +141,7 @@ QString DocsShell::openContents() {
     }
     const QString online = onlineUrl(buildVersion());
     if (open(online)) {
-        hint(page ? tr("No program opened the installed pages: opening the online user documentation")
+        hint(page ? tr("No program opens the installed pages: opening the online user documentation")
                   : tr("Opening the online user documentation"));
         return online;
     }

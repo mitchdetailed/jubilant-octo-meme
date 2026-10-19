@@ -194,6 +194,37 @@ All notable changes are recorded here, newest first. The project follows semanti
   project and the log (the command line of the demo of 07 §7.5); the application's tests read a child's
   `settings.json` through `esses::readWholeFile`. The soak no longer fails at its 17th cycle, a restart right after
   Close All, where it looked for a Main that was not there.
+- The M4 fix pass (wave 3, D-217): PR #5's first CI run and the audit's and reviews' findings. The main window no
+  longer crashes at its teardown under Qt 6.12 (a dock added after the first tab bar: the window now deletes its
+  dock contents and other children before its layout); three lines take a form every clang-format release accepts;
+  the vendor-mark scan of programs ignores an allow-listed literal that an optimiser split into immediates; the
+  Windows Qt install runs aqtinstall with one worker, so its 7-Zip processes no longer race for the kit's folder
+  (`.github/aqt-settings.ini`), and still tries twice; every action of ci.yml and bench.yml is pinned and `package`
+  runs on every pull request. **Reload** keeps the stale source open until its file is open again (a failed sidecar
+  write or a missing file refuses it; the selection and edits move to the new source), decode faults and changes
+  found while Esses stays active reach Messages and mark the source stale at once, and the activation check runs on
+  the pool.
+  **Single instance:** a forwarded request waits until no dialog or menu is open and applies after its answer
+  reached the client; the channel's name carries a per-folder random salt (`instance.salt`) and the Windows pipe
+  grants only the user; a POSIX client connects without blocking; a launch that can neither forward nor listen says
+  so in Messages; a cancelled project switch opens none of the request's logs. **Versions:** a release build is
+  stamped from its own tag whatever other tags the commit carries; a build without a reachable version tag is
+  `<project version>+g<hash>` (`lint.version_git`). **esses-cli convert:** a `.ld` cut carries its own Log Time, Log
+  Date and Start Lap; a stale `.ldx` beside the output is removed when none is written; only a `.ld` input's
+  companion is protected; a conversion that writes no channel leaves no file and exits 1; a channel named twice is
+  exit 2. **Bench:** new rows `plot.relayout_resize_20tr`, `values.refresh_250ch` and `app.startup_empty_warm` (07
+  §12's last MVP rows); the hosted preset records results without the reference gates (`ESSES_BENCH_GATE`). The
+  Values window computes only the rows on screen and draws its cells without the style's text layout (1.65 ms for
+  250 channels, was 2.6 ms). **Packaging:** an upgrade removes stale runtime DLLs and Qt plugins and offers the
+  association again; the uninstaller leaves another program's `.ld` association; the portable association script
+  works from a folder with `&` in its name; the macOS bundle names its minimum system and exports the log type
+  (`smoke.py dmg` checks both). Smaller: a time_distance group's vertical zoom follows it through a move, undo and
+  redo and stays with a group edited in place (a channel added or removed, a rename); the Track Editor keeps the
+  bound its field shows; Help Contents goes online when no program opens `.md`; the Data window's badges are
+  drawn at each DPR; a channel report shows one channel in two units; File > Export Data survives the component
+  closing during its prompts; one `ld.source_changed` per source in its DecodeLog. Deferred: the macOS strips at
+  DPR 1.5 and 2, crisp 2 px lines at DPR 2 (the maintainer decides), same-size same-mtime replacements, Qt's bundled
+  notices (`docs/milestones/M4.md` §10 items 51-54).
 
 ## Unreleased (M3)
 

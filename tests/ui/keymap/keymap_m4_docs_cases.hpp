@@ -6,7 +6,8 @@
 // Fixture, Case and Before (as keymap_m3_cases.hpp), so it uses only what that file includes (docs_shell.hpp,
 // QFileInfo and QUrl among them since the integration, D-216).
 // help.contents (global, F1; from the Data window and from the palette too): the arrange replaces the
-// shell's URL opener by one that records the URL and reports success, so no browser starts. The fixture's
+// shell's URL opener by one that records the URL and reports success, so no browser starts, and the handler
+// query by one that says a program opens .md files (D-217). The fixture's
 // data directory is the repository's data/, beside docs/user/, the layout of an installation
 // (docs_shell.hpp), so verify expects exactly one URL: the file URL of the repository's docs/user/index.md
 // (compared as the canonical local path), and the window's hint.
@@ -25,6 +26,8 @@ void addM4DocsCases(std::map<QString, Case>& table) {
                                         docsOpened << url;
                                         return true;
                                     });
+                                    // As on a machine with a program for .md files (D-217).
+                                    docs->setHandlerQuery([](const QString&) { return true; });
                                     f.w->clearHint();
                                 },
                                 {},

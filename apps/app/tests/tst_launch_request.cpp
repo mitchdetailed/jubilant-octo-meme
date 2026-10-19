@@ -15,6 +15,7 @@
 
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QRegularExpression>
@@ -226,6 +227,23 @@ private Q_SLOTS:
         QVERIFY(lines[1].startsWith(QStringLiteral("commit: ")));
         QVERIFY(lines[2].startsWith(QStringLiteral("Qt: ")));
         QVERIFY(lines[3].startsWith(QStringLiteral("build date: ")));
+    }
+
+    // D-217 (U16): the channel's name mixes in a random salt kept in the settings folder: stable for one
+    // folder, another for a new folder with the same path.
+    void theNameCarriesTheFoldersSalt() {
+        EnvGuard guard("ESSES_INSTANCE_NAME");
+        qunsetenv("ESSES_INSTANCE_NAME");
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const std::filesystem::path folder = test::fsPath(dir.path() + QStringLiteral("/settings"));
+        const QString first = instanceName(folder);
+        QCOMPARE(instanceName(folder), first);
+        const QString saltFile = dir.path() + QStringLiteral("/settings/instance.salt");
+        QVERIFY(QFileInfo::exists(saltFile));
+        QCOMPARE(test::fileText(saltFile).trimmed().size(), 32);
+        QVERIFY(QFile::remove(saltFile)); // a new folder at the same path: another salt, another name
+        QVERIFY(instanceName(folder) != first);
     }
 
     // D-212: one channel per user and settings folder; ESSES_INSTANCE_NAME replaces it, made safe.

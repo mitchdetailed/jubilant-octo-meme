@@ -12,6 +12,8 @@
 #include "launch.hpp"
 #include "launch_request.hpp"
 
+#include <esses/base/json_doc.hpp>
+#include <esses/project/project_file.hpp>
 #include <esses/project/scheme.hpp>
 #include <esses/qtmodel/keymap_binder.hpp>
 #include <esses/qtmodel/messages_model.hpp>
@@ -22,6 +24,8 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
@@ -193,6 +197,48 @@ private Q_SLOTS:
         QCOMPARE(QDir::cleanPath(opened.at(0).at(0).toString()), QDir::cleanPath(csv));
         QCOMPARE(reopened.count(), 0);
         QTRY_COMPARE_WITH_TIMEOUT(sh.w->loader().sources().size(), std::size_t{1}, 60000);
+    }
+
+    // Regression (PR #5 review U15, D-217): a forwarded switch to another project that the user cancels at
+    // "Save the changes?" opens none of its logs into the project that stays; an Info row says why.
+    void cancelledProjectSwitchOpensNoLogs() {
+        Shell sh;
+        QVERIFY(sh.start());
+        QTemporaryDir projects;
+        QVERIFY(projects.isValid());
+        const QString here = projects.path() + QStringLiteral("/Here");
+        const QString there = projects.path() + QStringLiteral("/There");
+        QVERIFY(sh.w->session().newProject(fsPath(here), "Here").ok());
+        QVERIFY(sh.w->session().newProject(fsPath(there), "There").ok());
+        QVERIFY(sh.w->openProject(fsPath(here)));
+        int asked = 0;
+        sh.w->setExitPrompt([&asked] {
+            ++asked;
+            return widgets::MainWindow::ExitAnswer::Cancel;
+        });
+        project::ProjectFile next = sh.w->session().projectFile(); // save on exit off, then an edit
+        QJsonObject o = QJsonDocument::fromJson(QByteArray::fromStdString(next.options.compact())).object();
+        QJsonObject general = o.value(QStringLiteral("general")).toObject();
+        general.insert(QStringLiteral("saveOnExit"), false);
+        o.insert(QStringLiteral("general"), general);
+        next.options = JsonDoc::parse(QJsonDocument(o).toJson(QJsonDocument::Compact).toStdString()).value();
+        sh.w->session().setProjectFile(std::move(next));
+        QVERIFY(sh.w->session().isDirty());
+        QSignalSpy opened(sh.w.get(), &widgets::MainWindow::sourceOpened);
+        LaunchRequest r;
+        r.project = there;
+        r.logs = QStringList{repoRoot() + QStringLiteral("/fixtures/generic.csv/sparse-gps/input.csv")};
+        openRequestedFiles(*sh.w, r, LaunchKind::Forwarded);
+        QCOMPARE(asked, 1);
+        QVERIFY(sh.w->projectOpenCancelled());
+        QCOMPARE(sh.w->session().projectFile().name, std::string("Here"));
+        QCOMPARE(opened.count(), 0); // nothing of the other project's logs opened here
+        int rows = 0;
+        for (int row = 0; row < sh.w->messages().rowCount(); ++row) {
+            rows += sh.w->messages().at(row).code == QStringLiteral("launch.cancelled") ? 1 : 0;
+        }
+        QCOMPARE(rows, 1);
+        sh.w->setExitPrompt([] { return widgets::MainWindow::ExitAnswer::Discard; });
     }
 };
 

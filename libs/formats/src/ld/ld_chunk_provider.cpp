@@ -106,11 +106,15 @@ Result<void> LdChunkProvider::materialise(store::SampleIdx chunkNo, store::Chunk
         return fail(ErrorCode::Cancelled, "LdChunkProvider: cancelled");
     }
     if (const MappedFile* mf = file_->mapped(); mf != nullptr && mf->changedOnDisk()) {
+        // Once for the source (its channels share the DecodeLog), as ld.io_fault (D-217).
         if (log_ && !changeLogged_.exchange(true)) {
-            ImportLogEntry::Context ctx;
-            ctx.channel = c.loggedName;
-            log_->add(ImportLogEntry::Level::Warning, std::string(code::kSourceChanged),
-                      "the .ld file changed on disk after it was opened; reload it", std::move(ctx));
+            const std::scoped_lock once(ioFaultLogMutex());
+            if (!log_->contains(code::kSourceChanged)) {
+                ImportLogEntry::Context ctx;
+                ctx.channel = c.loggedName;
+                log_->add(ImportLogEntry::Level::Warning, std::string(code::kSourceChanged),
+                          "the .ld file changed on disk after it was opened; reload it", std::move(ctx));
+            }
         }
         ErrorContext ectx;
         ectx.path = mf->path();

@@ -38,6 +38,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iterator>
+#include <limits>
 #include <set>
 #include <string_view>
 
@@ -337,15 +338,21 @@ TrackEditor::TrackEditor(qt::ProjectSession& session, qt::DataSelectionModel& se
     });
     connect(table_, &QTableWidget::currentCellChanged, this, [this](int row) { loadForm(row); });
     connect(add_, &QPushButton::clicked, this, [this] {
-        addSection(name_->text(), toMetres(start_->value()), toMetres(end_->value()),
-                   category_->currentText(), set_->text(), speedClass_->currentData().toString());
+        const std::shared_ptr<const analysis::TrackMap> map = currentMap();
+        const double length = map != nullptr ? map->lengthM : std::numeric_limits<double>::max();
+        addSection(name_->text(), fieldMetres(*start_, std::nullopt, length),
+                   fieldMetres(*end_, std::nullopt, length), category_->currentText(), set_->text(),
+                   speedClass_->currentData().toString());
     });
     connect(addSpan_, &QPushButton::clicked, this, [this] { addSectionFromCursorSpan(name_->text()); });
     connect(apply_, &QPushButton::clicked, this, [this] {
         const int row = table_->currentRow();
-        if (row >= 0) {
+        const std::shared_ptr<const analysis::TrackMap> map = currentMap();
+        if (row >= 0 && map != nullptr && static_cast<std::size_t>(row) < map->sections.size()) {
+            const analysis::TrackSection& s = map->sections[static_cast<std::size_t>(row)];
             editSection(table_->item(row, kColName)->data(Qt::UserRole).toString(), name_->text(),
-                        toMetres(start_->value()), toMetres(end_->value()), category_->currentText(),
+                        fieldMetres(*start_, s.startM, map->lengthM),
+                        fieldMetres(*end_, s.endM, map->lengthM), category_->currentText(),
                         speedClass_->currentData().toString());
         }
     });
@@ -799,6 +806,20 @@ double TrackEditor::toMetres(double shown) const {
     }
     const std::optional<units::UnitId> id = reg->find(distanceUnit().toStdString());
     return id ? reg->toBase(*id)(shown) : shown;
+}
+
+double TrackEditor::fieldMetres(const QDoubleSpinBox& field, std::optional<double> storedM,
+                                double lengthM) const {
+    const double shown = field.value();
+    if (storedM) {
+        // What the field showed when the section was loaded: the stored bound at the field's decimals.
+        const double loaded = std::clamp(QString::number(toShown(*storedM), 'f', field.decimals()).toDouble(),
+                                         field.minimum(), field.maximum());
+        if (std::abs(shown - loaded) < 0.5 * std::pow(10.0, -field.decimals())) {
+            return *storedM;
+        }
+    }
+    return std::clamp(toMetres(shown), 0.0, std::max(0.0, lengthM));
 }
 
 void TrackEditor::applyDistanceUnit() {

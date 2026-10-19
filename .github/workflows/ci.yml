@@ -58,10 +58,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
         with: { submodules: false } # fixtures/private only when the deploy-key secret exists (section 4.5)
-      - uses: lukka/get-cmake@latest # CMake and Ninja
-      - uses: ilammy/msvc-dev-cmd@v1 # no-op outside Windows
+      - uses: lukka/get-cmake@v3.31.6 # CMake and Ninja (as package.yml)
+      - uses: ilammy/msvc-dev-cmd@v1.13.0 # no-op outside Windows
       - name: Configure (ESSES_BUILD_QT=OFF, no Qt on the runner)
         run: cmake --preset ${{ matrix.preset }}
       - name: Build
@@ -101,7 +101,7 @@ jobs:
       # A DrawList golden mismatch writes <case>@<dpr>x.actual.json next to the test binary (libs/plotcore/README.md).
       - name: Upload DrawList golden diffs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: drawlist-diffs-${{ matrix.os }}
           path: |
@@ -153,11 +153,19 @@ jobs:
       QT_QPA_PLATFORM: offscreen
       ESSES_TEST_FONT_DIR: ${{ github.workspace }}/tests/golden/fonts # Noto Sans only (D-127)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
         with: { submodules: false }
-      - uses: lukka/get-cmake@latest
+      - uses: lukka/get-cmake@v3.31.6
+      # On Windows, aqtinstall's parallel 7-Zip processes (--external 7z, below) can race to create the kit's folder
+      # ("Cannot create output directory : ... already exists", package.yml's first run on PR #5; D-217):
+      # .github/aqt-settings.ini (AQT_CONFIG) gives aqtinstall one worker there. A failed first install still gets a
+      # second try over what it left.
       - name: Install Qt ${{ env.QT_VERSION }} (aqtinstall)
-        uses: jurplel/install-qt-action@v4 # sets QT_ROOT_DIR, puts the kit's bin on PATH (08 section 3.7.5)
+        id: qt
+        continue-on-error: true # a second try follows (D-217)
+        uses: jurplel/install-qt-action@v4.1.1 # sets QT_ROOT_DIR, puts the kit's bin on PATH (08 section 3.7.5)
+        env:
+          AQT_CONFIG: ${{ runner.os == 'Windows' && format('{0}/.github/aqt-settings.ini', github.workspace) || '' }}
         with:
           version: ${{ env.QT_VERSION }}
           arch: ${{ matrix.qtarch }}
@@ -168,6 +176,18 @@ jobs:
           # aqtinstall #995; fixed upstream in py7zr 329b83de, not released yet). On Windows, extract with the
           # 7-Zip preinstalled on the runner instead, the action's documented example for this.
           extra: ${{ runner.os == 'Windows' && '--external 7z' || '' }}
+      - name: Install Qt ${{ env.QT_VERSION }} (aqtinstall, second try)
+        if: steps.qt.outcome == 'failure'
+        uses: jurplel/install-qt-action@v4.1.1
+        env:
+          AQT_CONFIG: ${{ runner.os == 'Windows' && format('{0}/.github/aqt-settings.ini', github.workspace) || '' }}
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: ${{ matrix.qtarch }}
+          cache: true
+          aqtsource: ${{ env.AQT_SOURCE }}
+          py7zrversion: "==1.1.3"
+          extra: ${{ runner.os == 'Windows' && '--external 7z' || '' }}
       # libxcb1-dev: ADS includes <xcb/xcb.h> and links libxcb on Linux (its floating windows talk to X11 when the
       # platform is xcb; offscreen they do not). Its other Linux need, Qt6::GuiPrivate (Qt 6.9+), is in the kit.
       - name: Qt build and runtime dependencies (Linux)
@@ -176,7 +196,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libgl-dev libegl-dev libglx-dev libopengl-dev \
             libxkbcommon-dev libfontconfig1-dev libfreetype-dev libdbus-1-3 libxcb1-dev
-      - uses: ilammy/msvc-dev-cmd@v1 # no-op outside Windows
+      - uses: ilammy/msvc-dev-cmd@v1.13.0 # no-op outside Windows
       # The kit comes from install-qt-action; on Windows this overrides the local C:/Qt kit of ci-win-msvc-qt.
       - name: Configure (ESSES_BUILD_QT=ON)
         id: configure
@@ -215,7 +235,7 @@ jobs:
       # The ubuntu renders are uploaded on every run, so new pixel goldens can be taken from a passing run too.
       - name: Upload golden diffs
         if: failure() || matrix.os == 'ubuntu-24.04'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: golden-diffs-${{ matrix.os }}
           path: |
@@ -233,13 +253,14 @@ jobs:
     # about a fifth more tidied units (154 -> 185) plus their tests; it grows with every library.
     timeout-minutes: 75
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
         with: { fetch-depth: 0 }
-      - uses: lukka/get-cmake@latest
-      # The same LLVM release as the maintainer's machine (Visual Studio 2022's bundled LLVM 19.1.5, AGENTS.md section
-      # 4): clang-format 18 and 19 lay out some constructs differently, so a tree formatted locally failed here with 18.
-      # Exact PyPI wheels; clang-tidy falls back, with a warning, to the newest 19.1.x of LLVM's apt repository when
-      # its wheel is missing or cannot compile a standard header. CLANG_FORMAT and CLANG_TIDY carry absolute paths.
+      - uses: lukka/get-cmake@v3.31.6
+      # LLVM 19.1.5, the release the tree is formatted for (AGENTS.md section 4): clang-format 18 and 19 lay out some
+      # constructs differently (`struct stat st {}` against `st{}`: PR #5's first run, D-217), so a local check runs
+      # 18.1.7 and 22.1.3 and keeps only forms both accept. Exact PyPI wheels; clang-tidy falls back, with a warning, to
+      # the newest 19.1.x of LLVM's apt repository when its wheel is missing or cannot compile a standard header.
+      # CLANG_FORMAT and CLANG_TIDY carry absolute paths.
       - name: Install LLVM tools (clang-format and clang-tidy 19.1.5)
         shell: bash
         run: |
@@ -316,7 +337,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
         with: { fetch-depth: 0 }
       # Every commit of the pull request needs a Signed-off-by: line (CONTRIBUTING.md, DCO). On pull_request the
       # checkout is GitHub's synthetic merge of the PR into its base (refs/pull/<n>/merge), so HEAD is that merge
@@ -364,8 +385,8 @@ jobs:
       UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
       TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
     steps:
-      - uses: actions/checkout@v4
-      - uses: lukka/get-cmake@latest
+      - uses: actions/checkout@v4.2.2
+      - uses: lukka/get-cmake@v3.31.6
       - run: cmake --preset ${{ matrix.preset }}
       - run: cmake --build --preset ${{ matrix.preset }}
       - run: ctest --preset ${{ matrix.preset }} --parallel 2
@@ -374,8 +395,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30 # build with ASan + UBSan + coverage, generate the seeds, 5 targets x 60 s
     steps:
-      - uses: actions/checkout@v4
-      - uses: lukka/get-cmake@latest
+      - uses: actions/checkout@v4.2.2
+      - uses: lukka/get-cmake@v3.31.6
       - run: cmake --preset linux-clang-fuzz
       - run: cmake --build --preset linux-clang-fuzz
       - name: Seeds from the synthetic fixture families (tools/fuzz_seeds.py)
@@ -396,9 +417,9 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: lukka/get-cmake@latest
-      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: actions/checkout@v4.2.2
+      - uses: lukka/get-cmake@v3.31.6
+      - uses: ilammy/msvc-dev-cmd@v1.13.0
       - name: Build the generator (Qt-free core, release)
         run: |
           cmake --preset win-msvc-core-rel -DESSES_BUILD_TESTS=OFF

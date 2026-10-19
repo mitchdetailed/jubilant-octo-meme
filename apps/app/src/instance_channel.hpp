@@ -7,20 +7,27 @@
 // application does not link (01 section 2.2 rule 4, tools/check_layering.py); the channel is built on the
 // operating system's own local IPC with Qt Core's notifiers, so it needs no thread and no new Qt module:
 //   Windows  a named pipe \\.\pipe\<name>, one instance (FILE_FLAG_FIRST_PIPE_INSTANCE), local clients only,
-//            overlapped I/O watched by QWinEventNotifier. The client opens it at the identification level
-//            (the server cannot impersonate it); each side checks that the other process runs as the same
-//            user (GetNamedPipeServerProcessId / GetNamedPipeClientProcessId, EqualSid), and the client lets
-//            the server take the foreground (AllowSetForegroundWindow).
+//            its DACL this user's alone (D-217), overlapped I/O watched by QWinEventNotifier. The client
+//            opens it at the identification level (the server cannot impersonate it); each side checks that
+//            the other process runs as the same user (GetNamedPipeServerProcessId /
+//            GetNamedPipeClientProcessId, EqualSid), and the client lets the server take the foreground
+//            (AllowSetForegroundWindow).
 //   POSIX    a Unix-domain stream socket <dir>/<name>.sock in a private directory: $XDG_RUNTIME_DIR, else
 //            $TMPDIR, else /tmp/esses-<uid> (created 0700); a directory is used only when it is ours, not a
 //            symbolic link and closed to group and others. The peer's uid is checked (SO_PEERCRED /
-//            getpeereid). A socket file left by a crashed instance (connection refused) is replaced.
-// The name: "esses-<user>-<12 hex digits of SHA-256 of the settings folder>", the user being the SID and the
-// session on Windows, the uid on POSIX; so a portable copy (its own settings folder) and the installed
-// program, or a test run with ESSES_CONFIG_DIR, never forward to each other. ESSES_INSTANCE_NAME replaces the
-// name (tests). The protocol: the client sends one line (LaunchRequest::toMessage, at most kMaxMessageBytes)
-// and reads one line back, "ok" when the server accepted the request, "error" otherwise. The server drops a
-// client that sends nothing complete within kClientTimeoutMs; it serves clients one after another.
+//            getpeereid). A socket file left by a crashed instance (connection refused) is replaced. Connects
+//            are non-blocking and bounded by the caller's deadline (a full backlog of a busy instance never
+//            hangs a launch; D-217).
+// The name: "esses-<user>-<12 hex digits of SHA-256 of the settings folder and its salt>", the user being the
+// SID and the session on Windows, the uid on POSIX, the salt 16 random bytes kept in the settings folder
+// (instance.salt, made on first use; D-217), so that another local user cannot derive the name and take it
+// first; a portable copy (its own settings folder) and the installed program, or a test run with
+// ESSES_CONFIG_DIR, never forward to each other. ESSES_INSTANCE_NAME replaces the name (tests). The protocol:
+// the client sends one line (LaunchRequest::toMessage, at most kMaxMessageBytes) and reads one line back,
+// "ok" when the server accepted the request, "error" otherwise. The server emits requestReceived only once
+// the "ok" has reached the client (a launch that gave up waiting opens its own window, and the files never
+// open in both; D-217). The server drops a client that sends nothing complete within kClientTimeoutMs; it
+// serves clients one after another.
 #pragma once
 
 #include "launch_request.hpp"
@@ -29,6 +36,7 @@
 #include <QString>
 #include <filesystem>
 #include <memory>
+#include <optional>
 
 namespace esses::app {
 
@@ -71,7 +79,7 @@ public:
     int accepted() const noexcept { return accepted_; }
 
 Q_SIGNALS:
-    // A request a client sent; the client has been answered "ok" already.
+    // A request a client sent, once its "ok" has reached the client (D-217).
     void requestReceived(const esses::app::LaunchRequest& request);
     // A client was refused (malformed line, too long, another user, timeout); for diagnostics and tests.
     void clientRefused(const QString& reason);
@@ -79,10 +87,13 @@ Q_SIGNALS:
 private:
     struct Impl;
     friend struct Impl;
-    // A complete line from a client: the answer to send.
+    // A complete line from a client: the answer to send (an accepted request waits in pending_).
     QByteArray handleLine(const QByteArray& line);
+    // The answer was written to the client (`delivered`) or not: the pending request is emitted or dropped.
+    void answered(bool delivered);
     void refuse(const QString& reason);
 
+    std::optional<LaunchRequest> pending_; // before d_: the Impl may still use it while it goes
     std::unique_ptr<Impl> d_;
     int accepted_ = 0;
 };

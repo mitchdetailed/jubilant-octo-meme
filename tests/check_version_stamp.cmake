@@ -22,18 +22,24 @@ set(_cases
     "v0.1.0-m3-1-g56d8065-dirty|56d8065|0.1.0-m3+1-g56d8065.dirty|56d8065-dirty"
     "v1.2.3-rc.1|abcdef0123|1.2.3-rc.1|abcdef0123"
     "v1.2.3-rc.1-dirty|abcdef0123|1.2.3-rc.1.dirty|abcdef0123-dirty"
-    # no tag yet: describe prints the hash alone, the version is the project's
-    "56d8065|56d8065|9.8.7|56d8065"
-    "56d8065-dirty|56d8065|9.8.7|56d8065-dirty"
+    # pre-release tags with hyphens (D-217): the tag is everything before the last -N-gHASH
+    "v0.1.0-beta-1|abcdef0|0.1.0-beta-1|abcdef0"
+    "v0.1.0-beta-1-2-gabc1234|abc1234|0.1.0-beta-1+2-gabc1234|abc1234"
+    "v0.1.0-beta-1-2-gabc1234-dirty|abc1234|0.1.0-beta-1+2-gabc1234.dirty|abc1234-dirty"
+    # no version tag reachable (no tag yet, a shallow clone): describe prints the hash alone; a development build
+    # is never the bare project version (D-217)
+    "56d8065|56d8065|9.8.7+g56d8065|56d8065"
+    "56d8065-dirty|56d8065|9.8.7+g56d8065.dirty|56d8065-dirty"
     # a tag that is not a version, and a version without its v
-    "release-1|56d8065|9.8.7|56d8065"
-    "0.1.0|56d8065|9.8.7|56d8065"
+    "release-1|56d8065|9.8.7+g56d8065|56d8065"
+    "release-1-4-g56d8065|56d8065|9.8.7+g56d8065|56d8065"
+    "0.1.0|56d8065|9.8.7+g56d8065|56d8065"
     # the dots of the version are dots
-    "v0x1x0|56d8065|9.8.7|56d8065"
+    "v0x1x0|56d8065|9.8.7+g56d8065|56d8065"
     # git missing or no commit
     "-|-|9.8.7|unknown"
     "v0.1.0|-|0.1.0|unknown"
-    "-|56d8065|9.8.7|56d8065")
+    "-|56d8065|9.8.7+g56d8065|56d8065")
 foreach(_case IN LISTS _cases)
   string(REPLACE "|" ";" _f "${_case}")
   list(GET _f 0 _describe)

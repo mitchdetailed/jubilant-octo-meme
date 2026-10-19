@@ -321,7 +321,7 @@ TEST_CASE("report_cells: the StatCache serves a second run and keys the options"
     ReportChannelData bare;
     bare.series = speedSeries(f.tc);
     ReportInputs noDescriptor = inputs;
-    noDescriptor.channels = [&bare](const ReportSource&, std::string_view) { return bare; };
+    noDescriptor.channels = [&bare](const ReportSource&, const ReportChannel&) { return bare; };
     StatCache other;
     const ReportTable uncached = run(spec, noDescriptor, other);
     CHECK(other.size() == 0);

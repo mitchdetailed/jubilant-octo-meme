@@ -88,6 +88,7 @@ struct Shell {
     QStringList opened;     // what the recording opener was handed
     bool openFile = true;   // the recording opener's answer for file: URLs
     bool openOnline = true; // and for the others
+    bool mdHandled = true;  // whether a program opens .md files (the handler query)
 
     // `paths` empty: the repository's data directory (beside docs/user/, as installed).
     bool start(std::optional<Paths> paths = std::nullopt) {
@@ -103,6 +104,8 @@ struct Shell {
             opened << url;
             return QUrl(url, QUrl::StrictMode).isLocalFile() ? openFile : openOnline;
         });
+        docs()->setHandlerQuery(
+            [this](const QString& suffix) { return suffix == QStringLiteral(".md") && mdHandled; });
         return true;
     }
     DocsShell* docs() const { return shellExtension<DocsShell>(*w); }
@@ -193,6 +196,11 @@ private Q_SLOTS:
             << QStringLiteral("0.1.0-m4") << kOnlineBase + QStringLiteral("v0.1.0-m4") + page;
         QTest::newRow("after a tag") << QStringLiteral("0.1.0+3-gabc1234")
                                      << kOnlineBase + QStringLiteral("main") + page;
+        // D-217: a pre-release tag with hyphens, and a development build without a version tag.
+        QTest::newRow("hyphenated pre-release tag")
+            << QStringLiteral("0.1.0-beta-1") << kOnlineBase + QStringLiteral("v0.1.0-beta-1") + page;
+        QTest::newRow("no version tag")
+            << QStringLiteral("0.1.0+g56d8065") << kOnlineBase + QStringLiteral("main") + page;
         QTest::newRow("after a milestone, dirty")
             << QStringLiteral("0.1.0-m3+12-g56d8065.dirty") << kOnlineBase + QStringLiteral("main") + page;
         QTest::newRow("dirty at a tag")
@@ -289,6 +297,18 @@ private Q_SLOTS:
         QCOMPARE(sh.docs()->openContents(), online);
         QCOMPARE(sh.opened, (QStringList{local, online}));
         QCOMPARE(sh.w->messages().rowCount(), rows);
+    }
+
+    // Regression (PR #5 review U9, D-217): no program for .md files (Windows would show its chooser and
+    // report success): the installed page is not handed over at all; the online one opens.
+    void noProgramForMarkdownGoesOnline() {
+        Shell sh;
+        QVERIFY(sh.start());
+        sh.mdHandled = false;
+        const QString online = DocsShell::onlineUrl(thisBuildsVersion());
+        QCOMPARE(sh.docs()->openContents(), online);
+        QCOMPARE(sh.opened, QStringList{online});
+        QVERIFY(sh.w->lastHint().contains(QStringLiteral("online")));
     }
 
     // Nothing opens: a Messages warning naming both places, the dock shown, the status bar's hint.

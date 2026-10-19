@@ -19,13 +19,17 @@
 #include <esses/qtmodel/source_loader.hpp>
 #include <esses/widgets/shell/main_window.hpp>
 
+#include <QDialog>
 #include <QDir>
+#include <QEventLoop>
 #include <QFile>
 #include <QFileInfo>
 #include <QProcess>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QThread>
+#include <QTimer>
 #include <atomic>
 #include <thread>
 #include <vector>
@@ -153,6 +157,95 @@ class TestInstanceChannel : public QObject {
     Q_OBJECT
 
 private Q_SLOTS:
+    // Regression (PR #5 review U1, D-217): a forwarded request that arrives inside a nested event loop (what
+    // a modal prompt runs) or while a modal widget is shown waits; it is applied at the top of the event
+    // loop.
+    void forwardedRequestsWaitForTheTopOfTheEventLoop() {
+        int applied = 0;
+        int appliedAtLevel = -1;
+        RequestQueue queue(
+            [&](const LaunchRequest&) {
+                ++applied;
+                appliedAtLevel = QThread::currentThread()->loopLevel();
+            },
+            0); // this test runs outside QApplication::exec: its top is level 0
+        int appliedInside = -1;
+        QEventLoop nested;
+        QTimer::singleShot(0, &nested, [&] {
+            queue.enqueue(requestFor({QStringLiteral("a.ld")})); // as InstanceServer::requestReceived would
+            QTimer::singleShot(4 * RequestQueue::kRetryMs, &nested, [&] {
+                appliedInside = applied;
+                nested.quit();
+            });
+        });
+        nested.exec(QEventLoop::ExcludeUserInputEvents); // a modal dialog's loop excludes user input too
+        QCOMPARE(appliedInside, 0);
+        QTRY_COMPARE_WITH_TIMEOUT(applied, 1, 10000);
+        QCOMPARE(appliedAtLevel, 0);
+        // A modal widget shown (its exec() not even running): the request waits until it is gone.
+        QDialog modal;
+        modal.setModal(true);
+        modal.show();
+        QTRY_VERIFY(QApplication::activeModalWidget() != nullptr);
+        queue.enqueue(requestFor({QStringLiteral("b.ld")}));
+        QTest::qWait(3 * RequestQueue::kRetryMs);
+        QCOMPARE(applied, 1);
+        QCOMPARE(queue.pending(), 1);
+        modal.close();
+        QTRY_COMPARE_WITH_TIMEOUT(applied, 2, 10000);
+        QCOMPARE(queue.pending(), 0);
+    }
+
+    // Regression (PR #5 review U12, D-217): a client that leaves before reading its answer (a launch whose
+    // wait timed out opens its own window) never has its request applied by the server.
+    void requestOfAClientThatLeftIsDropped() {
+        const QString name = uniqueInstanceName();
+        InstanceServer server;
+        QVERIFY(server.listen(name));
+        QSignalSpy received(&server, &InstanceServer::requestReceived);
+        QSignalSpy refused(&server, &InstanceServer::clientRefused);
+        const QByteArray line =
+            requestFor({QDir::temp().absoluteFilePath(QStringLiteral("gone.ld"))}).toMessage();
+#if defined(Q_OS_WIN)
+        const std::wstring path = instanceAddress(name).toStdWString();
+        HANDLE pipe =
+            CreateFileW(path.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
+        QVERIFY(pipe != INVALID_HANDLE_VALUE);
+        DWORD written = 0;
+        QVERIFY(WriteFile(pipe, line.constData(), static_cast<DWORD>(line.size()), &written, nullptr) != 0);
+        CloseHandle(pipe); // gone before the server ran: its answer cannot reach it
+#else
+        const int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
+        QVERIFY(fd >= 0);
+        sockaddr_un a{};
+        a.sun_family = AF_UNIX;
+        const QByteArray address = instanceAddress(name).toLocal8Bit();
+        std::memcpy(a.sun_path, address.constData(), static_cast<size_t>(address.size()) + 1);
+        QVERIFY(::connect(fd, reinterpret_cast<const sockaddr*>(&a), static_cast<socklen_t>(sizeof(a))) == 0);
+        QVERIFY(::send(fd, line.constData(), static_cast<size_t>(line.size()), 0) == line.size());
+        ::shutdown(fd, SHUT_RDWR);
+        ::close(fd);
+#endif
+        QTRY_VERIFY_WITH_TIMEOUT(server.accepted() + refused.count() > 0, 10000);
+        QTest::qWait(200); // a request that were emitted would arrive by now
+        QCOMPARE(received.count(), 0);
+        QCOMPARE(server.accepted(),
+                 1); // the line was a valid request: it was dropped, not refused as malformed
+        // The server goes on: the next client is served.
+        ClientThread client(
+            name, requestFor({QDir::temp().absoluteFilePath(QStringLiteral("next.ld"))}).toMessage());
+        QTRY_VERIFY_WITH_TIMEOUT(client.done(), 30000);
+        QStringList reasons;
+        for (const QList<QVariant>& r : refused) {
+            reasons << r.at(0).toString();
+        }
+        QVERIFY2(client.join() == ForwardResult::Delivered,
+                 qPrintable(client.detail() + QStringLiteral(" | refused: ") +
+                            reasons.join(QStringLiteral("; ")) +
+                            QStringLiteral(" | accepted %1").arg(server.accepted())));
+        QTRY_COMPARE_WITH_TIMEOUT(received.count(), 1, 30000);
+    }
+
     void nobodyListening() {
         const QString name = uniqueInstanceName();
         QString detail;

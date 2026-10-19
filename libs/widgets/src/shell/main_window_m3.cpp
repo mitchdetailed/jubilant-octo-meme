@@ -45,6 +45,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMenuBar>
+#include <QPointer>
 #include <QStatusBar>
 #include <QTimer>
 #include <QUndoStack>
@@ -1074,7 +1075,8 @@ void MainWindow::registerM3Commands() {
             }
         });
     const auto exportFocused = [focused](MainWindow& w) {
-        ComponentWidget* c = focused(w);
+        // Held across the prompts (nested event loops) by QPointer: the component may go meanwhile (D-217).
+        const QPointer<ComponentWidget> c = focused(w);
         if (c == nullptr) {
             w.hint(tr("No component to export"));
             return;
@@ -1089,6 +1091,10 @@ void MainWindow::registerM3Commands() {
         }
         const QString file = w.impl_->prompts.file(tr("Export Data"), tr("CSV files (*.csv)"), true);
         if (file.isEmpty()) {
+            return;
+        }
+        if (c.isNull()) {
+            w.hint(tr("The component went away; nothing was exported"));
             return;
         }
         ExportOptions options;

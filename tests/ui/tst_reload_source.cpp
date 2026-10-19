@@ -40,11 +40,13 @@
 #include <QIcon>
 #include <QIdentityProxyModel>
 #include <QMenu>
+#include <QPixmap>
 #include <QSortFilterProxyModel>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTreeView>
 #include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -153,7 +155,19 @@ struct Shell {
     }
     bool badge(const model::SourceId& id) {
         const QVariant icon = w->dataWindow().viewModel().data(row(id), Qt::DecorationRole);
-        return icon.isValid() && !icon.value<QIcon>().isNull();
+        if (!icon.isValid() || icon.value<QIcon>().isNull()) {
+            return false;
+        }
+        // Drawn at the screen's own resolution, never a 12 px pixmap scaled up (PR #5 review U13, D-217).
+        for (const qreal dpr : {1.0, 1.5, 2.0}) {
+            const QPixmap pm = icon.value<QIcon>().pixmap(QSize(12, 12), dpr);
+            if (pm.devicePixelRatio() != dpr || pm.width() != static_cast<int>(std::lround(12 * dpr))) {
+                qWarning("badge pixmap at DPR %g: %dx%d at %g", dpr, pm.width(), pm.height(),
+                         pm.devicePixelRatio());
+                return false;
+            }
+        }
+        return true;
     }
     // The Messages list's row with this code, or an invalid index.
     QModelIndex message(const QString& code) {
@@ -216,8 +230,9 @@ private Q_SLOTS:
 
             // The writer replaces a; coming back to the application marks it stale.
             QVERIFY(replaceOnDisk(a, next));
-            Shell::activate();
-            QVERIFY(s.w->loader().isStale(srcA->id));
+            Shell::activate(); // the re-stats run on the pool (D-217)
+            QTRY_VERIFY_WITH_TIMEOUT(s.w->loader().isStale(srcA->id), 30000);
+            QTRY_COMPARE_WITH_TIMEOUT(s.w->loader().fileChecksPending(), 0, 30000);
             QVERIFY(!s.w->loader().isStale(srcB->id));
             QVERIFY(s.badge(srcA->id));
             QVERIFY(!s.badge(srcB->id));
@@ -236,11 +251,12 @@ private Q_SLOTS:
                      QStringLiteral("file.reload_source"));
             QVERIFY(row.data(Qt::DisplayRole).toString().contains(QStringLiteral("Reload File")));
             Shell::activate(); // a second activation adds nothing
+            QTRY_COMPARE_WITH_TIMEOUT(s.w->loader().fileChecksPending(), 0, 30000);
             QCOMPARE(s.w->loader().staleSources(), std::vector<model::SourceId>{srcA->id});
 
             // Reload from the Messages row.
             QVERIFY(s.w->messagesWindow().invokeAction(row));
-            QVERIFY(sel.source(srcA->id) == nullptr); // closed at once, reopening
+            QVERIFY(sel.source(srcA->id) != nullptr); // kept until the reopen publishes (D-217)
             QTRY_VERIFY_WITH_TIMEOUT(s.w->loader().pendingReloads() == 0 && sel.sources().size() == 2, 30000);
             const auto reopened = sel.sources().front(); // first again in the Data window
             QVERIFY(!(reopened->id == srcA->id));        // one more lap: another SourceId
@@ -281,7 +297,7 @@ private Q_SLOTS:
 
             QVERIFY(replaceOnDisk(b, copy)); // the same bytes, a newer file
             Shell::activate();
-            QVERIFY(s.w->loader().isStale(srcB->id));
+            QTRY_VERIFY_WITH_TIMEOUT(s.w->loader().isStale(srcB->id), 30000);
             // A fresh row offers Reload File disabled; the stale row enabled.
             const auto reloadIn = [](QMenu& menu) {
                 return menu.findChild<QAction*>(QStringLiteral("dataReloadFile"));
@@ -323,6 +339,7 @@ private Q_SLOTS:
             const auto src = s.open(a);
             QVERIFY(src != nullptr);
             Shell::activate();
+            QTRY_COMPARE_WITH_TIMEOUT(s.w->loader().fileChecksPending(), 0, 30000);
             QVERIFY(s.w->loader().staleSources().empty());
             const QString id = QString::fromLatin1(ReloadShell::kCommand);
             QVERIFY(!s.w->commands().isEnabled(id));

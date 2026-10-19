@@ -136,6 +136,10 @@ private:
     // M4 (D-211 (c)): the Corr Dist display unit's conversions (metres <-> shown) and the fields' units.
     double toShown(double metres) const;
     double toMetres(double shown) const;
+    // A bound field in metres (D-217): the stored bound while the field still shows it (the field rounds it
+    // to its decimals, so a section that ends at the track's length would otherwise leave the track or
+    // shrink), else the field's value, kept on the track [0, lengthM].
+    double fieldMetres(const QDoubleSpinBox& field, std::optional<double> storedM, double lengthM) const;
     void applyDistanceUnit();
     void setStatus(const QString& text);
     bool pushMap(std::shared_ptr<const analysis::TrackMap> after, const QString& text,

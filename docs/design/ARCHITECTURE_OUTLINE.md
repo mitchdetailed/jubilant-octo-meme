@@ -488,6 +488,19 @@ left at the integration of wave 2, D-216).
   `esses_version_from_git` (`cmake/version_parse.cmake`); ctest entries `soak.guard`, `lint.version_stamp`,
   `app.tst_demo_command_line`. `DocsShell::kRepositoryUrl` is now the About dialog's `kRepositoryUrl`.
 
+### Names added by the M4 fix pass (2026-10-19, D-217)
+
+- `esses_qtmodel`: `SourceLoader::checkChangedFilesInBackground`, `fileChecksPending`, `staleState`,
+  `setFileCheckForTest`; `analysis::ReportChannelLookup` takes the spec's `ReportChannel` (name and display unit).
+- `esses_widgets`: `MainWindow::projectOpenCancelled`; `DocsShell::HandlerQuery`, `setHandlerQuery`,
+  `hasDefaultHandler`.
+- `esses` (apps/app): `RequestQueue`, `reportNoInstanceChannel`; the settings folder's `instance.salt`;
+  `ESSES_STARTUP_PROBE` (the startup bench's ready line); Messages codes `launch.instance` (Warning: no channel)
+  and `launch.cancelled` (Info: a forwarded project switch cancelled). `esses-cli`: `cutDetails` (convert.hpp).
+- Build: `esses_git_describe` (`cmake/version_parse.cmake`), the option `ESSES_BENCH_GATE`; ctest entries
+  `lint.version_git`, `lint.bench_presets`; bench rows `plot.relayout_resize_20tr`, `values.refresh_250ch`,
+  `app.startup_empty_warm`.
+
 ---
 
 ## 5. Persisted files and schemas

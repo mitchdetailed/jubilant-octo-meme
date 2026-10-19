@@ -16,8 +16,10 @@
 #include <esses/widgets/editors_options/scheme_selector.hpp>
 #include <esses/widgets/shell/main_window.hpp>
 
+#include <QApplication>
 #include <QDateTime>
 #include <QFileInfo>
+#include <QThread>
 #include <QWidget>
 #include <filesystem>
 #include <memory>
@@ -83,9 +85,68 @@ void openRequestedFiles(widgets::MainWindow& window, const LaunchRequest& reques
         return;
     }
     if (request.project.isEmpty() || !window.openProject(toPath(request.project), logs)) {
+        if (!request.project.isEmpty() && window.projectOpenCancelled()) {
+            // The user chose to stay in the open project: the other project's logs are not opened into it
+            // (D-217).
+            if (!logs.empty()) {
+                qt::Message m;
+                m.timestamp = QDateTime::currentDateTime();
+                m.severity = qt::Message::Severity::Info;
+                m.origin = qt::Message::Origin::System;
+                m.code = QStringLiteral("launch.cancelled");
+                m.text = QStringLiteral("The switch to %1 was cancelled; its %2 log file(s) were not opened")
+                             .arg(request.project)
+                             .arg(logs.size());
+                window.messages().append(std::move(m));
+            }
+            return;
+        }
         for (const std::filesystem::path& log : logs) {
             window.openLog(log);
         }
+    }
+}
+
+void reportNoInstanceChannel(widgets::MainWindow& window, const QString& detail) {
+    warn(window, QStringLiteral("launch.instance"),
+         QStringLiteral(
+             "Later launches cannot hand their files to this window (%1); each opens a window of its "
+             "own")
+             .arg(detail));
+}
+
+RequestQueue::RequestQueue(Apply apply, int topLevel, Busy busy)
+    : apply_(std::move(apply)), topLevel_(topLevel), busy_(std::move(busy)) {
+    retry_.setSingleShot(true);
+    retry_.setInterval(kRetryMs);
+    QObject::connect(&retry_, &QTimer::timeout, [this] { tryApply(); });
+}
+
+bool RequestQueue::guiBusy(int topLevel) {
+    return QApplication::activeModalWidget() != nullptr || QApplication::activePopupWidget() != nullptr ||
+           QThread::currentThread()->loopLevel() > topLevel;
+}
+
+void RequestQueue::enqueue(LaunchRequest request) {
+    queue_.push_back(std::move(request));
+    tryApply();
+}
+
+void RequestQueue::tryApply() {
+    if (applying_) {
+        return; // inside a request's own prompt: the next one waits for it (the timer comes back)
+    }
+    const auto busy = [this] { return busy_ ? busy_() : guiBusy(topLevel_); };
+    applying_ = true;
+    while (!queue_.empty() && !busy()) {
+        const LaunchRequest next = std::move(queue_.front());
+        queue_.pop_front();
+        ++applied_;
+        apply_(next);
+    }
+    applying_ = false;
+    if (!queue_.empty() && !retry_.isActive()) {
+        retry_.start();
     }
 }
 

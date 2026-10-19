@@ -15,7 +15,10 @@ package before it is archived): the words in every file and folder name, in ever
 files without one that read as UTF-8 text, such as AppRun) and in the strings of our own programs (esses,
 esses-cli, esses-render; for binaries only the long marks, motec, i2pro and i2wkb/i2wsp, since two printable
 bytes "i2" occur by chance). Third-party binaries (Qt, the docking library, the C++ runtime) are checked by name
-only. The allow-list's literals and path patterns apply as in the source tree.
+only. The allow-list's literals and path patterns apply as in the source tree; in a binary also a prefix of a
+literal that is a whole number of 8-byte words and is cut off there (an optimiser stores a short literal as
+immediates: GCC and Apple Clang at -O2 write "motec.csv" as the 8-byte word "motec.cs", an opcode, then "v", so
+the printable run reads "motec.csH"; D-217).
 
 Standard library only. Run with `python -I tools/check_vendor_marks.py [--root DIR | --tree DIR]`; `--self-test`
 checks the scanner itself. Exit status: 0 clean, 1 findings, 2 usage error.
@@ -230,6 +233,24 @@ def binary_strings(data: bytes) -> list[bytes]:
             for m in STRINGS_RE.finditer(data)]
 
 
+def strip_binary_literals(run: bytes, literals: list[bytes]) -> bytes:
+    """`run` with the allow-listed literals blanked, and the prefixes of a literal that an immediate store cut
+    short: a prefix of 8, 16, ... bytes (whole 64-bit words) of a longer literal that the literal's next byte does
+    not follow (D-217). A prefix of another length, and a mark outside every literal, stay."""
+    for lit in literals:
+        run = run.replace(lit, b" " * len(lit))
+    for lit in literals:
+        for n in range(8, len(lit), 8):
+            prefix = lit[:n]
+            start = run.find(prefix)
+            while start >= 0:
+                end = start + n
+                if end >= len(run) or run[end] != lit[n]:
+                    run = run[:start] + b" " * n + run[end:]
+                start = run.find(prefix, start + 1)
+    return run
+
+
 def scan_tree(tree: pathlib.Path, allow: Allowlist) -> list[str]:
     """A release tree (AC-M4-08): names, text files, the strings of our programs."""
     findings: list[str] = []
@@ -260,8 +281,7 @@ def scan_tree(tree: pathlib.Path, allow: Allowlist) -> list[str]:
                     findings.append(f"{rel}:{lineno}: word '{m.group(0)}'")
         elif OUR_PROGRAM.match(path.name):
             for run in binary_strings(data):
-                for lit in literals:
-                    run = run.replace(lit, b" " * len(lit))
+                run = strip_binary_literals(run, literals)
                 for m in BINARY_RE.finditer(run):
                     findings.append(f"{rel}: string '{run.decode('ascii', 'replace')[:80]}' contains "
                                     f"'{m.group(0).decode('ascii', 'replace')}'")
@@ -279,8 +299,14 @@ def self_test_tree(allow: Allowlist) -> bool:
         "Contents/Info.plist": "<string>Esses</string>\n",                                  # clean
         "AppRun": "#!/bin/sh\n# runs i2pro\n",                                              # text without extension
         "icons/motec.png": b"\x89PNG",                                                       # a mark in a name
+        # Release builds (D-217): "motec.csv" and "MoTeC CSV File" stored as 8-byte immediates, cut after a word
+        "bin/esses-cli": b"\x00motec.csH\x89\x00motec.csH3\x00MoTeC CSH\x8b\x00motec.ldH\x00",
+        # ... but not a cut of another length, and not the mark itself
+        "bin/esses": b"\x00motec.lH\x89\x00a motec tool\x00",
     }
     expected = {
+        "bin/esses: string 'motec.lH' contains 'motec'",
+        "bin/esses: string 'a motec tool' contains 'motec'",
         "esses-render.exe: string 'a MoTeC export' contains 'MoTeC'",
         "esses-cli: string 'workbook i2wkb' contains 'i2wkb'",
         "share/applications/esses.desktop:2: word 'i2'",

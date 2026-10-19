@@ -10,7 +10,8 @@ application over a Qt-free C++20 core. Status: M0 (foundations) is complete, M1 
 acceptance run, and M2 (channels, maths, persistence) is merged and tagged `v0.1.0-m2`
 (`docs/milestones/M2.md`). M3 (the 80 % components) is merged and tagged `v0.1.0-m3`
 (`docs/milestones/M3.md`). M4 (hardening and 0.1) is built and integrated on branch `m4-hardening` (waves 1 and 2,
-D-206 to D-216): its automated criteria pass here or wait for CI, and the maintainer's steps of
+D-206 to D-216) and through the fix pass of its first CI run (wave 3, D-217): its automated criteria pass here or
+wait for CI, and the maintainer's steps of
 `docs/milestones/M4.md` §6 (the VMs, the SMB share, the mixed-DPI check, the reference bench, the 2 h soak, the
 `v0.1.0` tag) close it. See `docs/milestones/` for what each milestone actually built and where it departs from
 the design.
@@ -122,7 +123,7 @@ Layers (01 §2, outline §1). An arrow means "may depend on"; no layer depends u
 
 ## 4. Building
 
-The maintainer's machine is Windows 11 with MSVC 2022, Ninja and CMake 4.4; Qt 6.7.2 is at
+The maintainer's machine is Windows 11 with Visual Studio 2026 (MSVC 14.51), Ninja and CMake 4.4; Qt 6.7.2 is at
 `C:/Qt/6.7.2/msvc2019_64`; CI uses Qt 6.12.0. The repository path contains spaces: quote it. All binary
 directories live under `build/` (git-ignored). When several agents or builds run at once, give each its own
 binary directory (`-B build/<task>-<flavour>`) and never delete one you did not create.
@@ -158,10 +159,13 @@ unfinished library or application out of a configure (D-149).
 
 **Before handing in a change:** it builds warning-free with the matching `ci-*` preset (MSVC `/W4 /WX`;
 GCC/Clang `-Wall -Wextra -Wpedantic ... -Werror`, `cmake/warnings.cmake`), every test passes, the C/C++ files
-you touched are clang-format clean
-(`C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\Llvm\x64\bin\clang-format.exe -i <files>`;
-CI runs this same release, LLVM 19.1.5, as clang-format on every file and as clang-tidy on the Qt-free
-targets), and the lint scripts below are clean. Clang (macOS) and GCC (Linux) warn where MSVC does not: a local
+you touched are clang-format clean (CI runs LLVM 19.1.5 as clang-format on every file and as clang-tidy on the
+Qt-free targets; this machine has no 19.1.5, so run both local releases, Qt Creator's 18.1.7
+`"C:\Qt\Tools\Qt Creator 14.0.0-rc1\bin\clang\bin\clang-format.exe"` and Visual Studio 2026's 22.1.3
+`"C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\Llvm\x64\bin\clang-format.exe"`, with
+`--dry-run --Werror`, and where they disagree write the line in a form both leave alone, as `struct stat st = {};`
+for `struct stat st {};`: 18.1.7 alone let three lines through that 19.1.5 rejected, D-217 (b)), and the lint
+scripts below are clean. Clang (macOS) and GCC (Linux) warn where MSVC does not: a local
 that shadows a field, even in a static member function (`-Wshadow`), every implicit `float` to `double`
 widening (`-Wdouble-promotion`; write the cast) and a reference bound to the result of a call that took a
 temporary (GCC 13 `-Wdangling-reference`); floating-point `std::from_chars` does not exist in Apple Clang 15's

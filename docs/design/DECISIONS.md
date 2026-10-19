@@ -849,6 +849,7 @@ Rewritten on 2026-10-10 after the review. The list is deduplicated across this d
 | D-214 | The Saturday walkthrough, the CLI golden tests, esses-cli convert and the Data finals as built: one test function per 0.1 item in the real shell over data written by the test, item 10's functional half beside the bench rows, golden-JSON tests per subcommand with expectations from the corpus and the reference decoder, convert with --format (alias --to), a CLI-side cut of a .ld range and the input never overwritten, "final" as the design's checks asserted by the walkthrough (refines D-155, D-181 (e), D-202 (a), D-206 (i), D-209; reads 05 §5, §9.2, 06 §4.3, §14.4, §16, §20, §22, 07 §2.2, §7.1 "Data", §7.2 AC-M4-01, §7.5; amends 05 §9.2's convert row, 07 §7.2 AC-M4-01's test path) | no | M4 walkthrough, AC-M4-01 (items 1-11), 07 §7.1 "Data" |
 | D-215 | The user guide and Help Contents as built: Markdown pages under docs/user/ with index.md as the start page, the installed page beside the data directory then the executable, the online page at the build's tag, the online page when the installed one does not open, a Messages warning when nothing opens, CLEANROOM.md completed for 0.1 (refines D-004, D-206 (h)-(i); reads 06 §2.2, §14.4, 07 §7.1, 08 §7, §9 item 4; amends 06 §14.4's "local HTML or URL") | no | M4 docs, 07 §7.1 "Docs", AC-M4-01 (help.contents row) |
 | D-216 | The M4 integration as built: the commit stamped at a tag, the soak out of the normal runs with its guard's tests in them, the walkthrough and the CLI golden tests as CI steps of their own, the install rules with and without Qt and the release tree scanned in lint, every M4 keymap row implemented with M4 as the keymap checker's milestone, the demo's command line in a real process, one repository URL, the soak's restart check after a Close All (refines D-206, D-212 (b), D-213 (f), D-214, D-215; reads 07 §7.2, §7.5, 08 §3.10, §4.1, §4.4, §5; amends D-213 (f), 08 §4.1's qt-app and lint rows) | no | M4 integration, AC-M4-01/-03/-08/-09 |
+| D-217 | The M4 fix pass: PR #5's first CI failures fixed at the root (the main window's teardown, the formatter, the vendor-mark scan of optimised binaries, the Qt install with one aqtinstall worker), Reload that keeps the source until its file is open again, decode-time diagnostics in Messages, the activation check on the pool, forwarded requests at the top of the event loop and only after their answer, a salted per-user channel, the release stamped from its own tag and development builds marked, convert's companion, cut details, empty output and duplicate channels, the hosted bench without the reference gates, the three missing MVP bench rows, installer upgrades and uninstalls that keep what is not theirs; the deferrals (macOS strips, crisp 2 px lines at DPR 2, same-size same-mtime replacements, Qt's bundled notices) (refines D-208, D-209, D-212, D-214, D-215, D-216; reads 02 §1 behaviour 5, 05 §5, §9.2, 06 §6, §17, §18-19, 07 §1.5, §7.2, §12, 08 §3.10, §4, §7; amends D-208's "Reload as a close then an open", D-212 (b)'s channel name, D-216 (a)'s version of a build without a version tag) | **yes**: (n) only | M4 fix pass, AC-M4-01/-04/-05/-07/-08/-09/-10 |
 
 ### A.1 Review amendments
 
@@ -3067,3 +3068,114 @@ run first in CI (none of them can run here); M4.md §6 lists what the maintainer
 §12 have no benchmark (full relayout, the Values window's refresh of 250 channels, startup to an empty workspace;
 M4.md §10 item 46): AC-M4-05 needs them measured or moved under 07 §1.5 by the maintainer.
 **User must confirm:** no.
+
+#### D-217 The M4 fix pass: PR #5's first CI failures fixed at the root, Reload that keeps the source until its file is open again, decode-time diagnostics in Messages, the activation check on the pool, forwarded requests at the top of the event loop and only after their answer, a salted per-user channel, the release stamped from its own tag and development builds marked, convert's companion, cut details, empty output and duplicate channels, the hosted bench without the reference gates, the three missing MVP bench rows, installer upgrades and uninstalls that keep what is not theirs, and the deferrals (refines D-208, D-209, D-212, D-214, D-215, D-216; reads 02 §1 behaviour 5, 05 §5, §9.2, 06 §6, §17, §18-19, 07 §1.5, §7.2, §12, 08 §3.10, §4, §7; amends D-208's "Reload as a close then an open", D-212 (b)'s channel name, D-216 (a)'s version of a build without a version tag)
+**Context.** PR #5 (M4 waves 1 and 2, head 32b7795) failed its first CI run: `lint` at clang-format (three lines that
+19.1.5 lays out differently from the 18.1.7 the packages used locally; every later lint step skipped), both required
+`qt-app` rows in `ui.tst_dpr_switch` (SIGSEGV on ubuntu, 0xc0000005 on windows-2022, Qt 6.12), and every `package`
+job (Windows at the Qt install, Linux and macOS at the vendor-mark scan of the Release tree). The milestone audit and
+two reviews (`build/m4-review/*.json`, 44 findings) added: Reload lost a source whose file was missing or did not
+reopen; decode-time faults reached no one; the activation check stat'ed every file on the GUI thread; forwarded
+launches ran inside modal prompts; `convert` kept another file's `.ldx`, copied stale details into a cut, refused
+`run.csv -> run.ld` and wrote empty `.ld` files; a second `v*` tag on the release commit could change the release
+build's version; the hosted bench alarm failed on the reference limits; three MVP rows of 07 §12 had no benchmark;
+and smaller points in the installer, the association script, Help Contents, the badge, the reports and the docs.
+**Decision.** (a) **The main window's teardown.** `~MainWindow` deleted every direct child one by one while
+QMainWindow's layout lived; that layout keeps raw pointers to the `QDockWidget` frames and to the tab bars of tabbed
+docks, and a dock newer than its group's tab bar (added later into a tabbed area, or floated and docked back) met the
+deleted tab bar when it was removed (Qt 6.12 crashes there; 6.7.2 happens not to touch it). Now only the docks' contents
+(which reference the models) go there; the frames and the tab bars go in `~QWidget`, after the layout, as in any
+QMainWindow (`widgets.tst_main_window` `dockFramesGoAfterTheMainWindowLayout`). (b) **The formatter.** The three
+declarations are written `struct stat st = {};`, which 18.1.7, 19.1.5 and 22.1.3 format alike; AGENTS.md names the local
+formatters (Qt Creator's 18.1.7 and Visual Studio 2026's 22.1.3) and the rule: CI's 19.1.5 is the reference, and a line
+the two local ones format differently is rewritten into a form both accept. (c) **Vendor marks in optimised binaries.**
+GCC and Apple Clang at -O2 store the allow-listed literal `motec.csv` as the 8-byte immediate `motec.cs`, an opcode,
+then `v`; `check_vendor_marks.py --tree` now also blanks a prefix of an allow-listed literal that is a whole number of
+8-byte words and is cut off there (a cut of another length and a bare mark are still reported; self-test cases). (d)
+**The Qt install.** With `--external 7z`, aqtinstall's 4 default workers ran a 7-Zip process per archive into the kit's
+folder, and they raced to create it. The Windows installs of `package.yml` and `ci.yml`'s `qt-app` now give aqtinstall
+one worker (`.github/aqt-settings.ini` through `AQT_CONFIG`, read on top of aqtinstall's own settings; checked against
+aqtinstall 3.3.0's code here), so the archives are extracted one after another; a failed first install still gets a
+second try over what it left (`continue-on-error`). Neither has run in CI yet: the next package run is the evidence.
+Every action of `ci.yml` and `bench.yml` is pinned as `package.yml`'s are, and `package.yml` runs on every pull request
+(what is deployed depends on more than the packaging, and its Release-tree scan proves (c) on what ships). (e)
+**Reload** (amends D-208): `SourceLoader::reload` keeps the stale source until its file is open again. It is refused
+while the file cannot be stat'ed (Missing) and while the source's due sidecar edits cannot be written (the document then
+stays due); otherwise the sidecar is flushed and the path opened beside the stale source. When the reopen publishes, the
+stale source is closed (its selection parked) and `sourceReloaded` hands the selection on; a reopen with the same
+content id replaces it in `published()` (its decode log kept). A reopen that fails, is cancelled or is held and
+cancelled (Mapping panel, budget gate) leaves everything as it was; the shell says why a reload was refused. (f)
+**Decode-time diagnostics.** The loader reads every open source's `DecodeLog` on a 1 s GUI timer: new entries reach the
+Messages dock through `importLog`, and `ld.io_fault` (Missing) or `ld.source_changed`/`text.source_changed` (Changed)
+marks the source stale at once, so a source a dropped share sealed is offered Reload; `ld.source_changed` is logged once
+per source, as `ld.io_fault`. (g) **The activation check on the pool.** The shell's `Qt::ApplicationActive` runs
+`SourceLoader::checkChangedFilesInBackground()`: one TaskPool task re-stats every open source (one pass at a time), the
+result comes back through the Dispatcher, and the Messages row reads the state the check recorded (`staleState`) instead
+of stat-ing again; `checkChangedFiles()` stays the synchronous pass for tools and tests. (h) **Forwarded launches.**
+`InstanceServer` emits a request only once its "ok" reached the client (a launch that gave up waiting opens its own
+window, and the files never open twice), and a launch tries a second forward only when the first found no instance. The
+application applies forwarded requests through `app::RequestQueue`: only with no modal widget or popup open and the
+event loop at its top level, one at a time. A forwarded project switch the user cancels opens none of its logs into the
+project that stays (`MainWindow::projectOpenCancelled`). The channel (amends D-212 (b)): the Windows pipe gets a
+protected DACL for this user alone, the name mixes in a random salt kept in the settings folder (`instance.salt`,
+written once by an atomic rename), and a launch that would forward but ends without the channel says so in Messages
+(`launch.instance`); `--scheme`/`--keymap` given to a launch that forwards are reported on the terminal. On POSIX,
+connects are non-blocking and bounded by the caller's deadline. (i) **The version stamp** (amends D-216 (a)). With
+`ESSES_RELEASE_TAG`, the stamp describes that very tag when HEAD carries it (`git describe --tags --dirty --exact-match
+--match <tag>`), so another `v*` tag on the release commit (the milestone tag) cannot change the release's version; a
+build without a version tag (a shallow clone, a non-version tag) is `<project version>+g<hash>` (`.dirty` when
+modified), never the bare release version; pre-release tags may hold hyphens. (j) **convert.** The motec.ld writer
+removes a `.ldx` already beside its output when it writes none; a `.ld` cut carries its own details (Log Time and, past
+midnight, Log Date moved to the cut's time 0; Start Lap the first flying lap of the cut) and does not reuse the input's
+verbatim header; only a `.ld` input's companion is protected; a conversion that writes no channel leaves no file and
+exits 1; a channel named twice is a usage error. The cut stays the half-open `[start, end)` of D-214 (d): its closing
+beacon is the new end of log, so the circuit rule calls that single lap the In lap, and a slower channel has no sample
+after its last one in the range (05 §5: no resampling in 0.1). (k) **Benchmarks.** `bench/CMakeLists.txt` gains
+`ESSES_BENCH_GATE` (ON); the hosted preset sets it OFF, so the hosted alarm records results instead of failing on the
+reference limits, and its comparison and upload always run. The three missing MVP rows of 07 §12 are measured:
+`plot.relayout_resize_20tr` (`plot_bench`, the 20-trace graph resized between 4,200 x 1,000 and 3,000 x 800, each step
+from its leading edge to the repaint), `values.refresh_250ch` (`plot_bench`, the Values window over 250 channels, 60
+cursor moves to the repaint) and `app.startup_empty_warm` (`open_bench`, `esses --new-instance` to its
+`ESSES_STARTUP_PROBE` ready line); the §1.5 option M4.md offered for them is withdrawn (07 §1.5 never moves a budget row
+but for a machine cause). The Values row failed at first (2.6 ms): `ValuesModel` now reads the view once per refresh and
+computes a row when a view asks for its cells, the window sizes its value columns to the rows on screen, and its cells
+are drawn by one positioned `drawText` each over the style's item panel (the style's per-cell text layout was most of a
+repaint), with selection, focus, alignment, elision and the pending colour unchanged. (l) **Packaging.** The installer's
+`[InstallDelete]` removes before `[Files]` what it and earlier packages put into `{app}` (runtime DLLs, Qt modules and
+plugin folders); an upgrade no longer takes the previous tasks (`UsePreviousTasks=no`), and the uninstaller removes
+`.ld`'s default only while it is `Esses.LogFile`. `associate-ld.cmd` passes the folder's path to `reg` through delayed
+expansion. The macOS Info.plist names `LSMinimumSystemVersion` (the deployment target, 14.0 in `package.yml`) and
+exports the log type; `smoke.py dmg` checks both on the built bundle (`--macos-minimum`, the job's
+`MACOS_DEPLOYMENT_TARGET`). `smoke.py windows-portable` compares `%APPDATA%\esses` file by file and runs the scripts
+from a folder whose name holds `&` and `%`. (m) **Smaller fixes.** Moving a time_distance group, its undo and its redo
+carry the group's vertical zoom, and a group edited in place keeps it (`applySpec`: a group still in its place keeps its
+zoom, the others are found by their name and channels, and those left over on both sides are paired in order when there
+are as many of each, so adding or removing a channel or renaming a group does not drop it); the Track Editor keeps a
+bound whose field still shows it (the last section's end) and keeps edited bounds on the track; Help Contents goes
+online at once when no program opens `.md` files (Windows: the association); the Data window's badge and funnel are
+drawn at each DPR and cached; a channel report keys its channels by display unit too; File > Export Data holds the
+component by QPointer across its prompts. (n) **Deferred** (`docs/milestones/M4.md` §10): the macOS nightly's
+`qtrender.tst_static_strips` at DPR 1.5 and 2 (red since M1: text painted on a pool thread differs from the GUI thread's
+under CoreText; needs a Mac or CI iterations; macOS is "builds green, not supported", and the walkthrough step still
+runs after it); **crisp 2 px lines at DPR 2** (the builders centre them on pixel centres, so they spread over three
+device columns, D-209 (d)'s "no blur" admits it): centring even widths on pixel edges changes every DPR 2 golden and
+needs the ubuntu artefact, so the maintainer decides before the tag whether 0.1 ships the soft lines with a line in the
+release note or waits for that change (the user-confirm part of this ADR); a same-size replacement that keeps the mtime
+(02 §1's `changedOnDisk()` is a re-stat of size and mtime by design; a content or identity check is a design change for
+v1.0); the binary-distribution notices of Qt's bundled third-party code in `THIRD_PARTY_LICENSES.md` (they need the Qt
+6.12.0 sources the maintainer attaches at the release, M4.md §6.0 step 8).
+**Consequences.** PR #5's four CI failures are fixed at their cause: (a) and (c) with tests that fail without the fix,
+(b) in a form both local clang-format releases accept, (d) by construction (one aqtinstall worker). None has had a CI
+run since: the first runs of the new and changed steps are CI's (M4.md §8 "Fix pass (wave 3)"). A reload never loses a
+source, its selection or its edits; for a moment during a reload both files are open. Decode faults and changes made
+while Esses stays active show at once. A forwarded request waits while a prompt or menu is open (at most until it
+closes); a second Esses launched while the first is hung waits once, not twice. A build from a shallow clone reports
+`+g<hash>`; the release build's version comes from its tag whatever other tags the commit carries. `esses-cli convert`
+changes behaviour for empty outputs (exit 1) and duplicate channels (exit 2). The hosted bench job is green unless a run
+fails to run; its regression signal waits for `tools/bench_compare.py` (M5). AC-M4-05 has a benchmark for every MVP row;
+their verdict is the reference machine's (§6.4). Package runs cost every pull request about 12 minutes per OS. The
+settings folder gains `instance.salt`. A local soak of fewer than about 16 cycles can judge the widget series grown from
+the Maths Editor's first use in a restart epoch, not a leak (M4.md §10 item 57); the nightly's 30 minutes are not
+affected.
+**User must confirm:** yes: (n)'s crisp 2 px lines at DPR 2 (ship 0.1 with them soft and say so, or wait for the
+builders' change and new DPR 2 goldens); the rest no.

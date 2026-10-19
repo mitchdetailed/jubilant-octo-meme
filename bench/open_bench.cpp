@@ -26,6 +26,16 @@
 //                                it also records the chunk cache's resident bytes (what the budget counts),
 //                                the resident set at the end and the private bytes (Windows: the commit
 //                                charge, which leaves out the mapped file's pages). Limit 1 GB (2^30 bytes).
+//
+// M4 (07 section 12 "Startup to empty workspace (warm) <= 1 s"; D-217):
+//   app.startup_empty_warm       `esses --new-instance` in a process of its own, offscreen, with a settings,
+//   cache
+//                                and log folder of its own and its own channel name (it never forwards):
+//                                QProcess::start -> the line "esses: ready" that ESSES_STARTUP_PROBE makes
+//                                esses print once its window is shown and its event loop has run
+//                                (apps/app/src/main.cpp; it then quits). One untimed launch first (warm: the
+//                                OS file cache), then --runs launches. Limit 1,000 ms. --startup-only runs
+//                                this row alone.
 // Each run is its own process (the executable started with --resident-run), so a run's peak is its own and
 // the heap of a previous run does not hide the next one's growth. --smoke shortens RW-2 to 60 s (one run).
 // --first-paint-only and --resident-only run one of the two rows. RW-2 is written by this executable started
@@ -60,7 +70,9 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QProcess>
+#include <QProcessEnvironment>
 #include <QSysInfo>
+#include <QTemporaryDir>
 #include <QTextStream>
 #include <QThread>
 #include <algorithm>
@@ -594,6 +606,55 @@ bool residentRow(const QString& dir, bool smoke, int runs, QJsonObject& row, QSt
 
 } // namespace
 
+constexpr double kStartupLimitMs = 1000.0; // 07 section 12: startup to an empty workspace, warm
+
+// One launch of esses to its "ready" line (the startup row above); false with `error` when it does not get
+// there.
+bool startupOnce(double& ms, QString& error) {
+#ifdef ESSES_APP_EXE
+    QTemporaryDir home;
+    if (!home.isValid()) {
+        error = QStringLiteral("no temporary folder");
+        return false;
+    }
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    env.insert(QStringLiteral("QT_QPA_PLATFORM"), QStringLiteral("offscreen"));
+    env.insert(QStringLiteral("ESSES_STARTUP_PROBE"), QStringLiteral("1"));
+    env.insert(QStringLiteral("ESSES_CONFIG_DIR"), home.filePath(QStringLiteral("config")));
+    env.insert(QStringLiteral("ESSES_CACHE_DIR"), home.filePath(QStringLiteral("cache")));
+    env.insert(QStringLiteral("ESSES_LOG_DIR"), home.filePath(QStringLiteral("logs")));
+    env.insert(QStringLiteral("ESSES_INSTANCE_NAME"),
+               QStringLiteral("esses-startup-bench-%1").arg(QCoreApplication::applicationPid()));
+    QProcess p;
+    p.setProcessEnvironment(env);
+    QByteArray output;
+    QElapsedTimer t;
+    t.start();
+    p.start(QString::fromUtf8(ESSES_APP_EXE), {QStringLiteral("--new-instance")});
+    bool ready = false;
+    while (!ready && t.elapsed() < 120000 && p.state() != QProcess::NotRunning) {
+        p.waitForReadyRead(50);
+        output += p.readAllStandardOutput();
+        ready = output.contains("esses: ready");
+    }
+    ms = static_cast<double>(t.nsecsElapsed()) / 1e6;
+    if (!p.waitForFinished(30000)) {
+        p.kill();
+        p.waitForFinished(5000);
+    }
+    if (!ready) {
+        error = QStringLiteral("esses did not report ready (exit %1): %2")
+                    .arg(p.exitCode())
+                    .arg(QString::fromUtf8(output + p.readAllStandardError()).left(400));
+    }
+    return ready;
+#else
+    static_cast<void>(ms);
+    error = QStringLiteral("built without the application (ESSES_APP_EXE)");
+    return false;
+#endif
+}
+
 int main(int argc, char** argv) {
     if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM")) {
         qputenv("QT_QPA_PLATFORM", "offscreen");
@@ -626,6 +687,8 @@ int main(int argc, char** argv) {
                                                QStringLiteral("Only open.first_paint_100mb_8ch."));
     const QCommandLineOption residentOnlyOpt(QStringLiteral("resident-only"),
                                              QStringLiteral("Only open.resident_rw2_20maths."));
+    const QCommandLineOption startupOnlyOpt(QStringLiteral("startup-only"),
+                                            QStringLiteral("Only app.startup_empty_warm."));
     const QCommandLineOption writeRw2Opt(QStringLiteral("write-rw2"),
                                          QStringLiteral("Internal: write RW-2 as <file> and exit."),
                                          QStringLiteral("file"));
@@ -637,7 +700,7 @@ int main(int argc, char** argv) {
                                             QStringLiteral("Internal: one resident run over <file>."),
                                             QStringLiteral("file"));
     parser.addOptions({runsOpt, fileOpt, jsonOpt, gateOpt, smokeOpt, firstPaintOnlyOpt, residentOnlyOpt,
-                       writeRw2Opt, rw2SecondsOpt, residentRunOpt});
+                       startupOnlyOpt, writeRw2Opt, rw2SecondsOpt, residentRunOpt});
     parser.process(app);
     if (parser.isSet(writeRw2Opt)) {
         const qint64 seconds = std::clamp<qint64>(parser.value(rw2SecondsOpt).toLongLong(), 1, 6 * 3600);
@@ -648,8 +711,10 @@ int main(int argc, char** argv) {
     }
     const bool smoke = parser.isSet(smokeOpt);
     const int runs = smoke ? 1 : std::max(1, parser.value(runsOpt).toInt());
-    const bool firstPaint = !parser.isSet(residentOnlyOpt);
-    const bool residentWanted = !parser.isSet(firstPaintOnlyOpt);
+    const bool startupOnly = parser.isSet(startupOnlyOpt);
+    const bool firstPaint = !parser.isSet(residentOnlyOpt) && !startupOnly;
+    const bool residentWanted = !parser.isSet(firstPaintOnlyOpt) && !startupOnly;
+    const bool startupWanted = !parser.isSet(firstPaintOnlyOpt) && !parser.isSet(residentOnlyOpt);
     const QString dataDir =
         QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("../bench-data"));
     const QString file = parser.isSet(fileOpt)
@@ -712,6 +777,28 @@ int main(int argc, char** argv) {
         bench::report(rows, QStringLiteral("open.first_paint_100mb_8ch"), bench::statsOf(firstPaintMs),
                       kFirstPaintLimitMs);
     }
+    // 07 section 12: startup to an empty workspace, warm (D-217).
+    if (startupWanted) {
+        double ms = 0.0;
+        if (!startupOnce(ms, error)) { // warm-up, untimed
+            err << "open_bench: " << error << '\n';
+            return 2;
+        }
+        std::vector<double> startupMs;
+        for (int r = 0; r < runs; ++r) {
+            if (!startupOnce(ms, error)) {
+                err << "open_bench: " << error << '\n';
+                return 2;
+            }
+            startupMs.push_back(ms);
+            out << QStringLiteral("run %1: startup to an empty workspace %2 ms\n")
+                       .arg(r + 1)
+                       .arg(ms, 0, 'f', 1);
+            out.flush();
+        }
+        bench::report(rows, QStringLiteral("app.startup_empty_warm"), bench::statsOf(startupMs),
+                      kStartupLimitMs);
+    }
     // AC-M4-02: a byte row, kept out of the timing rows (and so out of the "benchmarks" array).
     QJsonObject memory;
     if (residentWanted) {
@@ -726,7 +813,7 @@ int main(int argc, char** argv) {
         parser.isSet(jsonOpt) ? parser.value(jsonOpt) : bench::defaultJsonPath(QStringLiteral("open_bench"));
     if (!jsonPath.isEmpty()) {
         const QJsonObject doc{{QStringLiteral("bench"), QStringLiteral("open_bench")},
-                              {QStringLiteral("ac"), QStringLiteral("AC-M1-03, AC-M4-02")},
+                              {QStringLiteral("ac"), QStringLiteral("AC-M1-03, AC-M4-02, AC-M4-05")},
                               {QStringLiteral("cpu"), QSysInfo::currentCpuArchitecture()},
                               {QStringLiteral("os"), QSysInfo::prettyProductName()},
                               {QStringLiteral("threads"), QThread::idealThreadCount()},
@@ -748,6 +835,12 @@ int main(int argc, char** argv) {
                                    .toObject()
                                    .value(QStringLiteral("pass"))
                                    .toBool();
+    if (startupWanted) {
+        pass = pass && rows.value(QStringLiteral("app.startup_empty_warm"))
+                           .toObject()
+                           .value(QStringLiteral("pass"))
+                           .toBool();
+    }
     if (residentWanted) {
         pass = pass && memory.value(QStringLiteral("open.resident_rw2_20maths"))
                            .toObject()

@@ -919,7 +919,7 @@ Result<ReportTable> ReportEngine::cells(const ReportSpec& spec, const ReportInpu
     const auto lookup = [&](std::size_t source, std::size_t ch) -> const ReportChannelData& {
         std::optional<ReportChannelData>& slot = lookups[source * nch + ch];
         if (!slot) {
-            slot = inputs.channels ? inputs.channels(inputs.sources[source], spec.channels[ch].name)
+            slot = inputs.channels ? inputs.channels(inputs.sources[source], spec.channels[ch])
                                    : ReportChannelData{};
         }
         return *slot;

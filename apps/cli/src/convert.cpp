@@ -14,6 +14,8 @@
 #include <esses/formats/import_log.hpp>
 #include <esses/formats/ld_importer.hpp>
 #include <esses/formats/registry.hpp>
+#include <esses/model/detail.hpp>
+#include <esses/model/range.hpp>
 #include <esses/model/sidecar.hpp>
 #include <esses/model/source.hpp>
 #include <esses/store/column.hpp>
@@ -25,9 +27,13 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <memory>
+#include <optional>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <utility>
 #include <variant>
@@ -201,6 +207,72 @@ Result<model::DataLayer> sliceLayer(const model::DataLayer& layer, const std::ve
     return out;
 }
 
+// Days since 1970-01-01 of a proleptic Gregorian date, and back (the civil-date algorithms of H. Hinnant,
+// public domain).
+long long daysFromCivil(long long y, unsigned m, unsigned d) {
+    y -= m <= 2 ? 1 : 0;
+    const long long era = (y >= 0 ? y : y - 399) / 400;
+    const auto yoe = static_cast<unsigned>(y - era * 400);
+    const unsigned doy = (153 * (m + (m > 2 ? static_cast<unsigned>(-3) : 9)) + 2) / 5 + d - 1;
+    const unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    return era * 146097 + static_cast<long long>(doe) - 719468;
+}
+
+void civilFromDays(long long z, long long& y, unsigned& m, unsigned& d) {
+    z += 719468;
+    const long long era = (z >= 0 ? z : z - 146096) / 146097;
+    const auto doe = static_cast<unsigned>(z - era * 146097);
+    const unsigned yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    const unsigned doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    const unsigned mp = (5 * doy + 2) / 153;
+    d = doy - (153 * mp + 2) / 5 + 1;
+    m = mp < 10 ? mp + 3 : mp - 9;
+    y = static_cast<long long>(yoe) + era * 400 + (m <= 2 ? 1 : 0);
+}
+
+// "a/b/c" or "a:b[:c]" as numbers; empty when it is not that shape.
+std::vector<long long> numberFields(const std::string& text, char sep) {
+    std::vector<long long> out;
+    long long value = 0;
+    int digits = 0;
+    for (const char ch : text) {
+        if (ch >= '0' && ch <= '9') {
+            if (++digits > 6) {
+                return {};
+            }
+            value = value * 10 + (ch - '0');
+        } else if (ch == sep && digits > 0) {
+            out.push_back(value);
+            value = 0;
+            digits = 0;
+        } else {
+            return {};
+        }
+    }
+    if (digits == 0) {
+        return {};
+    }
+    out.push_back(value);
+    return out;
+}
+
+void setText(std::vector<model::Detail>& details, std::string_view id, std::optional<std::string> text) {
+    model::Detail* d = model::findDetail(details, id);
+    if (!text) {
+        if (d != nullptr) {
+            details.erase(details.begin() + (d - details.data()));
+        }
+        return;
+    }
+    if (d == nullptr) {
+        details.push_back(model::Detail{std::string(id), *text, model::Provenance::Logged, std::nullopt});
+    } else if (auto* q = std::get_if<model::Quantityd>(&d->value)) {
+        q->v = std::strtod(text->c_str(), nullptr);
+    } else {
+        d->value = *text;
+    }
+}
+
 json notesJson(const std::vector<formats::ImportLogEntry>& notes) {
     json out = json::array();
     for (const formats::ImportLogEntry& e : notes) {
@@ -217,10 +289,77 @@ json notesJson(const std::vector<formats::ImportLogEntry>& notes) {
 
 } // namespace
 
+void cutDetails(model::DataSource& source, const model::DataLayer& layer, Micros start) {
+    // Log Time and Log Date of the cut's time 0.
+    std::optional<std::string> time;
+    std::optional<std::string> date;
+    bool dateKnown = false;
+    long long dayShift = 0;
+    if (const model::Detail* t = model::findDetail(source.details, "Log Time")) {
+        const auto* text = std::get_if<std::string>(&t->value);
+        const std::vector<long long> f =
+            text != nullptr ? numberFields(*text, ':') : std::vector<long long>{};
+        if ((f.size() == 2 || f.size() == 3) && f[0] < 24 && f[1] < 60 && (f.size() == 2 || f[2] < 60)) {
+            const long long seconds = f[0] * 3600 + f[1] * 60 + (f.size() == 3 ? f[2] : 0) +
+                                      static_cast<long long>(std::llround(static_cast<double>(start) / 1e6));
+            dayShift = seconds / 86400;
+            const long long s = seconds % 86400;
+            char buf[16];
+            std::snprintf(buf, sizeof buf, "%02lld:%02lld:%02lld", s / 3600, s / 60 % 60, s % 60);
+            time = std::string(buf);
+        }
+        setText(source.details, "Log Time", time);
+        setText(source.baseDetails, "Log Time", time);
+    }
+    if (const model::Detail* d = model::findDetail(source.details, "Log Date");
+        d != nullptr && dayShift > 0) {
+        const auto* text = std::get_if<std::string>(&d->value);
+        const std::vector<long long> f =
+            text != nullptr ? numberFields(*text, '/') : std::vector<long long>{};
+        if (f.size() == 3 && f[0] >= 1 && f[0] <= 31 && f[1] >= 1 && f[1] <= 12 && f[2] >= 1) {
+            long long y = 0;
+            unsigned m = 0;
+            unsigned day = 0;
+            civilFromDays(daysFromCivil(f[2], static_cast<unsigned>(f[1]), static_cast<unsigned>(f[0])) +
+                              dayShift,
+                          y, m, day);
+            char buf[24];
+            std::snprintf(buf, sizeof buf, "%02u/%02u/%04lld", day, m, y);
+            date = std::string(buf);
+            dateKnown = true;
+        }
+        if (!dateKnown) {
+            date.reset();
+        }
+        setText(source.details, "Log Date", date);
+        setText(source.baseDetails, "Log Date", date);
+    }
+    // Start Lap: the first flying lap that starts in the cut.
+    std::optional<int> first;
+    Micros firstStart = 0;
+    layer.ranges.forEach([&](const model::RangeGroup& g) {
+        for (const model::Range& r : g.ranges) {
+            if (r.kind == model::RangeKind::Lap && r.lapClass == model::LapClass::Flying &&
+                r.start >= start && (!first || r.start < firstStart)) {
+                first = r.number;
+                firstStart = r.start;
+            }
+        }
+    });
+    if (first && (*first != 1 || model::findDetail(source.details, "Start Lap") != nullptr)) {
+        setText(source.details, "Start Lap", std::to_string(*first));
+        setText(source.baseDetails, "Start Lap", std::to_string(*first));
+    }
+}
+
 bool convertWouldOverwriteInput(const std::filesystem::path& input, const std::filesystem::path& output,
                                 bool ldOutput) {
-    const std::vector<std::filesystem::path> protectedFiles{input, withExtension(input, ".ldx"),
-                                                            model::SidecarDocument::pathFor(input)};
+    std::vector<std::filesystem::path> protectedFiles{input, model::SidecarDocument::pathFor(input)};
+    // A companion exists only for a .ld input (its .ldx): run.csv -> run.ld touches nothing of run.csv
+    // (D-217).
+    if (caseFold(u8(input.extension())) == ".ld") {
+        protectedFiles.push_back(withExtension(input, ".ldx"));
+    }
     std::vector<std::filesystem::path> written{output};
     if (ldOutput) {
         written.push_back(withExtension(output, ".ldx"));
@@ -332,6 +471,11 @@ int runConvert(AppContext& ctx, const ConvertOptions& o, std::ostream& out, std:
                 err << "esses-cli convert: no channel '" << name << "' in " << u8(o.input.filename()) << "\n";
                 return 1;
             }
+            if (std::find(ids.begin(), ids.end(), c->desc.id) != ids.end()) {
+                // Written twice it would read back as "<name>" and "<name> (2)" (D-217).
+                err << "esses-cli convert: --channels names '" << c->desc.name << "' twice\n";
+                return 2;
+            }
             ids.push_back(c->desc.id);
             names.push_back(c->desc.name);
         }
@@ -359,6 +503,9 @@ int runConvert(AppContext& ctx, const ConvertOptions& o, std::ostream& out, std:
                 break; // layer names are unique
             }
         }
+        // The cut's own details (D-217); the input's verbatim header would name the input's start and laps.
+        cutDetails(*sliced, *layer, start);
+        sliced->prov.rawHeader.clear();
         view.source = sliced;
         // Every channel the cut kept, in order (the ids are unchanged).
         for (const model::ChannelId& id : ids) {
@@ -399,6 +546,16 @@ int runConvert(AppContext& ctx, const ConvertOptions& o, std::ostream& out, std:
         if (!wasSkipped) {
             written.push_back(name);
         }
+    }
+    if (written.empty()) {
+        // Nothing of the input reached the output: no file that reads as an empty log stays behind (D-217).
+        for (const std::filesystem::path& f : report->files) {
+            std::error_code ec;
+            std::filesystem::remove(f, ec);
+        }
+        err << "esses-cli convert: no channel could be written to " << u8(*o.output) << " (" << skipped.size()
+            << " skipped); nothing is written\n";
+        return 1;
     }
     if (o.json) {
         json files = json::array();

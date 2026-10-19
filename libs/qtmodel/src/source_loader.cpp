@@ -211,8 +211,8 @@ SourceLoader::~SourceLoader() {
     // The edits not on disk yet are written now (exit: a queued write may be cancelled by the pool's
     // shutdown), and the opens in flight are cancelled.
     while (!sidecarsDue_.empty() || !sidecarsInFlight_.empty()) {
-        flushSidecar(!sidecarsDue_.empty() ? sidecarsDue_.begin()->first : sidecarsInFlight_.begin()->first,
-                     false);
+        static_cast<void>(flushSidecar(
+            !sidecarsDue_.empty() ? sidecarsDue_.begin()->first : sidecarsInFlight_.begin()->first, false));
     }
     for (auto& [id, inFlight] : opens_) {
         inFlight.cancel.cancel();
@@ -410,8 +410,9 @@ void SourceLoader::published(const std::filesystem::path& path,
         Q_EMIT openFailed(toQString(path), tr("the importer returned no source"));
         return;
     }
-    if (this->source(source->id) != nullptr) {
-        // A second open of the same file (06 section 19 item 6): it is already in the Data window.
+    if (this->source(source->id) != nullptr && !reloadSameContent(path, source->id)) {
+        // A second open of the same file (06 section 19 item 6): it is already in the Data window. (The
+        // reopen of a stale source with the same content replaced it instead: M4 reload, D-217.)
         formats::ImportLogEntry note;
         note.code = "open.already_open";
         note.message = "the file is already open";
@@ -751,7 +752,7 @@ void SourceLoader::writeDueSidecars() {
     }
 }
 
-void SourceLoader::flushSidecar(const model::SourceId& source, bool report) {
+bool SourceLoader::flushSidecar(const model::SourceId& source, bool report, bool keepOnFailure) {
     // The newest document of the source: the one due, else the one whose Background write may not have run.
     std::optional<SidecarDue> latest;
     if (const auto it = sidecarsDue_.find(source); it != sidecarsDue_.end()) {
@@ -765,17 +766,21 @@ void SourceLoader::flushSidecar(const model::SourceId& source, bool report) {
         sidecarsInFlight_.erase(it);
     }
     if (!latest) {
-        return;
+        return true;
     }
     const SidecarDue& due = *latest;
     const std::shared_ptr<SidecarSlot> slot = slotFor(source);
     // On this thread: a Background write of an older document in flight finishes first (the slot's mutex).
-    if (Result<void> r = writeSidecarFile(slot->m, slot->written, due.doc, due.path, due.generation);
-        !r && report) {
+    Result<void> r = writeSidecarFile(slot->m, slot->written, due.doc, due.path, due.generation);
+    if (!r && report) {
         Q_EMIT importLog(toQString(due.path),
                          {logEntry(formats::ImportLogEntry::Level::Warning, "sidecar.write_failed",
                                    "the sidecar could not be written: " + r.error().toString())});
     }
+    if (!r && keepOnFailure) {
+        sidecarsDue_.insert_or_assign(source, std::move(*latest)); // a later flush writes it (D-217)
+    }
+    return r.ok();
 }
 
 void SourceLoader::close(const model::SourceId& id) {
@@ -783,7 +788,7 @@ void SourceLoader::close(const model::SourceId& id) {
     if (it == open_.end()) {
         return;
     }
-    flushSidecar(id, true); // the edits not on disk yet, before the source goes (D-190)
+    static_cast<void>(flushSidecar(id, true)); // the edits not on disk yet, before the source goes (D-190)
     open_.erase(it);
     const std::string hex = detail::sourceHex(id);
     pool_.cancelAll("chunk/" + hex);
@@ -800,7 +805,9 @@ void SourceLoader::close(const model::SourceId& id) {
     if (maths_ != nullptr) {
         maths_->removeSource(id);
     }
-    registry_->release(id);
+    if (!keepDecodeLogOnClose_) { // a reopen with the same content id registered its own (D-217)
+        registry_->release(id);
+    }
     budgetForget(id); // M4 hooks (D-206)
     reloadForget(id);
     Q_EMIT sourceClosed(id);

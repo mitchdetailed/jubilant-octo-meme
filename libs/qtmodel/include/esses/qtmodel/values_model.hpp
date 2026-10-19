@@ -11,14 +11,18 @@
 // window and the values_list component. GUI thread only.
 // M1 details: the reference column is the reference overlay (Overlay 0, else Overlay 1; none while F4 hides
 // the overlays); Delta = Main - reference in the display unit; display units and decimals come from
-// setChannelRequests (a values_list body) or the stored unit; every row is recomputed on refresh (<= 250
-// rows, tryPin only) and a refresh is retried every 50 ms while a cell waits for a chunk or a maths output.
-// The worksheet supplies the domain, cursor and DistanceService; without a worksheet every value cell is
-// empty. rowCount() follows the effective rows (setChannels, or every channel of the Main source with
-// setAllChannels(true)).
+// setChannelRequests (a values_list body) or the stored unit. A refresh takes the view (the cursor, the
+// slots' mappers) once and marks every row out of date; a row is computed when a view asks for its cells
+// (data(), cellText), so a refresh costs only the rows on screen (07 section 12 "Values window refresh, 250
+// channels <= 2 ms"; D-217); a refresh is retried every 50 ms while a computed cell waits for a chunk or a
+// maths output. The worksheet supplies the domain, cursor and DistanceService; without a worksheet every
+// value cell is empty. rowCount() follows the effective rows (setChannels, or every channel of the Main
+// source with setAllChannels(true)).
 #pragma once
 
 #include <esses/plotcore/change_mask.hpp>
+#include <esses/plotcore/domain_mapper.hpp>
+#include <esses/plotcore/selection_snapshot.hpp>
 #include <esses/plotcore/view_state.hpp>
 #include <esses/qtmodel/render_service.hpp>
 
@@ -26,7 +30,9 @@
 #include <QString>
 #include <QStringList>
 #include <QVariant>
+#include <cstdint>
 #include <functional>
+#include <optional>
 #include <vector>
 
 class QTimer;
@@ -88,7 +94,22 @@ private:
     std::vector<ChannelRequest> requests_;
     bool allChannels_ = false;
     std::vector<ChannelRequest> rows_; // the effective rows
-    std::vector<RowCells> cells_;
+    // What one refresh read (D-217): the cells of a row are computed against it when a view first asks for
+    // them.
+    struct Context {
+        bool live = false;
+        plot::ViewState view;
+        plot::SelectionSnapshot snap;
+        std::optional<plot::DomainMapper> mainMap;
+        std::optional<model::RangeRef> reference;
+        std::optional<plot::DomainMapper> refMap;
+        double xc = 0.0;
+    };
+    Context context_;
+    std::uint64_t generation_ = 0;                  // bumps on every refresh
+    mutable std::vector<RowCells> cells_;           // computed on demand
+    mutable std::vector<std::uint64_t> computedAt_; // the generation each row was computed at (0: never)
+    void computeRow(std::size_t row) const;
     QTimer* retry_ = nullptr;
 };
 

@@ -50,6 +50,13 @@ if(APPLE)
   list(REVERSE _esses_domain)
   string(JOIN "." _esses_bundle_prefix ${_esses_domain})
   set(_esses_numeric_version "${ESSES_VERSION_MAJOR}.${ESSES_VERSION_MINOR}.${ESSES_VERSION_PATCH}")
+  # LSMinimumSystemVersion of the Info.plist: the deployment target the build was made for (package.yml sets
+  # 14.0), so that Launch Services refuses an older macOS with a message instead of a dyld failure (D-217).
+  if(CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(ESSES_MACOS_MINIMUM "${CMAKE_OSX_DEPLOYMENT_TARGET}")
+  else()
+    set(ESSES_MACOS_MINIMUM "14.0")
+  endif()
   set_target_properties(${ESSES_PREFIX}_app PROPERTIES
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/tools/packaging/macos/Info.plist.in"
     MACOSX_BUNDLE_BUNDLE_NAME "${ESSES_APP_NAME}"

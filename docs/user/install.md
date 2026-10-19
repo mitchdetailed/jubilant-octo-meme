@@ -28,9 +28,10 @@ The 0.1 packages are not code-signed, so each operating system warns the first t
 3. Esses is installed under `Program Files\Esses`, with `esses.exe`, the command-line tool `esses-cli.exe`, the
    licence notices (`NOTICES.md`, `THIRD_PARTY_LICENSES.md`) and this guide (`docs\user\`).
 
-**The Microsoft Visual C++ runtime.** Esses needs the Visual C++ 2015-2022 runtime at version 14.40 or later. An
-older copy that is already installed counts as present for many installers but makes Esses crash at start-up, so
-the Esses installer checks the installed version. Installed for all users (the default, which asks for
+**The Microsoft Visual C++ runtime.** Esses needs the Visual C++ 2015-2022 runtime (x64) at least as new as the one
+its installer carries (14.40 or later; the installer names the exact version it needs in its log). An older copy
+that is already installed counts as present for many installers but makes Esses crash at start-up, so the Esses
+installer checks the installed version against its own. Installed for all users (the default, which asks for
 administrator rights), it installs the runtime that ships with it when the installed one is missing or older, and
 stops without installing anything if the runtime is still too old afterwards. Installed for your user only ("Install
 for me only", no administrator rights), it puts its own copy of the runtime files beside `esses.exe` instead.
@@ -84,7 +85,12 @@ esses --version
   `light` or `dark`); it stays the active scheme.
 - `--keymap <name|file>` uses that key-binding file on top of the default key bindings for this run only (a file
   path, or the name of a file in the `keymaps` folder of your settings); your own settings are not changed.
+- `--scheme` and `--keymap` apply to a window that starts: when Esses is already running, the files go to the
+  running window, which keeps its own scheme and key bindings, and the terminal says so; add `--new-instance` to
+  start a window with them.
 - A problem with `--scheme` or `--keymap` is a warning in the Messages window; Esses starts anyway.
+- If a second start cannot reach the running window (another program holds the channel), it opens a window of its
+  own, and that window's Messages say so.
 - `--version` prints the version and exits. On Windows `esses.exe` is a windowed program; the version still
   prints in the terminal you started it from. `esses-cli --version` does the same from the command-line tool.
 

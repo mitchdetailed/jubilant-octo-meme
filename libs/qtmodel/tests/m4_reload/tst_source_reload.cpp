@@ -9,14 +9,23 @@
 //     open.file_changed, action file.reload_source with the id), the Data window model's StaleRole and
 //     dataChanged of its row; a file gone from its path is stale too (its own row text); close() clears the
 //     mark.
-//   * reloadRestoresTheSelection: reload() of a file whose content changed (one more lap) closes it, reopens
-//     it through the pipeline (a new SourceId) and announces sourceReloaded(previous, source): the slots back
-//     by RangeId at their positions, the filter and the Data-window position restored, the sidecar edit
-//     re-applied.
+//   * reloadRestoresTheSelection: reload() of a file whose content changed (one more lap) reopens it through
+//     the pipeline (a new SourceId) while the stale source stays (D-217), closes the stale one when the
+//     reopen publishes and announces sourceReloaded(previous, source): the slots back by RangeId at their
+//     positions, the filter and the Data-window position restored, the sidecar edit re-applied.
 //   * reloadOfTheSameBytesKeepsTheId: the same bytes under a new mtime reopen as the same SourceId and
 //     selection.
-//   * reloadEndsWhenTheOpenEnds: a reload whose open fails (the file is gone) or is cancelled (cancelOpens)
-//     publishes nothing and is no longer pending; reload() of a source that is not open is NotFound.
+//   * reloadEndsWhenTheOpenEnds (D-217): a file gone from its path is not reloaded (NotFound) and its source
+//     stays open, stale, with its selection; a reload whose open is cancelled (cancelOpens) ends at once and
+//     leaves the source; reload() of a source that is not open is NotFound.
+//   * reloadOfAnUnreadableReplacementKeepsTheSource (D-217): a replacement that does not open (not a log)
+//     fails the reopen, and the stale source, its selection and its sidecar edit stay.
+//   * reloadRefusedWhileTheEditsCannotBeWritten (D-217): the sidecar's place is not writable: reload() is
+//     refused (Io), the edit stays due, and once the place is free the reload carries it over.
+//   * backgroundCheckRunsOnThePool (D-217): checkChangedFilesInBackground() re-stats on a pool thread and
+//     marks the source stale when the result comes back; the GUI thread never waits for it.
+//   * decodeTimeFaultsReachMessagesAndMarkStale (D-217): an ld.io_fault in a source's DecodeLog reaches the
+//     Messages dock and marks the source stale (Missing), so Reload is offered.
 //   * selection*: DataSelectionModel::sourceReloaded over in-memory sources: the lap-number fallback and a
 //     dropped slot (with its hint), a Main the close moved to another source given back to its overlay slot,
 //     two reloads in flight at once in either order, closeAllSources and the bound on parked closes.
@@ -40,11 +49,14 @@
 
 #include <QSignalSpy>
 #include <QTest>
+#include <QThread>
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 using namespace esses;
@@ -291,11 +303,14 @@ private Q_SLOTS:
             QSignalSpy stale(&w.loader, &SourceLoader::staleChanged);
             QVERIFY(w.loader.reload(srcA->id).ok());
             QCOMPARE(w.loader.pendingReloads(), 1);
-            QVERIFY(w.loader.source(srcA->id) == nullptr); // closed at once
-            QVERIFY(!w.loader.isStale(srcA->id));
-            QCOMPARE(stale.count(), 1); // the mark went with the closed source
+            QVERIFY(w.loader.source(srcA->id) != nullptr); // D-217: kept until the reopen publishes
+            QVERIFY(w.loader.isStale(srcA->id));
             QTRY_COMPARE_WITH_TIMEOUT(reloaded.count(), 1, 30000);
             QCOMPARE(w.loader.pendingReloads(), 0);
+            QVERIFY(w.loader.source(srcA->id) == nullptr); // closed once the reopen published
+            QVERIFY(!w.loader.isStale(srcA->id));
+            QCOMPARE(stale.count(), 1); // the mark went with the closed source
+            QCOMPARE(stale.first().at(1).toBool(), false);
             QCOMPARE(reloaded.first().at(0).value<model::SourceId>(), srcA->id);
             const auto next = reloaded.first().at(1).value<std::shared_ptr<const model::DataSource>>();
             QVERIFY(next != nullptr);
@@ -367,17 +382,23 @@ private Q_SLOTS:
             QSignalSpy failed(&w.loader, &SourceLoader::openFailed);
             QCOMPARE(w.loader.reload(model::SourceId{}).error().code, ErrorCode::NotFound);
 
-            // A file gone: the reopen fails, and the reload with it.
+            // A file gone (D-217): not reloaded; the source stays open and stale, with its selection.
             const auto srcA = openAndWait(w, a);
             QVERIFY(srcA != nullptr);
+            w.selection.setMain(rangeRef(*srcA, 2));
             QVERIFY(renameRetrying(a, dir / "a" / "gone.ld"));
             QCOMPARE(w.loader.checkChangedFiles(), std::vector<model::SourceId>{srcA->id});
-            QVERIFY(w.loader.reload(srcA->id).ok());
-            QTRY_COMPARE_WITH_TIMEOUT(failed.count(), 1, 30000);
+            const Result<void> refused = w.loader.reload(srcA->id);
+            QVERIFY(!refused.ok());
+            QCOMPARE(refused.error().code, ErrorCode::NotFound);
             QCOMPARE(w.loader.pendingReloads(), 0);
-            QVERIFY(w.selection.source(srcA->id) == nullptr);
+            QVERIFY(w.loader.source(srcA->id) != nullptr);
+            QVERIFY(w.selection.source(srcA->id) != nullptr);
+            QVERIFY(w.selection.snapshot().main == rangeRef(*srcA, 2));
+            QVERIFY(w.loader.isStale(srcA->id));
 
-            // A reload whose open is cancelled (a project change, Close All) ends at once.
+            // A reload whose open is cancelled (a project change, Close All) ends at once and leaves the
+            // source.
             const auto srcB = openAndWait(w, b);
             QVERIFY(srcB != nullptr);
             QVERIFY(w.loader.reload(srcB->id).ok());
@@ -386,7 +407,151 @@ private Q_SLOTS:
             QCOMPARE(w.loader.pendingReloads(), 0);
             QVERIFY(QTest::qWaitFor([&] { return quiet(rt); }, 30000));
             QCOMPARE(reloaded.count(), 0);
-            QVERIFY(w.loader.sources().empty());
+            QCOMPARE(failed.count(), 0);
+            QCOMPARE(w.loader.sources().size(), std::size_t{2});
+            QVERIFY(w.loader.source(srcB->id) != nullptr);
+        }
+        rt.shutdown();
+    }
+
+    // Regression (PR #5 review E1, D-217): a replacement that is not a log fails the reopen; nothing of the
+    // stale source is lost.
+    void reloadOfAnUnreadableReplacementKeepsTheSource() {
+        AppRuntime rt(runtimeOptions());
+        const fs::path dir = scratchDir("reload-unreadable");
+        const fs::path a = writeLog(rt, dir / "a", "session-a", {40.0, 50.0, 48.0, 49.0, 30.0});
+        {
+            Workspace w(rt);
+            const auto src = openAndWait(w, a);
+            QVERIFY(src != nullptr);
+            w.selection.setMain(rangeRef(*src, 2));
+            w.selection.setTrusted(rangeRef(*src, 1), false); // a sidecar edit
+            const fs::path junk = dir / "junk" / "session-a.ld";
+            fs::create_directories(junk.parent_path());
+            std::ofstream(junk, std::ios::binary) << "not a log at all, a partial copy perhaps";
+            replaceOnDisk(a, junk);
+            QCOMPARE(w.loader.checkChangedFiles(), std::vector<model::SourceId>{src->id});
+            QSignalSpy failed(&w.loader, &SourceLoader::openFailed);
+            QSignalSpy reloaded(&w.loader, &SourceLoader::sourceReloaded);
+            QVERIFY(w.loader.reload(src->id).ok());
+            QTRY_VERIFY_WITH_TIMEOUT(failed.count() == 1 && w.loader.pendingReloads() == 0, 30000);
+            QCOMPARE(reloaded.count(), 0);
+            QVERIFY(w.loader.source(src->id) != nullptr); // still open, still stale
+            QVERIFY(w.loader.isStale(src->id));
+            QVERIFY(w.selection.snapshot().main == rangeRef(*src, 2));
+            QVERIFY(!rangeAt(*w.loader.source(src->id), 1).trusted);
+            QVERIFY(QTest::qWaitFor([&] { return quiet(rt); }, 30000));
+        }
+        rt.shutdown();
+    }
+
+    // Regression (PR #5 review E1, D-217): the edits not on disk yet cannot be written next to the log (a
+    // directory holds the sidecar's name): reload() is refused and the edit stays due; once the name is free
+    // the reload writes it and the reopened source has it.
+    void reloadRefusedWhileTheEditsCannotBeWritten() {
+        AppRuntime rt(runtimeOptions());
+        const fs::path dir = scratchDir("reload-sidecar");
+        const fs::path a = writeLog(rt, dir / "a", "session-a", {40.0, 50.0, 48.0, 49.0, 30.0});
+        {
+            Workspace w(rt);
+            const auto src = openAndWait(w, a);
+            QVERIFY(src != nullptr);
+            replaceOnDisk(a, writeLog(rt, dir / "next", "session-a", {40.0, 50.0, 48.0, 49.0, 47.0, 30.0}));
+            QCOMPARE(w.loader.checkChangedFiles(), std::vector<model::SourceId>{src->id});
+            const fs::path sidecar = model::SidecarDocument::pathFor(a);
+            std::error_code ec;
+            fs::remove(sidecar, ec);
+            fs::create_directories(sidecar);                  // the document cannot be written there now
+            w.selection.setTrusted(rangeRef(*src, 1), false); // due; the 500 ms timer has not run
+            const Result<void> refused = w.loader.reload(src->id);
+            QVERIFY(!refused.ok());
+            QCOMPARE(refused.error().code, ErrorCode::Io);
+            QVERIFY(w.loader.source(src->id) != nullptr);
+            QCOMPARE(w.loader.pendingReloads(), 0);
+            fs::remove(sidecar, ec);
+            QSignalSpy reloaded(&w.loader, &SourceLoader::sourceReloaded);
+            QVERIFY(w.loader.reload(src->id).ok());
+            QTRY_COMPARE_WITH_TIMEOUT(reloaded.count(), 1, 30000);
+            const auto next = reloaded.first().at(1).value<std::shared_ptr<const model::DataSource>>();
+            QVERIFY(next != nullptr);
+            QVERIFY(!rangeAt(*w.loader.source(next->id), 1).trusted); // the edit reached the reopened file
+            QVERIFY(QTest::qWaitFor([&] { return quiet(rt); }, 30000));
+        }
+        rt.shutdown();
+    }
+
+    // Regression (PR #5 review U4, D-217): the activation check's re-stats run on the pool.
+    void backgroundCheckRunsOnThePool() {
+        AppRuntime rt(runtimeOptions());
+        const fs::path dir = scratchDir("reload-background");
+        const fs::path a = writeLog(rt, dir / "a", "session-a", {40.0, 50.0, 48.0, 49.0, 30.0});
+        {
+            Workspace w(rt);
+            w.loader.setUseSidecars(false);
+            const auto src = openAndWait(w, a);
+            QVERIFY(src != nullptr);
+            std::atomic<bool> onGui{true};
+            std::atomic<bool> release{false};
+            QThread* gui = QThread::currentThread();
+            w.loader.setFileCheckForTest([&](const model::SourceProvenance&) {
+                onGui = QThread::currentThread() == gui;
+                while (!release) { // a share that does not answer: the GUI thread must not be the one waiting
+                    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                }
+                formats::SourceFileCheck c;
+                c.state = formats::SourceFileState::Missing;
+                return c;
+            });
+            w.loader.checkChangedFilesInBackground();
+            QCOMPARE(w.loader.fileChecksPending(), 1); // returned while the check still waits
+            QVERIFY(!w.loader.isStale(src->id));
+            w.loader.checkChangedFilesInBackground(); // a second activation while one runs: coalesced
+            QCOMPARE(w.loader.fileChecksPending(), 1);
+            release = true;
+            QTRY_VERIFY_WITH_TIMEOUT(w.loader.isStale(src->id), 30000);
+            QVERIFY(!onGui);
+            QCOMPARE(w.loader.fileChecksPending(), 0);
+            QCOMPARE(w.loader.staleState(src->id), formats::SourceFileState::Missing);
+            QCOMPARE(staleRows(w.messages).size(), std::size_t{1});
+            QVERIFY(staleRows(w.messages)[0].text.contains(QStringLiteral("can no longer be read")));
+            w.loader.setFileCheckForTest({});
+            QVERIFY(QTest::qWaitFor([&] { return quiet(rt); }, 30000));
+        }
+        rt.shutdown();
+    }
+
+    // Regression (PR #5 review E8, D-217): what the providers log while decoding (here an ld.io_fault, as a
+    // page fault inside the mapping logs it) reaches Messages and marks the source stale.
+    void decodeTimeFaultsReachMessagesAndMarkStale() {
+        AppRuntime rt(runtimeOptions());
+        const fs::path dir = scratchDir("reload-decodelog");
+        const fs::path a = writeLog(rt, dir / "a", "session-a", {40.0, 50.0, 48.0, 49.0, 30.0});
+        {
+            Workspace w(rt);
+            w.loader.setUseSidecars(false);
+            const auto src = openAndWait(w, a);
+            QVERIFY(src != nullptr);
+            const std::shared_ptr<formats::DecodeLog> log = w.loader.registry().decodeLog(src->id);
+            QVERIFY(log != nullptr);
+            QSignalSpy stale(&w.loader, &SourceLoader::staleChanged);
+            formats::ImportLogEntry::Context ctx;
+            ctx.channel = "Ground Speed";
+            log->add(formats::ImportLogEntry::Level::Warning, "ld.io_fault",
+                     "page fault while decoding chunk 3; chunk marked invalid", ctx);
+            QTRY_VERIFY_WITH_TIMEOUT(w.loader.isStale(src->id), 10000);
+            QCOMPARE(w.loader.staleState(src->id), formats::SourceFileState::Missing);
+            QCOMPARE(stale.count(), 1);
+            const auto hasCode = [&](const QString& code) {
+                for (int i = 0; i < w.messages.rowCount(); ++i) {
+                    if (w.messages.at(i).code == code) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            QVERIFY(hasCode(QStringLiteral("ld.io_fault")));
+            QCOMPARE(staleRows(w.messages).size(), std::size_t{1}); // with its Reload action
+            QVERIFY(QTest::qWaitFor([&] { return quiet(rt); }, 30000));
         }
         rt.shutdown();
     }

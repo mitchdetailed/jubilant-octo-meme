@@ -5,18 +5,22 @@
 
 #include "instance_channel.hpp"
 
+#include <esses/base/read_file.hpp>
 #include <esses/base/utf8.hpp>
 
 #include <QByteArray>
 #include <QCryptographicHash>
 #include <QDeadlineTimer>
 #include <QDir>
+#include <QFile>
+#include <QRandomGenerator>
 #include <QTimer>
 #include <QtGlobal>
 #include <algorithm>
 #include <climits>
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 #if defined(Q_OS_WIN)
@@ -28,6 +32,8 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+// windows.h first
+#include <sddl.h>
 #else
 #include <QSocketNotifier>
 #include <cerrno>
@@ -67,6 +73,46 @@ void setDetail(QString* detail, const QString& text) {
 
 int remainingMs(const QDeadlineTimer& deadline) {
     return static_cast<int>(std::clamp<qint64>(deadline.remainingTime(), 0, INT_MAX));
+}
+
+// The salt of a settings folder (D-217): 32 hex digits kept in <folder>/instance.salt, made once from the
+// system's random generator. A temporary file is renamed into place, which fails when the file exists, so two
+// launches that race both end with the one that was renamed first. Empty when the folder cannot be written
+// (the name is then the folder's alone).
+QByteArray instanceSalt(const std::filesystem::path& configDir) {
+    if (configDir.empty()) {
+        return {};
+    }
+    const std::filesystem::path file = configDir / "instance.salt";
+    const auto read = [&file]() -> QByteArray {
+        const Result<std::string> text = readWholeFile(file);
+        if (!text.ok()) {
+            return {};
+        }
+        const QByteArray salt = QByteArray::fromStdString(text.value()).trimmed();
+        return salt.size() == 32 ? salt : QByteArray();
+    };
+    if (QByteArray salt = read(); !salt.isEmpty()) {
+        return salt;
+    }
+    const QString dir = QString::fromStdString(pathToUtf8(configDir));
+    if (!QDir().mkpath(dir)) {
+        return {};
+    }
+    QByteArray fresh;
+    for (int i = 0; i < 4; ++i) {
+        fresh += QByteArray::number(QRandomGenerator::system()->generate(), 16).rightJustified(8, '0');
+    }
+    const QString tmpName = dir + QStringLiteral("/instance.salt.") + QString::fromLatin1(fresh.left(8));
+    QFile tmp(tmpName);
+    if (tmp.open(QIODevice::WriteOnly | QIODevice::NewOnly)) {
+        tmp.write(fresh + '\n');
+        tmp.close();
+        if (!QFile::rename(tmpName, QString::fromStdString(pathToUtf8(file)))) {
+            QFile::remove(tmpName); // another launch was first: its salt counts
+        }
+    }
+    return read();
 }
 
 #if defined(Q_OS_WIN)
@@ -145,6 +191,40 @@ std::wstring pipePath(const QString& name) {
     return (QStringLiteral("\\\\.\\pipe\\") + name).toStdWString();
 }
 
+// The pipe's security (D-217): a protected DACL that grants this user alone (a named pipe's default one also
+// lets Everyone read). Null attributes (the default) when it cannot be built.
+class PipeSecurity {
+public:
+    PipeSecurity() {
+        std::vector<std::uint64_t> ours = tokenUserOf(GetCurrentProcess());
+        if (ours.empty()) {
+            return;
+        }
+        const std::wstring sddl =
+            (QStringLiteral("D:P(A;;GA;;;") + sidText(sidOf(ours)) + QStringLiteral(")")).toStdWString();
+        if (ConvertStringSecurityDescriptorToSecurityDescriptorW(sddl.c_str(), SDDL_REVISION_1, &sd_,
+                                                                 nullptr) == 0) {
+            sd_ = nullptr;
+            return;
+        }
+        attributes_.nLength = sizeof(attributes_);
+        attributes_.lpSecurityDescriptor = sd_;
+        attributes_.bInheritHandle = FALSE;
+    }
+    ~PipeSecurity() {
+        if (sd_ != nullptr) {
+            LocalFree(sd_);
+        }
+    }
+    PipeSecurity(const PipeSecurity&) = delete;
+    PipeSecurity& operator=(const PipeSecurity&) = delete;
+    SECURITY_ATTRIBUTES* get() { return sd_ != nullptr ? &attributes_ : nullptr; }
+
+private:
+    PSECURITY_DESCRIPTOR sd_ = nullptr;
+    SECURITY_ATTRIBUTES attributes_{};
+};
+
 #else // POSIX
 
 QString userPart() {
@@ -153,7 +233,7 @@ QString userPart() {
 
 // A directory of ours, not a symbolic link, closed to group and others.
 bool privateDirectory(const std::string& dir) {
-    struct stat st {};
+    struct stat st = {};
     return ::lstat(dir.c_str(), &st) == 0 && S_ISDIR(st.st_mode) && st.st_uid == ::getuid() &&
            (st.st_mode & 077) == 0;
 }
@@ -207,6 +287,9 @@ void closeOnExec(int fd, bool nonBlocking) {
 #endif
 }
 
+// How long listen() waits to learn whether a socket file belongs to a running instance (D-217).
+constexpr int kProbeTimeoutMs = 1000;
+
 #ifdef MSG_NOSIGNAL
 constexpr int kSendFlags = MSG_NOSIGNAL;
 #else
@@ -230,7 +313,11 @@ bool peerIsUs(int fd) {
 #endif
 }
 
-int connectTo(const std::string& path, int& error) {
+// A non-blocking connect bounded by `timeoutMs` (D-217): a listener whose backlog is full (Linux: EAGAIN, the
+// connect is tried again) or that does not accept (EINPROGRESS: POLLOUT, then SO_ERROR) never hangs the
+// caller; ETIMEDOUT when the time is up. The descriptor stays non-blocking (the callers poll before each
+// transfer).
+int connectTo(const std::string& path, int& error, int timeoutMs) {
     sockaddr_un address{};
     if (!socketAddress(path, address)) {
         error = ENAMETOOLONG;
@@ -241,15 +328,47 @@ int connectTo(const std::string& path, int& error) {
         error = errno;
         return -1;
     }
-    closeOnExec(fd, false);
-    if (::connect(fd, reinterpret_cast<const sockaddr*>(&address), static_cast<socklen_t>(sizeof(address))) !=
-        0) {
-        error = errno;
+    closeOnExec(fd, true);
+    const QDeadlineTimer deadline(timeoutMs);
+    for (;;) {
+        if (::connect(fd, reinterpret_cast<const sockaddr*>(&address),
+                      static_cast<socklen_t>(sizeof(address))) == 0) {
+            error = 0;
+            return fd;
+        }
+        const int e = errno;
+        if (e == EINTR) {
+            continue;
+        }
+        if (e == EINPROGRESS) {
+            pollfd p{fd, POLLOUT, 0};
+            const int ready = ::poll(&p, 1, remainingMs(deadline));
+            if (ready < 0 && errno == EINTR && !deadline.hasExpired()) {
+                continue;
+            }
+            int soError = ETIMEDOUT;
+            if (ready > 0) {
+                socklen_t length = sizeof(soError);
+                if (::getsockopt(fd, SOL_SOCKET, SO_ERROR, &soError, &length) != 0) {
+                    soError = errno;
+                }
+            }
+            if (soError == 0) {
+                error = 0;
+                return fd;
+            }
+            error = soError;
+            ::close(fd);
+            return -1;
+        }
+        if ((e == EAGAIN || e == EWOULDBLOCK) && !deadline.hasExpired()) {
+            ::poll(nullptr, 0, 10); // the backlog is full: once more in 10 ms
+            continue;
+        }
+        error = (e == EAGAIN || e == EWOULDBLOCK) ? ETIMEDOUT : e;
         ::close(fd);
         return -1;
     }
-    error = 0;
-    return fd;
 }
 
 #endif
@@ -266,7 +385,9 @@ QString instanceName(const std::filesystem::path& configDir) {
     folder = folder.toLower(); // one settings folder, however it is spelled
 #endif
     const QByteArray digest =
-        QCryptographicHash::hash(folder.toUtf8(), QCryptographicHash::Sha256).toHex().left(12);
+        QCryptographicHash::hash(folder.toUtf8() + '\n' + instanceSalt(configDir), QCryptographicHash::Sha256)
+            .toHex()
+            .left(12);
     return sanitizedName(QStringLiteral("esses-") + userPart() + QLatin1Char('-') +
                          QString::fromLatin1(digest));
 }
@@ -302,10 +423,11 @@ struct InstanceServer::Impl {
     bool open(const QString& n, QString* detail) {
         name = n;
         const std::wstring path = pipePath(n);
+        PipeSecurity security;
         pipe = CreateNamedPipeW(path.c_str(),
                                 PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED | FILE_FLAG_FIRST_PIPE_INSTANCE,
                                 PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
-                                1, 4096, 4096, 0, nullptr);
+                                1, 4096, 4096, 0, security.get());
         if (pipe == INVALID_HANDLE_VALUE) {
             setDetail(detail, win32Error("CreateNamedPipe", GetLastError()));
             return false;
@@ -375,7 +497,7 @@ struct InstanceServer::Impl {
             return;
         }
         pending = false;
-        restart();
+        restart(); // the client left: its request is dropped (restart)
     }
 
     void signalled() {
@@ -431,6 +553,8 @@ struct InstanceServer::Impl {
             return;
         }
         case Phase::Writing:
+            // The answer is in the pipe: the request goes to the window only now (D-217).
+            q.answered(ok && n == static_cast<DWORD>(reply.size()));
             // Disconnecting now would discard the answer before the client reads it (DisconnectNamedPipe), so
             // wait until the client closes its end (the read fails), at most kClientTimeoutMs.
             phase = Phase::Draining;
@@ -459,8 +583,9 @@ struct InstanceServer::Impl {
         pending = false;
     }
 
-    // The current client is done (or failed): the next one.
+    // The current client is done (or failed): the next one. A request not answered yet is dropped.
     void restart() {
+        q.answered(false);
         cancelPending();
         if (pipe == INVALID_HANDLE_VALUE) {
             return;
@@ -627,7 +752,7 @@ struct InstanceServer::Impl {
                 return false;
             }
             int error = 0;
-            const int probe = connectTo(path, error);
+            const int probe = connectTo(path, error, kProbeTimeoutMs);
             if (probe >= 0) {
                 ::close(probe);
                 setDetail(detail, QStringLiteral("another instance listens"));
@@ -652,7 +777,7 @@ struct InstanceServer::Impl {
             shut();
             return false;
         }
-        struct stat st {};
+        struct stat st = {};
         if (::lstat(path.c_str(), &st) == 0) {
             device = st.st_dev;
             inode = st.st_ino;
@@ -695,8 +820,10 @@ struct InstanceServer::Impl {
                 if (newline >= 0) {
                     const QByteArray answer = q.handleLine(buffer.left(newline));
                     // A few bytes into an empty socket buffer: one send (the client reads them after we
-                    // close).
-                    (void)::send(client, answer.constData(), static_cast<size_t>(answer.size()), kSendFlags);
+                    // close). The request goes to the window only when the answer went out (D-217).
+                    const ssize_t sent =
+                        ::send(client, answer.constData(), static_cast<size_t>(answer.size()), kSendFlags);
+                    q.answered(sent == static_cast<ssize_t>(answer.size()));
                     dropClient();
                     return;
                 }
@@ -746,7 +873,7 @@ struct InstanceServer::Impl {
             fd = -1;
         }
         if (owned) { // remove our socket file, never one another instance put there since
-            struct stat st {};
+            struct stat st = {};
             if (::lstat(path.c_str(), &st) == 0 && st.st_dev == device && st.st_ino == inode) {
                 ::unlink(path.c_str());
             }
@@ -778,7 +905,7 @@ ForwardResult forwardToInstance(const QString& name, const QByteArray& message, 
     }
     const QDeadlineTimer deadline(timeoutMs);
     int error = 0;
-    const int fd = connectTo(path, error);
+    const int fd = connectTo(path, error, timeoutMs);
     if (fd < 0) {
         if (error == ENOENT || error == ECONNREFUSED) {
             return ForwardResult::NoInstance;
@@ -864,9 +991,21 @@ QByteArray InstanceServer::handleLine(const QByteArray& line) {
         return QByteArrayLiteral("error\n");
     }
     ++accepted_;
-    // Delivered after the answer is on its way: opening a project may ask a question (a nested event loop).
-    QTimer::singleShot(0, this, [this, r = std::move(*request)] { Q_EMIT requestReceived(r); });
+    pending_ = std::move(*request); // emitted once the answer reached the client (answered)
     return QByteArrayLiteral("ok\n");
+}
+
+void InstanceServer::answered(bool delivered) {
+    std::optional<LaunchRequest> request = std::exchange(pending_, std::nullopt);
+    if (!request) {
+        return;
+    }
+    if (!delivered) {
+        refuse(QStringLiteral("the client left before its answer: its request is dropped"));
+        return;
+    }
+    // Delivered from the event loop: opening a project may ask a question (a nested event loop).
+    QTimer::singleShot(0, this, [this, r = std::move(*request)] { Q_EMIT requestReceived(r); });
 }
 
 void InstanceServer::refuse(const QString& reason) {

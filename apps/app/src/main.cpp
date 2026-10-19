@@ -35,6 +35,7 @@
 #include <QIcon>
 #include <QSize>
 #include <QTextStream>
+#include <QTimer>
 #include <cstdio>
 #include <cstring>
 #include <memory>
@@ -118,16 +119,22 @@ QIcon applicationIcon() {
     return icon;
 }
 
-// Hands the request to the instance on `name`; true when it took it.
-bool forwarded(const QString& name, const esses::app::LaunchRequest& request) {
+// Hands the request to the instance on `name`. A launch that also asks for --scheme or --keymap is told
+// that the running instance keeps its own (they apply to a new instance only; D-217).
+esses::app::ForwardResult forward(const QString& name, const esses::app::LaunchRequest& request) {
     QString detail;
     const esses::app::ForwardResult r =
         esses::app::forwardToInstance(name, request.toMessage(), esses::app::kForwardTimeoutMs, &detail);
     if (r == esses::app::ForwardResult::Failed) {
         QTextStream(stderr) << "esses: the running instance did not take the files (" << detail
                             << "); starting a new one\n";
+    } else if (r == esses::app::ForwardResult::Delivered &&
+               (!request.scheme.isEmpty() || !request.keymap.isEmpty())) {
+        QTextStream(stderr)
+            << "esses: the files went to the running Esses, which keeps its own scheme and keymap; "
+               "--scheme and --keymap apply to a new instance (--new-instance)\n";
     }
-    return r == esses::app::ForwardResult::Delivered;
+    return r;
 }
 
 } // namespace
@@ -177,14 +184,26 @@ int main(int argc, char** argv) {
 
     // Single instance (06 section 18 step 1, D-113): hand the files over and stop, else be the instance later
     // launches reach. Listening may fail when another instance started at the same moment: try it once more.
+    // A forward that timed out is not tried again: the busy instance may still answer the first one, which it
+    // then drops (it applies a request only once its answer reached the client; D-217).
     esses::app::InstanceServer server;
+    QString listenProblem;
     if (!request.dumpCommands) {
         const QString name = esses::app::instanceName(paths->configDir());
-        if (esses::app::shouldForward(request) && forwarded(name, request)) {
-            return 0;
+        esses::app::ForwardResult first = esses::app::ForwardResult::NoInstance;
+        if (esses::app::shouldForward(request)) {
+            first = forward(name, request);
+            if (first == esses::app::ForwardResult::Delivered) {
+                return 0;
+            }
         }
-        if (!server.listen(name) && esses::app::shouldForward(request) && forwarded(name, request)) {
-            return 0;
+        if (!server.listen(name, &listenProblem)) {
+            if (esses::app::shouldForward(request) && first == esses::app::ForwardResult::NoInstance &&
+                forward(name, request) == esses::app::ForwardResult::Delivered) {
+                return 0; // another instance started at the same moment
+            }
+        } else {
+            listenProblem.clear();
         }
         console.release(); // the GUI from here on: nothing more is printed for the terminal
     }
@@ -202,14 +221,32 @@ int main(int argc, char** argv) {
             QTextStream(stdout) << window.commands().dumpJson();
         } else {
             esses::app::applyStartOptions(window, request); // --scheme, --keymap (problems go to Messages)
+            // A launch that would forward (not --new-instance) but neither forwarded nor listens:
+            // single-instance forwarding is off for this window, and Messages says so (D-217).
+            if (!server.isListening() && esses::app::shouldForward(request)) {
+                esses::app::reportNoInstanceChannel(
+                    window, listenProblem.isEmpty() ? QStringLiteral("the channel is held by another process")
+                                                    : listenProblem);
+            }
             esses::app::openRequestedFiles(window, request, esses::app::LaunchKind::Start);
+            // Forwarded requests wait for the top of the event loop (no prompt or menu open; D-217).
+            esses::app::RequestQueue queue([&window](const esses::app::LaunchRequest& forwardedRequest) {
+                esses::app::openRequestedFiles(window, forwardedRequest, esses::app::LaunchKind::Forwarded);
+                esses::app::bringToFront(window);
+            });
             QObject::connect(&server, &esses::app::InstanceServer::requestReceived, &window,
-                             [&window](const esses::app::LaunchRequest& forwardedRequest) {
-                                 esses::app::openRequestedFiles(window, forwardedRequest,
-                                                                esses::app::LaunchKind::Forwarded);
-                                 esses::app::bringToFront(window);
+                             [&queue](const esses::app::LaunchRequest& forwardedRequest) {
+                                 queue.enqueue(forwardedRequest);
                              });
             window.show();
+            // The startup bench (bench/open_bench app.startup_empty_warm, 07 section 12; D-217): once the
+            // window is shown and the event loop has run, say so and end.
+            if (qEnvironmentVariableIsSet("ESSES_STARTUP_PROBE")) {
+                QTimer::singleShot(0, &window, [] {
+                    QTextStream(stdout) << "esses: ready" << Qt::endl;
+                    QCoreApplication::quit();
+                });
+            }
             rc = QApplication::exec();
             server.close(); // no request reaches a window that is going away
         }

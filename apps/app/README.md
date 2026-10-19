@@ -26,16 +26,29 @@ esses [-w <project folder>] [-l <log file>]... [--new-instance] [--scheme <name>
   Project would) and comes to the front. A launch without files just brings the running window forward. Otherwise
   the launch listens itself, so later launches reach it. The channel is the operating system's own local IPC, not
   Qt Network (which the application does not link, 01 §2.2 rule 4): a named pipe `\\.\pipe\<name>` on Windows
-  (one instance, local clients only, the client at identification level, both sides checking that the other runs
-  as the same user, `AllowSetForegroundWindow` for the running one), a Unix-domain socket in a private directory
+  (one instance, local clients only, a DACL that grants the user alone, the client at identification level, both
+  sides checking that the other runs as the same user, `AllowSetForegroundWindow` for the running one), a
+  Unix-domain socket in a private directory
   (`$XDG_RUNTIME_DIR`, else `$TMPDIR`, else `/tmp/esses-<uid>`, used only when it is ours and closed to group and
-  others; the peer's uid checked) on Linux and macOS; Qt Core's `QWinEventNotifier`/`QSocketNotifier` drive it, no
-  thread. The name is `esses-<user>-<12 hex digits of SHA-256 of the settings folder>`, so a portable copy and the
-  installed program, or a run with `ESSES_CONFIG_DIR`, never forward to each other; `ESSES_INSTANCE_NAME` replaces
-  it (tests). The message is one line of JSON (`{"protocol": 1, "project": ..., "logs": [...]}`, absolute paths
-  only, at most 1 MiB); the answer is `ok` or `error` (a launch whose request is refused, or that gets no answer in
-  20 s, starts a window of its own). `--new-instance` never forwards; `--version`, `--help` and `--dump-commands`
-  neither forward nor listen. `--scheme` and `--keymap` are options of an instance's start and are not forwarded.
+  others; the peer's uid checked; the client connects without blocking, within the launch's 20 s wait for an answer,
+  `kForwardTimeoutMs`; a starting instance that finds a socket file there tries it for at most 1 s before taking the
+  name over) on Linux and macOS; Qt Core's
+  `QWinEventNotifier`/`QSocketNotifier` drive it, no thread. The name is `esses-<user>-<12 hex digits of SHA-256 of
+  the settings folder and its salt>`: the salt is 32 random hex digits that the first launch writes to
+  `instance.salt` in the settings folder (D-217 (h)), so another user cannot compute the name in advance, and a
+  portable copy and the installed program, or a run with `ESSES_CONFIG_DIR`, never forward to each other;
+  `ESSES_INSTANCE_NAME` replaces it (tests). The message is one line of JSON (`{"protocol": 1, "project": ...,
+  "logs": [...]}`, absolute paths only, at most 1 MiB); the answer is `ok` or `error` (a launch whose request is
+  refused, or that gets no answer in 20 s, starts a window of its own; it waits once: a launch whose first try found
+  an instance that did not answer does not try again). The running instance emits a request only after its `ok`
+  reached the client (a client that left gets nothing opened), and `RequestQueue` (`src/launch.*`) applies it when
+  the event loop is back at its top level with no modal dialog or popup open (retried every 200 ms), one request at
+  a time; a project switch the user cancels opens none of the request's logs (Info row `launch.cancelled`). A launch
+  that can neither forward nor listen says so in Messages (Warning row `launch.instance`). `--new-instance` never
+  forwards; `--version`, `--help` and `--dump-commands` neither forward nor listen. `--scheme` and `--keymap` are
+  options of an instance's start and are not forwarded (a forwarding launch says so on stderr).
+- **`ESSES_STARTUP_PROBE`** (bench only, D-217 (k)): set, `esses` prints `esses: ready` and quits once its window is
+  shown and the event loop has run once; `esses-open-bench`'s `app.startup_empty_warm` times a start to that line.
 - **`--scheme <name>`** (`src/launch.*`): a scheme of the scheme selector by its name, any case, or `light`/`dark`
   for the shipped ones, chosen as the toolbar's selector chooses it (it stays the active scheme). An unknown name is
   a Warning row in Messages (`launch.scheme`).

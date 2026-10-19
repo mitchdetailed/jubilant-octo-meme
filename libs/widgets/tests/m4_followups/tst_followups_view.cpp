@@ -5,7 +5,8 @@
 // offscreen:
 //   (e) the time_distance group headings of 04 section 8.2 item 4: a GroupHeading hit over each group's key
 //       column outside its labels, dragging a heading moves the group (one undoable edit, traces, unknown
-//       members and vertical zoom along, explicit panel heights kept), a double-click opens Group Properties;
+//       members and vertical zoom along, explicit panel heights kept; the zoom also follows undo and redo and
+//       stays with a group edited in place, D-217), a double-click opens Group Properties;
 //   (f) links (04 section 2.4): a component with links.cursor, links.zoom or links.datum off keeps its own
 //       cursor, zoom or datum, starting from the worksheet's; the worksheet's changes of that part do not
 //       reach it, its own mouse and the keyboard rows offered to it change only its own; the outing graph's
@@ -187,6 +188,7 @@ private Q_SLOTS:
         TimeDistanceGraph& g = *rig.c;
         QVERIFY(waitQuiet(g));
         g.setVerticalZoom(0, plot::TdGroupZoom{0.25, 0.5});
+        const project::ComponentSpec beforeMove = g.spec();
         QVERIFY(!g.moveGroup(0, 0));
         QVERIFY(!g.moveGroup(0, 3));
         QVERIFY(!g.moveGroup(-1, 1));
@@ -211,6 +213,87 @@ private Q_SLOTS:
         QVERIFY(!after[0].toObject().contains(QStringLiteral("x-i2")));
         QVERIFY(g.verticalZoomOf(2) == (plot::TdGroupZoom{0.25, 0.5}));
         QVERIFY(g.verticalZoomOf(0) == plot::TdGroupZoom{});
+        // Regression (PR #5 review U2, D-217): undo and redo reach the graph as applySpec (the canvas's
+        // syncInPlace); the vertical zoom follows its group back and forth.
+        const project::ComponentSpec afterMove = g.spec();
+        g.applySpec(beforeMove); // undo
+        QCOMPARE(QString::fromStdString(g.body().groups[0].name), QStringLiteral("Wheel Speed FL"));
+        QVERIFY(g.verticalZoomOf(0) == (plot::TdGroupZoom{0.25, 0.5}));
+        QVERIFY(g.verticalZoomOf(2) == plot::TdGroupZoom{});
+        g.applySpec(afterMove); // redo
+        QVERIFY(g.verticalZoomOf(2) == (plot::TdGroupZoom{0.25, 0.5}));
+        QVERIFY(g.verticalZoomOf(0) == plot::TdGroupZoom{});
+    }
+
+    // (e) A group edited in place keeps its vertical zoom (a channel added or removed, a rename); when a
+    // group is added or removed, the others' zoom stays with its group (PR #5 re-verification of U2, D-217).
+    void editingAGroupInPlaceKeepsItsZoom() {
+        World w;
+        const auto src = w.publish(SourceOptions{});
+        selectMain(w, lapRef(*src, 1));
+        Rig<TimeDistanceGraph> rig(w, timeDistanceSpec({{"Wheel Speed FL"}, {"Throttle"}}), QSize(700, 480));
+        TimeDistanceGraph& g = *rig.c;
+        QVERIFY(waitQuiet(g));
+        const plot::TdGroupZoom speed{0.25, 0.5};
+        const plot::TdGroupZoom throttle{0.125, 0.875};
+        g.setVerticalZoom(0, speed);
+        g.setVerticalZoom(1, throttle);
+        QVERIFY(g.verticalZoomOf(0) == speed);
+        QVERIFY(g.verticalZoomOf(1) == throttle);
+        // An edit of the groups array, applied as the canvas's syncInPlace applies edits, undo and redo.
+        const auto applyEdit = [&g](const auto& edit) {
+            QJsonObject body = bodyOf(g);
+            QJsonArray groups = body.value(QStringLiteral("groups")).toArray();
+            edit(groups);
+            body.insert(QStringLiteral("groups"), groups);
+            project::ComponentSpec next = g.spec();
+            next.body =
+                JsonDoc::parse(QJsonDocument(body).toJson(QJsonDocument::Compact).toStdString()).value();
+            g.applySpec(next);
+        };
+
+        // Wheel Speed FR joins the speed group (like units) through the component's own edit.
+        const int edits = rig.edits;
+        g.addChannel(QStringLiteral("Wheel Speed FR"), false);
+        QCOMPARE(rig.edits, edits + 1);
+        QCOMPARE(rig.lastUndoText, QStringLiteral("Add Wheel Speed FR"));
+        QCOMPARE(g.body().groups.size(), std::size_t{2});
+        QCOMPARE(g.body().groups[0].traces.size(), std::size_t{2});
+        QVERIFY(g.verticalZoomOf(0) == speed);
+        QVERIFY(g.verticalZoomOf(1) == throttle);
+
+        // The throttle group renamed (Group Properties), then a trace removed from the speed group.
+        applyEdit([](QJsonArray& groups) {
+            QJsonObject t = groups[1].toObject();
+            t.insert(QStringLiteral("name"), QStringLiteral("Pedal"));
+            groups[1] = t;
+        });
+        QCOMPARE(groupNames(g).value(1), QStringLiteral("Pedal"));
+        QVERIFY(g.verticalZoomOf(0) == speed);
+        QVERIFY(g.verticalZoomOf(1) == throttle);
+        applyEdit([](QJsonArray& groups) {
+            QJsonObject s = groups[0].toObject();
+            QJsonArray traces = s.value(QStringLiteral("traces")).toArray();
+            traces.removeAt(1);
+            s.insert(QStringLiteral("traces"), traces);
+            groups[0] = s;
+        });
+        QCOMPARE(g.body().groups[0].traces.size(), std::size_t{1});
+        QVERIFY(g.verticalZoomOf(0) == speed);
+        QVERIFY(g.verticalZoomOf(1) == throttle);
+
+        // A new group at the bottom (CTRL): the others keep theirs, the new one has none.
+        g.addChannel(QStringLiteral("Wheel Speed FR"), true);
+        QCOMPARE(g.body().groups.size(), std::size_t{3});
+        QVERIFY(g.verticalZoomOf(0) == speed);
+        QVERIFY(g.verticalZoomOf(1) == throttle);
+        QVERIFY(g.verticalZoomOf(2) == plot::TdGroupZoom{});
+
+        // The speed group removed: the throttle group's zoom moves up with it, none lands on Wheel Speed FR.
+        applyEdit([](QJsonArray& groups) { groups.removeAt(0); });
+        QCOMPARE(groupNames(g), (QStringList{QStringLiteral("Pedal"), QStringLiteral("Wheel Speed FR")}));
+        QVERIFY(g.verticalZoomOf(0) == throttle);
+        QVERIFY(g.verticalZoomOf(1) == plot::TdGroupZoom{});
     }
 
     // (f) an unlinked cursor, zoom and datum.

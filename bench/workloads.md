@@ -14,7 +14,7 @@ The developer's machine, registered for M0 by hand (the self-hosted runner arriv
 | CPU | AMD Ryzen 7 3800X, 8 cores, 16 logical processors |
 | RAM | 64 GB |
 | OS | Windows 11 Pro 10.0.26300 |
-| Toolchain | MSVC 14.44 (Visual Studio 2022), Ninja, CMake 4.4, RelWithDebInfo (`win-msvc-core-rel`) |
+| Toolchain | MSVC 14.51 (Visual Studio 2026), Ninja, CMake 4.4, Release (`win-msvc-bench`, the reference gate's preset) since M4; M0-M3's figures below were taken with MSVC 14.44 (Visual Studio 2022), mostly RelWithDebInfo, as each section says |
 
 ## Reference workloads
 
@@ -234,3 +234,30 @@ is selected"): on the same graph with Main only, the graph's own inputs are buil
 
 Measured in the M3 acceptance run above: per-run medians between -0.11 and +0.00 ms (single pairs -0.6 to +0.8
 ms), no table built.
+
+## M4 MVP rows (AC-M4-05, D-217 (k))
+
+The three MVP rows of 07 §12 that M1-M3 left without a benchmark. `esses-plot-bench` times the first two
+(`--values-only` runs the second alone and prints its phases); `esses-open-bench` the third (`--startup-only`; it
+needs the `esses` executable it was built beside, `ESSES_APP_EXE`). `ESSES_BENCH_GATE` (ON) passes `--gate` to the
+ctest entries; the hosted `linux-gcc-bench` preset sets it OFF, so the hosted alarm records the rows instead of
+failing on the reference machine's limits.
+
+| Row | Workload | Measured | Limit |
+|---|---|---|---|
+| `plot.relayout_resize_20tr` | the `plot.cursor_move` graph's window resized 12 times between 4,200 x 1,000 and 3,000 x 800, each step from the resize to the relayout's Static build delivered and the widget repainted | **14.9 ms** | 50 ms (07 §12 "Full relayout / resize") |
+| `values.refresh_250ch` | the Values window (All channels) over a 1 min `.ld` of 250 channels, 600 x 900 (29 rows on screen), 60 cursor moves along a lap, each from `setCursor` to the table's synchronous repaint | **1.65 ms** | 2 ms (07 §12 "Values window refresh, 250 channels") |
+| `app.startup_empty_warm` | `esses --new-instance` with an empty settings, cache and log folder of its own (warm: the binaries in the file cache after an untimed first start) from the process start to its `ESSES_STARTUP_PROBE` line "esses: ready" (the window shown and the event loop run once) | **364 ms** | 1,000 ms (07 §12 "Startup to empty workspace (warm)") |
+
+Measured on the reference machine (2026-10-19, `win-msvc-bench` Release, MSVC 14.51, Qt 6.7.2, `--runs 5 --gate`):
+the rows above; in the same `esses-plot-bench` run `plot.cursor_move` 1.47 ms, `plot.zoom_pan_step` 11.7 ms,
+`plot.animation_frame_10x` 1.44 ms and `plot.variance_f3_no_overlay` -0.05 ms. The Values row first measured 2.6 ms:
+the model refreshed all 250 rows on every move and the style laid out every cell's text. `ValuesModel` now computes a
+row when the view asks for it, the window sizes its value columns to the rows on screen, and its cells are drawn by
+one positioned `drawText` each; phases (medians) of the row now: the cursor move with the model's refresh 0.41 ms,
+the repaint 1.23 ms, of which 1.15 ms is painting alone (the same repaint again).
+
+```
+build\m4-fix-bench\bin\esses-plot-bench --runs 5 --gate
+build\m4-fix-bench\bin\esses-open-bench --startup-only --runs 5 --gate
+```

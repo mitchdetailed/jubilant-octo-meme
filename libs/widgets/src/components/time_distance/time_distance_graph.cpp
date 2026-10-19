@@ -52,6 +52,7 @@
 #include <string_view>
 #include <utility>
 #include <variant>
+#include <vector>
 
 namespace esses::widgets {
 
@@ -88,6 +89,74 @@ QString valueText(const plot::ResolvedChannel& rc, Micros t, int dps, double* ou
         *out = display;
     }
     return QString::number(display, 'f', std::clamp(dps, 0, 9));
+}
+
+// Where each group of `before` is in `after` (-1: gone), for the vertical zoom, which is local view state
+// keyed by the group's index (D-217). A group still in its place stays there; the others are found by their
+// name and channels (the k-th of equal groups to the k-th), so a move, its undo and its redo carry the zoom
+// along. The groups left over on both sides are then paired in order when there are as many of each, so a
+// group edited in place (a channel added or removed, renamed in Group Properties) keeps its zoom as it did
+// by index. When a group was added or removed the counts differ, and only the groups found follow.
+std::vector<int> followGroups(const std::vector<plot::TdGroup>& before,
+                              const std::vector<plot::TdGroup>& after) {
+    const auto identity = [](const plot::TdGroup& g) {
+        std::string key = g.name;
+        for (const plot::TdTrace& t : g.traces) {
+            key += '\x1f';
+            key += t.channel;
+        }
+        return key;
+    };
+    std::vector<std::string> oldKeys;
+    oldKeys.reserve(before.size());
+    for (const plot::TdGroup& g : before) {
+        oldKeys.push_back(identity(g));
+    }
+    std::vector<std::string> newKeys;
+    newKeys.reserve(after.size());
+    for (const plot::TdGroup& g : after) {
+        newKeys.push_back(identity(g));
+    }
+    std::vector<int> to(before.size(), -1);
+    std::vector<bool> taken(after.size(), false);
+    for (std::size_t i = 0; i < before.size() && i < after.size(); ++i) {
+        if (oldKeys[i] == newKeys[i]) {
+            to[i] = static_cast<int>(i);
+            taken[i] = true;
+        }
+    }
+    // identity -> a group of `after` not taken yet (equal identities in order)
+    std::multimap<std::string, int> unmatched;
+    for (std::size_t j = 0; j < after.size(); ++j) {
+        if (!taken[j]) {
+            unmatched.emplace(newKeys[j], static_cast<int>(j));
+        }
+    }
+    std::vector<std::size_t> leftOver;
+    for (std::size_t i = 0; i < before.size(); ++i) {
+        if (to[i] >= 0) {
+            continue;
+        }
+        if (const auto it = unmatched.lower_bound(oldKeys[i]);
+            it != unmatched.end() && it->first == oldKeys[i]) {
+            to[i] = it->second;
+            unmatched.erase(it);
+        } else {
+            leftOver.push_back(i);
+        }
+    }
+    if (leftOver.size() == unmatched.size()) {
+        std::vector<int> open;
+        open.reserve(unmatched.size());
+        for (const auto& entry : unmatched) {
+            open.push_back(entry.second);
+        }
+        std::sort(open.begin(), open.end());
+        for (std::size_t k = 0; k < leftOver.size(); ++k) {
+            to[leftOver[k]] = open[k];
+        }
+    }
+    return to;
 }
 
 } // namespace
@@ -162,15 +231,22 @@ double TimeDistanceGraph::dprOrOne() const {
 
 void TimeDistanceGraph::applySpec(const project::ComponentSpec& spec) {
     ComponentWidget::applySpec(spec);
+    const std::vector<plot::TdGroup> before = std::move(body_.groups);
     if (auto parsed = plot::TimeDistanceBody::parse(spec.body)) {
         body_ = std::move(parsed).value();
     } else {
         body_ = plot::TimeDistanceBody{};
     }
-    // Vertical zoom is per group: a group that is gone loses it.
-    std::erase_if(local_.vZoom, [this](const auto& z) {
-        return z.first < 0 || static_cast<std::size_t>(z.first) >= body_.groups.size();
-    });
+    // Vertical zoom is per group: it follows its group into the new body (followGroups; D-217), also on undo
+    // and redo; a group that is gone loses it.
+    const std::vector<int> to = followGroups(before, body_.groups);
+    std::map<int, plot::TdGroupZoom> zoom;
+    for (const auto& [g, z] : local_.vZoom) {
+        if (g >= 0 && static_cast<std::size_t>(g) < to.size() && to[static_cast<std::size_t>(g)] >= 0) {
+            zoom[to[static_cast<std::size_t>(g)]] = z;
+        }
+    }
+    local_.vZoom = std::move(zoom);
     setMouseTracking(body_.keyStats || bandStart_.has_value());
     hoverLineX_.reset();
     onViewChanged(viewState(), plot::kFullRebuild);
@@ -1511,20 +1587,7 @@ bool TimeDistanceGraph::moveGroup(int from, int to) {
             body.rest = std::move(*doc);
         }
     }
-    // The vertical zoom (local view state by group index) follows the groups.
-    std::map<int, plot::TdGroupZoom> zoom;
-    for (const auto& [g, z] : local_.vZoom) {
-        int moved = g;
-        if (g == from) {
-            moved = to;
-        } else if (from < to && g > from && g <= to) {
-            moved = g - 1;
-        } else if (to < from && g >= to && g < from) {
-            moved = g + 1;
-        }
-        zoom[moved] = z;
-    }
-    local_.vZoom = std::move(zoom);
+    // The vertical zoom follows its group when the new body is applied (applySpec, also on undo and redo).
     local_.builtScales.clear();
     requestBody(
         body,

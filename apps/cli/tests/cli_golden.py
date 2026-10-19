@@ -15,9 +15,12 @@ the code under test (D-041):
   convert   .ld -> motec.ld -> read back: tools/ld_ref_decode.py on the converted file gives the committed
             oracle CSVs byte for byte (`fixture add --oracle ref-decode`) and the reader agrees with it there
             (`fixture verify`); --range cuts a lap (bounds from expected.laps.json) to exactly the oracle's
-            samples of the lap; csv and motec.csv carry the oracle's values on the lap's grid and the motec.csv
-            reads back; the input is never overwritten (exit 2, bytes unchanged); --rate with motec.ld is
-            refused.
+            samples of the lap, which reads back with its own number (Start Lap) and its own Log Time (the
+            input's + the lap's start); csv and motec.csv carry the oracle's values on the lap's grid and the
+            motec.csv reads back; the input is never overwritten (exit 2, bytes unchanged); --rate with motec.ld
+            is refused; a .ldx already beside a motec.ld output that writes none goes; run.csv -> run.ld is not
+            the input; nothing written (every channel skipped) exits 1 and leaves no file; a channel named twice
+            is a usage error (D-217).
   export    `export --json` (no project) reports the logged channel and writes the oracle's values.
   validate  `validate --json` over every schemas/examples/<schema>/{valid,invalid}: the status of each file is
             the name of the directory it lies in.
@@ -151,6 +154,20 @@ def lap_bounds(laps_json: dict, number: int) -> tuple[int, int]:
     if found is None:
         raise RuntimeError(f"no lap {number} in expected.laps.json")
     return found
+
+
+def all_ranges(group: dict, path: str) -> list[dict]:
+    """The ranges of the group `path` under `group` (laps --json)."""
+    out = list(group["ranges"]) if group["path"] == path else []
+    for child in group.get("children", []):
+        out += all_ranges(child, path)
+    return out
+
+
+def details_of(env: "Env", log: pathlib.Path) -> dict[str, str]:
+    """info --json's details as id -> value."""
+    r = env.run("info", "--json", str(log))
+    return {d["id"]: str(d["value"]) for d in json.loads(r.stdout).get("details", [])} if r.returncode == 0 else {}
 
 
 def read_csv_rows(path: pathlib.Path) -> list[list[str]]:
@@ -323,6 +340,17 @@ def cmd_convert(env: Env, c: Check) -> None:
             c.expect(rows and int(rows[0]["timeUs"]) == 0, "convert --range: the lap starts at time 0")
             got = json.loads(env.run("laps", "--json", "--no-sidecar", str(cut)).stdout)
             c.expect(got["layers"]["Normal"]["durationUs"] == end - start, "convert --range: duration")
+            # D-217: the lap keeps its number (the cut's Start Lap) and the cut's time 0 is its Log Time.
+            numbers = [r.get("number") for g in got["layers"]["Normal"]["groups"] for r in all_ranges(g, "Outings:Laps")]
+            c.expect(numbers == [LAP_NUMBER], f"convert --range: the cut's laps are numbered {numbers}")
+            mine = details_of(env, cut)
+            theirs = details_of(env, env.input(LAP_FAMILY))
+            h, m, sec = (int(x) for x in theirs["Log Time"].split(":"))
+            moved = (h * 3600 + m * 60 + sec + round(start / 1e6)) % 86400
+            c.expect(mine.get("Log Time") == f"{moved // 3600:02d}:{moved // 60 % 60:02d}:{moved % 60:02d}",
+                     f"convert --range: Log Time {mine.get('Log Time')} for a cut at {start / 1e6} s of "
+                     f"{theirs['Log Time']}")
+            c.expect(mine.get("Start Lap") == str(LAP_NUMBER), f"convert --range: Start Lap {mine.get('Start Lap')}")
 
     # (c) csv and (d) motec.csv on the lap's 10 Hz grid; the motec.csv reads back.
     for fmt in ("csv", "motec.csv"):
@@ -371,6 +399,40 @@ def cmd_convert(env: Env, c: Check) -> None:
     r = env.run("convert", str(src), "--format", "csv", "--channels", "No Such Channel", "-o",
                 str(env.work / "x.csv"))
     c.expect(r.returncode == 1, f"convert of an unknown channel should exit 1: exit {r.returncode}")
+    # (g) D-217: a .ldx beside a motec.ld output that needs none (an input without companion) goes, so the output
+    # does not read back with another file's beacons.
+    plain = next(f for f in LD_FAMILIES if not env.input(f).with_suffix(".ldx").exists())
+    stale = env.work / "stale"
+    stale.mkdir()
+    shutil.copyfile(env.input("synthetic-ldx-companion").with_suffix(".ldx"), stale / "out.ldx")
+    r = env.run("convert", str(env.input(plain)), "--format", "motec.ld", "-o", str(stale / "out.ld"), "--json")
+    if c.expect(r.returncode == 0, f"convert {plain} beside a stale .ldx: exit {r.returncode} {r.stderr!r}"):
+        c.expect(not (stale / "out.ldx").exists(), "convert: the stale out.ldx is gone")
+        markers = json.loads((env.fixture(plain) / "expected.markers.json").read_text(encoding="utf-8"))
+        back = read_back(env, c, stale / "out.ld", "stale")
+        if back is not None:
+            c.expect(json.loads((back / "expected.markers.json").read_text(encoding="utf-8")) == markers,
+                     "convert: the output reads back with its own markers only")
+    # (h) D-217: run.csv -> run.ld is not the input; a conversion that writes no channel leaves no file and exits 1
+    # (the legacy CSV's 20.48 Hz is no whole number of Hz); a channel named twice is a usage error.
+    for family in TEXT_FAMILIES:
+        text = env.work / "text" / family.replace("/", "-") / "run.csv"
+        text.parent.mkdir(parents=True)
+        shutil.copyfile(env.root / "fixtures" / family / "input.csv", text)
+        r = env.run("convert", str(text), "--format", "motec.ld", "-o", str(text.with_suffix(".ld")))
+        c.expect(b"refusing to overwrite the input" not in r.stderr, f"convert {family}: run.csv -> run.ld refused")
+        if family == "motec.csv/dialect-basic":  # every channel at 20.48 Hz: none can be written
+            c.expect(r.returncode == 1 and b"no channel could be written" in r.stderr,
+                     f"convert {family}: exit {r.returncode} {r.stderr!r}")
+            c.expect(not text.with_suffix(".ld").exists() and not text.with_suffix(".ldx").exists(),
+                     f"convert {family}: nothing written leaves no run.ld")
+        else:  # the uniform channels are written, the timestamped ones skipped
+            c.expect(r.returncode == 0 and text.with_suffix(".ld").exists() and b" 0 channels" not in r.stdout,
+                     f"convert {family}: exit {r.returncode} {r.stdout!r}")
+    r = env.run("convert", str(env.input(LAP_FAMILY)), "--format", "csv", "--channels",
+                f"{LAP_CHANNEL},{LAP_CHANNEL}", "-o", str(env.work / "twice.csv"))
+    c.expect(r.returncode == 2 and b"twice" in r.stderr and not (env.work / "twice.csv").exists(),
+             f"convert --channels with a name twice: exit {r.returncode} {r.stderr!r}")
 
 
 # ---- export --------------------------------------------------------------------------------------------------

@@ -61,7 +61,8 @@ void addM4ReloadCases(std::map<QString, Case>& table) {
                  QVERIFY2(!ec, ec.message().c_str());
                  // The application becomes active: the shell checks every open file (06 section 6).
                  Q_EMIT qApp->applicationStateChanged(Qt::ApplicationActive);
-                 QVERIFY(f.w->loader().isStale(f.a));
+                 QTRY_VERIFY_WITH_TIMEOUT(f.w->loader().isStale(f.a), 30000); // re-stats on the pool (D-217)
+                 QTRY_COMPARE_WITH_TIMEOUT(f.w->loader().fileChecksPending(), 0, 30000);
                  QVERIFY(!f.w->loader().isStale(f.b));
                  QVERIFY(f.w->dataWindow()
                              .model()

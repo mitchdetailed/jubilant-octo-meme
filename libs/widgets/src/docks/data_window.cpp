@@ -26,6 +26,8 @@
 #include <QPushButton>
 #include <QTreeView>
 #include <QVBoxLayout>
+#include <cmath>
+#include <functional>
 #include <memory>
 #include <utility>
 
@@ -40,42 +42,63 @@ QColor toColor(project::Rgba c) {
     return QColor(project::red(c), project::green(c), project::blue(c), project::alpha(c));
 }
 
+// An icon of `logical` px drawn by `paint` (in logical coordinates) once per device pixel ratio a monitor may
+// have, so a HiDPI screen gets a pixmap drawn at its own resolution, never one scaled up (06 section 17,
+// D-217).
+QIcon drawnIcon(QSize logical, const std::function<void(QPainter&)>& paint) {
+    QIcon icon;
+    for (const qreal dpr : {1.0, 1.25, 1.5, 2.0, 3.0}) {
+        QPixmap pm(QSize(static_cast<int>(std::lround(logical.width() * dpr)),
+                         static_cast<int>(std::lround(logical.height() * dpr))));
+        pm.setDevicePixelRatio(dpr);
+        pm.fill(Qt::transparent);
+        QPainter p(&pm);
+        p.setRenderHint(QPainter::Antialiasing);
+        paint(p);
+        p.end();
+        icon.addPixmap(pm);
+    }
+    return icon;
+}
+
+void paintStale(QPainter& p) {
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(0xE0, 0xA0, 0x00));
+    p.drawEllipse(QRectF(0.5, 0.5, 11.0, 11.0));
+    p.setBrush(QColor(0x20, 0x20, 0x20));
+    p.drawRect(QRectF(5.0, 2.5, 2.0, 5.0));
+    p.drawRect(QRectF(5.0, 8.5, 2.0, 1.5));
+}
+
+void paintFilter(QPainter& p) {
+    p.setPen(Qt::NoPen);
+    p.setBrush(QApplication::palette().color(QPalette::Text));
+    const QPolygonF funnel({QPointF(1.0, 1.5), QPointF(11.0, 1.5), QPointF(7.0, 6.0), QPointF(7.0, 11.0),
+                            QPointF(5.0, 10.0), QPointF(5.0, 6.0)});
+    p.drawPolygon(funnel);
+}
+
 // The stale badge of 06 section 6 item 1 (M4 reload): an amber disc with an exclamation mark, so that the
 // shape, not the colour alone, carries it (06 section 20 item 4; the tool tip says what it means). Drawn
 // once.
 QIcon staleIcon() {
-    static const QIcon icon = [] {
-        QPixmap pm(12, 12);
-        pm.fill(Qt::transparent);
-        QPainter p(&pm);
-        p.setRenderHint(QPainter::Antialiasing);
-        p.setPen(Qt::NoPen);
-        p.setBrush(QColor(0xE0, 0xA0, 0x00));
-        p.drawEllipse(QRectF(0.5, 0.5, 11.0, 11.0));
-        p.setBrush(QColor(0x20, 0x20, 0x20));
-        p.drawRect(QRectF(5.0, 2.5, 2.0, 5.0));
-        p.drawRect(QRectF(5.0, 8.5, 2.0, 1.5));
-        p.end();
-        return QIcon(pm);
-    }();
+    static const QIcon icon = drawnIcon(QSize(12, 12), paintStale);
     return icon;
 }
 
 // The filter icon of 06 section 6 (a funnel in the text colour), drawn once.
 QIcon filterIcon() {
-    static const QIcon icon = [] {
-        QPixmap pm(12, 12);
-        pm.fill(Qt::transparent);
-        QPainter p(&pm);
-        p.setRenderHint(QPainter::Antialiasing);
-        p.setPen(Qt::NoPen);
-        p.setBrush(QApplication::palette().color(QPalette::Text));
-        const QPolygonF funnel({QPointF(1.0, 1.5), QPointF(11.0, 1.5), QPointF(7.0, 6.0), QPointF(7.0, 11.0),
-                                QPointF(5.0, 10.0), QPointF(5.0, 6.0)});
-        p.drawPolygon(funnel);
-        p.end();
-        return QIcon(pm);
-    }();
+    static const QIcon icon = drawnIcon(QSize(12, 12), paintFilter);
+    return icon;
+}
+
+// A stale source that is also filtered: the badge, then the funnel. Drawn once, not on every repaint (D-217).
+QIcon staleAndFilterIcon() {
+    static const QIcon icon = drawnIcon(QSize(26, 12), [](QPainter& p) {
+        paintStale(p);
+        p.translate(14.0, 0.0);
+        paintFilter(p);
+    });
     return icon;
 }
 
@@ -126,16 +149,7 @@ public:
         // line of its tool tip is the model's.
         if (index.column() == M::NameCol && role == Qt::DecorationRole && !index.parent().isValid() &&
             QIdentityProxyModel::data(index, M::StaleRole).toBool()) {
-            if (!sourceFilter(index)) {
-                return staleIcon();
-            }
-            QPixmap both(26, 12);
-            both.fill(Qt::transparent);
-            QPainter p(&both);
-            p.drawPixmap(0, 0, staleIcon().pixmap(12, 12));
-            p.drawPixmap(14, 0, filterIcon().pixmap(12, 12));
-            p.end();
-            return QIcon(both);
+            return sourceFilter(index) ? staleAndFilterIcon() : staleIcon();
         }
         if (index.column() == M::NameCol && (role == Qt::DecorationRole || role == Qt::ToolTipRole)) {
             // Filters (06 section 5.4): a row kept only by its slot, and a filtered source, carry the icon.
