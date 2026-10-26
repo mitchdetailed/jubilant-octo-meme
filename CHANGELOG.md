@@ -283,6 +283,9 @@ All notable changes are recorded here, newest first. The project follows semanti
   graph between two checks of a wait that had already held). Every `renderedAt` wait of `ui.tst_dpr_switch` prints the
   graph's state, and a state that held and stops holding is logged. New tests `queuedSizeIsNotUpToDate` in
   `widgets.tst_time_distance_graph`, `tst_histogram` and `tst_track_position`.
+- The maintainer's two decisions of 2026-10-26 (D-217 (n), D-218 (c)): 0.1 ships the 2 px lines at DPR 2 as the DPR 2
+  goldens show them, over three device columns at half, full and half strength, and its release note says so; the two
+  fixes in the vendored ADS stay, with `GOVERNANCE.md`'s rule for such changes.
 
 ## Unreleased (M3)
 
