@@ -42,6 +42,7 @@
 #include <poll.h>
 
 #include <fcntl.h>
+#include <sys/file.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -289,6 +290,59 @@ void closeOnExec(int fd, bool nonBlocking) {
 
 // How long listen() waits to learn whether a socket file belongs to a running instance (D-217).
 constexpr int kProbeTimeoutMs = 1000;
+
+// How long listen() waits for another launch's election (a bind, at most one probe and a listen) to end.
+constexpr int kElectionTimeoutMs = 3 * kProbeTimeoutMs;
+
+// Who listens on a name is decided under an advisory lock (flock) on "<socket file>.lock" beside it (D-219
+// (d)): the bind, the check of a socket file nobody accepts on and the listen happen while it is held, so a
+// launch never takes the socket file of one that has bound but not listened yet for a stale one and unlinks
+// it (both would then listen, the first on a name that no longer leads to it; Codex review of PR #5). The
+// kernel drops the lock with its descriptor, so an instance that ended without closing leaves no lock behind;
+// the lock file stays (removing it would race the same way). flock, not fcntl: its locks belong to the open
+// file, so they also exclude each other within one process.
+class ElectionLock {
+public:
+    ElectionLock(const std::string& socketFile, int timeoutMs) {
+        fd_ = ::open((socketFile + ".lock").c_str(), O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600);
+        if (fd_ < 0) {
+            error_ = errno;
+            return;
+        }
+        const QDeadlineTimer deadline(timeoutMs);
+        for (;;) {
+            if (::flock(fd_, LOCK_EX | LOCK_NB) == 0) {
+                held_ = true;
+                return;
+            }
+            const int e = errno;
+            if (e != EWOULDBLOCK && e != EINTR) {
+                error_ = e;
+                return;
+            }
+            if (deadline.hasExpired()) {
+                error_ = EWOULDBLOCK;
+                return;
+            }
+            ::poll(nullptr, 0, 10); // once more in 10 ms
+        }
+    }
+    ~ElectionLock() {
+        if (fd_ >= 0) {
+            ::close(fd_); // releases the lock
+        }
+    }
+    ElectionLock(const ElectionLock&) = delete;
+    ElectionLock& operator=(const ElectionLock&) = delete;
+
+    bool held() const { return held_; }
+    int error() const { return error_; }
+
+private:
+    int fd_ = -1;
+    int error_ = 0;
+    bool held_ = false;
+};
 
 #ifdef MSG_NOSIGNAL
 constexpr int kSendFlags = MSG_NOSIGNAL;
@@ -733,6 +787,16 @@ struct InstanceServer::Impl {
         if (path.empty() || !socketAddress(path, address)) {
             setDetail(detail,
                       QStringLiteral("no private directory for the socket (or its path is too long)"));
+            return false;
+        }
+        const ElectionLock election(path, kElectionTimeoutMs); // held until this returns
+        if (!election.held()) {
+            if (election.error() == EWOULDBLOCK) {
+                setDetail(detail, QStringLiteral("another instance is starting"));
+            } else {
+                setDetail(detail,
+                          QStringLiteral("lock: ") + QString::fromLocal8Bit(std::strerror(election.error())));
+            }
             return false;
         }
         fd = ::socket(AF_UNIX, SOCK_STREAM, 0);

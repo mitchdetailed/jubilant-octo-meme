@@ -3409,6 +3409,17 @@ without the task must leave `.ld` as it was. The script passes, a parser check p
 fail: the step at `usPostUninstall`, D-217's handler, an `HKLM64` root, an `HKCR` root, `uninsdeletevalue` on `.ld`,
 no `uninsdeletekey` on the ProgId, `UsePreviousTasks=yes` and the `usDone` line removed.
 `uninstaller_self_test` checks the wait with a stand-in uninstaller that writes its log after it has returned.
+(d) **One launch at a time decides who listens** (POSIX; refines D-212 (b), D-217; the Codex review of PR #5 on
+`instance_channel.cpp`). A launch whose bind found the socket file taken and whose probe was refused unlinked the file
+as stale, but a refused probe also means a launch that has bound and not listened yet: the second then bound the name
+while the first listened on a file no longer reachable, and both took launch requests' place as the primary.
+`InstanceServer::listen()` now binds, checks and listens under an advisory `flock` on `<socket file>.lock` beside the
+socket (waiting at most 3 s for another launch's election, then failing with "another instance is starting", after
+which `main` forwards once more as before); the kernel drops the lock of an instance that died, so a socket file it
+left is still reclaimed, and the lock file stays. New test `app.tst_instance_channel`
+`aLaunchBetweenBindAndListenKeepsItsSocket` (POSIX: the test holds the lock and binds; the second `listen()` must fail
+and leave the file's inode, and once the first listens it must find it listening); it fails without the lock. The
+Windows named pipe is unaffected (`FILE_FLAG_FIRST_PIPE_INSTANCE`).
 **Consequences.** Each failure of 2d9a01c's runs except the deferred macOS strips is fixed at its cause, and each
 product fix comes with a test that fails without it: the five tests of (a) (four in any build, the exit flush's in MSVC
 Debug), the new `tst_maths_distance` function of (b), and for (c) `iss_self_test` (2d9a01c's `esses.iss` gives 11

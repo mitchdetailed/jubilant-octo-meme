@@ -272,6 +272,11 @@ All notable changes are recorded here, newest first. The project follows semanti
   `closeSourceOfAReferenceIntoTheClosedSource`, `qtmodel.tst_maths_service`
   `removeSourceOfAReferenceIntoTheRemovedSource`, `qtmodel.tst_mapping_handoff` `aReceiverMayAnswerAtOnce` and
   `qtmodel.tst_maths_distance` `lapsWaitingForAnEarlierCorrDistVersionAreBuilt`.
+- Two launches at the same moment no longer both become the running instance on Linux and macOS (PR #5 review, Codex
+  P2; D-219 (d)). A launch that found the socket file taken and nobody accepting on it unlinked the file as stale,
+  even when another launch had bound it and was about to listen; the bind, that check and the listen now happen
+  under an advisory lock on `<socket file>.lock`, which the kernel drops if its instance dies. New test
+  `app.tst_instance_channel` `aLaunchBetweenBindAndListenKeepsItsSocket`.
 
 ## Unreleased (M3)
 

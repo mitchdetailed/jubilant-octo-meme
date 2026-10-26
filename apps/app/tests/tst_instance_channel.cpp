@@ -47,9 +47,13 @@
 #endif
 #include <windows.h>
 #else
+#include <QScopeGuard>
 #include <cstring>
 
+#include <fcntl.h>
+#include <sys/file.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 #include <unistd.h>
 #endif
@@ -360,6 +364,56 @@ private Q_SLOTS:
         QVERIFY2(server.listen(name, &detail), qPrintable(detail));
         server.close();
         QVERIFY(!QFileInfo::exists(address));
+    }
+
+    // A launch that has bound its socket but not listened yet keeps it (D-219 (d)): another launch waits for
+    // the election lock on "<socket file>.lock" instead of taking the file for a stale one and unlinking it,
+    // which made both of them listen (Codex review of PR #5). The test is the first launch: it holds the lock
+    // and binds.
+    void aLaunchBetweenBindAndListenKeepsItsSocket() {
+        const QString name = uniqueInstanceName();
+        const QByteArray path = instanceAddress(name).toLocal8Bit();
+        QVERIFY(!path.isEmpty());
+        const QByteArray lockPath = path + ".lock";
+        int lockFd = ::open(lockPath.constData(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
+        const int fd = ::socket(AF_UNIX, SOCK_STREAM, 0);
+        const auto cleanup = qScopeGuard([&] {
+            if (fd >= 0) {
+                ::close(fd);
+            }
+            if (lockFd >= 0) {
+                ::close(lockFd);
+            }
+            ::unlink(path.constData());
+            ::unlink(lockPath.constData());
+        });
+        QVERIFY(lockFd >= 0);
+        QVERIFY(fd >= 0);
+        QCOMPARE(::flock(lockFd, LOCK_EX | LOCK_NB), 0);
+        sockaddr_un a{};
+        a.sun_family = AF_UNIX;
+        std::memcpy(a.sun_path, path.constData(), static_cast<size_t>(path.size()) + 1);
+        QCOMPARE(::bind(fd, reinterpret_cast<const sockaddr*>(&a), static_cast<socklen_t>(sizeof(a))), 0);
+        struct stat bound = {};
+        QCOMPARE(::lstat(path.constData(), &bound), 0);
+        // Between the first launch's bind and listen the second neither listens nor touches its file.
+        InstanceServer second;
+        QString detail;
+        QVERIFY(!second.listen(name, &detail));
+        QVERIFY(!second.isListening());
+        QVERIFY(!detail.isEmpty());
+        struct stat now = {};
+        QCOMPARE(::lstat(path.constData(), &now), 0);
+        QCOMPARE(now.st_ino, bound.st_ino);
+        // Once the first launch listens and lets the lock go, the second finds it listening and stays a
+        // client.
+        QCOMPARE(::listen(fd, 8), 0);
+        ::close(lockFd);
+        lockFd = -1;
+        QVERIFY(!second.listen(name, &detail));
+        QCOMPARE(detail, QStringLiteral("another instance listens"));
+        QCOMPARE(::lstat(path.constData(), &now), 0);
+        QCOMPARE(now.st_ino, bound.st_ino);
     }
 #endif
 
