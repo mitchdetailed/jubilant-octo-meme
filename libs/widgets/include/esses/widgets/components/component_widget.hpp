@@ -217,6 +217,9 @@ public:
     int sizeChangesDelivered() const noexcept { return sizeDeliveries_; }
     // True while the 30 Hz size throttle runs (a size change now would be coalesced, not delivered at once).
     bool sizeThrottleActive() const;
+    // M4: a size or DPR change waits in the throttle until it fires. The layers may not show the component's
+    // current size meanwhile, and its delivery rebuilds them, so the components' staticUpToDate() is false.
+    bool sizeChangePending() const noexcept { return sizePending_ != 0; }
     static constexpr int kSizeCoalesceMs = 33; // 30 Hz
 
 Q_SIGNALS:

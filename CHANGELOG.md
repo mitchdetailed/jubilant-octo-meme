@@ -277,6 +277,12 @@ All notable changes are recorded here, newest first. The project follows semanti
   even when another launch had bound it and was about to listen; the bind, that check and the listen now happen
   under an advisory lock on `<socket file>.lock`, which the kernel drops if its instance dies. New test
   `app.tst_instance_channel` `aLaunchBetweenBindAndListenKeepsItsSocket`.
+- A component whose size change still waits in its 30 Hz throttle no longer counts as rendered: `staticUpToDate()` of
+  the time/distance graph, the layered plots and Track Position is false while `sizeChangePending()` (the macOS
+  qt-app run of 1cfe62b failed `ui.tst_dpr_switch` `floatingDockAcrossMonitors` when a trailing resize rebuilt the
+  graph between two checks of a wait that had already held). Every `renderedAt` wait of `ui.tst_dpr_switch` prints the
+  graph's state, and a state that held and stops holding is logged. New tests `queuedSizeIsNotUpToDate` in
+  `widgets.tst_time_distance_graph`, `tst_histogram` and `tst_track_position`.
 
 ## Unreleased (M3)
 

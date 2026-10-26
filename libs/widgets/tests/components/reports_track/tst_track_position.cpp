@@ -26,6 +26,7 @@
 #include <QSignalSpy>
 #include <QTest>
 #include <QWheelEvent>
+#include <QWidget>
 #include <memory>
 
 using namespace esses;
@@ -334,6 +335,25 @@ private Q_SLOTS:
         QApplication::sendEvent(&tp, &press);
         QVERIFY(!press.isAccepted());
         QCOMPARE(focus.count(), 0);
+    }
+
+    // M4: a size the 30 Hz throttle still holds is an input the Static layer does not show yet
+    // (TrackPosition::staticUpToDate, cmptest::checkQueuedSizeIsNotUpToDate). A child, as a worksheet holds
+    // it: its resize events are synchronous.
+    void queuedSizeIsNotUpToDate() {
+        TrackWorld t;
+        QWidget host;
+        host.resize(420, 320);
+        auto* tp = new TrackPosition(trackSpec(), *t.w.context, &host);
+        tp->setGeometry(0, 0, 400, 300);
+        host.show();
+        QVERIFY(QTest::qWaitFor([&] { return t.distanceReady(); }, 20000));
+        QVERIFY(QTest::qWaitFor([&] { return settled(*tp); }, 20000));
+        QTRY_VERIFY(!tp->sizeThrottleActive());
+        checkQueuedSizeIsNotUpToDate(
+            *tp, [tp] { return tp->staticSubmitted(); },
+            [tp] { return tp->staticDelivered() == tp->staticSubmitted(); }, QSize(360, 260),
+            QSize(300, 220));
     }
 
     void printToClipboardEqualsTheOffscreenRenderer() {

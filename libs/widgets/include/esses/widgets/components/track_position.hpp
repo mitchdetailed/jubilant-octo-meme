@@ -79,7 +79,8 @@ public:
     const plot::TrackPositionBody& body() const noexcept { return body_; }
     // The map of the last prepared inputs (null: none bound).
     std::shared_ptr<const analysis::TrackMap> trackMap() const { return inputs_.trackMap; }
-    // Tests: the prepared inputs, the builds, whether the Static layer shows the current state.
+    // Tests: the prepared inputs, the builds, whether the Static layer shows the current state (no build
+    // dirty, scheduled or in flight and no size change waiting in the 30 Hz throttle).
     const plot::ComponentBuildInputs& inputs() const noexcept { return inputs_; }
     int staticSubmitted() const noexcept { return staticSubmitted_; }
     int staticDelivered() const noexcept { return staticDelivered_; }

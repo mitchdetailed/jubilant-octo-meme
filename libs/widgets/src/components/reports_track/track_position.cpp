@@ -168,7 +168,7 @@ QStringList TrackPosition::contextCommands() const {
 // ---- layers ---------------------------------------------------------------------------------------------
 
 bool TrackPosition::staticUpToDate() const noexcept {
-    return prepared_ && !staticDirty_ && !buildScheduled_ && !buildInFlight_ &&
+    return prepared_ && !staticDirty_ && !buildScheduled_ && !buildInFlight_ && !sizeChangePending() &&
            !layers_.staticImage().isNull();
 }
 

@@ -206,7 +206,7 @@ void LayeredComponent::requestBody(const JsonDoc& body, const QString& undoText)
 // ---- layers
 
 bool LayeredComponent::staticUpToDate() const noexcept {
-    return prepared_ && !staticDirty_ && !buildScheduled_ && !buildInFlight_ &&
+    return prepared_ && !staticDirty_ && !buildScheduled_ && !buildInFlight_ && !sizeChangePending() &&
            !layers_.staticImage().isNull();
 }
 

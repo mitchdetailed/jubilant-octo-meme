@@ -913,7 +913,7 @@ void TimeDistanceGraph::setActiveChannel(const QString& name) {
 // ---- layers ---------------------------------------------------------------------------------------------
 
 bool TimeDistanceGraph::staticUpToDate() const noexcept {
-    return prepared_ && !staticDirty_ && !buildScheduled_ && !buildInFlight_ &&
+    return prepared_ && !staticDirty_ && !buildScheduled_ && !buildInFlight_ && !sizeChangePending() &&
            !layers_.staticImage().isNull();
 }
 

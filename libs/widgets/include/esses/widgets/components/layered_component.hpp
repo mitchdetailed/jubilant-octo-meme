@@ -74,7 +74,8 @@ public:
     const plot::HitTester& hits() const noexcept { return hits_; }
     // The inputs of the current layers (adjusted); empty until the first build request.
     const plot::ComponentBuildInputs& inputs() const noexcept { return inputs_; }
-    // No Static build is dirty, scheduled or in flight: the Static image shows the current inputs.
+    // No Static build is dirty, scheduled or in flight and no size change waits in the 30 Hz throttle
+    // (sizeChangePending): the Static image shows the current inputs at the current size.
     bool staticUpToDate() const noexcept;
     bool pendingStripeShown() const noexcept { return pendingShown_; }
     std::uint64_t builtViewVersion() const noexcept { return builtViewVersion_; }

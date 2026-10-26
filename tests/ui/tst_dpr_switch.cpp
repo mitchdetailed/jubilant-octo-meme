@@ -26,11 +26,15 @@
 // A display whose scale changes in place reaches the same DevicePixelRatioChange path; the offscreen platform
 // cannot change a screen's DPI at run time through public API, so it is the manual check's step
 // (docs/milestones/M4.md section 6.3), with the two-monitor drag.
+// A graph is rendered at a DPR (renderedAt) once nothing can re-lay it out any more: no size change waits in
+// its 30 Hz throttle (staticUpToDate) or in its canvas's, so a QTRY_* wait, which checks again after the
+// first success, never sees it stop holding (the floating graph on macOS before the M4 fix).
 
 #include "../../libs/qtmodel/tests/qtmodel_test_support.hpp"
 #include "../../libs/widgets/tests/m4_hidpi/dpr_test_support.hpp"
 #include "ui_test_support.hpp"
 
+#include <esses/base/taskpool.hpp>
 #include <esses/base/thread_role.hpp>
 #include <esses/qtmodel/data_selection_model.hpp>
 #include <esses/qtmodel/distance_service.hpp>
@@ -55,6 +59,7 @@
 #include <QVBoxLayout>
 #include <QWindow>
 #include <cmath>
+#include <cstddef>
 #include <map>
 #include <memory>
 #include <string>
@@ -136,11 +141,82 @@ double driftOf(const Look& a, const Look& b) {
     return worst;
 }
 
-// The graph is laid out, rendered and settled at `dpr`.
+// A WorksheetCanvas holding `w` runs its 30 Hz layout throttle: a layout it holds may still place `w` anew.
+bool canvasLayoutThrottled(const QWidget& w) {
+    for (const QWidget* p = w.parentWidget(); p != nullptr; p = p->parentWidget()) {
+        if (const auto* canvas = qobject_cast<const WorksheetCanvas*>(p);
+            canvas != nullptr && canvas->layoutThrottleActive()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// What a graph shows now, for a failure message. It only reads (uitest::poolSettled would deliver events), so
+// it describes the state the check saw.
+QString stateOf(TimeDistanceGraph& g) {
+    const TaskPool::Stats pool = g.context().render.pool().stats();
+    std::size_t queued = 0;
+    for (const std::size_t q : pool.queued) {
+        queued += q;
+    }
+    const QImage& image = g.layers().staticImage();
+    const QSize wanted = deviceSize(g.size(), g.devicePixelRatioF());
+    return QStringLiteral(
+               "widget DPR %1, laid out at %2, layers at %3, %4x%5 logical, Static image %6x%7 at %8 "
+               "(%9 wanted); ")
+               .arg(g.devicePixelRatioF())
+               .arg(g.layoutDevicePixelRatio())
+               .arg(g.layers().devicePixelRatio())
+               .arg(g.width())
+               .arg(g.height())
+               .arg(image.width())
+               .arg(image.height())
+               .arg(image.devicePixelRatio())
+               .arg(QStringLiteral("%1x%2").arg(wanted.width()).arg(wanted.height())) +
+           QStringLiteral(
+               "size change pending %1, size throttle %2, canvas layout throttle %3; Static up to date "
+               "%4, builds submitted %5, delivered %6, shown %7; pool queued %8, parked %9, running "
+               "%10; visible %11")
+               .arg(g.sizeChangePending() ? 1 : 0)
+               .arg(g.sizeThrottleActive() ? 1 : 0)
+               .arg(canvasLayoutThrottled(g) ? 1 : 0)
+               .arg(g.staticUpToDate() ? 1 : 0)
+               .arg(g.staticBuildsSubmitted())
+               .arg(g.staticBuildsDelivered())
+               .arg(g.staticBuildShown())
+               .arg(queued)
+               .arg(pool.parked)
+               .arg(pool.running)
+               .arg(g.isVisible() ? 1 : 0);
+}
+
+// renderedAt's last result for one graph and DPR since a window last moved (moveTo resets it). A QTRY_* macro
+// evaluates its condition again once it holds (Qt 6.12 qtestcase.h: QTRY_TIMEOUT_DEBUG_IMPL, then QVERIFY),
+// so a state that holds and then stops holding fails the wait whatever its timeout, and the macro's message
+// shows no state: renderedAt logs the state it fell to.
+struct LastRendered {
+    const TimeDistanceGraph* graph = nullptr;
+    qreal dpr = 0.0;
+    bool held = false;
+};
+LastRendered gLastRendered;
+
+// The graph is laid out, rendered and settled at `dpr`: its window's DPR, laid out and its layers built at
+// it, its pool settled (no late result can arrive), no WorksheetCanvas holding it still laying it out (the
+// canvas's 30 Hz throttle) and its Static layer up to date, which since M4 includes no size change waiting in
+// its own 30 Hz throttle (sizeChangePending; before, the image of the size before passed for current and the
+// delivery rebuilt the graph after this had held).
 bool renderedAt(TimeDistanceGraph& g, qreal dpr) {
-    return g.devicePixelRatioF() == dpr && g.layoutDevicePixelRatio() == dpr &&
-           g.layers().devicePixelRatio() == dpr && uitest::poolSettled(g.context().render.pool()) &&
-           g.staticUpToDate();
+    const bool now = g.devicePixelRatioF() == dpr && g.layoutDevicePixelRatio() == dpr &&
+                     g.layers().devicePixelRatio() == dpr && uitest::poolSettled(g.context().render.pool()) &&
+                     !canvasLayoutThrottled(g) && g.staticUpToDate();
+    if (gLastRendered.graph == &g && gLastRendered.dpr == dpr && gLastRendered.held && !now) {
+        qWarning("renderedAt(DPR %s) held and no longer holds: %s", qPrintable(dprText(dpr)),
+                 qPrintable(stateOf(g)));
+    }
+    gLastRendered = LastRendered{&g, dpr, now};
+    return now;
 }
 
 // What the criterion asks of a re-render at `dpr` against the DPR 1 look `base`.
@@ -169,27 +245,13 @@ void checkLook(const Look& now, const Look& base, qreal dpr, const char* what) {
                    QStringLiteral(": in its window %1 pixels differ from its layers").arg(now.windowDiff)));
 }
 
-// What a graph shows now, for a failure message.
-QString stateOf(TimeDistanceGraph& g) {
-    return QStringLiteral(
-               "widget DPR %1, laid out at %2, layers at %3, pool settled %4, Static up to date %5, "
-               "visible %6, %7x%8")
-        .arg(g.devicePixelRatioF())
-        .arg(g.layoutDevicePixelRatio())
-        .arg(g.layers().devicePixelRatio())
-        .arg(uitest::poolSettled(g.context().render.pool()) ? 1 : 0)
-        .arg(g.staticUpToDate() ? 1 : 0)
-        .arg(g.isVisible() ? 1 : 0)
-        .arg(g.width())
-        .arg(g.height());
-}
-
 // A drag across monitors as Windows makes it: the window changes screen and DPR and keeps its logical size
 // (the platform applies the rectangle WM_DPICHANGED suggests, scaled by the DPR ratio). The offscreen
 // platform keeps the native size instead: once the move is reported, a 1280 x 800 window of DPR 1 is 640 x
 // 400 logical pixels at DPR 2. So the window changes screen, moves (the platform reports its geometry, which
 // the widget follows), and then gets its logical size back, as on Windows.
 bool moveTo(QWidget& top, qreal dpr, QPoint offset) {
+    gLastRendered = LastRendered{}; // what held before the move may stop holding
     const QSize logical = top.size();
     QWindow* window = top.windowHandle();
     window->setScreen(screenForDpr(dpr));
@@ -303,7 +365,10 @@ private Q_SLOTS:
         }
     }
 
-    void cleanup() { QCOMPARE(uitest::assertFailures(), 0); }
+    void cleanup() {
+        gLastRendered = LastRendered{}; // a later row's graph may live at a destroyed one's address
+        QCOMPARE(uitest::assertFailures(), 0);
+    }
 
     void windowAcrossMonitors() {
         Rig r;
@@ -311,7 +376,7 @@ private Q_SLOTS:
         TimeDistanceGraph* g = uitest::graphOf(*r.w);
         QVERIFY(g != nullptr);
         QVERIFY(uitest::waitQuiet(*g));
-        QVERIFY(renderedAt(*g, 1.0));
+        QVERIFY2(renderedAt(*g, 1.0), qPrintable(stateOf(*g)));
         HiDpiShell* hidpi = r.hidpi();
         QVERIFY(hidpi != nullptr && hidpi->watcher() != nullptr);
         DprWatcher& watcher = *hidpi->watcher();
@@ -329,7 +394,7 @@ private Q_SLOTS:
             QCOMPARE(watcher.lastDpr(r.w.get()), dpr);
             QCOMPARE(spy.last().at(0).value<QWidget*>(), static_cast<QWidget*>(r.w.get()));
             QCOMPARE(spy.last().at(2).toReal(), dpr);
-            QTRY_VERIFY_WITH_TIMEOUT(renderedAt(*g, dpr), kTimeoutMs);
+            QTRY_VERIFY2_WITH_TIMEOUT(renderedAt(*g, dpr), qPrintable(stateOf(*g)), kTimeoutMs);
             QVERIFY(uitest::waitQuiet(*g));
             for (ComponentWidget* c : r.w->canvas().components()) {
                 QTRY_COMPARE_WITH_TIMEOUT(c->layoutDevicePixelRatio(), dpr, kTimeoutMs);
@@ -397,7 +462,7 @@ private Q_SLOTS:
         QTRY_VERIFY_WITH_TIMEOUT(watcher.watched().contains(floating), kTimeoutMs); // the shell follows it
         floating->resize(720, 420);
         QVERIFY(moveTo(*floating, 1.0, QPoint(200, 260)));
-        QTRY_VERIFY_WITH_TIMEOUT(renderedAt(*graph, 1.0), kTimeoutMs);
+        QTRY_VERIFY2_WITH_TIMEOUT(renderedAt(*graph, 1.0), qPrintable(stateOf(*graph)), kTimeoutMs);
         QVERIFY(uitest::waitQuiet(*graph));
         const Look first = lookOf(*graph);
         checkLook(first, first, 1.0, "the floating graph");
@@ -422,7 +487,7 @@ private Q_SLOTS:
         // through the shell's re-check after the dock change (that path alone: tst_dpr_watcher
         // reparentedComponentRebuildsOnRefresh); the re-check runs either way and leaves nothing at DPR 2.
         QVERIFY(moveTo(*floating, 2.0, QPoint(200, 260)));
-        QTRY_VERIFY_WITH_TIMEOUT(renderedAt(*graph, 2.0), kTimeoutMs);
+        QTRY_VERIFY2_WITH_TIMEOUT(renderedAt(*graph, 2.0), qPrintable(stateOf(*graph)), kTimeoutMs);
         QVERIFY(uitest::waitQuiet(*graph));
         const int before = hidpi->dockRefreshes();
         r.w->docks().setState(QString::fromLatin1(kGraphDock), DockState::Docked);
