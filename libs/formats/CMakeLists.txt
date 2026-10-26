@@ -152,6 +152,12 @@ if(Python3_Interpreter_FOUND AND TARGET ${ESSES_PREFIX}_formats_ld_tests)
                    --oracle "${CMAKE_SOURCE_DIR}/tools/ld_ref_decode.py"
                    --work "${CMAKE_CURRENT_BINARY_DIR}/oracle-synthetic")
   set_tests_properties(formats_ld.oracle_synthetic PROPERTIES LABELS "unit;oracle-synthetic" TIMEOUT 600)
+  # The oracle's own checks, on whichever Python CMake found (3.8 or later): its struct and memoryview.cast
+  # sample paths agree for every code (cast takes half floats only from 3.12), float_sum, and a decode of a
+  # file with every code through both paths.
+  add_test(NAME formats_ld.oracle_self_test
+           COMMAND "${Python3_EXECUTABLE}" -I "${CMAKE_SOURCE_DIR}/tools/ld_ref_decode.py" --self-test)
+  set_tests_properties(formats_ld.oracle_self_test PROPERTIES LABELS "unit;oracle-synthetic" TIMEOUT 300)
   add_test(NAME lint.check_ld_codes
            COMMAND "${Python3_EXECUTABLE}" -I "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_ld_codes.py"
                    --root "${CMAKE_SOURCE_DIR}")

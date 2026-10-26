@@ -32,7 +32,9 @@
 #include <QEventLoop>
 #include <QImage>
 #include <QRect>
+#include <QSize>
 #include <QString>
+#include <QWidget>
 #include <cstddef>
 #include <filesystem>
 #include <memory>
@@ -84,6 +86,16 @@ inline bool poolSettled(const TaskPool& pool) {
 template <class C> bool settled(C& c) {
     return poolSettled(c.context().render.pool()) && c.staticUpToDate();
 }
+
+// Shows `component`, a child of `host`, as a worksheet holds a component: at (0, 0) with exactly `size`
+// (WorksheetCanvas::placement gives a component its rect, at least 1 px, and no minimum size) in `host`, a
+// window of that size; true once `host` is exposed. Not as a window of its own: Qt gives a window with a
+// layout that layout's minimum size (QLayout::SetDefaultConstraint), for a component holding a table the
+// table's QAbstractScrollArea::minimumSizeHint, made of the style's scroll bar metrics, and those differ by
+// platform under Qt Test: Fusion's 14 px extent and 26 px slider unscaled where QTEST_MAIN's Qt::AA_Use96Dpi
+// reaches the style (Windows, Linux), a third larger on macOS, where QStyleHelper ignores it (the offscreen
+// screen's 96 dpi over Darwin's base of 72). A values_list window of 280 x 70 came out 280 x 90 there.
+bool showPlaced(QWidget& host, QWidget& component, QSize size);
 
 std::filesystem::path repoRoot();
 // Before the QApplication exists (initMain): QT_QPA_FONTDIR = tests/golden/fonts unless set.

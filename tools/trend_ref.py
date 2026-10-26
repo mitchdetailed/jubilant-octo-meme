@@ -182,7 +182,7 @@ def main(argv: list[str]) -> int:
     text = document()
     if args.write:
         args.write.parent.mkdir(parents=True, exist_ok=True)
-        args.write.write_text(text, encoding="utf-8", newline="\n")
+        args.write.write_bytes(text.encode("utf-8"))
         print(f"wrote {args.write} ({len(CASES)} cases)")
         return 0
     try:

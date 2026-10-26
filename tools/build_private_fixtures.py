@@ -108,15 +108,11 @@ def oracle_windows(oracle, path: pathlib.Path, window: int, order: str) -> list[
                 n = min(e["count"], fit)
                 f = oracle.make_scaler(e, order)
                 rows = []
-                with memoryview(mm) as base:
-                    view = base[e["data_ptr"]:e["data_ptr"] + n * w].cast(code)
-                    try:
-                        for k in window_indices(n, window):
-                            v = f(view[k])
-                            rows.append("%d,%d,%r,%d\n" % (k, oracle.time_us(k, e["freq"]), v,
-                                                            1 if math.isfinite(v) else 0))
-                    finally:
-                        view.release()
+                with oracle.SampleView(mm, e["data_ptr"], n, code) as view:  # half floats on Python < 3.12 too
+                    for k in window_indices(n, window):
+                        v = f(view[k])
+                        rows.append("%d,%d,%r,%d\n" % (k, oracle.time_us(k, e["freq"]), v,
+                                                        1 if math.isfinite(v) else 0))
                 out.append((i, e["name"], rows))
         finally:
             mm.close()
@@ -201,8 +197,7 @@ def main(argv: list[str] | None = None) -> int:
         comp = companion_of(src)
         if comp is not None:
             fixture["companions"] = [{"file": "input.ldx", "sha256": sha256_of(comp), "bytes": comp.stat().st_size}]
-        (d / "fixture.json").write_text(json.dumps(fixture, indent=2, ensure_ascii=False) + "\n", encoding="utf-8",
-                                        newline="\n")
+        (d / "fixture.json").write_bytes((json.dumps(fixture, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
         for index, name, rows in oracle_windows(oracle, src, a.window, "afterMul"):
             fname = "%03d_%s.csv" % (index, percent_encode(name))
             with open(d / "expected.channels" / fname, "w", encoding="ascii", newline="\n") as fh:
@@ -210,8 +205,7 @@ def main(argv: list[str] | None = None) -> int:
                 fh.writelines(rows)
             channels += 1
         manifest["fixtures"].append({"dir": fid, "input": str(src)})
-    (out / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8",
-                                       newline="\n")
+    (out / "manifest.json").write_bytes((json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
     print(f"build_private_fixtures: {len(manifest['fixtures'])} fixtures, {channels} channel windows, "
           f"{missing} missing inputs -> {out}")
     if a.no_update:

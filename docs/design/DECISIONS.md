@@ -850,6 +850,7 @@ Rewritten on 2026-10-10 after the review. The list is deduplicated across this d
 | D-215 | The user guide and Help Contents as built: Markdown pages under docs/user/ with index.md as the start page, the installed page beside the data directory then the executable, the online page at the build's tag, the online page when the installed one does not open, a Messages warning when nothing opens, CLEANROOM.md completed for 0.1 (refines D-004, D-206 (h)-(i); reads 06 §2.2, §14.4, 07 §7.1, 08 §7, §9 item 4; amends 06 §14.4's "local HTML or URL") | no | M4 docs, 07 §7.1 "Docs", AC-M4-01 (help.contents row) |
 | D-216 | The M4 integration as built: the commit stamped at a tag, the soak out of the normal runs with its guard's tests in them, the walkthrough and the CLI golden tests as CI steps of their own, the install rules with and without Qt and the release tree scanned in lint, every M4 keymap row implemented with M4 as the keymap checker's milestone, the demo's command line in a real process, one repository URL, the soak's restart check after a Close All (refines D-206, D-212 (b), D-213 (f), D-214, D-215; reads 07 §7.2, §7.5, 08 §3.10, §4.1, §4.4, §5; amends D-213 (f), 08 §4.1's qt-app and lint rows) | no | M4 integration, AC-M4-01/-03/-08/-09 |
 | D-217 | The M4 fix pass: PR #5's first CI failures fixed at the root (the main window's teardown, the formatter, the vendor-mark scan of optimised binaries, the Qt install with one aqtinstall worker), Reload that keeps the source until its file is open again, decode-time diagnostics in Messages, the activation check on the pool, forwarded requests at the top of the event loop and only after their answer, a salted per-user channel, the release stamped from its own tag and development builds marked, convert's companion, cut details, empty output and duplicate channels, the hosted bench without the reference gates, the three missing MVP bench rows, installer upgrades and uninstalls that keep what is not theirs; the deferrals (macOS strips, crisp 2 px lines at DPR 2, same-size same-mtime replacements, Qt's bundled notices) (refines D-208, D-209, D-212, D-214, D-215, D-216; reads 02 §1 behaviour 5, 05 §5, §9.2, 06 §6, §17, §18-19, 07 §1.5, §7.2, §12, 08 §3.10, §4, §7; amends D-208's "Reload as a close then an open", D-212 (b)'s channel name, D-216 (a)'s version of a build without a version tag) | **yes**: (n) only | M4 fix pass, AC-M4-01/-04/-05/-07/-08/-09/-10 |
+| D-218 | PR #5's second CI run: the reference decoder and the Python tools on Python 3.8 and later (the half floats of `memoryview.cast` from 3.12 only, `float_sum` as 3.12's compensated sum), the association scripts with Windows's `reg` by its full path and nothing else, two defects of the vendored ADS fixed in place with the rule for such changes and `AdsBackend`'s docks read by `qobject_cast`, the two macOS-only test faults (forwarded paths compared by file identity, a values list placed as on a worksheet); the deferral (ADS's side-bar restore of a damaged layout) (refines D-041, D-212, D-217 (d) and (l); reads 06 §19 item 2, 08 §9; amends D-147 (a) and D-153 for the vendored ADS's source files, and the licence policy of `GOVERNANCE.md`) | **yes**: (c) only | PR #5's second CI run, AC-M4-01/-03/-04/-06/-07 |
 
 ### A.1 Review amendments
 
@@ -1440,6 +1441,7 @@ These entries record where M0, as built and accepted on the developer machine on
 **Consequences.** Builds are reproducible offline. Every vendored library is header-only or a static library built in the tree, so no third-party DLL has to be found at run time and D-124's triplet has nothing left to choose. Updating a dependency is a reviewed copy with new hashes instead of a baseline bump. 08 §1, §3.2, §3.6, §3.7, §4 and §12, 07 §3, 01 §1 and the outline's M0 row follow.
 **User must confirm:** no.
 *Amended by D-153 (A.12, decided 2026-10-11): ADS 5.1.1 is vendored here too, unmodified, but built by its own CMake project as a shared library (`cmake/qtads.cmake`), the one exception to (d); it is the one third-party library found at run time, beside the executables in `<build>/bin`.*
+*Amended by D-218 (c) (A.15, 2026-10-25, user must confirm): two source files of the vendored ADS are changed to fix defects upstream has not fixed, each listed in `third_party/qtads/UPSTREAM.md` and marked in the file; (a)'s "unchanged upstream files" holds for every other vendored file.*
 
 #### D-148 Catch2 3.7.1 amalgamated, with the project's own test discovery (refines D-033; amends D-120)
 **Context.** D-033 picks Catch2 v3, D-120 and 08 §3.7.1 take it from a vcpkg `tests` feature (3.5 or later), and 08 §6.2 registers each `TEST_CASE` with Catch2's `catch_discover_tests()`. M0 phase A could only use a local copy of Catch2 2.13.10 (single header). A Catch2 test spec matches names case-insensitively after trimming, treats a leading or trailing `*` as a wildcard and an `exclude:` prefix as a negation, and Catch2 v3 accepts one name twice when the tags differ, so a ctest entry built from a test name can run the wrong test case, several of them or none.
@@ -1480,6 +1482,7 @@ These entries record where M1, as built and reviewed on the developer machine on
 **Decision.** (a) ADS is the default `DockHost` backend (`AdsBackend`; `libs/widgets/src/shell/ads_backend.cpp` is the only translation unit that sees ADS). It is built as the shared library `qtadvanceddocking-qt6` (LGPL-2.1-or-later), aliased `esses::qtads`, and linked privately by `esses_widgets` only (`cmake/qt-free-check.cmake`, `tools/check_layering.py`). (b) The `QDockWidget` backend is kept on every OS, not only where S-3 fails as D-044 had it: the environment variable `ESSES_DOCK_BACKEND=qdockwidget` selects it at run time, and the CMake option `ESSES_DOCK_BACKEND=qdockwidget` builds without ADS for an OS on which ADS proves unusable (D-026's fallback rule). AC-M1-13's suite, `widgets.tst_dock_host`, runs on every backend the build has. (c) Acquisition (amends D-119 and 08 §3.7.3): ADS is vendored under D-147 instead of fetched, and it is built by its own unmodified CMake project (`add_subdirectory` with the options it declares: `BUILD_STATIC OFF`, `BUILD_EXAMPLES OFF`, `QT_VERSION_MAJOR` from our `find_package(Qt6)`; `cmake/qtads.cmake`), the one exception to D-147 (d). Its output directories are redirected to `<build>/bin`, beside every executable and test. ADS 5 names its target `qtadvanceddocking-qt6`, where 08 §3.7.3 has ADS 4's `qt6advanceddocking`, and the tree links the alias `esses::qtads`, where 08 has `esses::ads`. (d) A perspective names the backend that wrote it (`{"backend": "ads", ..., "state": <CDockManager::saveState>}` or `{"backend": "qdockwidget", ...}`); each backend refuses the other's, and `layout-1` records `dockBackend` and, for ADS, `adsVersion`.
 **Consequences.** Fly-outs are ADS's auto-hide side bars; the fallback keeps its emulation. A layout written by the other backend is replaced by the default layout, with an Info row in Messages naming the backend that wrote it. Spike S-3 has its Windows result (`docs/spikes/S-3.md`); the Linux and macOS results come from the `qt-app` CI runs, and an OS on which ADS fails is configured with the CMake option. `NOTICES.md` carries the LGPL notice and the replacement instructions for the ADS library (08 §9). 07 §4.1's widgets row, AC-M1-13 and R-10 read with this entry.
 **User must confirm:** no. Decided by the user on 2026-10-11 (ADS download approved; ADS is the default; the `QDockWidget` fallback is kept).
+*Amended by D-218 (c) (A.15, 2026-10-25, user must confirm): the vendored ADS is no longer unmodified. `src/AutoHideSideBar.cpp` and `src/DockManager.cpp` carry Esses changes that fix undefined behaviour upstream has not fixed (`third_party/qtads/UPSTREAM.md`); its CMake project is still unmodified.*
 
 #### D-154 The default `alternateList` ends with `Speed`; M1 uses the `alternateList` fallback (amends D-016, D-044)
 **Context.** D-044 moves `alternateList` and `gCorrection` to M3. The public ACC stand-in (`fixtures/motec.ld/synthetic-acc-dialect`, the sim-exporter dialect) logs its road speed as `SPEED` and has no wheel speeds. None of 03 §9.1's default channel lists names that channel, so the M1 data path (ACC `.ld` → Corr Speed/Corr Dist → distance mode; AC-M1-01, -09 and -10) showed "no distance data".
@@ -3179,3 +3182,126 @@ the Maths Editor's first use in a restart epoch, not a leak (M4.md §10 item 57)
 affected.
 **User must confirm:** yes: (n)'s crisp 2 px lines at DPR 2 (ship 0.1 with them soft and say so, or wait for the
 builders' change and new DPR 2 goldens); the rest no.
+
+#### D-218 PR #5's second CI run: the reference decoder and the Python tools on Python 3.8 and later, the association scripts with Windows's `reg` by its full path and nothing else, two defects of the vendored ADS fixed in place and `AdsBackend`'s docks read by `qobject_cast`, the two macOS-only test faults, and the deferral (refines D-041, D-212, D-217 (d) and (l); reads 06 §19 item 2, 08 §9; amends D-147 (a) and D-153 for the vendored ADS's source files, and the licence policy of `GOVERNANCE.md`)
+**Context.** PR #5's second CI run, on fe6cf07 (D-217) of 2026-10-19, with the runs dispatched on the branch before
+the merge (M4.md §6.0 step 1): `ci` 39302403071 (pull request) and 39302398363 (dispatch, adds qt-app on macos-14),
+`package` 39302403090 and `bench` 39302401850 (the soak's first run, 30 min). Green: core x3, `lint` (its
+clang-format step, the release-tree scan and `reuse lint` 5.0.2), sanitize x2, fuzz-smoke x2, qt-matrix, package's
+source, ubuntu-24.04 and macos-14 jobs (the AppImage and DMG smoke tests, the vendor-mark scans of the Release trees)
+and the hosted bench alarm; `ui.tst_dpr_switch` and the "Saturday walkthrough" step passed in all three qt-app rows.
+Failed: every qt-app row at `formats_ld.oracle_synthetic` (the reference decoder's `memoryview.cast` raised
+`ValueError` on the half floats of `pairs.ld`); qt-app on macOS also at `app.tst_instance_channel`,
+`widgets.tst_dpr_values_list` and `qtrender.tst_static_strips` (deferred, D-217 (n)); package windows-2022 at
+`smoke.py windows-portable`'s "unassociate-ld.cmd removes it"; the soak at its first main window, UBSan's "member
+call on null pointer of type 'ads::CDockFocusController'" at `third_party/qtads/src/AutoHideSideBar.cpp:217:52`.
+**Decision.** (a) **Python 3.8 and later.** D-217 (d) pinned `jurplel/install-qt-action@v4.1.1`, whose setup-python
+step takes `3.6.x - 3.11.x` and exports `Python3_ROOT_DIR`, so `find_package(Python3 3.8)` found Python 3.11 in qt-app
+and package (3.11.17 on ubuntu, 3.11.9 on Windows and macOS; main's nightly, on the floating `@v4`, had 3.14.8; core
+does not use the action), and `memoryview.cast` accepts the half-float code `'e'` only from Python 3.12. The tools
+that ctest and CI run keep to the minimum the CMake files declare, Python 3.8; neither the minimum nor CI's
+interpreter changes. `tools/ld_ref_decode.py` reads samples through `SampleView`: `memoryview.cast` where it gives the
+little-endian `struct` values (`_cast_ok`: a little-endian host, the native size equal to the standard size, a probe
+cast), `struct` with `<` otherwise, with `cast`'s slicing and clamping and only the requested samples built. Its
+float statistics use `float_sum`, CPython 3.12's compensated `sum` on every version (3.8 to 3.11 add left to right, so
+the means depended on the interpreter). On 3.12 and later no value or statistic changes and nothing moves toward the
+reader (D-041); only the payload bits of NaN samples in `.f64` dumps follow the interpreter's float conversion. New
+ctest `formats_ld.oracle_self_test` (`--self-test`, labels `unit;oracle-synthetic`): both sample paths for every code
+over unaligned buffers and 1,210 slice shapes, the 65,536 half patterns against an independent binary16 formula,
+`float_sum`, and a file with a channel of every code decoded through both paths (one of them a mean that only the
+compensated sum gets right). In the other scripts,
+`Path.write_text(newline=)` (3.10) becomes `write_bytes` of the UTF-8 text, which writes the same bytes
+(`check_vendor_marks.py`, `trend_ref.py`, `build_private_fixtures.py`, `packaging/package.py`, `gen_third_party.py`,
+`icons/make_icons.py`). `maths_ref.py`'s `Rate` is `typing.Tuple` (a subscripted `tuple` at import needs 3.9), and
+`build_private_fixtures.py` reads through `SampleView` (it cast `'e'` too). (b) **The association scripts** (refines
+D-212, D-217 (l)). The windows-2022 smoke step runs under Git for Windows' `bash.exe`, which puts `Git\usr\bin` before
+System32 on `PATH`. There `unassociate-ld.cmd`'s `reg query ... | find "Esses.LogFile"` met GNU `find` ("find:
+'Esses.LogFile': No such file or directory", exit 1), so `.ld`'s default stayed `Esses.LogFile` while the script said
+it was removed and exited 0. Any user with Git, MSYS2 or Cygwin tools before System32 met the same, and `find`'s
+substring match would also have removed another program's `MyEsses.LogFile` or `Esses.LogFileOld`. Both scripts now
+call `%SystemRoot%\System32\reg.exe` by its full path and exit 1 when it is missing. cmd looks a bare name up in the
+current folder first and then along `PATH`, and Explorer starts a script in its own folder; `%SystemRoot%` is the
+trust boundary, since whoever can change it can change `PATH`. The scripts look no program up by its bare name (the
+cmd of `for /f` starts through `%ComSpec%`, a full path behind the same boundary). `unassociate-ld.cmd`
+reads `reg query`'s output with `for /f` and removes `.ld`'s default only when the text after `REG_SZ` is exactly
+`Esses.LogFile`, whatever the language of Windows names the default value. It stores each line with delayed expansion
+off, so a `!` in another program's value cannot make it a match, and it exits 1 when that removal fails. As before,
+OpenWithProgids and the ProgId are always removed. `tools/dev/build-core.cmd` and `build-qt.cmd` call
+`%SystemRoot%\System32\where.exe` the same way. The new `esses_reg_stub` (`tools/packaging/windows/reg_stub.cpp`)
+stands in for `reg.exe`. It is Windows only, built with the tests and never installed, and it logs its own path and
+arguments, prints a given `query` listing and fails a given verb. The new ctest `packaging.association_scripts`
+(`smoke.py --script-test`; labels `packaging;lint`; exit 77, skipped, off Windows) runs the two scripts against the
+stub as `reg.exe` of a temporary `SystemRoot`, so the registry is never written. It runs them from six folder names
+with `&`, `%`, `!`, `^`, parentheses and accents, with `.bat` decoys of `reg`, `find`, `findstr`, `sort`, `more`,
+`where`, `timeout`, `choice` and `icacls` in their folder and first on `PATH`. It asserts the exact `reg` argument
+lists, that every call reached the stub, and nine `.ld` default values: `(Standard)` and `(par défaut)` count as
+Esses's; `Other.Program`, `Esses.LogFileOld`, `MyEsses.LogFile`, `Esses.LogFile!`, a value full of cmd's special
+characters, `(value not set)` and a missing key do not. It also asserts the exit codes of a failed delete, a failed add,
+a missing `esses.exe` and a missing `reg.exe`, and that no decoy ran. `smoke.py windows-portable` runs the real scripts
+with the decoys in place, now including the case of a program that took `.ld` between associate and unassociate. When
+a check fails, it prints the script's exit code and output, the registry values read and the decoys that ran.
+`smoke.py --self-test` (`packaging.smoke_self_test`) no longer runs `associate-ld.cmd`. fe6cf07's ran it with only
+the text `reg add ` turned into an echo, which the new `"!REG!" add` does not match, so over the new script it
+reached the real registry (M4.md §8 "Second CI run (D-218)"). It now checks windows-portable's checks and its
+failure report with Python stand-ins for the scripts and the registry: it runs no script and passes with either
+version of them. (c) **The vendored ADS changed** (amends D-147 (a) and D-153 for ADS's source files;
+`GOVERNANCE.md`'s licence policy).
+ADS 5.1.1 has two defects that are still in upstream `master` (087b35a, 2026-10-23) and that no upstream issue or pull
+request reports. Both are fixed in place in `third_party/qtads/src`. First, `CAutoHideSideBar::insertDockWidget()`
+called `clearDockWidgetFocus()` on the dock manager's focus controller. That controller exists only with
+`FocusHighlighting`, which Esses leaves off, so every pin to a side bar was undefined behaviour: Messages at
+registration, `setState`, the pin button, a restored side bar. The pointer is now checked as `CDockManager` checks its
+own. Second, after `~CDockManager()` had finished, `~CDockContainerWidget()` downcast the container's back-pointer to
+that same object to call `removeDockContainer()` on it. This happened at every destruction of a dock manager,
+including the soak's restart and teardown. `~CDockManager()` now clears the pointer with `removeFromDockManager()`
+while the object is still a `CDockManager`. Without the sanitizer, neither change alters behaviour: the skipped call
+only set a `focused` property that no stylesheet without focus highlighting reads, and `removeDockContainer()`
+ignores the manager itself. The rule for such changes: a vendored ADS file is changed only to fix a defect that
+upstream has not fixed. Each change is listed in `third_party/qtads/UPSTREAM.md` with its date, its reason and its
+upstream status, and marked below the file's licence header and at the change (LGPL-2.1 section 2(b)). No CMake file
+is changed, and a change is dropped once an upstream release fixes it and the copy is updated. `third_party/README.md`
+keeps the tree digest as downloaded (`5f5cca0a...`), the one now (`a72b087a...`, 104 files) and each changed file's
+SHA-256 now and in the archive. `GOVERNANCE.md`, `NOTICES.md`, `REUSE.toml`, `tools/packaging/third_party.json`,
+`docs/user/relinking.md` and the About dialog's `dockLibraryNotice()` say that the library is built from
+`third_party/qtads`, the upstream tag with the changes `UPSTREAM.md` lists, and no longer say "unmodified"
+(`widgets.tst_about_dialog`). The source offer is the upstream archive kept as a release asset together with the
+release's own tag, which holds the changed files (08 §9). Rejected: `FocusHighlighting` on, because it changes the UI
+(ADS's focus stylesheet, plus an application-wide focus tracker that sets the focus when a fly-out opens and works
+against the fly-out collapse) and leaves the second defect; excluding ADS from `-fsanitize=null`, because it hides
+undefined behaviour and the second defect is a vptr check anyway; the flag on only during construction, because it is
+fragile and changes behaviour the same way. In Esses's own code, `AdsBackend` held its docks as
+`QPointer<ads::CDockWidget>`. Each read was a `static_cast`, undefined while a dock is being destroyed: deleting its
+content moves the focus, and `DockHost::onFocusChanged` then asks `dockIdOf`. It now holds `QPointer<QWidget>` and
+reads through `qobject_cast` (`Entry::adsDock()`), which finds no dock in one being destroyed. The `QDockWidget`
+backend is clean under UBSan. New `widgets.tst_dock_host` functions: `autoHideWithoutAdsFocusController` (ADS row) and
+`teardownWithTheFocusInADock` (both rows). (d) **The macOS-only test faults** (the product was right both times).
+`app.tst_instance_channel` `secondLaunchHandsItsFilesOver` compared the forwarded paths as text, but
+`QDir::currentPath()` is `getcwd()`, the physical path on POSIX, and macOS's `/var` is a link to `/private/var`.
+Relative paths resolve against the physical current directory (reads 06 §19 item 2 with D-212 (d)'s absolute logs;
+`$PWD` is stale in a process started without a shell). The test now compares each path's folder by file identity
+(`std::filesystem::equivalent`) and gains a row started through a link to the folder (a symlink on POSIX, a junction
+on Windows), which brings the macOS case to Linux. `widgets.tst_dpr_values_list` `valuesListAt1_5(main_only_fixed)`
+showed the list as a window of its own, and Qt gives such a window its layout's minimum size. On Darwin only,
+`QStyleHelper::dpi` ignores `QTEST_MAIN`'s `AA_Use96Dpi`, so the offscreen Fusion metrics grow by 4/3 and that minimum
+is 90 px rather than 70 px. On a worksheet a component takes its rect through `setGeometry`, whatever its table's
+minimum. The tests now place it that way (`cmptest::showPlaced`) and check its size. A new
+`belowTheTablesMinimumSize` renders a list at half its table's minimum on every OS, and
+`widgets.tst_values_list_goldens` places it the same way (on macOS its `main_only_fixed` pixel checks had been
+skipped as "size differs"). (e)
+**Deferred** (M4.md §10): ADS's `restoreSideBar` casts a saved "Area" to `SideBarLocation`, and `autoHideSideBar()`
+inserts a null side bar for an unknown one, so a damaged or hand-edited `layout.json` with an Area outside 0-3 passes
+ADS's dry run and then dereferences that null. The soak cannot reach it. The macOS strips stay D-217 (n)'s.
+**Consequences.** Each failure of fe6cf07's runs is fixed at its cause, and each fix comes with a test that fails
+without it: `formats_ld.oracle_synthetic` under Python 3.11 here (fe6cf07's decoder raises CI's error) and the new
+self-test; for (b), `packaging.association_scripts` alone (fe6cf07's scripts start its decoys: over 100 problems),
+since `smoke.py --self-test` runs no script and passes with either version of them; the two `tst_dock_host` functions
+(the first in any build, the second under UBSan); and the rows of (d). None has had a CI run yet. CI's next run of
+the branch, with the macOS and soak dispatches again, is the record (M4.md §6.0 step 1, §8 "Second CI run"). The
+tools run on Python 3.8 and later, but no CI job runs an interpreter older than 3.11 (M4.md §10). The vendored ADS
+differs from its upstream archive in two files, so updating ADS means checking `UPSTREAM.md`'s changes against the new
+release, and the release's corresponding ADS source is the archive together with the tag. The association scripts
+trust `%SystemRoot%` and no `PATH` entry; a failed removal of `.ld`'s default now exits 1. The macOS nightly keeps the
+strips' failure.
+**User must confirm:** yes: (c), the vendored ADS changed in place and the licence policy of `GOVERNANCE.md` that now
+allows it (0.1 proceeds with the change; (c)'s alternatives are what remains if the maintainer declines); the rest
+no.

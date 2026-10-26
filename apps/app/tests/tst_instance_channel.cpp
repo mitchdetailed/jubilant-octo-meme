@@ -4,11 +4,12 @@
 // Single-instance forwarding (06 section 18 step 1, section 19 item 6; D-113, D-212), in process and with the
 // built esses (ESSES_APP_EXE): nobody listening answers at once, one listener per name, a request reaches the
 // server and is answered, a malformed, oversized or silent client is refused while the server keeps serving,
-// a second esses hands its files (absolute against its own working directory) to the running one and exits 0
-// without building a window, --new-instance runs its own window, and two real esses processes forward to each
-// other. The blocking client side of the channel runs on a test thread when the server is in this process (as
-// in esses, the server needs the event loop; the client is the short-lived launch).
-// Every channel name is unique (ESSES_INSTANCE_NAME), so no test meets a real Esses or another test.
+// a second esses hands its files (absolute against its own working directory, also when that folder is named
+// through a link) to the running one and exits 0 without building a window, --new-instance runs its own
+// window, and two real esses processes forward to each other. The blocking client side of the channel runs on
+// a test thread when the server is in this process (as in esses, the server needs the event loop; the client
+// is the short-lived launch). Every channel name is unique (ESSES_INSTANCE_NAME), so no test meets a real
+// Esses or another test.
 
 #include "app_test_support.hpp"
 #include "instance_channel.hpp"
@@ -31,6 +32,9 @@
 #include <QThread>
 #include <QTimer>
 #include <atomic>
+#include <filesystem>
+#include <optional>
+#include <system_error>
 #include <thread>
 #include <vector>
 
@@ -150,6 +154,68 @@ LaunchRequest requestFor(const QStringList& logs, const QString& project = {}) {
 QString settingsText(const QString& configDir) {
     return fileText(configDir + QStringLiteral("/settings.json")); // the child keeps rewriting it (D-216)
 }
+
+// Empty when `paths` are, in order, absolute clean paths of the files `names` in the folder `dir`, else what
+// differs. The folder is compared as a folder (std::filesystem::equivalent), not as text: a launch makes a
+// relative argument absolute against QDir::currentPath(), the system's name of its working directory, and
+// POSIX getcwd() answers the physical path (on macOS a launch started in /var/folders/... forwards
+// /private/var/folders/..., /var being a symbolic link), while Windows keeps the spelling it was given.
+QString namesTheFilesIn(const QStringList& paths, const QStringList& names, const QString& dir) {
+    if (paths.size() != names.size()) {
+        return QStringLiteral("%1 paths, expected %2: %3")
+            .arg(paths.size())
+            .arg(names.size())
+            .arg(paths.join(QStringLiteral(" | ")));
+    }
+    for (qsizetype i = 0; i < paths.size(); ++i) {
+        const QString& p = paths.at(i);
+        const QFileInfo info(p);
+        std::error_code ec;
+        if (!QDir::isAbsolutePath(p) || p != QDir::cleanPath(p) || info.fileName() != names.at(i) ||
+            !std::filesystem::equivalent(fsPath(info.absolutePath()), fsPath(dir), ec) || ec) {
+            return QStringLiteral("%1 is not %2 in %3").arg(p, names.at(i), dir);
+        }
+    }
+    return {};
+}
+
+// A second name `path` of the existing folder `target` while it lives: a symbolic link on POSIX, a junction
+// on Windows (a symbolic link there needs a privilege). Removed (the link only) at the end.
+class FolderLink {
+public:
+    FolderLink(const QString& target, const QString& path) : path_(path) {
+#if defined(Q_OS_WIN)
+        QProcess mklink;
+        mklink.setProgram(qEnvironmentVariable("ComSpec", QStringLiteral("cmd.exe")));
+        mklink.setNativeArguments(QStringLiteral("/c mklink /J \"%1\" \"%2\"")
+                                      .arg(QDir::toNativeSeparators(path), QDir::toNativeSeparators(target)));
+        mklink.start();
+        made_ = mklink.waitForFinished(30000) && mklink.exitStatus() == QProcess::NormalExit &&
+                mklink.exitCode() == 0;
+#else
+        made_ = QFile::link(target, path);
+#endif
+        made_ = made_ && QFileInfo(path).isDir();
+    }
+    ~FolderLink() {
+        if (!made_) {
+            return;
+        }
+#if defined(Q_OS_WIN)
+        QDir().rmdir(path_); // removes the junction, not what it names
+#else
+        QFile::remove(path_);
+#endif
+    }
+    FolderLink(const FolderLink&) = delete;
+    FolderLink& operator=(const FolderLink&) = delete;
+
+    bool made() const { return made_; }
+
+private:
+    QString path_;
+    bool made_ = false;
+};
 
 } // namespace
 
@@ -376,10 +442,27 @@ private Q_SLOTS:
     }
 
     // A second esses hands its files to the running instance (this test) and exits 0 before it builds a
-    // window.
+    // window. Its relative arguments name files of its working directory, however that folder is named: the
+    // forwarded paths are the system's (namesTheFilesIn). Regression (PR #5, the macOS qt-app run of
+    // fe6cf07): a comparison as text failed on macOS, where the temporary folder is under /var, a link to
+    // /private/var; "through a link" starts the launch in a link to the folder on every OS.
+    void secondLaunchHandsItsFilesOver_data() {
+        QTest::addColumn<bool>("linked");
+        QTest::newRow("in the folder") << false;
+        QTest::newRow("through a link") << true;
+    }
     void secondLaunchHandsItsFilesOver() {
+        QFETCH(bool, linked);
         QTemporaryDir dir;
         QVERIFY(dir.isValid());
+        const QString folder = dir.path() + QStringLiteral("/session");
+        QVERIFY(QDir().mkpath(folder));
+        const QString alias = dir.path() + QStringLiteral("/link");
+        std::optional<FolderLink> named;
+        if (linked) {
+            named.emplace(folder, alias);
+            QVERIFY2(named->made(), qPrintable(alias));
+        }
         const QString name = uniqueInstanceName();
         InstanceServer server;
         QVERIFY(server.listen(name));
@@ -389,7 +472,7 @@ private Q_SLOTS:
         QProcess child;
         const QString config = dir.path() + QStringLiteral("/config");
         child.setProcessEnvironment(childEnvironment(config, name));
-        child.setWorkingDirectory(dir.path());
+        child.setWorkingDirectory(linked ? alias : folder);
         child.start(essesExe(),
                     {QStringLiteral("-l"), QStringLiteral("relative.ld"), QStringLiteral("bare one.csv")});
         QVERIFY2(child.waitForStarted(30000), qPrintable(child.errorString()));
@@ -397,9 +480,9 @@ private Q_SLOTS:
         QTRY_VERIFY_WITH_TIMEOUT(child.state() == QProcess::NotRunning, kLong);
         QCOMPARE(child.exitStatus(), QProcess::NormalExit);
         QCOMPARE(child.exitCode(), 0);
-        const QString base = QDir::cleanPath(dir.path());
-        QCOMPARE(got[0].logs, (QStringList{base + QStringLiteral("/relative.ld"),
-                                           base + QStringLiteral("/bare one.csv")}));
+        const QString problem = namesTheFilesIn(
+            got[0].logs, {QStringLiteral("relative.ld"), QStringLiteral("bare one.csv")}, folder);
+        QVERIFY2(problem.isEmpty(), qPrintable(problem));
         QVERIFY(got[0].project.isEmpty());
         QVERIFY(!QFileInfo::exists(config + QStringLiteral("/settings.json"))); // no window, no settings
     }

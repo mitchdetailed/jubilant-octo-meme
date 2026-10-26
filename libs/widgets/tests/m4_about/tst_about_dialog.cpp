@@ -201,6 +201,9 @@ private Q_SLOTS:
         QVERIFY(n.contains(QStringLiteral("Qt Advanced Docking System ") + ads));
         QVERIFY(n.contains(QStringLiteral("GNU LGPL v2.1 or later")));
         QVERIFY(n.contains(QStringLiteral("licenses/LGPL-2.1-or-later.txt")));
+        // The vendored copy has Esses changes (LGPL-2.1 section 2): the notice names their list.
+        QVERIFY(n.contains(QStringLiteral("third_party/qtads/UPSTREAM.md")));
+        QVERIFY(!n.contains(QStringLiteral("unmodified")));
         QVERIFY(n.endsWith(
             QStringLiteral("https://github.com/githubuser0xFFFF/Qt-Advanced-Docking-System/tree/v") + ads));
 #else

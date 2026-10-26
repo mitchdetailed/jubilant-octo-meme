@@ -149,8 +149,10 @@ QString dockLibraryNotice() {
     }
     return QStringLiteral(
                "The dock windows use the Qt Advanced Docking System %1 under the GNU LGPL v2.1 or later "
-               "(licenses/LGPL-2.1-or-later.txt), built unmodified as a separate library that you may "
-               "replace. Source: https://github.com/githubuser0xFFFF/Qt-Advanced-Docking-System/tree/v%1")
+               "(licenses/LGPL-2.1-or-later.txt), built as a separate library that you may replace, from "
+               "third_party/qtads of the source of this build: the upstream release with the changes listed "
+               "in third_party/qtads/UPSTREAM.md. Upstream source: "
+               "https://github.com/githubuser0xFFFF/Qt-Advanced-Docking-System/tree/v%1")
         .arg(ads);
 }
 

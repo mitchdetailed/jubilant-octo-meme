@@ -319,7 +319,7 @@ def self_test_tree(allow: Allowlist) -> bool:
             p = root / rel
             p.parent.mkdir(parents=True, exist_ok=True)
             if isinstance(content, str):
-                p.write_text(content, encoding="utf-8", newline="\n")
+                p.write_bytes(content.encode("utf-8"))
             else:
                 p.write_bytes(content)
         found = set(scan_tree(root, allow))
@@ -373,7 +373,7 @@ def self_test(allowlist_path: pathlib.Path) -> int:
         for rel, content in cases.items():
             p = root / rel
             p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text(content, encoding="utf-8", newline="\n")
+            p.write_bytes(content.encode("utf-8"))
         found = set(scan(root, allow, sorted(cases)))
     ok = found == expected and self_test_tree(allow)
     for item in sorted(expected - found):

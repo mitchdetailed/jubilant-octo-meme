@@ -18,6 +18,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QTest>
 #include <cmath>
 #include <numbers>
 #include <stdexcept>
@@ -84,6 +85,16 @@ int registerGoldenFonts() {
     static const int count =
         qt::SchemeFonts::registerApplicationFonts(repoRoot() / "tests" / "golden" / "fonts");
     return count;
+}
+
+bool showPlaced(QWidget& host, QWidget& component, QSize size) {
+    if (component.parentWidget() != &host) {
+        return false;
+    }
+    host.resize(size);
+    component.setGeometry(QRect(QPoint(0, 0), size));
+    host.show();
+    return QTest::qWaitForWindowExposed(&host);
 }
 
 std::shared_ptr<const units::UnitRegistry> shippedUnits() {

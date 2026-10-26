@@ -152,7 +152,7 @@ def sha256(path: pathlib.Path) -> str:
 
 def write_checksums(out: pathlib.Path, names: list[str], dest: pathlib.Path) -> None:
     lines = [f"{sha256(out / n)}  {n}\n" for n in sorted(names) if (out / n).is_file()]
-    dest.write_text("".join(lines), encoding="utf-8", newline="\n")
+    dest.write_bytes("".join(lines).encode("utf-8"))
 
 
 # ---- running things ----------------------------------------------------------------------------------------------

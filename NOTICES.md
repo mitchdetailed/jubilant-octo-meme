@@ -52,12 +52,15 @@ software under the GNU Lesser General Public License version 2.1 or (at your opt
 licence text is `third_party/qtads/LICENSE` and `LICENSES/LGPL-2.1-or-later.txt` (in the packages:
 `licenses/LGPL-2.1-or-later.txt`). ADS comes with no warranty.
 
-- **Source.** The complete source of the version used is in this repository under `third_party/qtads/`,
-  unmodified, as downloaded from the upstream tag v5.1.1
+- **Source.** The complete source of the version used is in this repository under `third_party/qtads/`: the
+  files of the upstream tag v5.1.1
   (https://github.com/githubuser0xFFFF/Qt-Advanced-Docking-System/archive/refs/tags/v5.1.1.tar.gz, SHA-256
-  `9ce947acbb1984946f9145c976e42e6984f99b98fb414dd7354a290af6d4ff04`; `third_party/README.md`). Upstream:
+  `9ce947acbb1984946f9145c976e42e6984f99b98fb414dd7354a290af6d4ff04`; `third_party/README.md`) with the changes
+  Esses made to them. `third_party/qtads/UPSTREAM.md` lists each change with its date, its reason and its
+  upstream status, and each changed file says so where it was changed (LGPL-2.1 section 2). Upstream:
   https://github.com/githubuser0xFFFF/Qt-Advanced-Docking-System. Each Esses release keeps the same archive as a
-  release asset (08 section 9 item 3); the About dialog links the tag.
+  release asset (08 section 9 item 3), and the release's own source (its tag of this repository) holds the
+  changed files; the About dialog links both.
 - **Linking.** ADS is built from that source as a separate shared library and loaded by `esses` at run time:
   `qtadvanceddocking-qt6.dll` (Windows), `libqtadvanceddocking-qt6.so.5` (Linux),
   `libqtadvanceddocking-qt6.5.dylib` (macOS); Debug builds add a `d` (`qtadvanceddocking-qt6d.dll`). It is

@@ -47,8 +47,9 @@ if not exist "%ESSES_QT_DIR%\bin\Qt6Core.dll" (
 )
 
 rem Remember the CMake on PATH before vcvars (vcvars puts Visual Studio's bundled, older CMake first).
+rem where is Windows's own, by its full path: a bare name is looked up in the current folder and along PATH.
 set "CMAKE_EXE="
-for /f "delims=" %%C in ('where cmake 2^>nul') do if not defined CMAKE_EXE set "CMAKE_EXE=%%C"
+for /f "delims=" %%C in ('^""%SystemRoot%\System32\where.exe" cmake 2^>nul^"') do if not defined CMAKE_EXE set "CMAKE_EXE=%%C"
 if not defined CMAKE_EXE (
   echo build-qt: cmake not found on PATH 1>&2
   exit /b 2
@@ -72,7 +73,7 @@ if not defined VSCMD_VER (
 )
 :have_vs
 rem Ninja: Visual Studio's copy is on PATH after vcvars; fall back to the Qt tools copy.
-where ninja >nul 2>nul || set "PATH=%PATH%;C:\Qt\Tools\Ninja"
+"%SystemRoot%\System32\where.exe" ninja >nul 2>nul || set "PATH=%PATH%;C:\Qt\Tools\Ninja"
 rem Qt DLLs and plugins for the tests and the applications (the plugins are found relative to Qt6Core.dll).
 set "PATH=%ESSES_QT_DIR%\bin;%PATH%"
 set "QT_QPA_PLATFORM=offscreen"

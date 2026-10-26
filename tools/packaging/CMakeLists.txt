@@ -26,7 +26,8 @@
 # AC-M4-09), and the About dialog and `esses --version` give the tag's source URL (about_dialog.cpp, D-212).
 # <build>/packaging/package_info.json tells package.py the version, the layout and the tools of this build.
 # Tests (label packaging): the self-tests of the Python tools here, the icon check, the third-party manifest's
-# consistency with NOTICES.md and third_party/.
+# consistency with NOTICES.md and third_party/, and the portable zip's association scripts (Windows; against a
+# stand-in reg.exe, so the registry is never written).
 
 set(ESSES_RELEASE_TAG "" CACHE STRING
     "Release build: the git tag being built (v<version>); empty for a development build (D-212)")
@@ -222,6 +223,25 @@ if(ESSES_BUILD_TESTS)
              COMMAND "${Python3_EXECUTABLE}" -I "${CMAKE_CURRENT_SOURCE_DIR}/gen_third_party.py" --check
                      --root "${CMAKE_SOURCE_DIR}")
     set_tests_properties(packaging.third_party_consistent PROPERTIES LABELS "packaging;lint" TIMEOUT 120)
+    # The portable zip's associate-ld.cmd and unassociate-ld.cmd under cmd (D-218 (b)): from awkward folder names,
+    # with decoys of reg, find and the like in the current folder and first on PATH, against a stand-in reg.exe
+    # (windows/reg_stub.cpp) in a temporary SystemRoot, so nothing reaches the registry. Windows only; elsewhere the
+    # entry reports a skip.
+    set(_pkg_script_test_args "")
+    if(WIN32)
+      add_executable(${ESSES_PREFIX}_reg_stub windows/reg_stub.cpp)
+      esses_apply_warnings(${ESSES_PREFIX}_reg_stub)
+      if(MINGW)
+        target_link_options(${ESSES_PREFIX}_reg_stub PRIVATE -municode) # wmain; MSVC picks it by itself
+      endif()
+      set_target_properties(${ESSES_PREFIX}_reg_stub PROPERTIES FOLDER "tests")
+      set(_pkg_script_test_args --reg-stub "$<TARGET_FILE:${ESSES_PREFIX}_reg_stub>")
+    endif()
+    add_test(NAME packaging.association_scripts
+             COMMAND "${Python3_EXECUTABLE}" -I "${CMAKE_CURRENT_SOURCE_DIR}/smoke.py" --script-test
+                     ${_pkg_script_test_args})
+    set_tests_properties(packaging.association_scripts PROPERTIES LABELS "packaging;lint" TIMEOUT 300
+                         SKIP_RETURN_CODE 77)
   else()
     message(STATUS "packaging: no Python 3, the packaging self-tests are not registered")
   endif()

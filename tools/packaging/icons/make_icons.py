@@ -317,7 +317,7 @@ def write(folder: pathlib.Path) -> None:
         (folder / f"esses-{n}.png").write_bytes(png_bytes(n, images[n]))
     (folder / "esses.ico").write_bytes(ico_bytes(images))
     (folder / "esses.icns").write_bytes(icns_bytes(images))
-    (folder / "esses.svg").write_text(svg_text(), encoding="utf-8", newline="\n")
+    (folder / "esses.svg").write_bytes(svg_text().encode("utf-8"))
 
 
 def _close(a: bytes, b: bytes) -> bool:

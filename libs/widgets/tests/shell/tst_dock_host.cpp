@@ -48,6 +48,7 @@
 #include <AutoHideSideBar.h>
 #include <AutoHideTab.h>
 #include <DockAreaWidget.h>
+#include <DockFocusController.h>
 #include <DockManager.h>
 #include <DockWidget.h>
 #include <DockWidgetTab.h>
@@ -637,6 +638,114 @@ private Q_SLOTS:
         QCOMPARE(s.docks->state(kMessages), DockState::Docked);
         QVERIFY(s.shown(kMessages));
         QVERIFY(!p->hasAutoHideButton(kMessages));
+    }
+
+    // ADS with the shell's configuration (FocusHighlighting off: ads_backend.cpp) has no dock focus
+    // controller, and every way a dock is pinned to a side bar works without one: at registration (Messages),
+    // by DockHost::setState, by the dock area's own pin button and by restoring a perspective in a fresh
+    // window. ADS 5.1.1's CAutoHideSideBar::insertDockWidget, which every one of them goes through, called
+    // clearDockWidgetFocus() on that null controller (undefined behaviour; the UBSan soak aborted on it). The
+    // vendored copy checks the controller first (third_party/qtads/UPSTREAM.md). The call's only visible
+    // trace was the "focused" property it set on the dock and on its tab, so no dock may carry one here.
+    void autoHideWithoutAdsFocusController() {
+        QFETCH_GLOBAL(QString, backend);
+        if (backend != QStringLiteral("ads")) {
+            QSKIP("the ADS backend only");
+        }
+#if ESSES_HAVE_ADS
+        QVERIFY(!ads::CDockManager::testConfigFlag(ads::CDockManager::FocusHighlighting));
+        const auto adsDock = [](const Shell& sh, const QString& id) {
+            return qobject_cast<ads::CDockWidget*>(sh.docks->backend().container(id));
+        };
+        // Neither the dock nor its tab carries the focus-style property of ADS's focus controller.
+        const auto untouched = [&adsDock](const Shell& sh, const QString& id) {
+            ads::CDockWidget* d = adsDock(sh, id);
+            return d != nullptr && !d->property("focused").isValid() && d->tabWidget() != nullptr &&
+                   !d->tabWidget()->property("focused").isValid();
+        };
+        QByteArray perspective;
+        {
+            Shell s(backend);
+            QVERIFY(s.show());
+            auto* manager =
+                qobject_cast<ads::CDockManager*>(static_cast<AdsBackend&>(s.docks->backend()).dockManager());
+            QVERIFY(manager != nullptr);
+            // No focus controller (CDockManager::dockFocusController() is protected; ADS creates the
+            // controller as a child of its manager).
+            QVERIFY(manager->findChild<ads::CDockFocusController*>() == nullptr);
+            const std::unique_ptr<Probe> p = probeFor(s);
+
+            // Registered AutoHide.
+            QCOMPARE(s.docks->state(kMessages), DockState::AutoHide);
+            QVERIFY(p->hasAutoHideButton(kMessages));
+            QVERIFY(untouched(s, kMessages));
+
+            // Pinned by DockHost.
+            s.docks->setState(kData, DockState::AutoHide);
+            settle();
+            QCOMPARE(s.docks->state(kData), DockState::AutoHide);
+            QCOMPARE(p->autoHideButtonSide(kData), std::optional<DockArea>(DockArea::Left));
+            QVERIFY(untouched(s, kData));
+
+            // Pinned with the pin button of its dock area (the area holds only Values).
+            ads::CDockWidget* values = adsDock(s, kValues);
+            QVERIFY(values != nullptr && values->dockAreaWidget() != nullptr);
+            QCOMPARE(values->dockAreaWidget()->dockWidgetsCount(), 1);
+            QAbstractButton* pin = values->dockAreaWidget()->titleBarButton(ads::TitleBarButtonAutoHide);
+            QVERIFY(pin != nullptr);
+            pin->click();
+            QTRY_COMPARE(s.docks->state(kValues), DockState::AutoHide);
+            QCOMPARE(p->autoHideButtonSide(kValues), std::optional<DockArea>(DockArea::Right));
+            QVERIFY(untouched(s, kValues));
+
+            // The pinned dock flies out by command and collapses when the focus leaves it.
+            s.docks->focus(kValues);
+            QVERIFY(s.docks->backend().isFlownOut(kValues));
+            QVERIFY(s.shown(kValues));
+            QTRY_COMPARE(s.docks->focusedDockId(), kValues);
+            s.central->setFocus(Qt::OtherFocusReason);
+            QTRY_VERIFY(!s.docks->backend().isFlownOut(kValues));
+            QCOMPARE(s.docks->state(kValues), DockState::AutoHide);
+            perspective = s.docks->savePerspective();
+            QVERIFY(!perspective.isEmpty());
+        }
+
+        // Restored in a fresh window, where Data and Values start docked: ADS pins them from the saved state.
+        Shell t(backend);
+        QVERIFY(t.show());
+        QCOMPARE(t.docks->state(kValues), DockState::Docked);
+        QVERIFY(t.docks->restorePerspective(perspective));
+        settle();
+        for (const QString& id : {kData, kValues, kMessages}) {
+            QCOMPARE(t.docks->state(id), DockState::AutoHide);
+            QVERIFY2(untouched(t, id), qPrintable(id));
+        }
+        QCOMPARE(t.docks->state(kChannels), DockState::Docked);
+        // Unpinned again.
+        t.docks->setState(kValues, DockState::Docked);
+        settle();
+        QCOMPARE(t.docks->state(kValues), DockState::Docked);
+        QVERIFY(t.shown(kValues));
+#endif
+    }
+
+    // The window is destroyed with the focus inside a dock (docked, floating, flown out) while its DockHost,
+    // a child of the window as here, outlives the dock manager: the content a dock deletes moves the focus,
+    // and the focus handlers ask the backend about its docks while that dock is being destroyed. No dock may
+    // be read as its own type then (AdsBackend held them in QPointer<ads::CDockWidget>, whose read is a
+    // static_cast), nor the manager by its own container (ADS's ~CDockContainerWidget, UPSTREAM.md change
+    // 2): undefined behaviour that only UBSan reports. (MainWindow deletes its DockHost before its docks.)
+    void teardownWithTheFocusInADock() {
+        QFETCH_GLOBAL(QString, backend);
+        for (const DockState state : {DockState::Docked, DockState::Floating, DockState::AutoHide}) {
+            auto s = std::make_unique<Shell>(backend);
+            QVERIFY(s->show());
+            s->docks->setState(kValues, state);
+            s->docks->focus(kValues);
+            QTRY_COMPARE(s->docks->focusedDockId(), kValues);
+            s.reset();
+            QVERIFY(QApplication::focusWidget() == nullptr);
+        }
     }
 
     void toggleAndCloseButton() {

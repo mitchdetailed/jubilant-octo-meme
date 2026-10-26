@@ -22,7 +22,10 @@ Commands:
         installer's runtime check), and its uninstall leaves a .ld association another program owns
   windows-portable --zip <portable.zip>     unzip into a folder whose name holds & and %, settings beside the
         program, nothing written under %APPDATA%\\esses (compared file by file when the folder exists already;
-        D-217), associate-ld.cmd and unassociate-ld.cmd (--no-registry leaves them out, on a developer's machine)
+        D-217), associate-ld.cmd and unassociate-ld.cmd for real (HKCU), with decoys of reg, find and the like in
+        their folder and first on PATH, and .ld kept by a program that took it (D-218 (b); --no-registry leaves
+        them out, on a developer's machine); a failure prints the script's exit code and output and the registry
+        values read
   appimage --appimage <file>                --version and an offscreen start (APPIMAGE_EXTRACT_AND_RUN), the
         extracted tree
   dmg --dmg <file> [--macos-minimum <x.y>]  mounted read-only (hdiutil), the bundle, the programs, Info.plist: the
@@ -31,15 +34,21 @@ Commands:
         imports; D-217)
   cli --archive <zip or tar.gz>             the standalone esses-cli
 Common: --version <version> [--tag <vX.Y.Z>] [--fixture <a log file>]. --self-test checks the checks.
-Standard library only. Exit status: 0 passed, 1 a check failed, 2 usage error.
+--script-test --reg-stub <esses_reg_stub.exe> [--scripts <folder>] (ctest packaging.association_scripts, Windows;
+        elsewhere exit 77, skipped): associate-ld.cmd and unassociate-ld.cmd from awkward folder names, against the
+        stand-in reg.exe (windows/reg_stub.cpp) as %SystemRoot%\\System32\\reg.exe of a temporary SystemRoot, with
+        decoys in their folder and first on PATH; the registry is never touched (D-218 (b)).
+Standard library only. Exit status: 0 passed, 1 a check failed, 2 usage error, 77 skipped (--script-test).
 """
 from __future__ import annotations
 
 import argparse
+import itertools
 import os
 import pathlib
 import plistlib
 import re
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -213,6 +222,20 @@ def reg_get(root, path: str, name: str = "") -> str | None:
         return None
 
 
+def reg_describe(root, path: str, name: str = "") -> str:
+    """A registry value for a report: its data and type, "no value" or "no key"."""
+    import winreg
+    try:
+        with winreg.OpenKey(root, path, 0, winreg.KEY_READ | winreg.KEY_WOW64_64KEY) as key:
+            try:
+                data, kind = winreg.QueryValueEx(key, name)
+            except OSError:
+                return "no value"
+            return f"{data!r} (type {kind})"
+    except OSError:
+        return "no key"
+
+
 def wait_gone(path: pathlib.Path, seconds: float) -> bool:
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
@@ -361,8 +384,325 @@ def runtime_test(report: Report, args) -> None:
             reg_set_default(winreg.HKEY_CURRENT_USER, ld_key, previous)
 
 
-def windows_portable(report: Report, args) -> None:
+# ---- Windows: the portable zip's association scripts (D-218 (b)) --------------------------------------------------
+
+LD_KEY = r"Software\Classes\.ld"
+OPEN_WITH_KEY = r"Software\Classes\.ld\OpenWithProgids"
+PROGID = "Esses.LogFile"
+PROGID_KEY = r"Software\Classes\Esses.LogFile"
+COMMAND_KEY = r"Software\Classes\Esses.LogFile\shell\open\command"
+# Programs of Windows that a script could call by a bare name, which cmd looks up in the current folder and then
+# along PATH before it reaches System32 (Git for Windows' usr\bin has find, sort and timeout of its own).
+DECOY_NAMES = ("reg", "find", "findstr", "sort", "more", "where", "timeout", "choice", "icacls")
+
+
+def windows_program(name: str) -> str:
+    """One of Windows's programs by its full path (%SystemRoot%\\System32), never looked up along PATH."""
+    return os.path.join(os.environ.get("SYSTEMROOT", r"C:\Windows"), "System32", name)
+
+
+def plant_decoys(here: pathlib.Path, path_first: pathlib.Path) -> None:
+    """A decoy of each of DECOY_NAMES in the folder a script runs in and in a folder that goes first on PATH: each
+    one records that it ran in the file ESSES_DECOY_LOG names and fails. A script that takes Windows's programs from
+    System32 by their full path never starts one."""
+    for folder, where in ((here, "the current folder"), (path_first, "the first folder on PATH")):
+        folder.mkdir(parents=True, exist_ok=True)
+        for name in DECOY_NAMES:
+            (folder / f"{name}.bat").write_bytes(
+                f'@>>"%ESSES_DECOY_LOG%" echo {name}.bat from {where}\r\n@exit /b 1\r\n'.encode("ascii"))
+
+
+def script_env(path_first: pathlib.Path, decoy_log: pathlib.Path,
+               extra: dict[str, str] | None = None) -> dict[str, str]:
+    """The environment of an association script under test: the decoys first on PATH and, as cmd searches by default,
+    the current folder before PATH (NoDefaultCurrentDirectoryInExePath removed)."""
+    env = {k: v for k, v in os.environ.items() if k.upper() != "NODEFAULTCURRENTDIRECTORYINEXEPATH"}
+    env["PATH"] = str(path_first) + os.pathsep + env.get("PATH", "")
+    env["ESSES_DECOY_LOG"] = str(decoy_log)
+    env.update(extra or {})
+    return env
+
+
+def run_script(script: pathlib.Path, env: dict[str, str]) -> subprocess.CompletedProcess:
+    """As Explorer runs a script (cmd /c ""<path>""; quoted whole, whatever the folder's name), in its folder."""
+    return subprocess.run(f'"{windows_program("cmd.exe")}" /d /c ""{script}""', cwd=script.parent, env=env,
+                          capture_output=True, timeout=60)
+
+
+def script_output(r: subprocess.CompletedProcess) -> str:
+    def text(b: bytes) -> str:
+        return b.decode("oem" if os.name == "nt" else "latin-1", errors="replace").strip()
+    return f"exit code {r.returncode}, stdout {text(r.stdout)!r}, stderr {text(r.stderr)!r}"
+
+
+def decoys_started(decoy_log: pathlib.Path) -> list[str]:
+    try:
+        return [line.strip() for line in decoy_log.read_text(encoding="ascii", errors="replace").splitlines()
+                if line.strip()]
+    except OSError:
+        return []
+
+
+def association_state() -> list[str]:
+    """What the association scripts read and write under HKCU, for a failure's report."""
     import winreg
+    hkcu = winreg.HKEY_CURRENT_USER
+    return [f"HKCU\\{LD_KEY} (default): {reg_describe(hkcu, LD_KEY)}",
+            f"HKCU\\{OPEN_WITH_KEY} {PROGID}: {reg_describe(hkcu, OPEN_WITH_KEY, PROGID)}",
+            f"HKCU\\{PROGID_KEY} (default): {reg_describe(hkcu, PROGID_KEY)}",
+            f"HKCU\\{COMMAND_KEY} (default): {reg_describe(hkcu, COMMAND_KEY)}"]
+
+
+def portable_associations(report: Report, root: pathlib.Path, exe: pathlib.Path, work: pathlib.Path) -> None:
+    """associate-ld.cmd and unassociate-ld.cmd for real (HKCU) as Explorer runs them, with decoys of reg, find and
+    the other programs of DECOY_NAMES in the folder and first on PATH (D-218 (b): a GNU find first on PATH kept .ld
+    associated). A failed check prints what the script printed, its exit code, the registry values read and the
+    decoys that ran. .ld's default is put back as it was."""
+    import winreg
+    hkcu = winreg.HKEY_CURRENT_USER
+    decoy_log = work / "decoys.log"
+    plant_decoys(root, work / "decoys")
+    env = script_env(work / "decoys", decoy_log)
+    previous = reg_get(hkcu, LD_KEY)
+
+    def has_open_with() -> bool:
+        return reg_describe(hkcu, OPEN_WITH_KEY, PROGID) not in ("no key", "no value")
+
+    def step(script: str, expect, what: str) -> None:
+        r = run_script(root / script, env)
+        if not report.check(r.returncode == 0 and expect(), what):
+            print(f"        {script}: {script_output(r)}", flush=True)
+            for line in association_state():
+                print(f"        {line}", flush=True)
+            for line in decoys_started(decoy_log):
+                print(f"        decoy started: {line}", flush=True)
+
+    def associated() -> bool:
+        return (reg_get(hkcu, LD_KEY) == PROGID and has_open_with()
+                and reg_get(hkcu, COMMAND_KEY) == f'"{exe}" -l "%1"')
+
+    try:
+        step("associate-ld.cmd", associated, "associate-ld.cmd associates .ld with this esses.exe (ProgId, open "
+             "command of the whole path, OpenWithProgids, .ld's default)")
+        # Another program took .ld meanwhile: it keeps it, and the rest of Esses's association goes (D-218 (b)).
+        reg_set_default(hkcu, LD_KEY, OTHER_OWNER)
+        step("unassociate-ld.cmd",
+             lambda: reg_get(hkcu, LD_KEY) == OTHER_OWNER and reg_get(hkcu, COMMAND_KEY) is None
+             and not has_open_with(),
+             "unassociate-ld.cmd leaves .ld with the program that took it and removes the rest")
+        step("associate-ld.cmd", associated, "associate-ld.cmd associates .ld again")
+        step("unassociate-ld.cmd",
+             lambda: reg_get(hkcu, LD_KEY) is None and reg_get(hkcu, COMMAND_KEY) is None and not has_open_with(),
+             "unassociate-ld.cmd removes it (.ld's default, OpenWithProgids, the ProgId)")
+        started = decoys_started(decoy_log)
+        report.check(not started, "the scripts take reg from System32, never a program of that name from their "
+                                  "folder or PATH" + (f" (started: {'; '.join(started)})" if started else ""))
+    finally:
+        reg_set_default(hkcu, LD_KEY, previous)
+
+
+def portable_associations_self_test() -> bool:
+    """portable_associations() over a registry held in a dict, with Python stand-ins for the two scripts that act
+    out their effects on it: no script runs and nothing reaches the registry, so it passes with any version of the
+    scripts (they are --script-test's). It passes stand-ins that do the scripts' job, and fails one that acts out
+    fe6cf07's unassociate-ld.cmd under a GNU find first on PATH (.ld's default left, the decoy find started),
+    printing the registry values it read."""
+    import contextlib
+    import io
+    store: dict[tuple[str, str], str] = {}
+
+    def fake_get(root, path: str, name: str = "") -> str | None:
+        return store.get((path.lower(), name))
+
+    def fake_describe(root, path: str, name: str = "") -> str:
+        if (path.lower(), name) in store:
+            return f"{store[(path.lower(), name)]!r} (type 1)"
+        return "no value" if any(k[0] == path.lower() for k in store) else "no key"
+
+    def fake_set_default(root, path: str, value: str | None) -> None:
+        if value is None:
+            store.pop((path.lower(), ""), None)
+        else:
+            store[(path.lower(), "")] = value
+
+    def scripts(keep_default: bool):
+        def run(script: pathlib.Path, env: dict[str, str]) -> subprocess.CompletedProcess:
+            if script.name == "associate-ld.cmd":
+                store.update({(PROGID_KEY.lower(), ""): "Esses log file", (OPEN_WITH_KEY.lower(), PROGID): "",
+                              (COMMAND_KEY.lower(), ""): f'"{script.parent / "esses.exe"}" -l "%1"',
+                              (LD_KEY.lower(), ""): PROGID})
+                return subprocess.CompletedProcess([], 0, b".ld files now open with ...\r\n", b"")
+            if keep_default:  # `find` is GNU find: "find: 'Esses.LogFile': No such file or directory"
+                with open(env["ESSES_DECOY_LOG"], "a", encoding="ascii") as f:
+                    f.write("find.bat from the first folder on PATH\n")
+            elif store.get((LD_KEY.lower(), "")) == PROGID:
+                del store[(LD_KEY.lower(), "")]
+            store.pop((OPEN_WITH_KEY.lower(), PROGID), None)
+            for key in [k for k in store if k[0].startswith(PROGID_KEY.lower())]:
+                del store[key]
+            return subprocess.CompletedProcess([], 0, b"the .ld association of Esses is removed\r\n", b"")
+        return run
+
+    ok = True
+    saved = {n: globals()[n] for n in ("reg_get", "reg_describe", "reg_set_default", "run_script")}
+    try:
+        globals().update(reg_get=fake_get, reg_describe=fake_describe, reg_set_default=fake_set_default)
+        for keep_default in (False, True):
+            store.clear()
+            globals()["run_script"] = scripts(keep_default)
+            report = Report()
+            out = io.StringIO()
+            with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stdout(out):
+                root = pathlib.Path(tmp) / "R&D 100% tools" / "esses-portable"
+                root.mkdir(parents=True)
+                portable_associations(report, root, root / "esses.exe", pathlib.Path(tmp))
+            text = out.getvalue()
+            if not keep_default:
+                ok &= report.problems == [] and store == {}
+            else:
+                ok &= len(report.problems) == 2 and report.problems[0].startswith("unassociate-ld.cmd removes it")
+                ok &= f"HKCU\\{LD_KEY} (default): 'Esses.LogFile' (type 1)" in text and "exit code 0" in text
+                ok &= "decoy started: find.bat from the first folder on PATH" in text and store == {}
+            if not ok:
+                print(f"self-test: portable_associations (keep_default={keep_default}): {report.problems}\n{text}")
+    finally:
+        globals().update(saved)
+    return ok
+
+
+def stub_query_listing(data: str | None, name: str = "(Default)") -> bytes | None:
+    """What `reg query HKCU\\Software\\Classes\\.ld /ve` prints for a REG_SZ default value (None: no output, the key
+    is absent). The default value's name is in the language of Windows: "(Default)", "(Standard)", a French
+    one with a space in it."""
+    if data is None:
+        return None
+    return f"\r\nHKEY_CURRENT_USER\\{LD_KEY}\r\n    {name}    REG_SZ    {data}\r\n\r\n".encode("cp850")
+
+
+def association_script_problems(reg_stub: pathlib.Path, scripts: pathlib.Path) -> list[str]:
+    """associate-ld.cmd and unassociate-ld.cmd under cmd, as Explorer runs them, from awkward folder names, against
+    reg_stub (windows/reg_stub.cpp) as <a temporary SystemRoot>\\System32\\reg.exe, so nothing reaches the registry,
+    and with decoys of reg, find and the rest of DECOY_NAMES in the script's folder and first on PATH (D-218 (b)):
+    what is wrong with the reg commands each one runs."""
+    import json
+    problems: list[str] = []
+    with tempfile.TemporaryDirectory() as tmp:
+        t = pathlib.Path(tmp).resolve()
+        system_root = t / "SystemRoot"
+        (system_root / "System32").mkdir(parents=True)
+        reg = system_root / "System32" / "reg.exe"
+        shutil.copy2(reg_stub, reg)
+        empty_root = t / "NoReg"
+        (empty_root / "System32").mkdir(parents=True)
+        decoy_log = t / "decoys.log"
+        reg_log = t / "reg.log"
+        query = t / "query.txt"
+        counter = itertools.count()
+
+        def run(folder: pathlib.Path, script: str, listing: bytes | None = None, fail: str = "",
+                root: pathlib.Path = system_root) -> tuple[subprocess.CompletedProcess, list[list[str]]]:
+            for f in (reg_log, query):
+                f.unlink(missing_ok=True)
+            if listing is not None:
+                query.write_bytes(listing)
+            env = script_env(t / "decoys", decoy_log, {"SYSTEMROOT": str(root), "ESSES_REG_STUB_LOG": str(reg_log),
+                                                       "ESSES_REG_STUB_QUERY": str(query)})
+            env.pop("ESSES_REG_STUB_FAIL", None)
+            if fail:
+                env["ESSES_REG_STUB_FAIL"] = fail
+            r = run_script(folder / script, env)
+            calls = [json.loads(line) for line in reg_log.read_text(encoding="utf-8").splitlines()] \
+                if reg_log.exists() else []
+            for call in calls:
+                if not os.path.samefile(call[0], reg):
+                    problems.append(f"{script} in '{folder.name}' ran {call[0]}, not %SystemRoot%\\System32\\reg.exe")
+            return r, [call[1:] for call in calls]
+
+        def folder_named(name: str) -> pathlib.Path:
+            folder = t / f"{next(counter)}" / name
+            folder.mkdir(parents=True)
+            (folder / "esses.exe").write_bytes(b"MZ")
+            for s in ("associate-ld.cmd", "unassociate-ld.cmd"):
+                shutil.copy2(scripts / s, folder / s)
+            plant_decoys(folder, t / "decoys")
+            return folder
+
+        def expect(what: str, r: subprocess.CompletedProcess, ok: bool) -> None:
+            if not ok:
+                problems.append(f"{what}: {script_output(r)}")
+
+        ours = [["delete", f"HKCU\\{OPEN_WITH_KEY}", "/v", PROGID, "/f"], ["delete", f"HKCU\\{PROGID_KEY}", "/f"]]
+        query_call = ["query", f"HKCU\\{LD_KEY}", "/ve"]
+        drop_default = ["delete", f"HKCU\\{LD_KEY}", "/ve", "/f"]
+        # "50% of 100%": a pair of % that names no variable (a defined one, as in "%PATH%", is expanded by the cmd /c
+        # that starts any script, Explorer's included, before the script runs).
+        for name in ("Esses portable", "R&D 100% tools!", "R&D 100% (tools)", "a^b (c) !d", "50% of 100%",
+                     "Donn\u00e9es \u00fc"):
+            folder = folder_named(name)
+            exe = str(folder / "esses.exe")
+            r, calls = run(folder, "associate-ld.cmd")
+            wanted = [["add", f"HKCU\\{PROGID_KEY}", "/ve", "/d", "Esses log file", "/f"],
+                      ["add", f"HKCU\\{PROGID_KEY}\\DefaultIcon", "/ve", "/d", f'"{exe}",0', "/f"],
+                      ["add", f"HKCU\\{COMMAND_KEY}", "/ve", "/d", f'"{exe}" -l "%1"', "/f"],
+                      ["add", f"HKCU\\{OPEN_WITH_KEY}", "/v", PROGID, "/t", "REG_NONE", "/f"],
+                      ["add", f"HKCU\\{LD_KEY}", "/ve", "/d", PROGID, "/f"]]
+            expect(f"associate-ld.cmd from '{name}'", r, r.returncode == 0 and not r.stderr.strip())
+            if calls != wanted:
+                problems.append(f"associate-ld.cmd from '{name}' ran reg {calls} instead of {wanted}")
+            r, calls = run(folder, "unassociate-ld.cmd", stub_query_listing(PROGID))
+            expect(f"unassociate-ld.cmd from '{name}'", r, r.returncode == 0 and not r.stderr.strip())
+            if calls != [query_call, drop_default] + ours:
+                problems.append(f"unassociate-ld.cmd from '{name}' ran reg {calls}")
+        folder = folder_named("R&D 100% tools!")
+        # .ld's default is removed only while it is exactly Esses.LogFile, in any language of Windows.
+        for listing, owned in ((stub_query_listing(PROGID, "(Standard)"), True),
+                               (stub_query_listing(PROGID, "(par d\u00e9faut)"), True),
+                               (stub_query_listing("Other.Program"), False),
+                               (stub_query_listing("Esses.LogFileOld"), False),  # `find` took these two for Esses's
+                               (stub_query_listing("MyEsses.LogFile"), False),
+                               (stub_query_listing("Esses.LogFile!"), False),  # a lost ! would make it Esses's
+                               (stub_query_listing('A&B|C<D>E^F%PATH%"G'), False),
+                               (stub_query_listing("(value not set)"), False),
+                               (None, False)):
+            r, calls = run(folder, "unassociate-ld.cmd", listing)
+            what = f"unassociate-ld.cmd over {listing!r}"
+            expect(what, r, r.returncode == 0 and not r.stderr.strip())
+            if calls != [query_call] + ([drop_default] if owned else []) + ours:
+                problems.append(f"{what} ran reg {calls}")
+        # Failures: reported, with the exit code.
+        r, calls = run(folder, "unassociate-ld.cmd", stub_query_listing(PROGID), fail="delete")
+        expect("unassociate-ld.cmd when the removal of .ld's default fails", r,
+               r.returncode == 1 and b"could not be removed" in r.stderr and calls == [query_call, drop_default] + ours)
+        r, calls = run(folder, "associate-ld.cmd", fail="add")
+        expect("associate-ld.cmd when reg add fails", r, r.returncode == 1 and len(calls) == 1)
+        (folder / "esses.exe").unlink()
+        r, calls = run(folder, "associate-ld.cmd")
+        expect("associate-ld.cmd without esses.exe beside it", r, r.returncode == 1 and b"esses.exe" in r.stderr
+               and not calls)
+        for script in ("associate-ld.cmd", "unassociate-ld.cmd"):
+            r, calls = run(folder, script, stub_query_listing(PROGID), root=empty_root)
+            expect(f"{script} where System32 has no reg.exe", r, r.returncode == 1 and b"reg.exe" in r.stderr
+                   and not calls)
+        problems += [f"a decoy ran: {line}" for line in decoys_started(decoy_log)]
+    return problems
+
+
+def script_test(args) -> int:
+    """ctest packaging.association_scripts: association_script_problems() with the build's stand-in reg.exe."""
+    if os.name != "nt":
+        print("skipped: associate-ld.cmd and unassociate-ld.cmd are Windows cmd scripts (they run on Windows only)")
+        return 77
+    if args.reg_stub is None:
+        print("skipped: --script-test needs --reg-stub <the build's esses_reg_stub.exe> (ctest passes it)")
+        return 77
+    problems = association_script_problems(args.reg_stub.resolve(), (args.scripts or HERE / "windows").resolve())
+    for problem in problems:
+        print(f"script-test: {problem}")
+    print("smoke script-test: " + ("passed" if not problems else f"FAILED ({len(problems)} problem(s))"))
+    return 1 if problems else 0
+
+
+def windows_portable(report: Report, args) -> None:
     appdata = appdata_settings().parent
     before = folder_snapshot(appdata)  # compared file by file afterwards, also when the folder exists (D-217)
     with tempfile.TemporaryDirectory() as tmp:
@@ -387,17 +727,10 @@ def windows_portable(report: Report, args) -> None:
                      (f" ({'; '.join(changes[:5])})" if changes else
                       "" if before is None else f" (compared with the {len(before)} file(s) there before)"))
         if args.no_registry:
-            print("skipped  the association scripts (--no-registry: this machine's associations stay as they are)")
+            print("skipped  the association scripts (--no-registry: this machine's associations stay as they are; "
+                  "ctest packaging.association_scripts runs them against a stand-in reg.exe)")
             return
-        # As Explorer runs a script (cmd /c ""<path>""): quoted whole, whatever the folder's name.
-        r = subprocess.run(f'cmd /d /c ""{root / "associate-ld.cmd"}""', capture_output=True, text=True, timeout=60)
-        command = reg_get(winreg.HKEY_CURRENT_USER, r"Software\Classes\Esses.LogFile\shell\open\command")
-        report.check(r.returncode == 0 and command == f'"{exe}" -l "%1"',
-                     f"associate-ld.cmd associates .ld with this esses.exe (got {command})")
-        subprocess.run(f'cmd /d /c ""{root / "unassociate-ld.cmd"}""', capture_output=True, text=True, timeout=60)
-        report.check(reg_get(winreg.HKEY_CURRENT_USER, r"Software\Classes\Esses.LogFile\shell\open\command") is None
-                     and reg_get(winreg.HKEY_CURRENT_USER, r"Software\Classes\.ld") != "Esses.LogFile",
-                     "unassociate-ld.cmd removes it")
+        portable_associations(report, root, exe, pathlib.Path(tmp))
 
 
 # ---- Linux and macOS -----------------------------------------------------------------------------------------------
@@ -487,41 +820,12 @@ def cli_archive(report: Report, args) -> None:
 
 # ---- driver -------------------------------------------------------------------------------------------------------
 
-def association_script_problems(script: pathlib.Path, folder_name: str) -> list[str]:
-    """associate-ld.cmd run from a folder named `folder_name`, as Explorer runs it (cmd /c ""<path>""), with every
-    `reg add` turned into an echo (nothing reaches the registry): what is wrong with the commands it would run
-    (D-217: a folder name with & or % split them)."""
-    problems: list[str] = []
-    with tempfile.TemporaryDirectory() as tmp:
-        folder = pathlib.Path(tmp) / folder_name
-        folder.mkdir()
-        (folder / "esses.exe").write_bytes(b"MZ")
-        text = script.read_text(encoding="utf-8").replace("reg add ", "echo REG-ADD ").replace(" >nul ||", " ||")
-        copy = folder / "associate-ld-echo.cmd"
-        copy.write_text(text, encoding="utf-8", newline="\r\n")
-        r = subprocess.run(f'cmd /d /c ""{copy}""', capture_output=True, text=True, timeout=60)
-        exe = str(folder / "esses.exe")
-        lines = [line for line in r.stdout.splitlines() if line.startswith("REG-ADD ")]
-        if r.returncode != 0 or r.stderr.strip():
-            problems.append(f"exit {r.returncode}, stderr '{r.stderr.strip()[:200]}'")
-        if len(lines) != 5:
-            problems.append(f"{len(lines)} reg commands instead of 5")
-        if not any(f'\\"{exe}\\",0' in line for line in lines):
-            problems.append(f"no DefaultIcon of the whole path ({lines[1:2]})")
-        if not any(f'\\"{exe}\\" -l \\"%1\\"' in line for line in lines):
-            problems.append(f"no open command of the whole path ({lines[2:3]})")
-    return problems
-
-
 def self_test() -> int:
+    # The association scripts themselves, from awkward folder names (D-217), are --script-test's (ctest
+    # packaging.association_scripts), which needs the build's stand-in reg.exe.
     ok = True
-    if os.name == "nt":  # the portable zip's association script, from awkward folder names (D-217)
-        script = HERE / "windows" / "associate-ld.cmd"
-        for name in ("Esses portable", "R&D 100% (tools)", "a^b (c) !d"):
-            problems = association_script_problems(script, name)
-            for problem in problems:
-                print(f"self-test: associate-ld.cmd from '{name}': {problem}")
-            ok &= not problems
+    if os.name == "nt":  # windows-portable's checks of the scripts' work and its report of a failure (D-218 (b))
+        ok &= portable_associations_self_test()
     good = ("esses 0.1.0\ncommit: 56d8065\nQt: 6.12.0 (built with 6.12.0)\nbuild date: 2026-10-19\n"
             "dock library: ADS 5.1.1\nsource: https://github.com/mitchdetailed/jubilant-octo-meme/tree/v0.1.0\n")
     ok &= version_problems(good, "0.1.0", "v0.1.0") == []
@@ -615,11 +919,19 @@ def main() -> int:
     parser.add_argument("--no-registry", action="store_true",
                         help="windows-portable: leave the association scripts out (a developer's machine)")
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--script-test", action="store_true",
+                        help="the portable zip's association scripts against a stand-in reg.exe (Windows; exit 77: "
+                             "skipped)")
+    parser.add_argument("--reg-stub", type=pathlib.Path, help="--script-test: the build's esses_reg_stub.exe")
+    parser.add_argument("--scripts", type=pathlib.Path,
+                        help="--script-test: the folder of the scripts (default: tools/packaging/windows)")
     args = parser.parse_args()
     if args.self_test:
         return self_test()
+    if args.script_test:
+        return script_test(args)
     if not args.command or not args.version:
-        parser.error("a command and --version are needed (or --self-test)")
+        parser.error("a command and --version are needed (or --self-test, --script-test)")
     needed = {"windows-installer": "installer", "windows-portable": "zip", "appimage": "appimage", "dmg": "dmg",
               "cli": "archive"}[args.command]
     if getattr(args, needed) is None:

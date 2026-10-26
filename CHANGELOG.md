@@ -225,6 +225,30 @@ All notable changes are recorded here, newest first. The project follows semanti
   closing during its prompts; one `ld.source_changed` per source in its DecodeLog. Deferred: the macOS strips at
   DPR 1.5 and 2, crisp 2 px lines at DPR 2 (the maintainer decides), same-size same-mtime replacements, Qt's bundled
   notices (`docs/milestones/M4.md` §10 items 51-54).
+- PR #5's second CI run (D-218): fixes for the failures of fe6cf07's CI runs, the soak's first run among them.
+  **Reference decoder:** `tools/ld_ref_decode.py` decodes every channel code on Python 3.8 and later. Before 3.12,
+  `memoryview.cast` refuses half floats, and the qt-app and package jobs run Python 3.11. The decoder now falls back to
+  `struct` there, and its float statistics no longer depend on the interpreter (`float_sum`, 3.12's compensated sum).
+  New ctest `formats_ld.oracle_self_test`. The other Python tools no longer use `write_text(newline=)` (3.10) or a
+  subscripted `tuple` at import (3.9). **The portable zip's association:** `unassociate-ld.cmd` no longer leaves `.ld`
+  associated when another `find` (Git for Windows', MSYS2's) comes before Windows's on `PATH`. Both scripts call only
+  `%SystemRoot%\System32\reg.exe`, by its full path. `.ld`'s default is removed only while it is exactly
+  `Esses.LogFile`, in any language of Windows, and a failed removal exits 1. The developer scripts `build-core.cmd`
+  and `build-qt.cmd` call `where.exe` by its full path. New ctest `packaging.association_scripts` runs both scripts
+  against a stand-in `reg.exe` (`esses_reg_stub`) from awkward folder names, with decoy programs in their folder and
+  on `PATH`; the registry is never touched. `smoke.py windows-portable` uses the same decoys and reports what it read
+  when a check fails. `smoke.py --self-test` no longer runs `associate-ld.cmd`, whose `reg` calls it neutralised by
+  their text (a call written another way reached the registry); it checks windows-portable's checks against
+  stand-ins for the scripts and the registry. **Docking library:** two defects of ADS 5.1.1 that the soak's UBSan
+  reported, and that upstream has not fixed, are fixed in the vendored copy (`third_party/qtads/UPSTREAM.md`). One
+  was a call on a null focus controller at every pin to a side bar; the other read the dock manager as its own type
+  after its destructor had run. `NOTICES.md`, Help > About, `relinking.md`, `GOVERNANCE.md` and `REUSE.toml` now say
+  the library is built with those changes. `AdsBackend` no longer reads a dock that is being destroyed as a dock. New
+  `widgets.tst_dock_host` functions `autoHideWithoutAdsFocusController` and `teardownWithTheFocusInADock`. **macOS
+  tests:** `app.tst_instance_channel` compares forwarded paths by file identity, with a new row run through a linked
+  folder. `widgets.tst_dpr_values_list` and `widgets.tst_values_list_goldens` place the list in a host as a worksheet
+  does, and `belowTheTablesMinimumSize` is new. Deferred: ADS's restore of a damaged side-bar area in `layout.json`
+  (`docs/milestones/M4.md` §10 item 58).
 
 ## Unreleased (M3)
 

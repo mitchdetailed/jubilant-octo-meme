@@ -5,7 +5,9 @@
 // 1 and 2; M4 hidpi package, D-209, AC-M4-07). The time_distance goldens at 1.5 are DrawList JSON
 // (tests/golden/images/tst_dpr_goldens.cpp); values_list is a table painted by Qt, so its 1.5 goldens are the
 // three cases of libs/widgets/tests/components/tst_values_list_goldens.cpp rendered as Print to Clipboard
-// does (renderToImage at DPR 1.5):
+// does (renderToImage at DPR 1.5), each placed as a worksheet places a component (cmptest::showPlaced: a
+// child given its rect, never a window of its own, whose size Qt would hold at the table's style-dependent
+// minimum):
 //   * exact, on every OS: what the table shows does not depend on the DPR: its headers, hidden columns,
 //     heading and every cell equal the committed table goldens of those cases
 //     (tests/golden/tables/values_list/<case>.json, computed by hand there), and the hand-worked Throttle
@@ -237,12 +239,15 @@ private Q_SLOTS:
             QVERIFY(QTest::qWaitFor([&] { return w.distanceReady(src); }, kTimeoutMs));
         }
         w.view->setCursor(c.cursor, qt::CursorSource::Programmatic);
-        ValuesList list(withBody(valuesListSpec({}, {}, 0, "5c3f1a52-8d7e-4b8e-9a51-0c6d2f4e7a10"), c.body),
-                        *w.context);
-        list.resize(c.size);
-        list.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&list));
-        const qt::ValuesModel& m = list.model();
+        // Regression (PR #5, the macOS qt-app run of fe6cf07): shown as a window of its own, main_only_fixed
+        // (280 x 70) was 280 x 90 on macOS, its table's minimum there (showPlaced).
+        QWidget host;
+        auto* list = new ValuesList(
+            withBody(valuesListSpec({}, {}, 0, "5c3f1a52-8d7e-4b8e-9a51-0c6d2f4e7a10"), c.body), *w.context,
+            &host);
+        QVERIFY(showPlaced(host, *list, c.size));
+        QCOMPARE(list->size(), c.size);
+        const qt::ValuesModel& m = list->model();
         QTRY_VERIFY_WITH_TIMEOUT(settledCells(m, c.reference.has_value()), kTimeoutMs);
 
         // What the table shows equals the committed (DPR-free) table golden of the case.
@@ -257,12 +262,12 @@ private Q_SLOTS:
         }
         QJsonArray hidden;
         for (int col = 0; col < m.columnCount(); ++col) {
-            if (list.table().isColumnHidden(col)) {
+            if (list->table().isColumnHidden(col)) {
                 hidden.append(col);
             }
         }
         QCOMPARE(hidden, golden.value(QStringLiteral("hiddenColumns")).toArray());
-        QCOMPARE(list.table().horizontalHeader()->isVisible(),
+        QCOMPARE(list->table().horizontalHeader()->isVisible(),
                  golden.value(QStringLiteral("showHeading")).toBool());
         const QJsonArray rows = golden.value(QStringLiteral("rows")).toArray();
         QCOMPARE(m.rowCount(), static_cast<int>(rows.size()));
@@ -282,14 +287,14 @@ private Q_SLOTS:
         }
 
         // The render at DPR 1.5.
-        const QImage render = list.renderToImage(kDpr);
+        const QImage render = list->renderToImage(kDpr);
         const QString stem = c.name + QStringLiteral("@1.5x");
         render.save(artefactsDir() + QLatin1Char('/') + stem + QStringLiteral(".png"));
         QCOMPARE(render.size(), QSize(static_cast<int>(std::lround(c.size.width() * kDpr)),
                                       static_cast<int>(std::lround(c.size.height() * kDpr))));
         QCOMPARE(render.devicePixelRatio(), kDpr);
         QVERIFY(hasInk(render));
-        QCOMPARE(differing(render, list.renderToImage(kDpr), nullptr), 0);
+        QCOMPARE(differing(render, list->renderToImage(kDpr), nullptr), 0);
 
         const std::filesystem::path png = imagesDir() / (stem.toStdString() + ".png");
         if (updating()) {
@@ -348,6 +353,26 @@ private Q_SLOTS:
                 "values_list/%s: %.3f %% of pixels differ from the golden made on %s (reported only, D-127)",
                 qPrintable(stem), pct, qPrintable(generatedOn));
         }
+    }
+
+    // Regression (PR #5, the macOS qt-app run of fe6cf07), on every OS: a values_list in a worksheet takes
+    // its rect also below its table's minimum size hint (where a window of its own would be held), its table
+    // fills it, and it renders at lround(logical x 1.5) device pixels.
+    void belowTheTablesMinimumSize() {
+        World w;
+        QWidget host;
+        auto* list = new ValuesList(valuesListSpec({"Throttle"}), *w.context, &host);
+        const QSize minimum = list->table().minimumSizeHint();
+        QVERIFY2(minimum.width() > 2 && minimum.height() > 2,
+                 qPrintable(QStringLiteral("%1 x %2").arg(minimum.width()).arg(minimum.height())));
+        const QSize size(minimum.width() / 2, minimum.height() / 2);
+        QVERIFY(showPlaced(host, *list, size));
+        QCOMPARE(list->size(), size);
+        QCOMPARE(list->table().size(), size);
+        const QImage render = list->renderToImage(kDpr);
+        QCOMPARE(render.size(), QSize(static_cast<int>(std::lround(size.width() * kDpr)),
+                                      static_cast<int>(std::lround(size.height() * kDpr))));
+        QCOMPARE(render.devicePixelRatio(), kDpr);
     }
 };
 

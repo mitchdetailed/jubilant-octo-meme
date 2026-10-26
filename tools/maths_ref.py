@@ -34,7 +34,7 @@ import math
 import pathlib
 import struct
 import sys
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Tuple
 
 NaN = float("nan")
 SCHEMA = "urn:esses:maths-case-1"
@@ -56,7 +56,7 @@ def round_half_away(v: float) -> int:
 
 
 # ---- time grid (D-008, D-129) ------------------------------------------------------------------------------
-Rate = tuple[int, int]  # (num, den) hertz
+Rate = Tuple[int, int]  # (num, den) hertz; typing.Tuple: a subscripted builtin tuple needs Python 3.9
 
 
 def hz(rate: Rate) -> float:

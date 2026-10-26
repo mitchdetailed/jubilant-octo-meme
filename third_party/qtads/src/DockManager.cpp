@@ -16,6 +16,8 @@
 ** License along with this library; If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
 
+// Changed by the Esses project on 2026-10-25 (LGPL-2.1 section 2): see
+// CDockManager::~CDockManager() and third_party/qtads/UPSTREAM.md.
 
 //============================================================================
 /// \file   DockManager.cpp
@@ -638,6 +640,13 @@ CDockManager::~CDockManager()
 		delete area;
 	}
 
+	// Esses change, 2026-10-25: this manager is also its own dock container,
+	// whose back-pointer to the manager is this object. Clear it while this is
+	// still a CDockManager: ~CDockContainerWidget() runs after this destructor
+	// and read the pointer (a static_cast to CDockManager in QPointer) to call
+	// removeDockContainer() on the finished CDockManager, undefined behaviour.
+	// removeDockContainer() ignores the manager itself, so nothing else changes.
+	removeFromDockManager();
 	delete d;
 }
 

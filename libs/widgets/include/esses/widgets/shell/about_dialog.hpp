@@ -16,8 +16,9 @@
 //   * qtLicenceNotice(): 08 section 9 item 2's statement "This application uses Qt <version> under the
 //     GNU LGPL v3", where the licence texts are, that Qt may be replaced, and the exact URL of the source
 //     archive of the Qt version the application runs with (qtSourceArchiveUrl, 08 section 9 item 3).
-//   * dockLibraryNotice(): the same for the Qt Advanced Docking System (LGPL-2.1-or-later, its tag URL);
-//     empty in a build without ADS.
+//   * dockLibraryNotice(): the same for the Qt Advanced Docking System (LGPL-2.1-or-later; built from
+//     third_party/qtads, the upstream tag with the changes listed in third_party/qtads/UPSTREAM.md; the tag
+//     URL); empty in a build without ADS.
 //   * sourceUrl(): the exact source of this build (D-212): the public repository's tag URL in a release build
 //     (`<repository>/tree/<tag>`; the tag comes from ESSES_RELEASE_TAG, which tools/packaging/CMakeLists.txt
 //     defines for this file only when a release is configured with -DESSES_RELEASE_TAG=v<version>), else the

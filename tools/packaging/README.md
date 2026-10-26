@@ -28,6 +28,7 @@ release one `sha256sums.txt` over everything.
 | `smoke.py` | the smoke tests of each package (CI; usable on a VM that has Python) |
 | `windows/esses.iss` | the Inno Setup script (AppId fixed; the version from the build; `.ld` association task; the C++ runtime check of 08 section 7.1) |
 | `windows/associate-ld.cmd`, `unassociate-ld.cmd` | the portable zip's per-user `.ld` association (06 section 19 item 5) |
+| `windows/reg_stub.cpp` | `esses_reg_stub`, a stand-in for `reg.exe` that records its arguments (built with the tests on Windows, never installed): `ctest packaging.association_scripts` runs the two scripts against it |
 | `linux/esses.desktop`, `linux/esses-mime.xml` | the desktop entry and the `application/x-esses-log` type (`*.ld`, low weight) |
 | `macos/Info.plist.in` | the bundle's Info.plist (apps/app sets it as `MACOSX_BUNDLE_INFO_PLIST`) |
 | `icons/` | the application icon, drawn by `make_icons.py` from geometry (PNG 16-512, `.ico`, `.icns`, `.svg`); `--check` compares the committed files with a fresh render |
@@ -48,7 +49,10 @@ reachable (a shallow clone), each with `.dirty` for a modified tree.
 
 `--no-registry` leaves out the association scripts' check, which writes to the user's registry (CI runs it). The
 installer's smoke test installs and uninstalls for real: run it on a VM or a CI runner, not on a working machine.
-ctest runs the tools' self-tests, the icon check and the manifest's consistency (label `packaging`).
+ctest runs the tools' self-tests, the icon check, the manifest's consistency and, on Windows, the association scripts
+against `esses_reg_stub` as `reg.exe` of a temporary `SystemRoot`, with decoy `reg`, `find` and the like in their
+folder and first on `PATH`, from folders named with `&`, `%`, `!`, `^`, parentheses and accents (label `packaging`;
+`packaging.association_scripts` reports a skip elsewhere). The registry is not touched.
 
 `package.py` needs CMake on `PATH`, the build's Qt kit (`windeployqt`, `macdeployqt`; linuxdeploy with
 linuxdeploy-plugin-qt on Linux), on Windows a developer environment (`VCToolsRedistDir`, for the runtime the
@@ -76,7 +80,12 @@ deterministic (sorted entries, the time of `SOURCE_DATE_EPOCH`, else 2026-01-01;
   (`UTExportedTypeDeclarations`); `LSMinimumSystemVersion` is the build's deployment target (14.0 in `package.yml`).
   `smoke.py dmg` checks these on the built bundle (`--macos-minimum`, the job's `MACOS_DEPLOYMENT_TARGET`).
   `associate-ld.cmd` hands the folder's path to `reg` through delayed expansion, so a folder named with `&`, `%` or
-  `!` works.
+  `!` works. Both scripts call `reg` by its full path (`%SystemRoot%\System32\reg.exe`) and look no program up by
+  its bare name, and `unassociate-ld.cmd` reads `reg query`'s output itself (`for /f`, whose cmd starts through
+  `%ComSpec%`): cmd looks a bare command name up in the current folder and along `PATH` first, where another
+  program of that name can stand in for Windows's (Git for Windows' `usr\bin` has a GNU `find`, which kept `.ld`
+  associated, D-218 (b)). `.ld`'s default is removed only while it is exactly `Esses.LogFile`, whatever the
+  language of Windows names the default value.
 - **Upgrade and uninstall (Windows, D-217 (l)).** An upgrade first removes what the installer and earlier packages
   put into `{app}` (`[InstallDelete]`: the runtime DLLs, the Qt modules and the plugin folders) and does not take
   the previous install's tasks (`UsePreviousTasks=no`), so the association is offered as on a first install. The

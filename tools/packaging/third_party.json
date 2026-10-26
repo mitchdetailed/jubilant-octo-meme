@@ -32,7 +32,7 @@
       "vendored": "third_party/qtads",
       "licenceFiles": [{"file": "third_party/qtads/LICENSE", "shippedAs": "licenses/LGPL-2.1-or-later.txt"}],
       "packages": ["app"],
-      "use": "the dock windows of esses (the default DockHost backend), built unmodified from third_party/qtads as a separate shared library beside esses (D-026, D-153)."
+      "use": "the dock windows of esses (the default DockHost backend), built from third_party/qtads (the upstream tag with the changes listed in third_party/qtads/UPSTREAM.md) as a separate shared library beside esses (D-026, D-153)."
     },
     {
       "id": "pugixml",

@@ -374,14 +374,13 @@ def generate(root: pathlib.Path, stage: pathlib.Path, package: str, os_name: str
     comps = [resolved(c, info.get("qtVersion", ""), vc_version) for c in components_for(data, package, os_name)]
     if package == "app" and not found["qtFiles"]:
         return [f"{stage}: no Qt library in the package (was the deployment tool run?)"]
-    out.write_text(render_markdown(root, comps, info, found, package, os_name, system_licences), encoding="utf-8",
-                   newline="\n")
+    out.write_bytes(render_markdown(root, comps, info, found, package, os_name, system_licences).encode("utf-8"))
     if sbom is not None:
         bom = render_sbom(comps, info, found, package, os_name)
         problems = validate_sbom(bom)
         if problems:
             return [f"SBOM: {p}" for p in problems]
-        sbom.write_text(json.dumps(bom, indent=2, sort_keys=False) + "\n", encoding="utf-8", newline="\n")
+        sbom.write_bytes((json.dumps(bom, indent=2, sort_keys=False) + "\n").encode("utf-8"))
     return []
 
 
