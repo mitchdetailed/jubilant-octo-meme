@@ -49,6 +49,7 @@
 #include <esses/widgets/shell/shell_extension.hpp>
 #include <esses/widgets/shell/worksheet_canvas.hpp>
 
+#include <QDir>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -60,6 +61,7 @@
 #include <QWindow>
 #include <cmath>
 #include <cstddef>
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <string>
@@ -129,6 +131,34 @@ Look lookOf(TimeDistanceGraph& g) {
 QSize deviceSize(QSize logical, qreal dpr) {
     return {static_cast<int>(std::lround(logical.width() * dpr)),
             static_cast<int>(std::lround(logical.height() * dpr))};
+}
+
+// Back at DPR 1, the composite equals the first one; on a mismatch both and their difference (red where they
+// differ) are written to <build>/tests/ui/artefacts/ (CI uploads them), so a difference can be read: text
+// only or geometry too (macOS, D-220).
+long long differsFromFirst(const Look& back, const Look& first, const QString& name) {
+    const long long n = differingPixels(back.composite, first.composite);
+    if (n != 0) {
+        const QString dir = QString::fromStdWString(
+            (std::filesystem::path(ESSES_TEST_BINARY_DIR) / "artefacts").lexically_normal().wstring());
+        QDir().mkpath(dir);
+        first.composite.save(dir + QLatin1Char('/') + name + QStringLiteral(".first.png"));
+        back.composite.save(dir + QLatin1Char('/') + name + QStringLiteral(".back.png"));
+        if (n > 0) {
+            QImage diff = rgb32(first.composite);
+            const QImage b = rgb32(back.composite);
+            for (int y = 0; y < diff.height(); ++y) {
+                auto* d = reinterpret_cast<QRgb*>(diff.scanLine(y));
+                const auto* q = reinterpret_cast<const QRgb*>(b.constScanLine(y));
+                for (int x = 0; x < diff.width(); ++x) {
+                    d[x] =
+                        (d[x] & 0x00FFFFFFU) != (q[x] & 0x00FFFFFFU) ? qRgb(255, 0, 0) : qRgb(255, 255, 255);
+                }
+            }
+            diff.save(dir + QLatin1Char('/') + name + QStringLiteral(".diff.png"));
+        }
+    }
+    return n;
 }
 
 double driftOf(const Look& a, const Look& b) {
@@ -404,7 +434,7 @@ private Q_SLOTS:
         // Back on the DPR 1 monitor: the same layout and the same pixels as before the trip.
         const Look back = lookOf(*g);
         QVERIFY(back.rects == first.rects);
-        QCOMPARE(differingPixels(back.composite, first.composite), 0LL);
+        QCOMPARE(differsFromFirst(back, first, QStringLiteral("dpr_switch_window")), 0LL);
         QCOMPARE(spy.count(), 4);
     }
 
@@ -480,7 +510,7 @@ private Q_SLOTS:
         }
         const Look back = lookOf(*graph);
         QVERIFY(back.rects == first.rects);
-        QCOMPARE(differingPixels(back.composite, first.composite), 0LL);
+        QCOMPARE(differsFromFirst(back, first, QStringLiteral("dpr_switch_floating_") + backend), 0LL);
 
         // Floating on the DPR 2 monitor, then docked back into the DPR 1 window: Qt moves the widgets without
         // a DPR event. The graph rebuilds at DPR 1 through its resize when its docked size differs, else

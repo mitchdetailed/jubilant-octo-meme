@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 the Esses contributors
 // SPDX-License-Identifier: MIT
 
+#include "glyph_bins.hpp"
 #include "paint_internal.hpp"
 #include "span_raster.hpp"
 
@@ -687,7 +688,12 @@ void drawText(QPainter& p, const plot::DrawList& list, const plot::DrawCmd& cmd,
     // A named key: the reference is into this thread's cache, but GCC 13's -Wdangling-reference cannot tell
     // that from a call whose argument is a temporary.
     const std::string key = staticTextKey(fonts, run, dpr, tp->text);
-    const QStaticText& st = detail::threadStaticText(key, tp->text);
+    bool newText = false;
+    const QStaticText& st = detail::threadStaticText(key, tp->text, &newText);
+    // One subpixel bin count for every engine this text is drawn with, before Qt computes one from this
+    // thread's first glyph-cache fill at whatever DPR that had (glyph_bins.hpp; on by default on macOS only,
+    // D-220).
+    detail::pinGlyphSubpixelBins(p.font(), tp->text, newText);
     if (mayDrawAsOutlines(p)) {
         resetOutlineState(font.font, tp->text); // nothing rasterises a glyph between this and the outlines
     }

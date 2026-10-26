@@ -14,7 +14,9 @@
 # clang-format/clang-tidy wheels and the reuse tool) and, in qt-app, the Qt kit through install-qt-action
 # (aqtinstall, D-006). The vendored libraries replace the vcpkg manifest that 08 section 3.7.1
 # describes, so the vcpkg cache steps of 08 section 4.2 are not needed; sccache is not configured yet (08 section
-# 4.3).
+# 4.3). D-220: a manual dispatch can add the job `probe` (the diagnostic probes, ESSES_BUILD_PROBES; input probe:
+# with-everything) or run it alone (probe: only, every other job skipped); pull requests, pushes and the nightly
+# never run it and run as before.
 name: ci
 
 on:
@@ -23,7 +25,17 @@ on:
     branches: [main]
   schedule:
     - cron: "0 3 * * *" # nightly
-  workflow_dispatch: {} # manual run of everything, including the nightly-only qt-app on macOS
+  workflow_dispatch: # manual run of everything, including the nightly-only qt-app on macOS
+    inputs:
+      probe:
+        description: "Diagnostic probe job (D-220): none = the run of everything as before; with-everything = that run plus the probe job; only = the probe job alone"
+        type: choice
+        options: [none, with-everything, only]
+        default: none
+      probe_windows:
+        description: "The probe job on windows-2022 as well as macos-14 (its DirectWrite entries)"
+        type: boolean
+        default: false
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -48,6 +60,7 @@ env:
 jobs:
   core:
     name: core (${{ matrix.os }})
+    if: github.event_name != 'workflow_dispatch' || inputs.probe != 'only' # D-220: not in a probe-only dispatch
     strategy:
       fail-fast: false
       matrix:
@@ -113,6 +126,7 @@ jobs:
   # The qt-app rows: Windows and Linux always (the required qt-app checks, D-124); macOS only nightly and on manual
   # dispatch (08 section 4.4). A job-level `if` cannot see the matrix, so this job picks the rows.
   qt-matrix:
+    if: github.event_name != 'workflow_dispatch' || inputs.probe != 'only' # D-220: not in a probe-only dispatch
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -246,7 +260,88 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  # Diagnostic probes (D-220), on manual dispatch only (input probe: with-everything or only): the Qt build of qt-app
+  # with ESSES_BUILD_PROBES=ON on macos-14 (and windows-2022 with probe_windows: true), then `ctest -L probe`
+  # verbose, so every PROBE line of qtrender.probe_text_engines and its platform entries (macOS: cocoa, and minimal
+  # with FreeType engines; Windows: the windows platform's DirectWrite, also at QT_SCALE_FACTOR=1.5) is in the job
+  # log, in probe.log and, for the env and verdict lines, in the job summary; then the suites the probe is about
+  # (qtrender.tst_*, ui.tst_dpr_switch). The same pinned actions and Qt kit as qt-app; never merge-blocking.
+  probe:
+    name: probe (${{ matrix.os }})
+    if: github.event_name == 'workflow_dispatch' && (inputs.probe == 'with-everything' || inputs.probe == 'only')
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.probe_windows && '[{"os":"macos-14","preset":"ci-mac-clang-qt","qtarch":"clang_64"},{"os":"windows-2022","preset":"ci-win-msvc-qt","qtarch":"win64_msvc2022_64"}]' || '[{"os":"macos-14","preset":"ci-mac-clang-qt","qtarch":"clang_64"}]') }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      QT_QPA_PLATFORM: offscreen
+      ESSES_TEST_FONT_DIR: ${{ github.workspace }}/tests/golden/fonts # Noto Sans only (D-127)
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with: { submodules: false }
+      - uses: lukka/get-cmake@v3.31.6
+      - name: Install Qt ${{ env.QT_VERSION }} (aqtinstall)
+        id: qt
+        continue-on-error: true # a second try follows (D-217)
+        uses: jurplel/install-qt-action@v4.1.1
+        env:
+          AQT_CONFIG: ${{ runner.os == 'Windows' && format('{0}/.github/aqt-settings.ini', github.workspace) || '' }}
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: ${{ matrix.qtarch }}
+          cache: true
+          aqtsource: ${{ env.AQT_SOURCE }}
+          py7zrversion: "==1.1.3"
+          extra: ${{ runner.os == 'Windows' && '--external 7z' || '' }}
+      - name: Install Qt ${{ env.QT_VERSION }} (aqtinstall, second try)
+        if: steps.qt.outcome == 'failure'
+        uses: jurplel/install-qt-action@v4.1.1
+        env:
+          AQT_CONFIG: ${{ runner.os == 'Windows' && format('{0}/.github/aqt-settings.ini', github.workspace) || '' }}
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: ${{ matrix.qtarch }}
+          cache: true
+          aqtsource: ${{ env.AQT_SOURCE }}
+          py7zrversion: "==1.1.3"
+          extra: ${{ runner.os == 'Windows' && '--external 7z' || '' }}
+      - uses: ilammy/msvc-dev-cmd@v1.13.0 # no-op outside Windows
+      - name: Configure (ESSES_BUILD_QT=ON, ESSES_BUILD_PROBES=ON)
+        shell: bash
+        run: cmake --preset ${{ matrix.preset }} -DCMAKE_PREFIX_PATH="${QT_ROOT_DIR//\\//}" -DESSES_BUILD_PROBES=ON
+      - name: Build
+        id: build
+        run: cmake --build --preset ${{ matrix.preset }}
+      - name: Probes (ctest -L probe, verbose)
+        shell: bash
+        run: ctest --preset ${{ matrix.preset }} -L '^probe$' -V 2>&1 | tee build/${{ matrix.preset }}/probe.log
+      - name: The probe's env and verdict lines (job summary)
+        if: always() && steps.build.outcome == 'success'
+        shell: bash
+        run: |
+          { echo '### probe (${{ matrix.os }})'; echo '```'
+            grep -E 'PROBE (env|verdict)' build/${{ matrix.preset }}/probe.log || echo 'no PROBE lines'
+            echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: The suites the probe is about (qtrender.tst_*, ui.tst_dpr_switch)
+        if: always() && steps.build.outcome == 'success'
+        shell: bash
+        run: ctest --preset ${{ matrix.preset }} --parallel 4 -R '^(qtrender\.tst_|ui\.tst_dpr_switch$)'
+      - name: Upload the probe's report and images
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: probe-${{ matrix.os }}
+          path: |
+            build/${{ matrix.preset }}/probe.log
+            build/${{ matrix.preset }}/**/artefacts/
+            build/${{ matrix.preset }}/Testing/Temporary/LastTest*.log
+          if-no-files-found: ignore
+          retention-days: 14
+
   lint:
+    if: github.event_name != 'workflow_dispatch' || inputs.probe != 'only' # D-220: not in a probe-only dispatch
     runs-on: ubuntu-24.04
     # 75, not 20: the clang-tidy build of the Qt-free targets (ci-linux-lint, every translation unit through
     # clang-tidy) was cancelled at step 228 of 233 on a slow hosted runner under 45 min in M2, and M3 adds
@@ -372,6 +467,7 @@ jobs:
 
   sanitize:
     name: sanitize (${{ matrix.preset }})
+    if: github.event_name != 'workflow_dispatch' || inputs.probe != 'only' # D-220: not in a probe-only dispatch
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     strategy:
@@ -392,6 +488,7 @@ jobs:
       - run: ctest --preset ${{ matrix.preset }} --parallel 2
 
   fuzz-smoke:
+    if: github.event_name != 'workflow_dispatch' || inputs.probe != 'only' # D-220: not in a probe-only dispatch
     runs-on: ubuntu-24.04
     timeout-minutes: 30 # build with ASan + UBSan + coverage, generate the seeds, 5 targets x 60 s
     steps:
@@ -414,6 +511,7 @@ jobs:
 
   # The same targets with MSVC's libFuzzer and ASan (preset win-msvc-fuzz: the libraries and the fuzz targets only).
   fuzz-smoke-windows:
+    if: github.event_name != 'workflow_dispatch' || inputs.probe != 'only' # D-220: not in a probe-only dispatch
     runs-on: windows-2022
     timeout-minutes: 30
     steps:

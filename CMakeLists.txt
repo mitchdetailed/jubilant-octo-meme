@@ -16,6 +16,9 @@ option(ESSES_BUILD_TESTS "Build the Catch2 test executables and enable ctest" ON
 option(ESSES_BUILD_BENCH "Build Google Benchmark targets (phase B: not vendored yet)" OFF)
 option(ESSES_BUILD_FUZZ "Build libFuzzer targets (Clang only)" OFF)
 option(ESSES_BUILD_PLUGINS "Build plugins/ and sdk/ (v1.0)" OFF)
+# Diagnostic probes (D-220): Qt Test executables outside the suites that report what they measure (ctest label
+# probe); built only on request, as by ci.yml's manually dispatched probe job. Needs ESSES_BUILD_QT and tests.
+option(ESSES_BUILD_PROBES "Build the diagnostic probes (ctest label probe; with the Qt layers and tests)" OFF)
 option(ESSES_WARNINGS_AS_ERRORS "Treat warnings as errors (ON in the ci-* presets only)" OFF)
 option(ESSES_ENABLE_CLANG_TIDY "Run clang-tidy on Qt-free targets" OFF)
 option(ESSES_LTO "Interprocedural optimisation" OFF)
@@ -85,6 +88,12 @@ include(qt-free-check)    # deferred configure-time check over every QT_FREE tar
 if(ESSES_BUILD_QT)
   # Qt is found only here; with ESSES_BUILD_QT=OFF there is no find_package(Qt6) at all (D-007).
   find_package(Qt6 6.7 REQUIRED COMPONENTS Core Gui Widgets Svg PrintSupport Test)
+  # Qt Gui's private API, for esses_qtrender's glyph bin pinning (D-220). From Qt 6.9 the private modules are
+  # packages of their own; found here, so Qt6::GuiPrivate is defined wherever esses_qtrender (a static library
+  # that hands its link on) is linked.
+  if(Qt6_VERSION VERSION_GREATER_EQUAL 6.9)
+    find_package(Qt6 REQUIRED COMPONENTS GuiPrivate)
+  endif()
   message(STATUS "Qt ${Qt6_VERSION} from ${Qt6_DIR}")
   include(qtads)          # esses::qtads, the docking library (shared, LGPL), when ESSES_DOCK_BACKEND is "ads"
 endif()

@@ -6,7 +6,8 @@ scheme fonts and thread-safe text metrics, and the golden pixel comparison. Buil
 
 Namespace `esses::qt` (01 §1, shared with `esses_qtmodel`); public headers in `include/esses/qtrender/`
 (umbrella `qtrender.hpp`). Links `esses_plotcore` (plus `esses_project`, `esses_model`, `esses_store`,
-`esses_units`, `esses_base` for the types it names) and Qt Gui. Never links `esses_qtmodel` (forbidden edge) or
+`esses_units`, `esses_base` for the types it names) and Qt Gui, and privately Qt Gui's private API
+(`Qt6::GuiPrivate`, for `src/glyph_bins.cpp` only, D-220). Never links `esses_qtmodel` (forbidden edge) or
 Qt Widgets (`cmake/qt-free-check.cmake` rule 4). Compiled with `QT_NO_KEYWORDS` (PUBLIC): write `Q_SIGNALS`,
 `Q_SLOTS`, `Q_EMIT`. Sources (`src/**`, `include/**`) are globbed with AUTOMOC; every `tests/**/tst_<name>.cpp` is
 one Qt Test executable (`ctest -R qtrender.tst_`), run offscreen; `tests/qtrender_test_support.cpp` is compiled
@@ -23,7 +24,16 @@ into each.
 
 Internal (`src/`): `font_cache.*` (the one QFont construction rule, the style -> role table, per-thread font and
 `QStaticText` caches), `paint_internal.hpp` (text placement, command bounds and `paintStaticList`, shared by
-`RasterBackend` and `LayerCache`), `span_raster.*` (the Static-layer line rasteriser).
+`RasterBackend` and `LayerCache`), `span_raster.*` (the Static-layer line rasteriser), `glyph_bins.*` (one
+subpixel position count, 4, for every font engine that draws plot text, set before Qt computes one from the
+thread's first glyph-cache fill; on by default on macOS only, D-220).
+
+Diagnostic probe (`probes/`, built only with `-DESSES_BUILD_PROBES=ON`, ctest label `probe`, never part of the
+suites; D-220): `probe_text_engines.cpp` (`qtrender.probe_text_engines`, plus `.cocoa` and `.freetype` on macOS
+and `.directwrite` and `.directwrite_scaled` on Windows) reports, as `PROBE ` lines, which font engine draws each
+scheme role on each thread, its subpixel position count after each DPR history, Qt's own count per glyph and
+scale, and the differing pixels of text drawn after different histories with the count pinned and not. ci.yml's
+manually dispatched job `probe` runs it.
 
 ## Behaviour notes
 
@@ -100,7 +110,7 @@ the pixel references in `tests/reference/` are geometry-only scenes and therefor
 | Test | Covers |
 |---|---|
 | `tst_raster_backend` | layer life cycle and free-list; every command at DPR 1 and 2 (exact pixels); slices, gaps, dashes; text anchors, elision, background, rotation, DPR scaling against `QtTextMetrics`; compose order; straight-alpha readback; Static rasteriser == QPainter picture, single blend of translucent strokes, scissor clipping of huge coordinates; `geometry_scene@{1,1.5,2}x.png` references |
-| `tst_static_strips` | `RasterBackend::rasteriseStatic` in strips == one `LayerCache::rasteriseStatic` pass (tolerance 0): geometry scene, split traces and text at DPR 1, 2 and 1.5, text across every strip edge at subpixel glyph positions, the eight `time_distance` golden cases; clear colour; one strip on a NoBlock thread; spare-buffer reuse |
+| `tst_static_strips` | `RasterBackend::rasteriseStatic` in strips == one `LayerCache::rasteriseStatic` pass (tolerance 0): geometry scene, split traces and text at DPR 1, 2 and 1.5, text across every strip edge at subpixel glyph positions, the eight `time_distance` golden cases; clear colour; one strip on a NoBlock thread; spare-buffer reuse; text a thread draws at DPR 1 after DPR 2 == text a thread draws at DPR 1 first (D-220) |
 | `tst_layer_cache` | the ChangeMask table of 04 §2.2 bit by bit (recomposition only on the right masks); resize; buffer reuse; damage = cursor strips + key column at DPR 1 and 2; `paint` == `RasterBackend::compose`; exposed-region clipping |
 | `tst_text_metrics_concurrency` | 8 threads measuring while the GUI thread swaps schemes (200 snapshots); per-snapshot caches; metrics == `SchemeFonts` fonts |
 | `tst_scheme_fonts` | style -> role table, QFont attributes, caption fallback, golden font registration |
