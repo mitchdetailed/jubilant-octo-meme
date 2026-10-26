@@ -211,8 +211,10 @@ SourceLoader::~SourceLoader() {
     // The edits not on disk yet are written now (exit: a queued write may be cancelled by the pool's
     // shutdown), and the opens in flight are cancelled.
     while (!sidecarsDue_.empty() || !sidecarsInFlight_.empty()) {
-        static_cast<void>(flushSidecar(
-            !sidecarsDue_.empty() ? sidecarsDue_.begin()->first : sidecarsInFlight_.begin()->first, false));
+        // A copy of the key: flushSidecar erases the entry that holds it.
+        const model::SourceId next =
+            !sidecarsDue_.empty() ? sidecarsDue_.begin()->first : sidecarsInFlight_.begin()->first;
+        static_cast<void>(flushSidecar(next, false));
     }
     for (auto& [id, inFlight] : opens_) {
         inFlight.cancel.cancel();
@@ -752,7 +754,10 @@ void SourceLoader::writeDueSidecars() {
     }
 }
 
-bool SourceLoader::flushSidecar(const model::SourceId& source, bool report, bool keepOnFailure) {
+bool SourceLoader::flushSidecar(const model::SourceId& sourceRef, bool report, bool keepOnFailure) {
+    // A copy: the caller may pass a key of sidecarsDue_ or sidecarsInFlight_ (the destructor reads them
+    // there), and both entries are erased below before the last use of the id.
+    const model::SourceId source = sourceRef;
     // The newest document of the source: the one due, else the one whose Background write may not have run.
     std::optional<SidecarDue> latest;
     if (const auto it = sidecarsDue_.find(source); it != sidecarsDue_.end()) {
@@ -783,7 +788,11 @@ bool SourceLoader::flushSidecar(const model::SourceId& source, bool report, bool
     return r.ok();
 }
 
-void SourceLoader::close(const model::SourceId& id) {
+void SourceLoader::close(const model::SourceId& source) {
+    // A copy: `source` may be a member of the DataSource being closed (a caller's src->id), and this close
+    // lets go of its owners (open_, the maths, the selection among sourceClosed's receivers) before its last
+    // use of the id, the emission included: every receiver gets this copy, never the source's own id.
+    const model::SourceId id = source;
     const auto it = std::find_if(open_.begin(), open_.end(), [&](const auto& s) { return s->id == id; });
     if (it == open_.end()) {
         return;
@@ -816,7 +825,8 @@ void SourceLoader::close(const model::SourceId& id) {
 void SourceLoader::closeAll() {
     cancelOpens();
     while (!open_.empty()) {
-        close(open_.back()->id);
+        const model::SourceId last = open_.back()->id; // a copy: the close drops the source that holds it
+        close(last);
     }
 }
 

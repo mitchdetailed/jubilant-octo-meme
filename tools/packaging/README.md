@@ -89,9 +89,17 @@ deterministic (sorted entries, the time of `SOURCE_DATE_EPOCH`, else 2026-01-01;
 - **Upgrade and uninstall (Windows, D-217 (l)).** An upgrade first removes what the installer and earlier packages
   put into `{app}` (`[InstallDelete]`: the runtime DLLs, the Qt modules and the plugin folders) and does not take
   the previous install's tasks (`UsePreviousTasks=no`), so the association is offered as on a first install. The
-  uninstaller removes `.ld`'s default only while it is still `Esses.LogFile`: another program's association
-  stays. `smoke.py` checks both (an upgrade over the installed package, an uninstall that leaves another
-  program's `.ld`) and compares `%APPDATA%\esses` file by file around the portable run.
+  uninstaller removes `.ld`'s default only while it is still `Esses.LogFile` (under the root the install wrote,
+  HKLM or HKCU): another program's association stays. It decides at `usUninstall`, before the ProgId goes: Inno
+  Setup's `unins000.exe` returns its exit code before the uninstaller's last steps (`usPostUninstall`, `usDone`;
+  the help's "Uninstaller Exit Codes"), and a removal there left `.ld` naming the deleted ProgId when the exit
+  code came back (PR #5's package job on 2d9a01c). `smoke.py` checks an upgrade over the installed package, the
+  administrative uninstall of its own `.ld`, and per-user installs whose uninstall removes its own `.ld` and
+  leaves another program's; it waits for each uninstall's end (the log line `esses.iss` writes at `usDone`) and
+  compares `%APPDATA%\esses` file by file around the portable run. `smoke.py --self-test` (ctest
+  `packaging.smoke_self_test`) reads `esses.iss` and runs its `[Registry]` entries and `.ld` step on a model of
+  Inno Setup through installs, upgrades with and without the task and another program taking `.ld`,
+  administrative and per-user.
 - **Vendor marks.** `package.py` runs `tools/check_vendor_marks.py --tree` on every staged tree (file names, text
   files, the strings of our programs) before it is archived (AC-M4-08).
 

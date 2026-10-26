@@ -254,6 +254,34 @@ private Q_SLOTS:
         QTRY_COMPARE_WITH_TIMEOUT(finished.count(), 1, 5000);
     }
 
+    // A receiver may answer mappingRequired() at once (D-219), which erases the waiting entry: the argument
+    // is the loader's copy, never that entry, so the receivers after the answer still read the pending open.
+    void aReceiverMayAnswerAtOnce() {
+        const auto dir = scratchDir("map-at-once");
+        Workspace w(dir / "config");
+        w.loader.setMappingHandOff(true);
+        int answered = 0;
+        int aliased = 0;
+        QObject::connect(&w.loader, &SourceLoader::mappingRequired, &w.loader,
+                         [&](int id, const formats::PendingResolution& pending) {
+                             aliased += &pending == w.loader.pendingMapping(id) ? 1 : 0;
+                             w.loader.cancelMapping(id);
+                             ++answered;
+                         });
+        std::size_t rowsAfter = 0; // what a receiver after the answer reads (sizes only)
+        QObject::connect(&w.loader, &SourceLoader::mappingRequired, &w.loader,
+                         [&rowsAfter](int, const formats::PendingResolution& pending) {
+                             rowsAfter = pending.rows.size();
+                         });
+        QSignalSpy logs(&w.loader, &SourceLoader::importLog);
+        w.loader.open(writeCsv(dir, "k.csv"));
+        QTRY_COMPARE_WITH_TIMEOUT(answered, 1, 30000);
+        QCOMPARE(aliased, 0);
+        QCOMPARE(rowsAfter, std::size_t{2}); // Boost (zorks) and Coolant (blips)
+        QCOMPARE(w.loader.pendingMappings(), 0);
+        QVERIFY(logged(logs, "open.mapping_cancelled"));
+    }
+
     // D-190: an open waiting for the Mapping panel or in flight when the project changes is cancelled: it
     // never publishes, and its mapping cannot be resolved into the next project's documents.
     void projectChangeCancelsOpens() {

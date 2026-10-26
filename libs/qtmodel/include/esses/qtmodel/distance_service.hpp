@@ -13,8 +13,9 @@
 // keeps a stale build from being joined after Corr Dist was re-evaluated); a lap whose Corr Dist has no valid
 // sample stays without an index (the chain draws only the indexed laps); state() is NoDistance when the
 // source has no usable Corr Dist (no speed channel, E-CSD-NO-SPEED) or no lap could be indexed, Ready once
-// one index exists. Laps requested before Corr Dist is evaluated are built when MathsService::channelReady
-// arrives.
+// one index exists. Laps requested before Corr Dist is evaluated are built when its evaluation is applied:
+// MathsService::channelReady, or statusChanged in a finished state (channelReady comes once per version, so
+// Corr Dist back at an earlier version, a settings edit undone, is announced by statusChanged alone; M4).
 #pragma once
 
 #include <esses/analysis/distance_index.hpp>

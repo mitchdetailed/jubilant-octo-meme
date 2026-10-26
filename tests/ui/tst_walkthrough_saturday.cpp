@@ -124,8 +124,10 @@
 #include <cmath>
 #include <fstream>
 #include <map>
+#include <memory>
 #include <numbers>
 #include <set>
+#include <vector>
 
 // The qtmodel synthetic-source helpers (.ld writer, shipped units), compiled into this executable only.
 #include "../../libs/qtmodel/tests/qtmodel_test_support.cpp" // NOLINT(bugprone-suspicious-include)
@@ -1261,7 +1263,31 @@ private Q_SLOTS:
 
         // Lap stretching from the toolbar toggle: every lap measures the circuit's length (the speed
         // integrates to L per lap), so each is within the tolerance; the Lap Editor shows the per-lap report.
+        // The report is read as reportChanged announces it (polling report() would itself ask for the lap
+        // indexes): the undo above brought Corr Dist back to an earlier version, so every lap's index is
+        // built again, one pool task per lap, and the report is final once each lap's length is in.
         qt::LapStretchService& stretch = w.lapStretch();
+        std::vector<analysis::LapStretchRow> announced;
+        auto receiver = std::make_unique<QObject>();
+        QObject::connect(&stretch, &qt::LapStretchService::reportChanged, receiver.get(),
+                         [&](const model::SourceId& id) {
+                             if (id == d.src) {
+                                 announced = stretch.report(id);
+                             }
+                         });
+        const auto everyLapMeasuresTheCircuit = [&] {
+            return announced.size() >= kLapSeconds.size() - 2 &&
+                   std::all_of(announced.begin(), announced.end(), [&](const analysis::LapStretchRow& row) {
+                       return std::abs(row.lengthM - L) < 0.005 * L;
+                   });
+        };
+        const auto lengths = [&] {
+            QStringList out;
+            for (const analysis::LapStretchRow& row : announced) {
+                out << QString::number(row.lengthM);
+            }
+            return out.join(QStringLiteral(", "));
+        };
         const bool stretchWasOn = stretch.enabled();
         QVERIFY(w.commands().invoke(QStringLiteral("data.lap_stretch_toggle")));
         QCOMPARE(stretch.enabled(), !stretchWasOn);
@@ -1269,10 +1295,8 @@ private Q_SLOTS:
             QVERIFY(w.commands().invoke(QStringLiteral("data.lap_stretch_toggle")));
         }
         QVERIFY(stretch.enabled());
-        QTRY_VERIFY_WITH_TIMEOUT(stretch.report(d.src).size() >= kLapSeconds.size() - 2, kTimeoutMs);
-        for (const analysis::LapStretchRow& row : stretch.report(d.src)) {
-            QVERIFY2(std::abs(row.lengthM - L) < 0.005 * L, qPrintable(QString::number(row.lengthM)));
-        }
+        QTRY_VERIFY2_WITH_TIMEOUT(everyLapMeasuresTheCircuit(), qPrintable(lengths()), kTimeoutMs);
+        receiver.reset();
         QVERIFY(w.commands().invoke(QStringLiteral("tools.lap_editor")));
         LapEditor& laps = w.lapEditor();
         QTRY_VERIFY(laps.isVisible());

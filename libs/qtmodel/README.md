@@ -74,10 +74,10 @@ on a `ThreadRole::NoBlock` thread with a recording assertion handler (AC-M1-12).
 | Test | Covers |
 |---|---|
 | `tst_dispatcher` | FIFO delivery, dead contexts, posts from 8 threads, `close`, `drain`, the NoBlock `Future::get` assertion (AC-M1-12), `AppRuntime` install/shutdown, shutdown with 20 builds and a 3-level chain in flight |
-| `tst_dataselection` | every 06 §5.2 row with its `changed()` bits, compact renumbering, D-109, N/P without wrap in the filtered order, the TT 2485 candidate rule (out/in never), CTRL+ALT+F tolerance, trust through the sidecar, `sourceReplaced` (by id, by lap number, dropped), close, restore keys, filters, lap-number syntax, invariants over 2,000 random operations |
+| `tst_dataselection` | every 06 §5.2 row with its `changed()` bits, compact renumbering, D-109, N/P without wrap in the filtered order, the TT 2485 candidate rule (out/in never), CTRL+ALT+F tolerance, trust through the sidecar, `sourceReplaced` (by id, by lap number, dropped), close (also of a reference into the closed source, D-219), restore keys, filters, lap-number syntax, invariants over 2,000 random operations |
 | `tst_worksheetviewmodel` | F9 through the Main lap's DistanceIndex and back within one sample, the fraction rule and the banner without Corr Dist (AC-M1-09), N/P zoom and cursor in both domains, W, Z, F2, zoom limits, pan clamping, cursor steps and edges, datum, animation (Cursor-only), the shared view across worksheets, offsets |
-| `tst_maths_distance` | Background prefetch observed in the pool's band (AC-M1-10), the settings schema examples, E-CSD-SETTINGS, no speed -> NoDistance, versions kept across a sidecar snapshot (D-140), enable/disable, the per-lap index (AC-M1-08 through the service), outing chains, the no-blocking path |
-| `tst_source_loader` | open/publish of a written .ld + .ldx, Import Log, maths and distance without a request, phase-2 stint annotation, a second open, failures to Messages, trust through `commitSidecar` read back on reopen, close, the no-blocking path, and the public ACC stand-in when its input is generated; D-190: sidecar writes coalesced on a Background task and flushed on close, `closeAll()` cancelling an open in flight |
+| `tst_maths_distance` | Background prefetch observed in the pool's band (AC-M1-10), the settings schema examples, E-CSD-SETTINGS, no speed -> NoDistance, versions kept across a sidecar snapshot (D-140), enable/disable, the per-lap index (AC-M1-08 through the service), outing chains, the no-blocking path; D-219: laps waiting for Corr Dist back at an earlier version (a settings edit undone) are built without another request |
+| `tst_source_loader` | open/publish of a written .ld + .ldx, Import Log, maths and distance without a request, phase-2 stint annotation, a second open, failures to Messages, trust through `commitSidecar` read back on reopen, close, the no-blocking path, and the public ACC stand-in when its input is generated; D-190: sidecar writes coalesced on a Background task and flushed on close, `closeAll()` cancelling an open in flight; D-219: `sourceClosed` receivers get the loader's copy of the id (never the closed source's own, from `close()` or `closeAll()`), and a loader destroyed with an edit due and an older write queued keeps the newest edit on disk |
 | `tst_project_session` | shipped defaults, user keymap and scheme, the new-project layout, save/reopen with D-070 backups, skipped workbooks, recent sources, the options the selection reads |
 | `tst_settings_messages` | settings-1 defaults, dotted keys, coalesced write, unknown members, MRU caps, load errors; the Messages cap, first error, Import Log rows, the Log sink |
 | `tst_commands_keymap` | registry semantics, the shipped keymap without conflicts, focus-chain resolution, normalisation, rejected rows, facade commands equal to their keymap rows, every qtmodel-bound batch-1 key driving its post-condition |
@@ -86,14 +86,16 @@ on a `ThreadRole::NoBlock` thread with a recording assertion handler (AC-M1-12).
 | `tst_undo_contract` | `QUndoStack` under `QCoreApplication`, document commands, merge, worksheet move (the M2 contract) |
 | `tst_undo_property` | AC-M2-09: 30 randomised sequences (seed `ESSES_TEST_SEED`) of every command kind, undo and redo, equal to an independent replay after every step; undo-all and redo-all; view-state operations (selection, zoom, cursor, F9, filters, the stretch toggle) never on the stack; file open/close not on the stack |
 | `tst_project_recovery` | every document saved and reopened, renamed/removed files retired, unreadable files kept, autosave writing only changed documents and never project files, the kill-and-recover path of AC-M2-06, the prompt's three answers, the timer, the selection, single-colour state and filters restored through `SessionRestore`; D-187 and D-190: a failed or killed save recovers without false conflicts, a journal holding only saved content is not offered, a failed backup copy keeps the save, the prompt's replay is the one recovered, `saveMathsModules` leaves other edits unsaved |
-| `tst_maths_service` | modules defined with only the edited cone re-versioned (AC-M2-04 through the service), every 03 §7.3 state, Recalculate, compat, mappings, local maths (explicit and from the sidecar), transient maths, GPS corrections, the live check and `LiveDiagnostics`, `connectProjectSession`, Channel Status rows with every trace kind and "(missing)" references (AC-M2-12) |
-| `tst_mapping_handoff` | AC-M2-11 at the model level: two unknown units wait for the panel, the decision as an undoable macro, the saved unit map applied silently to the next file, Cancel, Open anyway, headless opens, user text profiles; D-190: a project change cancels the opens in flight and those waiting for the panel |
+| `tst_maths_service` | modules defined with only the edited cone re-versioned (AC-M2-04 through the service), every 03 §7.3 state, Recalculate, compat, mappings, local maths (explicit and from the sidecar), transient maths, GPS corrections, the live check and `LiveDiagnostics`, `connectProjectSession`, Channel Status rows with every trace kind and "(missing)" references (AC-M2-12), `removeSource` of a reference into the removed source (D-219) |
+| `tst_mapping_handoff` | AC-M2-11 at the model level: two unknown units wait for the panel, the decision as an undoable macro, the saved unit map applied silently to the next file, Cancel, Open anyway, headless opens, user text profiles; D-190: a project change cancels the opens in flight and those waiting for the panel; D-219: a receiver may answer `mappingRequired` at once |
 | `tst_filters_search` | the lap-number syntax and its messages, filters persisted by source hash with the default and the apply-to-all flag, the word-prefix search, the Channels tree's Alias and Constants |
-| `tst_lap_stretch` | factors within the tolerance published and cleared by the toggle (view state), the tolerance as an undoable options edit, `Venue Length` as the track length, the report, `edit.undo`/`edit.redo` |
+| `tst_lap_stretch` | factors within the tolerance published and cleared by the toggle (view state), the tolerance as an undoable options edit, `Venue Length` as the track length, the report (read as `reportChanged` announces it, once every lap's length is in, D-219), `edit.undo`/`edit.redo` |
 
 `tests/qtmodel_test_support.*` builds synthetic circuit sources in memory (out lap, flying laps, in lap; wheel
 speeds whose integral is exactly the track length, optionally scaled per lap; optional GPS channels, a renamed
-throttle, a `Venue Length` detail) and writes them as .ld + .ldx through the motec.ld writer.
+throttle, a `Venue Length` detail) and writes them as .ld + .ldx through the motec.ld writer; `quarantinedCopy` gives a
+source whose bytes are overwritten when its last owner lets go of it (storage kept until the process ends), so a
+read of its id through a reference that outlived it fails a plain build's test (D-219).
 
 ## Deviations from the design text and open issues
 
@@ -118,7 +120,9 @@ throttle, a `Venue Length` detail) and writes them as .ld + .ldx through the mot
   joins a stale build; a pending build asked for again at a higher priority is raised to that band
   (`TaskPool::raise`), so F9 or W right after an open does not wait behind the Background prefetch; a lap without
   a valid Corr Dist sample stays without an index; `state()` is NoDistance when Corr Dist is in Error or no
-  lap could be indexed.
+  lap could be indexed. A lap asked for while Corr Dist evaluates is built when the evaluation is applied:
+  `channelReady`, or `statusChanged` in a finished state, since `channelReady` comes once per (output, version)
+  while the source is open and Corr Dist back at an earlier version (a settings edit undone) gets none (D-219).
 - `MathsService` adds `source`, `units`, `pool`, `descriptor`, `outputs`, the settings-schema calls,
   `setCorrectedSpeedEnabled` and `moduleMessage`.
 - `SourceLoader` submits the open task itself (the same key as `ImporterRegistry::load`) so that the task holds

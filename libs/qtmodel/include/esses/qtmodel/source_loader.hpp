@@ -126,7 +126,8 @@ public:
     void setUseSidecars(bool on) { useSidecars_ = on; }
     // Asynchronous; one sourcePublished() or openFailed() per call.
     void open(const std::filesystem::path& path);
-    // Closes a source (its pending sidecar write is done first, on this thread).
+    // Closes a source (its pending sidecar write is done first, on this thread). `source` may be the source's
+    // own id (src->id): it is copied first, and sourceClosed() carries the copy (D-219).
     void close(const model::SourceId& source);
     // Cancels the opens in flight (cancelOpens()) and closes every source.
     void closeAll();

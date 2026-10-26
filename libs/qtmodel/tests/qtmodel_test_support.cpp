@@ -14,8 +14,12 @@
 
 #include <QCoreApplication>
 #include <cmath>
+#include <cstring>
+#include <mutex>
+#include <new>
 #include <numbers>
 #include <stdexcept>
+#include <vector>
 
 namespace esses::qt::test {
 
@@ -205,6 +209,34 @@ std::filesystem::path scratchDir(const std::string& name) {
     std::filesystem::remove_all(dir, ec);
     std::filesystem::create_directories(dir);
     return dir;
+}
+
+std::shared_ptr<const model::DataSource> quarantinedCopy(const model::DataSource& src) {
+    // The storage of every quarantined source, freed when the process ends (a worker may drop the last
+    // owner).
+    struct Quarantine {
+        std::mutex m;
+        std::vector<void*> blocks;
+        Quarantine() = default;
+        Quarantine(const Quarantine&) = delete;
+        Quarantine& operator=(const Quarantine&) = delete;
+        ~Quarantine() {
+            for (void* block : blocks) {
+                ::operator delete(block);
+            }
+        }
+    };
+    static Quarantine quarantine;
+    void* storage = ::operator new(sizeof(model::DataSource));
+    {
+        const std::lock_guard<std::mutex> lock(quarantine.m);
+        quarantine.blocks.push_back(storage);
+    }
+    const model::DataSource* copy = new (storage) model::DataSource(src);
+    return {copy, [storage](const model::DataSource* p) {
+                p->~DataSource();
+                std::memset(storage, 0xA5, sizeof(model::DataSource));
+            }};
 }
 
 } // namespace esses::qt::test

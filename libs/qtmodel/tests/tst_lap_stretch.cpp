@@ -24,7 +24,10 @@
 
 #include <QSignalSpy>
 #include <QTest>
+#include <algorithm>
 #include <cmath>
+#include <memory>
+#include <vector>
 
 using namespace esses;
 using namespace esses::qt;
@@ -102,6 +105,12 @@ bool near(std::optional<double> v, double want) {
     return v.has_value() && std::abs(*v - want) < 0.002;
 }
 
+// Every lap of the report has its measured length (its index has arrived).
+bool everyLapMeasured(const std::vector<analysis::LapStretchRow>& rows) {
+    return !rows.empty() && std::all_of(rows.begin(), rows.end(),
+                                        [](const analysis::LapStretchRow& r) { return r.lengthM > 0.0; });
+}
+
 } // namespace
 
 class TstLapStretch : public QObject {
@@ -129,10 +138,23 @@ private Q_SLOTS:
             QVERIFY(!stretchOf(w.loader, src->id, i).has_value());
         }
         QSignalSpy report(&w.stretch, &LapStretchService::reportChanged);
+        // The report as reportChanged announces it, read in the receiver (polling report() would itself ask
+        // for the lap indexes). Each lap's index is a pool task of its own, so laps 1 and 2 can be stretched
+        // while lap 3's length is still on its way (a loaded machine): its arrival is announced too.
+        std::vector<analysis::LapStretchRow> announced;
+        auto receiver = std::make_unique<QObject>();
+        connect(&w.stretch, &LapStretchService::reportChanged, receiver.get(),
+                [&](const model::SourceId& id) {
+                    if (id == src->id) {
+                        announced = w.stretch.report(id);
+                    }
+                });
         w.stretch.setTrackLength(src->id, 2000.0);
         QCOMPARE(*w.stretch.trackLength(src->id), 2000.0);
         QTRY_VERIFY_WITH_TIMEOUT(near(stretchOf(w.loader, src->id, 1), 2000.0 / 2040.0), 30000);
         QTRY_VERIFY_WITH_TIMEOUT(near(stretchOf(w.loader, src->id, 2), 2000.0 / 1940.0), 30000);
+        QTRY_VERIFY_WITH_TIMEOUT(everyLapMeasured(announced), 30000);
+        receiver.reset();
         QVERIFY(!stretchOf(w.loader, src->id, 3).has_value()); // +10 %: outside the 5 % tolerance
         QVERIFY(report.count() >= 1);
         // The report of the Lap Editor (06 section 13.3 item 1).

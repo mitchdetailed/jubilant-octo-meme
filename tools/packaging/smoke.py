@@ -16,10 +16,14 @@ Commands:
   windows-installer --installer <setup.exe> [--runtime-test <setup-runtime-test.exe>]  silent install into a
         temporary folder with the .ld association task, the uninstall entry's DisplayVersion, the association, the
         programs; an upgrade over it (files an earlier package had and this one has not, app-local runtime DLLs
-        included, are gone; a .ld association another program took meanwhile stays; D-217), uninstall; with
-        --runtime-test: an administrative install that requires a runtime no machine has is refused (exit code 7,
-        nothing installed) and a per-user one installs the runtime DLLs beside esses.exe (08 section 7.1, the
-        installer's runtime check), and its uninstall leaves a .ld association another program owns
+        included, are gone; a .ld association another program took meanwhile stays; D-217), uninstall (.ld's
+        default and the ProgId gone); with --runtime-test: an administrative install that requires a runtime no
+        machine has is refused (exit code 7, nothing installed) and a per-user one with the task installs the
+        runtime DLLs beside esses.exe (08 section 7.1, the installer's runtime check) and associates .ld under
+        HKCU; its uninstall removes .ld's default, and after a second per-user install another program's .ld
+        stays. Each uninstall is waited for to its end (its log's last line, not only the exit code: Inno's
+        uninstaller returns it before its last steps); a failed association check prints the values read under
+        HKLM and HKCU and the uninstaller's lines about .ld
   windows-portable --zip <portable.zip>     unzip into a folder whose name holds & and %, settings beside the
         program, nothing written under %APPDATA%\\esses (compared file by file when the folder exists already;
         D-217), associate-ld.cmd and unassociate-ld.cmd for real (HKCU), with decoys of reg, find and the like in
@@ -291,10 +295,54 @@ def reg_set_default(root, path: str, value: str | None) -> None:
 
 
 OTHER_OWNER = "Esses.SmokeOtherProgram"  # a ProgId that stands for another program owning .ld
+# esses.iss logs this line at usDone, the uninstaller's last step: the uninstall has run to its end.
+UNINSTALL_DONE = "Esses: uninstall done"
+LOG_CLOSED = "Log closed."  # Inno Setup's own last line of a log, whichever way the program ends
+
+
+def wait_for_log(log: pathlib.Path, needles: tuple[str, ...], seconds: float) -> str:
+    """The text of `log` once it holds one of `needles`, or as it stands after `seconds` ("" when there is none)."""
+    deadline = time.monotonic() + seconds
+    while True:
+        try:
+            text = log.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            text = ""
+        if any(n in text for n in needles) or time.monotonic() >= deadline:
+            return text
+        time.sleep(0.2)
+
+
+def run_uninstaller(report: Report, uninstaller: pathlib.Path, log: pathlib.Path, what: str,
+                    seconds: float = 300.0, run=None) -> str:
+    """Runs an Inno Setup uninstaller silently and waits for the end of the uninstall; returns its log. The exit code
+    comes from the unins000.exe started here, which the clone doing the work ends before its last steps (Inno Setup
+    help, "Uninstaller Exit Codes"; usPostUninstall and usDone come after): the wait goes on until the log holds
+    esses.iss's UNINSTALL_DONE, or Inno's LOG_CLOSED when the uninstall ended without reaching usDone. `run` stands
+    in for subprocess.run (the self-test)."""
+    r = (run or subprocess.run)([str(uninstaller), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", f"/LOG={log}"],
+                                timeout=seconds)
+    report.check(r.returncode == 0, f"{what} exits 0 (got {r.returncode})")
+    text = wait_for_log(log, (UNINSTALL_DONE, LOG_CLOSED), seconds)
+    if not report.check(UNINSTALL_DONE in text, f"{what} runs to its end (its log has '{UNINSTALL_DONE}')"):
+        print("        " + "\n        ".join(text.strip().splitlines()[-15:] or ["(no log)"]), flush=True)
+    return text
+
+
+def installer_check(report: Report, condition: bool, what: str, uninstall_log: str = "") -> bool:
+    """An association check of the installer: when it fails, what it read under HKLM and HKCU (.ld's default,
+    OpenWithProgids, the ProgId and its open command) and the uninstaller's lines about .ld (esses.iss)."""
+    if not report.check(condition, what):
+        lines = association_state("HKLM") + association_state("HKCU")
+        lines += [f"uninstall log: {line.strip()}" for line in uninstall_log.splitlines() if ".ld:" in line]
+        for line in lines:
+            print(f"        {line}", flush=True)
+    return condition
 
 
 def windows_installer(report: Report, args) -> None:
     import winreg
+    hklm = winreg.HKEY_LOCAL_MACHINE
     uninstall_key = rf"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{APP_ID}_is1"
     with tempfile.TemporaryDirectory() as tmp:
         target = pathlib.Path(tmp) / "Esses"
@@ -302,7 +350,7 @@ def windows_installer(report: Report, args) -> None:
         r = subprocess.run([str(args.installer), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", f"/DIR={target}",
                             "/MERGETASKS=assocld", f"/LOG={log}"], timeout=900)
         report.check(r.returncode == 0, f"silent install exits 0 (got {r.returncode})")
-        shown = reg_get(winreg.HKEY_LOCAL_MACHINE, uninstall_key, "DisplayVersion")
+        shown = reg_get(hklm, uninstall_key, "DisplayVersion")
         report.check(shown == args.version, f"the uninstall entry's DisplayVersion is {args.version} (got {shown})")
         if args.tag:
             report.check(shown == args.tag[1:], f"the installer's version equals the tag {args.tag} (AC-M4-09)")
@@ -312,10 +360,10 @@ def windows_installer(report: Report, args) -> None:
                   + notices_files(""), "the installation")
         report.check(any(target.glob("qtadvanceddocking-qt6*.dll")), "the docking library is installed")
         exe = target / "esses.exe"
-        report.check(reg_get(winreg.HKEY_LOCAL_MACHINE, r"Software\Classes\.ld") == "Esses.LogFile",
-                     ".ld is associated with Esses.LogFile")
-        command = reg_get(winreg.HKEY_LOCAL_MACHINE, r"Software\Classes\Esses.LogFile\shell\open\command")
-        report.check(command == f'"{exe}" -l "%1"', f"the open command is \"esses.exe\" -l \"%1\" (got {command})")
+        installer_check(report, reg_get(hklm, LD_KEY) == PROGID, ".ld is associated with Esses.LogFile")
+        command = reg_get(hklm, COMMAND_KEY)
+        installer_check(report, command == f'"{exe}" -l "%1"',
+                        f"the open command is \"esses.exe\" -l \"%1\" (got {command})")
         run_version(report, [str(exe)], args.version, args.tag)
         r = subprocess.run([str(target / "esses-cli.exe"), "--version"], capture_output=True, text=True, timeout=120)
         report.check(r.returncode == 0 and args.version in r.stdout, "esses-cli --version names the version")
@@ -327,8 +375,7 @@ def windows_installer(report: Report, args) -> None:
                  target / "Qt6Stale.dll"]
         for f in stale:
             f.write_bytes(b"stale")
-        ld_key = r"Software\Classes\.ld"
-        reg_set_default(winreg.HKEY_LOCAL_MACHINE, ld_key, OTHER_OWNER)
+        reg_set_default(hklm, LD_KEY, OTHER_OWNER)
         r = subprocess.run([str(args.installer), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", f"/DIR={target}",
                             f"/LOG={pathlib.Path(tmp) / 'upgrade.log'}"], timeout=900)
         report.check(r.returncode == 0, f"a silent upgrade over it exits 0 (got {r.returncode})")
@@ -336,15 +383,19 @@ def windows_installer(report: Report, args) -> None:
         report.check(not left, "the upgrade removes what this package does not install" +
                      (f" (left: {', '.join(left)})" if left else ""))
         report.check((target / "platforms").is_dir() and exe.exists(), "the upgrade installs the package again")
-        report.check(reg_get(winreg.HKEY_LOCAL_MACHINE, ld_key) == OTHER_OWNER,
-                     "the upgrade leaves .ld with the program that took it")
-        reg_set_default(winreg.HKEY_LOCAL_MACHINE, ld_key, "Esses.LogFile")
-        subprocess.run([str(target / "unins000.exe"), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"], timeout=300)
+        installer_check(report, reg_get(hklm, LD_KEY) == OTHER_OWNER,
+                        "the upgrade leaves .ld with the program that took it")
+        # .ld is Esses's own again when Esses is uninstalled (the install with the task wrote it, the upgrade without
+        # the task did not): the uninstaller removes .ld's default before the ProgId goes (D-217 (l)).
+        reg_set_default(hklm, LD_KEY, PROGID)
+        text = run_uninstaller(report, target / "unins000.exe", pathlib.Path(tmp) / "uninstall.log", "uninstall")
         report.check(wait_gone(exe, 300), "uninstall removes esses.exe")
-        report.check(reg_get(winreg.HKEY_LOCAL_MACHINE, uninstall_key, "DisplayVersion") is None,
-                     "uninstall removes the uninstall entry")
-        report.check(reg_get(winreg.HKEY_LOCAL_MACHINE, r"Software\Classes\.ld") != "Esses.LogFile",
-                     "uninstall removes the .ld association")
+        report.check(reg_get(hklm, uninstall_key, "DisplayVersion") is None, "uninstall removes the uninstall entry")
+        installer_check(report, reg_get(hklm, LD_KEY) is None,
+                        "uninstall removes .ld's default, which was Esses.LogFile", text)
+        installer_check(report, reg_describe(hklm, PROGID_KEY) == "no key"
+                        and reg_describe(hklm, OPEN_WITH_KEY, PROGID) in ("no key", "no value"),
+                        "uninstall removes the ProgId Esses.LogFile and its OpenWithProgids entry", text)
     if args.runtime_test:
         runtime_test(report, args)
 
@@ -362,26 +413,47 @@ def runtime_test(report: Report, args) -> None:
                                         f"(exit code 7, got {r.returncode})")
         report.check("vc_redist.x64.exe exit code" in text, "it ran the bundled vc_redist.x64.exe first")
         report.check(not (admin / "esses.exe").exists(), "the refused install copied nothing")
+        # Per-user (HKA is HKCU), twice with the .ld task: an uninstall while .ld is Esses's own removes it, one
+        # after another program took .ld leaves it; both remove the ProgId (D-217 (l)). .ld's default is put back.
+        hkcu = winreg.HKEY_CURRENT_USER
         user = pathlib.Path(tmp) / "user"
-        r = subprocess.run([str(args.runtime_test), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER",
-                            f"/DIR={user}", f"/LOG={pathlib.Path(tmp) / 'user.log'}"], timeout=900)
-        report.check(r.returncode == 0, f"a per-user install exits 0 (got {r.returncode})")
-        has_files(report, user, ["esses.exe", "msvcp140.dll", "vcruntime140.dll"],
-                  "the per-user installation (with the runtime beside esses.exe)")
-        run_version(report, [str(user / "esses.exe")], args.version, args.tag)
         key = rf"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{APP_ID}_is1"
-        report.check(reg_get(winreg.HKEY_CURRENT_USER, key, "DisplayVersion") == args.version,
-                     "the per-user uninstall entry names the version")
-        if (user / "unins000.exe").exists():
-            # Another program owns .ld when Esses is uninstalled: its association stays (D-217).
-            ld_key = r"Software\Classes\.ld"
-            previous = reg_get(winreg.HKEY_CURRENT_USER, ld_key)
-            reg_set_default(winreg.HKEY_CURRENT_USER, ld_key, OTHER_OWNER)
-            subprocess.run([str(user / "unins000.exe"), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"], timeout=300)
-            report.check(wait_gone(user / "esses.exe", 300), "the per-user uninstall removes esses.exe")
-            report.check(reg_get(winreg.HKEY_CURRENT_USER, ld_key) == OTHER_OWNER,
-                         "the uninstall leaves a .ld association another program owns")
-            reg_set_default(winreg.HKEY_CURRENT_USER, ld_key, previous)
+        previous = reg_get(hkcu, LD_KEY)
+        try:
+            for n, owner in enumerate((PROGID, OTHER_OWNER)):
+                r = subprocess.run([str(args.runtime_test), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
+                                    "/CURRENTUSER", "/MERGETASKS=assocld", f"/DIR={user}",
+                                    f"/LOG={pathlib.Path(tmp) / f'user{n}.log'}"], timeout=900)
+                report.check(r.returncode == 0, f"a per-user install exits 0 (got {r.returncode})")
+                if n == 0:
+                    has_files(report, user, ["esses.exe", "msvcp140.dll", "vcruntime140.dll"],
+                              "the per-user installation (with the runtime beside esses.exe)")
+                    run_version(report, [str(user / "esses.exe")], args.version, args.tag)
+                    report.check(reg_get(hkcu, key, "DisplayVersion") == args.version,
+                                 "the per-user uninstall entry names the version")
+                    command = reg_get(hkcu, COMMAND_KEY)
+                    installer_check(report, reg_get(hkcu, LD_KEY) == PROGID
+                                    and command == f'"{user / "esses.exe"}" -l "%1"',
+                                    "the per-user install associates .ld under HKCU (.ld's default, the open command)")
+                if not report.check((user / "unins000.exe").exists(), "the per-user installation has unins000.exe"):
+                    break
+                reg_set_default(hkcu, LD_KEY, owner)
+                mine = owner == PROGID
+                what = "the per-user uninstall" + ("" if mine else " (another program took .ld)")
+                text = run_uninstaller(report, user / "unins000.exe", pathlib.Path(tmp) / f"uninstall{n}.log", what)
+                report.check(wait_gone(user / "esses.exe", 300), f"{what} removes esses.exe")
+                report.check(reg_get(hkcu, key, "DisplayVersion") is None, f"{what} removes its uninstall entry")
+                if mine:
+                    installer_check(report, reg_get(hkcu, LD_KEY) is None,
+                                    f"{what} removes .ld's default, which was Esses.LogFile", text)
+                else:
+                    installer_check(report, reg_get(hkcu, LD_KEY) == OTHER_OWNER,
+                                    f"{what} leaves the .ld association another program owns", text)
+                installer_check(report, reg_describe(hkcu, PROGID_KEY) == "no key"
+                                and reg_describe(hkcu, OPEN_WITH_KEY, PROGID) in ("no key", "no value"),
+                                f"{what} removes the ProgId Esses.LogFile and its OpenWithProgids entry", text)
+        finally:
+            reg_set_default(hkcu, LD_KEY, previous)
 
 
 # ---- Windows: the portable zip's association scripts (D-218 (b)) --------------------------------------------------
@@ -443,14 +515,14 @@ def decoys_started(decoy_log: pathlib.Path) -> list[str]:
         return []
 
 
-def association_state() -> list[str]:
-    """What the association scripts read and write under HKCU, for a failure's report."""
+def association_state(hive: str = "HKCU") -> list[str]:
+    """What the association scripts (HKCU) or the installer (HKLM or HKCU) read and write, for a failure's report."""
     import winreg
-    hkcu = winreg.HKEY_CURRENT_USER
-    return [f"HKCU\\{LD_KEY} (default): {reg_describe(hkcu, LD_KEY)}",
-            f"HKCU\\{OPEN_WITH_KEY} {PROGID}: {reg_describe(hkcu, OPEN_WITH_KEY, PROGID)}",
-            f"HKCU\\{PROGID_KEY} (default): {reg_describe(hkcu, PROGID_KEY)}",
-            f"HKCU\\{COMMAND_KEY} (default): {reg_describe(hkcu, COMMAND_KEY)}"]
+    root = {"HKCU": winreg.HKEY_CURRENT_USER, "HKLM": winreg.HKEY_LOCAL_MACHINE}[hive]
+    return [f"{hive}\\{LD_KEY} (default): {reg_describe(root, LD_KEY)}",
+            f"{hive}\\{OPEN_WITH_KEY} {PROGID}: {reg_describe(root, OPEN_WITH_KEY, PROGID)}",
+            f"{hive}\\{PROGID_KEY} (default): {reg_describe(root, PROGID_KEY)}",
+            f"{hive}\\{COMMAND_KEY} (default): {reg_describe(root, COMMAND_KEY)}"]
 
 
 def portable_associations(report: Report, root: pathlib.Path, exe: pathlib.Path, work: pathlib.Path) -> None:
@@ -702,6 +774,364 @@ def script_test(args) -> int:
     return 1 if problems else 0
 
 
+# ---- the installer's .ld rule, read from esses.iss and checked on a model of Inno Setup (D-217 (l)) --------------
+
+ISS = HERE / "windows" / "esses.iss"
+UNINSTALL_STEPS = ("usAppMutexCheck", "usUninstall", "usPostUninstall", "usDone")
+# The uninstaller's caller has its exit code once the uninstall log has been processed: the clone doing the work ends
+# the original unins000.exe there, before usPostUninstall (Inno Setup help, "Uninstaller Exit Codes").
+STEPS_BEFORE_EXIT_CODE = ("usAppMutexCheck", "usUninstall")
+LD_ARG = r"'(?:Software\\Classes\\)?\.ld'"  # the key of .ld in [Code]: 'Software\Classes\.ld' ('.ld' under HKCR)
+
+
+def iss_params(line: str) -> dict[str, str]:
+    """The parameters of an entry of an Inno Setup section (`Name: value; Name: "a ""quoted"" value"`), the names
+    in lower case."""
+    out: dict[str, str] = {}
+    i = 0
+    while i < len(line):
+        colon = line.find(":", i)
+        if colon < 0:
+            break
+        name = line[i:colon].strip().lower()
+        j = colon + 1
+        while j < len(line) and line[j] == " ":
+            j += 1
+        value = ""
+        if j < len(line) and line[j] == '"':
+            j += 1
+            while j < len(line):
+                if line[j] == '"' and line[j + 1:j + 2] == '"':
+                    value += '"'
+                    j += 2
+                elif line[j] == '"':
+                    j += 1
+                    break
+                else:
+                    value += line[j]
+                    j += 1
+            end = line.find(";", j)
+        else:
+            end = line.find(";", j)
+            value = line[j:end if end >= 0 else len(line)].strip()
+        out[name] = value
+        i = len(line) if end < 0 else end + 1
+    return out
+
+
+def iss_sections(text: str) -> tuple[dict[str, str], list[dict[str, str]], str]:
+    """[Setup]'s directives (names in lower case), [Registry]'s entries and the [Code] section (the script's last)."""
+    setup: dict[str, str] = {}
+    registry: list[dict[str, str]] = []
+    code: list[str] = []
+    section = ""
+    for raw in text.splitlines():
+        line = raw.strip()
+        if section == "code":
+            code.append(raw)
+            continue
+        m = re.fullmatch(r"\[(\w+)\]", line)
+        if m:
+            section = m.group(1).lower()
+        elif not line or line.startswith((";", "#")):
+            continue
+        elif section == "setup":
+            name, _, value = line.partition("=")
+            setup[name.strip().lower()] = value.strip()
+        elif section == "registry":
+            registry.append(iss_params(line))
+    return setup, registry, "\n".join(code)
+
+
+def iss_ld_rule(code: str) -> tuple[dict, list[str]]:
+    """How [Code] treats .ld's default at uninstall: {"step": the TUninstallStep it runs at, "query" and "delete":
+    the roots it reads and deletes with as (administrative, per-user), "progid": the value it removes}; problems
+    when that is not recognised (then extend this reading)."""
+    heads = list(re.finditer(r"^(?:procedure|function)\s+(\w+)", code, re.M | re.I))
+    routines = {m.group(1).lower(): code[m.start():heads[k + 1].start() if k + 1 < len(heads) else len(code)]
+                for k, m in enumerate(heads)}
+    delete = r"RegDeleteValue\(\s*(\w+)\s*,\s*" + LD_ARG + r"\s*,\s*''\s*\)"
+    where = [name for name, body in routines.items() if re.search(delete, body)]
+    if len(where) != 1:
+        return {}, [f"[Code] removes .ld's default value in {len(where)} routines instead of 1"]
+    body = routines[where[0]]
+    query = re.search(r"RegQueryStringValue\(\s*(\w+)\s*,\s*" + LD_ARG + r"\s*,\s*''\s*,\s*(\w+)\s*\)", body)
+    if not query:
+        return {}, ["[Code] removes .ld's default without reading it first (RegQueryStringValue)"]
+    compared = re.search(r"\b" + query.group(2) + r"\s*(?:=|<>)\s*'([^']*)'", body)
+    if not compared:
+        return {}, [f"[Code] does not compare {query.group(2)}, .ld's default, with a ProgId"]
+
+    def roots(name: str) -> tuple[str, str]:
+        m = re.search(r"if\s+IsAdminInstallMode(?:\(\))?\s+then\s+" + name + r"\s*:=\s*(\w+)\s*;?\s*else\s+"
+                      + name + r"\s*:=\s*(\w+)", body, re.I)
+        return (m.group(1), m.group(2)) if m else (name, name)
+
+    handler = routines.get("curuninstallstepchanged", "")
+    if where[0] == "curuninstallstepchanged":
+        step = re.search(r"CurUninstallStep\s*(?:<>\s*(\w+)\s*then\s+exit|=\s*(\w+))", handler, re.I)
+    else:
+        step = re.search(r"\b(us\w+)\s*(?::|\)?\s*then)\s*(?:begin\s+)?" + where[0] + r"\b", handler, re.I)
+    names = [s for s in UNINSTALL_STEPS if step and s.lower() in [g.lower() for g in step.groups() if g]]
+    if not names:
+        return {}, [f"CurUninstallStepChanged does not call {where[0]} at one TUninstallStep"]
+    rule = {"step": names[0], "query": roots(query.group(1)), "delete": roots(re.search(delete, body).group(1)),
+            "progid": compared.group(1)}
+    problems = []
+    if not re.search(r"\busDone\b[^;]*?Log\('" + re.escape(UNINSTALL_DONE) + r"'\)", handler):
+        problems.append(f"CurUninstallStepChanged does not log '{UNINSTALL_DONE}' at usDone (smoke.py waits for it)")
+    return rule, problems
+
+
+def iss_hive(root: str, admin: bool) -> str:
+    """The hive an Inno Setup root names in a mode (HKA: HKLM in administrative install mode, HKCU otherwise; HKCR:
+    the merged view). The 32 or 64 suffix only picks a view, and Windows shares Software\\Classes\\.ld and the
+    ProgIds between the views, so the model leaves views out."""
+    base = re.sub(r"_?(?:32|64)$", "", root.upper())
+    return {"HKA": "HKLM" if admin else "HKCU", "HKEY_AUTO": "HKLM" if admin else "HKCU", "HKLM": "HKLM",
+            "HKEY_LOCAL_MACHINE": "HKLM", "HKCU": "HKCU", "HKEY_CURRENT_USER": "HKCU", "HKCR": "HKCR",
+            "HKEY_CLASSES_ROOT": "HKCR"}.get(base, "unknown root " + root)
+
+
+def iss_uninstall_problems(text: str) -> list[str]:
+    """esses.iss's .ld rule (D-217 (l), tools/packaging/README.md) on a model of what Inno Setup does with the
+    registry, without running anything: an install writes the [Registry] entries of the tasks it has (an upgrade
+    takes the earlier install's tasks again unless UsePreviousTasks=no) and appends the uninsdelete*/uninsclearvalue
+    flags of what it wrote to the uninstall log; the uninstaller runs [Code]'s .ld step at its TUninstallStep and the
+    log backwards, and its caller has the exit code after the log, before usPostUninstall. After every sequence of
+    installs, upgrades with and without the task and another program taking .ld, administrative and per-user: an
+    upgrade without the task leaves .ld's default as it was; when the caller has the exit code, and still when the
+    uninstaller ends, the ProgId and its OpenWithProgids entry are gone and .ld's default is gone if it was
+    Esses.LogFile and unchanged if it was another program's (the user's own HKCU choice too)."""
+    setup, entries, code = iss_sections(text)
+    rule, problems = iss_ld_rule(code)
+    unread = [f"the model does not read the [Registry] entry {e} (a Tasks expression, or a root other than HKA, "
+              "HKLM and HKCU)" for e in entries
+              if not re.fullmatch(r"[\w ]*", e.get("tasks", "")) or iss_hive(e.get("root", ""), True) == "HKCR"
+              or iss_hive(e.get("root", ""), True).startswith("unknown")]
+    if not rule or unread:
+        return problems + unread
+    keep_tasks = setup.get("useprevioustasks", "yes").lower() not in ("no", "false", "0")
+    ld, progid_key, open_with = LD_KEY.lower(), PROGID_KEY.lower(), OPEN_WITH_KEY.lower()
+    take, task = ("take",), {"assocld"}
+    sequences = {
+        "install with the task, uninstall": [task, "uninstall"],
+        "install with the task, another program takes .ld, uninstall": [task, take + (OTHER_OWNER,), "uninstall"],
+        "install with the task, upgrade without it, uninstall": [task, set(), "uninstall"],
+        "install with the task, another program takes .ld, upgrade without the task, .ld set back to Esses.LogFile, "
+        "uninstall (package.yml's smoke)": [task, take + (OTHER_OWNER,), set(), take + (PROGID,), "uninstall"],
+        "install with the task, another program takes .ld, upgrade without the task, uninstall":
+            [task, take + (OTHER_OWNER,), set(), "uninstall"],
+        "install without the task, upgrade with it, uninstall": [set(), task, "uninstall"],
+        "install with the task, upgrade with it, another program takes .ld, uninstall":
+            [task, task, take + (OTHER_OWNER,), "uninstall"],
+        "another program owns .ld, install without the task, uninstall": [take + (OTHER_OWNER,), set(), "uninstall"],
+        "the user's HKCU .ld names another program, install with the task, uninstall":
+            [take + (OTHER_OWNER, "HKCU"), task, "uninstall"],
+    }
+    for admin, (scenario, sequence) in itertools.product((True, False), sequences.items()):
+        mode = ("administrative: " if admin else "per-user: ") + scenario
+        hive = "HKLM" if admin else "HKCU"
+        store: dict[str, dict[str, dict[str, str]]] = {"HKLM": {}, "HKCU": {}}
+        records: list[tuple[str, str, str, str]] = []
+        tasks: set[str] | None = None
+
+        def default(where: str) -> str | None:
+            if where == "HKCR":
+                where = "HKCU" if ld in store["HKCU"] else "HKLM"
+            return store.get(where, {}).get(ld, {}).get("")
+
+        def ld_step() -> None:
+            if default(iss_hive(rule["query"][0 if admin else 1], admin)) == rule["progid"]:
+                where = iss_hive(rule["delete"][0 if admin else 1], admin)
+                if where == "HKCR":
+                    where = "HKCU" if ld in store["HKCU"] else "HKLM"
+                store.get(where, {}).get(ld, {}).pop("", None)
+
+        for op in sequence:
+            if isinstance(op, tuple):  # another program (or the smoke test) sets .ld's default
+                store[op[2] if len(op) > 2 else hive].setdefault(ld, {})[""] = op[1]
+            elif isinstance(op, set):  # an install, or an upgrade over the earlier one
+                upgrade = tasks is not None
+                tasks = op | (tasks if upgrade and keep_tasks else set())
+                before = default(hive)
+                for e in entries:
+                    if e.get("tasks") and not set(e["tasks"].split()) & tasks:
+                        continue  # an entry of a task this run does not have: neither written nor logged
+                    where, key = iss_hive(e["root"], admin), e["subkey"].lower()
+                    parts = key.split("\\")
+                    for k in range(1, len(parts) + 1):
+                        store[where].setdefault("\\".join(parts[:k]), {})
+                    name = e.get("valuename", "").lower()
+                    if e.get("valuetype", "none").lower() != "none":
+                        store[where][key][name] = e.get("valuedata", "")
+                    flags = e.get("flags", "").lower().split()
+                    records += [(f, where, key, name) for f in ("uninsdeletekey", "uninsdeletekeyifempty",
+                                                                "uninsdeletevalue", "uninsclearvalue") if f in flags]
+                if "assocld" in tasks and default(hive) != PROGID:
+                    problems.append(f"{mode}: an install with the task leaves .ld's default {default(hive)!r}")
+                if upgrade and "assocld" not in op and default(hive) != before:
+                    problems.append(f"{mode}: the upgrade without the task changes .ld's default from {before!r} "
+                                    f"to {default(hive)!r}")
+            else:  # the uninstall
+                expected = {"HKLM": default("HKLM"), "HKCU": default("HKCU")}
+                if expected[hive] == PROGID:
+                    expected[hive] = None
+                if rule["step"] in STEPS_BEFORE_EXIT_CODE:
+                    ld_step()
+                for flag, where, key, name in reversed(records):
+                    keys = store[where]
+                    if flag == "uninsdeletekey":
+                        for k in [k for k in keys if k == key or k.startswith(key + "\\")]:
+                            del keys[k]
+                    elif flag == "uninsdeletekeyifempty":
+                        if key in keys and not keys[key] and not any(k.startswith(key + "\\") for k in keys):
+                            del keys[key]
+                    elif flag == "uninsdeletevalue":
+                        keys.get(key, {}).pop(name, None)
+                    elif key in keys:
+                        keys[key][name] = ""
+                for when in ("when unins000.exe returns", "when the uninstaller ends"):
+                    if when == "when the uninstaller ends" and rule["step"] not in STEPS_BEFORE_EXIT_CODE:
+                        ld_step()
+                    got = {"HKLM": default("HKLM"), "HKCU": default("HKCU")}
+                    if got != expected:
+                        problems.append(f"{mode}: {when} (.ld step at {rule['step']}), .ld's default is {got} "
+                                        f"instead of {expected}")
+                    if progid_key in store[hive] or PROGID.lower() in store[hive].get(open_with, {}):
+                        problems.append(f"{mode}: {when}, the ProgId or its OpenWithProgids entry is left")
+    return problems
+
+
+# fe6cf07's uninstall step (D-217), which left .ld naming the deleted ProgId when unins000.exe returned (PR #5's
+# package job on 2d9a01c): the self-test's proof that iss_uninstall_problems() reports it.
+ISS_D217_HANDLER = r"""procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  Root: Integer;
+  ProgId: String;
+begin
+  if CurUninstallStep <> usPostUninstall then
+    exit;
+  if IsAdminInstallMode() then
+    Root := HKLM64
+  else
+    Root := HKCU;
+  if RegQueryStringValue(Root, 'Software\Classes\.ld', '', ProgId) and (ProgId = 'Esses.LogFile') then
+    RegDeleteValue(Root, 'Software\Classes\.ld', '');
+end;
+"""
+
+
+def iss_self_test() -> bool:
+    """iss_uninstall_problems() passes esses.iss and reports copies of it with each way the .ld rule can break."""
+    ok = iss_params('Root: HKA; Subkey: "a\\b"; ValueData: """{app}\\esses.exe"",0"; Flags: uninsdeletekey') == {
+        "root": "HKA", "subkey": "a\\b", "valuedata": '"{app}\\esses.exe",0', "flags": "uninsdeletekey"}
+    text = ISS.read_text(encoding="utf-8")
+    problems = iss_uninstall_problems(text)
+    for problem in problems:
+        print(f"self-test: esses.iss: {problem}")
+    ok &= problems == []
+
+    def reported(edits: list[tuple[str, str]], expect: str) -> bool:
+        broken = text
+        for old, new in edits:
+            if old not in broken:
+                print(f"self-test: esses.iss no longer holds {old!r} (update iss_self_test)")
+                return False
+            broken = broken.replace(old, new)
+        found = iss_uninstall_problems(broken)
+        if not any(expect in p for p in found):
+            print(f"self-test: esses.iss with {edits} is not reported for '{expect}' (got {found})")
+            return False
+        return True
+
+    ld_query = "RegQueryStringValue(HKA64, 'Software\\Classes\\.ld'"
+    ld_delete = "RegDeleteValue(HKA64, 'Software\\Classes\\.ld'"
+    ok &= reported([("usUninstall: RemoveOwnLdDefault", "usPostUninstall: RemoveOwnLdDefault")],
+                   "when unins000.exe returns (.ld step at usPostUninstall)")
+    ok &= reported([(text[text.index("procedure RemoveOwnLdDefault"):], ISS_D217_HANDLER)],
+                   "administrative: install with the task, another program takes .ld, upgrade without the task, .ld "
+                   "set back to Esses.LogFile, uninstall (package.yml's smoke): when unins000.exe returns (.ld step "
+                   "at usPostUninstall)")
+    ok &= reported([(ld_query, ld_query.replace("HKA64", "HKLM64")), (ld_delete, ld_delete.replace("HKA64", "HKLM64"))],
+                   "per-user: install with the task, uninstall: when unins000.exe returns")
+    ok &= reported([(ld_query, "RegQueryStringValue(HKCR, '.ld'"), (ld_delete, "RegDeleteValue(HKCR, '.ld'")],
+                   "administrative: the user's HKCU .ld names another program, install with the task, uninstall: when "
+                   "unins000.exe returns")
+    ok &= reported([('ValueData: "Esses.LogFile"; Tasks: assocld',
+                     'ValueData: "Esses.LogFile"; Flags: uninsdeletevalue; Tasks: assocld')],
+                   "another program takes .ld, uninstall: when unins000.exe returns")
+    ok &= reported([('ValueData: "Esses log file"; Flags: uninsdeletekey', 'ValueData: "Esses log file"')],
+                   "the ProgId or its OpenWithProgids entry is left")
+    ok &= reported([("UsePreviousTasks=no", "UsePreviousTasks=yes")],
+                   "the upgrade without the task changes .ld's default from 'Esses.SmokeOtherProgram'")
+    ok &= reported([(f"usDone: Log('{UNINSTALL_DONE}');", "")], f"does not log '{UNINSTALL_DONE}' at usDone")
+    if not ok:
+        print("self-test: iss_uninstall_problems FAILED")
+    return ok
+
+
+def uninstaller_self_test() -> bool:
+    """run_uninstaller() waits past the uninstaller's exit code for the end of the uninstall (a stand-in clone writes
+    the log's last line after the exit code came back, as Inno's does), reports one that ends before usDone, and,
+    on Windows, a failed installer_check() prints the values read under HKLM and HKCU and the log's .ld lines."""
+    import contextlib
+    import io
+    import threading
+    ok = True
+    with tempfile.TemporaryDirectory() as tmp:
+        log = pathlib.Path(tmp) / "uninstall.log"
+        lines = ".ld: HKLM\\Software\\Classes\\.ld was Esses.LogFile; removed\r\n"
+        cases = {"late": f"{lines}{UNINSTALL_DONE}\r\n{LOG_CLOSED}\r\n", "early": f"{lines}{LOG_CLOSED}\r\n",
+                 "none": None}
+        for case, content in cases.items():
+            log.unlink(missing_ok=True)
+            writers: list[threading.Thread] = []
+
+            def clone(content: str) -> None:  # the uninstaller's clone: its last lines after the exit code is back
+                time.sleep(0.5)
+                log.write_text(content, encoding="utf-8")
+
+            def run(command: list[str], timeout: float) -> subprocess.CompletedProcess:
+                if content is not None:
+                    writers.append(threading.Thread(target=clone, args=(content,)))
+                    writers[-1].start()
+                return subprocess.CompletedProcess(command, 0)
+
+            report = Report()
+            with contextlib.redirect_stdout(io.StringIO()):
+                text = run_uninstaller(report, pathlib.Path(tmp) / "unins000.exe", log, "uninstall",
+                                       seconds=60.0 if content else 0.5, run=run)
+            for w in writers:
+                w.join()
+            if case == "late":
+                ok &= report.problems == [] and UNINSTALL_DONE in text
+            else:
+                ok &= report.problems == [f"uninstall runs to its end (its log has '{UNINSTALL_DONE}')"]
+            if not ok:
+                print(f"self-test: run_uninstaller ({case}): {report.problems}")
+                return False
+    if os.name == "nt":
+        saved = globals()["reg_describe"]
+        try:
+            globals()["reg_describe"] = lambda root, path, name="": "'Esses.LogFile' (type 1)" if path == LD_KEY \
+                else "no key"
+            out = io.StringIO()
+            report = Report()
+            with contextlib.redirect_stdout(out):
+                installer_check(report, False, "uninstall removes .ld's default", "x\r\n" + lines)
+            text = out.getvalue()
+            ok &= report.problems == ["uninstall removes .ld's default"]
+            ok &= all(f"{hive}\\{LD_KEY} (default): 'Esses.LogFile' (type 1)" in text for hive in ("HKLM", "HKCU"))
+            ok &= f"HKLM\\{COMMAND_KEY} (default): no key" in text and f"uninstall log: {lines.strip()}" in text
+            ok &= "uninstall log: x" not in text
+            if not ok:
+                print(f"self-test: installer_check: {text}")
+        finally:
+            globals()["reg_describe"] = saved
+    return ok
+
+
 def windows_portable(report: Report, args) -> None:
     appdata = appdata_settings().parent
     before = folder_snapshot(appdata)  # compared file by file afterwards, also when the folder exists (D-217)
@@ -826,6 +1256,8 @@ def self_test() -> int:
     ok = True
     if os.name == "nt":  # windows-portable's checks of the scripts' work and its report of a failure (D-218 (b))
         ok &= portable_associations_self_test()
+    ok &= iss_self_test()  # the installer's .ld rule on a model of Inno Setup (D-217 (l))
+    ok &= uninstaller_self_test()  # windows-installer's wait for the end of an uninstall and its failure report
     good = ("esses 0.1.0\ncommit: 56d8065\nQt: 6.12.0 (built with 6.12.0)\nbuild date: 2026-10-19\n"
             "dock library: ADS 5.1.1\nsource: https://github.com/mitchdetailed/jubilant-octo-meme/tree/v0.1.0\n")
     ok &= version_problems(good, "0.1.0", "v0.1.0") == []

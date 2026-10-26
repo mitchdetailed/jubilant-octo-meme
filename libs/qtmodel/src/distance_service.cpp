@@ -97,8 +97,17 @@ DistanceService::DistanceService(MathsService& maths, Dispatcher& dispatcher, QO
         }
     });
     connect(&maths_, &MathsService::statusChanged, this, [this](const maths::ChannelKey& key) {
-        if (isCorrDist(key)) {
-            onStatusChanged(key.src);
+        if (!isCorrDist(key)) {
+            return;
+        }
+        onStatusChanged(key.src);
+        // An applied evaluation is announced by statusChanged too, and channelReady only once per (output,
+        // version) while the source is open: Corr Dist back at a version it had before (a settings edit
+        // undone) gets no channelReady, so the laps asked for while it evaluated (and a prefetching source's
+        // laps) are built from here, or they would wait for good and nothing would hear distanceReady.
+        const maths::MathState st = maths_.status(key).state;
+        if (st == maths::MathState::Ok || st == maths::MathState::Warning) {
+            onCorrDistReady(key.src);
         }
     });
 }

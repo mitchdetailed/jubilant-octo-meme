@@ -5,7 +5,8 @@
 // AC-M1-12): the built-in corrected speed/distance module registered per source and prefetched at
 // Background, settings validated against the module schema, one posted completion per evaluation, Error
 // without a speed channel (the "no distance data" path), versions kept across a sidecar snapshot, enable/
-// disable; the per-lap DistanceIndex and the outing DistanceChain; nothing blocks a NoBlock (GUI) thread.
+// disable; the per-lap DistanceIndex and the outing DistanceChain; nothing blocks a NoBlock (GUI) thread;
+// M4: laps waiting for Corr Dist back at an earlier version (a settings edit undone) are built all the same.
 
 #include "qtmodel_test_support.hpp"
 
@@ -22,7 +23,9 @@
 #include <QTest>
 #include <atomic>
 #include <cmath>
+#include <condition_variable>
 #include <fstream>
+#include <mutex>
 #include <sstream>
 #include <thread>
 
@@ -58,6 +61,25 @@ SyntheticOptions source(const char* path, bool wheels = true) {
 maths::ChannelKey keyOf(const model::DataSource& src, const char* name) {
     return maths::ChannelKey::make(src.id, model::kNormalLayer, name);
 }
+
+// Holds the pool's workers (tasks waiting on it) until open(), which notifies under the lock.
+class Gate {
+public:
+    void wait() {
+        std::unique_lock lock(mutex_);
+        cv_.wait(lock, [this] { return open_; });
+    }
+    void open() {
+        std::lock_guard lock(mutex_);
+        open_ = true;
+        cv_.notify_all();
+    }
+
+private:
+    std::mutex mutex_;
+    std::condition_variable cv_;
+    bool open_ = false;
+};
 
 model::OpaqueJson readJson(const std::filesystem::path& p) {
     std::ifstream in(p, std::ios::binary);
@@ -357,6 +379,70 @@ private Q_SLOTS:
 #else
         QSKIP("assertions are compiled out in this configuration");
 #endif
+    }
+
+    // A lap asked for while Corr Dist evaluates waits for the column. MathsService announces channelReady
+    // once per (output, version) while the source is open, so Corr Dist back at a version it had before (a
+    // settings edit undone) gets none: the applied evaluation reaches the service by statusChanged, which
+    // builds the waiting lap and the prefetching source's laps without another request, and distanceReady
+    // (the lap-stretch report, the worksheets) follows. The pool's workers are held while the version comes
+    // back, so the request certainly finds Corr Dist unevaluated.
+    void lapsWaitingForAnEarlierCorrDistVersionAreBuilt() {
+        Gate gate; // the gate and the count before the runtime: its workers use them until they return
+        std::atomic<int> held{0};
+        AppRuntime rt(runtimeOptions(2));
+        MathsService maths(rt.pool(), rt.dispatcher(), shippedUnits());
+        DistanceService distance(maths, rt.dispatcher());
+        struct Open { // frees the workers on every exit path, before the runtime joins them
+            Gate& gate;
+            ~Open() { gate.open(); }
+        } openOnExit{gate};
+        const auto src = makeSource(source("m-recur.ld"), rt.cache());
+        const maths::ChannelKey corrDist = keyOf(*src, "Corr Dist");
+        const std::size_t laps = rangeCount(*src);
+        const auto allIndexed = [&] {
+            for (std::size_t i = 0; i < laps; ++i) {
+                if (distance.index(rangeRef(*src, i), Priority::Interactive) == nullptr) {
+                    return false;
+                }
+            }
+            return true;
+        };
+        maths.addSource(src);
+        distance.prefetch(src->id);
+        QTRY_VERIFY_WITH_TIMEOUT(allIndexed(), 30000);
+        const maths::Version defaults = maths.status(corrDist).version;
+
+        // Another speed method: another Corr Dist version, and every lap indexed from it.
+        auto alternate = model::OpaqueJson::parse(
+            R"({"method": "alternateList", "alternateList": {"channels": ["Wheel Speed FR"]}})");
+        QVERIFY(alternate.ok());
+        maths.setCorrectedSpeedSettings(std::move(alternate).value());
+        QVERIFY(!(maths.status(corrDist).version == defaults));
+        QTRY_VERIFY_WITH_TIMEOUT(allIndexed(), 30000);
+        QTRY_VERIFY_WITH_TIMEOUT(rt.pool().queuedTasks("").empty() && rt.pool().stats().running == 0, 30000);
+
+        // The edit undone with the workers held: Corr Dist is back at the version of the open, unevaluated.
+        for (int i = 0; i < 2; ++i) {
+            rt.pool().submit(Priority::Interactive, TaskKey{}, CancelToken{},
+                             [&gate, &held](const CancelToken&) {
+                                 held.fetch_add(1);
+                                 gate.wait();
+                                 return 0;
+                             });
+        }
+        QTRY_COMPARE(held.load(), 2);
+        QSignalSpy ready(&distance, &DistanceService::distanceReady);
+        maths.setCorrectedSpeedSettings(model::OpaqueJson{});
+        QCOMPARE(maths.status(corrDist).version, defaults);
+        QVERIFY(distance.index(rangeRef(*src, 2), Priority::Visible) == nullptr); // waits for the column
+        gate.open();
+        // Nothing asks again: every lap is indexed from the column (the waiting one and the prefetch).
+        QTRY_VERIFY_WITH_TIMEOUT(ready.size() >= static_cast<qsizetype>(laps), 30000);
+        QCOMPARE(maths.status(corrDist).state, maths::MathState::Ok);
+        const auto idx = distance.index(rangeRef(*src, 2), Priority::Visible);
+        QVERIFY(idx != nullptr);
+        QVERIFY(std::abs(idx->lengthM() - 2000.0) < 2.0);
     }
 };
 

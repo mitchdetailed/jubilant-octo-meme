@@ -234,11 +234,10 @@ private Q_SLOTS:
         QVERIFY(QTest::qWaitForWindowExposed(&window));
         QVERIFY(settle(report->model(), 0));
         QCOMPARE(text(report->tableView(), 0, 1), QStringLiteral("49.50"));
-        // The world's distance pass ends first (its arrival re-runs every report of the source), so nothing
-        // else is in flight when the checks below count runs.
-        QTRY_VERIFY_WITH_TIMEOUT(w.distance.state(src->id) != qt::DistanceState::Pending, 30000);
-        drainEvents();
-        QTRY_VERIFY(!report->model().busy());
+        // The world's distance pass ends first (each lap index's arrival re-runs every report of the source),
+        // so nothing else is in flight when the checks below count runs: the pool settled, not the first
+        // index (DistanceState::Ready), which leaves the other laps' builds running.
+        QTRY_VERIFY_WITH_TIMEOUT(poolSettled(w.rt.pool()) && !report->model().busy(), 30000);
         // An unlisted channel becoming ready: nothing to re-run.
         const int shown = report->model().deliveries();
         report->onChannelDataChanged(maths::ChannelKey::make(src->id, "Normal", "Throttle"));

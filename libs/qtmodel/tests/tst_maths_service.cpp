@@ -13,8 +13,10 @@
 #include "qtmodel_test_support.hpp"
 
 #include <esses/base/paths.hpp>
+#include <esses/base/taskpool.hpp>
 #include <esses/qtmodel/app_runtime.hpp>
 #include <esses/qtmodel/channel_status_model.hpp>
+#include <esses/qtmodel/dispatcher.hpp>
 #include <esses/qtmodel/live_diagnostics.hpp>
 #include <esses/qtmodel/maths_service.hpp>
 #include <esses/qtmodel/project_session.hpp>
@@ -79,6 +81,16 @@ std::set<std::string> keysOf(const QSignalSpy& spy) {
         out.insert(args.at(0).value<maths::ChannelKey>().nameCf);
     }
     return out;
+}
+
+// Every task of the pool has completed and every result it posted has been delivered to this thread.
+bool quiet(AppRuntime& rt) {
+    const TaskPool::Stats s = rt.pool().stats();
+    std::size_t queued = 0;
+    for (const std::size_t q : s.queued) {
+        queued += q;
+    }
+    return queued == 0 && s.parked == 0 && s.running == 0 && rt.dispatcher().pending() == 0;
 }
 
 bool hasCode(const maths::Diagnostics& diags, std::string_view code) {
@@ -282,6 +294,38 @@ private Q_SLOTS:
         maths.removeSource(src->id);
         QVERIFY(maths.sources().empty());
         QVERIFY(maths.statusRows().empty());
+    }
+
+    // removeSource given a reference into the source whose last owners are the service's own (D-219): the id
+    // is copied first, so every table of the source goes, the channelReady already announced too: the same
+    // file added again (a reload of unchanged content: the same versions) is announced again. The source
+    // frees into overwritten storage, so a read of the dead id would match nothing.
+    void removeSourceOfAReferenceIntoTheRemovedSource() {
+        AppRuntime rt(runtimeOptions());
+        MathsService maths(rt.pool(), rt.dispatcher(), shippedUnits());
+        SyntheticOptions o;
+        o.path = "ms-remove.ld";
+        const auto original = makeSource(o, rt.cache());
+        const maths::ChannelKey corrDist = keyOf(*original, "Corr Dist");
+        QSignalSpy ready(&maths, &MathsService::channelReady);
+        const auto announced = [&ready, &corrDist] {
+            return std::count_if(ready.begin(), ready.end(), [&corrDist](const QList<QVariant>& args) {
+                return args.at(0).value<maths::ChannelKey>() == corrDist;
+            });
+        };
+        const model::DataSource* raw = nullptr;
+        {
+            const std::shared_ptr<const model::DataSource> copy = quarantinedCopy(*original);
+            raw = copy.get();
+            maths.addSource(copy); // Corr Dist prefetched
+        }
+        QTRY_COMPARE_WITH_TIMEOUT(announced(), 1, 30000);
+        QTRY_VERIFY_WITH_TIMEOUT(quiet(rt), 30000); // no task holds the source any more
+        maths.removeSource(raw->id);
+        QVERIFY(maths.sources().empty());
+        QVERIFY(maths.statusRows().empty());
+        maths.addSource(original);
+        QTRY_COMPARE_WITH_TIMEOUT(announced(), 2, 30000);
     }
 
     // 03 section 9.2: the zero-fix step is registered for a layer that logs both GPS inputs.

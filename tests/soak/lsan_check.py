@@ -8,7 +8,10 @@ The soak job runs tests/soak's executable under ASan + UBSan with LeakSanitizer,
 decides the run:
 
   * fail on an AddressSanitizer or UndefinedBehaviorSanitizer error (a crash, an ESSES_ASSERT or thread
-    violation, which the soak turns into an abort reported by ASan with handle_abort=1);
+    violation, which the soak turns into an abort reported by ASan with handle_abort=1); the first such report is
+    printed from its rule line to its SUMMARY line, paths as logged, so the job log shows where it happened
+    without the soak-logs artefact (a heap-use-after-free report with its four stacks fits in REPORT_LINES lines;
+    a longer report is cut there and says how many lines it left out);
   * fail on a failed or missing Qt Test result (--qtest, the -o <file>,txt log: its "Totals:" line);
   * fail on a leak report whose allocation stack has an esses frame: a function in namespace esses (any
     "esses::" in the frame's function), a source file under the checkout's libs/ or apps/ (--source-root), or an
@@ -198,6 +201,15 @@ ERROR_PATTERNS = (
     re.compile(r": runtime error: "),
     re.compile(r"ERROR: ThreadSanitizer"),
 )
+# Where an error report starts (the "=====" rule above it included) and the line that ends it.
+REPORT_START = re.compile(r"ERROR: (?:AddressSanitizer|UndefinedBehaviorSanitizer|ThreadSanitizer)|: runtime error: ")
+REPORT_RULE = re.compile(r"^=+$")
+REPORT_END = re.compile(r"^SUMMARY: ")
+# How much of the first report the verdict prints: up to REPORT_LINES lines, enough for a whole heap-use-after-free
+# report (its use, freed-by, allocated-by and thread-creation stacks: 129 lines in the soak's first one), and of a
+# longer line (a frame of a deeply templated function) its head and its tail, where the file and line are.
+REPORT_LINES = 200
+REPORT_LINE_CHARS = 600
 
 
 def parse_frame(line: str) -> Frame | None:
@@ -242,6 +254,42 @@ def parse_log(text: str, name: str = "") -> tuple[list[Leak], list[str]]:
         if any(p.search(line) for p in ERROR_PATTERNS):
             errors.append(line.strip())
     return leaks, errors
+
+
+def error_reports(text: str) -> list[list[str]]:
+    """The ASan, UBSan and TSan error reports of a log, each from its error line (with the rule above it) to its
+    SUMMARY line, else to the next report or the end of the log. LeakSanitizer's report is not one of them."""
+    lines = text.splitlines()
+    reports: list[list[str]] = []
+    i = 0
+    while i < len(lines):
+        if REPORT_START.search(lines[i]) is None:
+            i += 1
+            continue
+        start = i - 1 if i > 0 and REPORT_RULE.match(lines[i - 1].strip()) else i
+        end = i + 1
+        while end < len(lines) and REPORT_START.search(lines[end]) is None:
+            end += 1
+            if REPORT_END.match(lines[end - 1].strip()):
+                break
+        reports.append([line.rstrip() for line in lines[start:end]])
+        i = end
+    return reports
+
+
+def shown_report(name: str, report: list[str]) -> list[str]:
+    """The verdict's lines for a report: a heading, then its first REPORT_LINES lines, indented."""
+    heading = f"the first sanitizer report ({name}, {len(report)} line(s)"
+    heading += f"; the first {REPORT_LINES} shown):" if len(report) > REPORT_LINES else "):"
+    out = [heading]
+    for line in report[:REPORT_LINES]:
+        if len(line) > REPORT_LINE_CHARS:
+            keep = REPORT_LINE_CHARS // 2
+            line = f"{line[:keep]} [... {len(line) - 2 * keep} characters ...] {line[-keep:]}"
+        out.append(f"  | {line}")
+    if len(report) > REPORT_LINES:
+        out.append(f"  | ... {len(report) - REPORT_LINES} more line(s) in {name}")
+    return out
 
 
 ENTRY_FUNCTIONS = {"main", "qMain", "__libc_start_main", "__libc_start_call_main", "_start"}
@@ -308,6 +356,7 @@ class Verdict:
     counted: list[tuple[Leak, Frame]]
     foreign: list[Leak]
     errors: list[str]
+    report: list[str] = field(default_factory=list)  # the first error report, as the verdict prints it
 
 
 def judge(logs: list[tuple[str, str]], qtest: str | None, exit_status: int | None, source_root: str | None,
@@ -317,9 +366,14 @@ def judge(logs: list[tuple[str, str]], qtest: str | None, exit_status: int | Non
     counted: list[tuple[Leak, Frame]] = []
     foreign: list[Leak] = []
     errors: list[str] = []
+    report: list[str] = []
     for name, text in logs:
         leaks, errs = parse_log(text, name)
         errors.extend(f"{name}: {e}" for e in errs)
+        if errs and not report:
+            reports = error_reports(text)
+            if reports:
+                report = shown_report(name, reports[0])
         for leak in leaks:
             frame = esses_frame_of(leak, source_root)
             if frame is not None:
@@ -330,6 +384,7 @@ def judge(logs: list[tuple[str, str]], qtest: str | None, exit_status: int | Non
         ok = False
         lines.append(f"FAIL: {len(errors)} sanitizer error line(s):")
         lines.extend(f"  {e}" for e in errors[:20])
+        lines.extend(report)
     if qtest is not None:
         passed, why = qtest_verdict(qtest)
         lines.append(("" if passed else "FAIL: ") + why)
@@ -358,7 +413,7 @@ def judge(logs: list[tuple[str, str]], qtest: str | None, exit_status: int | Non
     if exit_status not in (None, 0) and ok and not counted and not foreign and expect_leak is None:
         ok = False
         lines.append(f"FAIL: the soak exited with {exit_status} without a leak report or sanitizer error to explain it")
-    return Verdict(ok, lines, counted, foreign, errors)
+    return Verdict(ok, lines, counted, foreign, errors, report)
 
 
 def read_logs(paths: list[str]) -> list[tuple[str, str]]:
@@ -412,8 +467,21 @@ SUMMARY: AddressSanitizer: 4336 byte(s) leaked in 6 allocation(s).
 """
 
 SELF_ERRORS = """\
+=================================================================
 ==4712==ERROR: AddressSanitizer: heap-use-after-free on address 0x602000000010 at pc 0x55d1c2 bp 0x7ffc sp 0x7ffc
+READ of size 8 at 0x602000000010 thread T0
+    #0 0x55d1c2 in esses::qt::DataSelectionModel::closeSource(esses::Hash128 const&) /work/repo/libs/qtmodel/src/data_selection_model.cpp:1009:14
+    #1 0x55d1d3 in esses::qt::SourceLoader::close(esses::Hash128 const&) /work/repo/libs/qtmodel/src/source_loader.cpp:813:12
+
+0x602000000010 is located 24 bytes inside of 1200-byte region [0x601ffffffff8,0x6020000004a8)
+freed by thread T0 here:
+    #0 0x55d0c1 in operator delete(void*) /src/llvm-project/compiler-rt/lib/asan/asan_new_delete.cpp:152:3
+    #1 0x55d1e4 in esses::qt::DataSelectionModel::closeSource(esses::Hash128 const&) /work/repo/libs/qtmodel/src/data_selection_model.cpp:1008:14
+
+SUMMARY: AddressSanitizer: heap-use-after-free /work/repo/libs/base/include/esses/base/hash.hpp:31:39 in esses::operator<=>(esses::Hash128 const&, esses::Hash128 const&)
+Shadow bytes around the buggy address:
 /work/repo/libs/store/src/column.cpp:120:5: runtime error: signed integer overflow
+    #0 0x55d2f5 in esses::store::Column::append(double) /work/repo/libs/store/src/column.cpp:120:5
 """
 
 
@@ -456,6 +524,54 @@ def self_test(suppressions: str | None) -> int:
     # Sanitizer errors and test results.
     v = judge([("asan.3", SELF_ERRORS)], "Totals: 6 passed, 0 failed", 1, root)
     expect(not v.ok and len(v.errors) == 2, "ASan and UBSan errors fail the run")
+    # The first report is printed in full (its rule to its SUMMARY line, paths as logged); the second is not.
+    expect(len(v.report) == 13 and v.report[0] == "the first sanitizer report (asan.3, 12 line(s)):",
+           f"the first report is printed whole, got {v.report[:1]} and {len(v.report)} line(s)")
+    expect(v.report[1] == "  | " + "=" * 65 and v.report[-1].startswith("  | SUMMARY: AddressSanitizer: "),
+           "the report runs from its rule to its SUMMARY line")
+    expect(any("/work/repo/libs/qtmodel/src/data_selection_model.cpp:1008:14" in line for line in v.report),
+           "the report keeps its frames and their paths (the freed-by stack included)")
+    expect(not any("Column::append" in line for line in v.report), "only the first report is printed")
+    expect(all(line in v.lines for line in v.report), "the verdict prints the report")
+    reports = error_reports(SELF_ERRORS)
+    expect(len(reports) == 2 and reports[1][-1].endswith("column.cpp:120:5"),
+           "a UBSan report without a SUMMARY line runs to the end of the log")
+    # A heap-use-after-free report of the soak's first one's shape (129 lines: the use stack of 43 frames, the
+    # freed-by stack of 33, the allocated-by stack of 26 and the creation stack of the allocating thread of 15) is
+    # printed whole, down to its SUMMARY line.
+    def stack(header: str, count: int, where: str) -> list[str]:
+        return [header] + [f"    #{k} 0x55 in esses::{where}{k}() /work/repo/libs/{where}.cpp:{k + 1}:1"
+                           for k in range(count)] + [""]
+
+    uaf_report = "\n".join(["=" * 65, "==2==ERROR: AddressSanitizer: heap-use-after-free on address 0x5170 at pc 0x55"]
+                           + stack("READ of size 8 at 0x5170 thread T0", 43, "use")
+                           + ["0x5170 is located 24 bytes inside of 688-byte region [0x5170,0x5172)"]
+                           + stack("freed by thread T0 here:", 33, "freed")
+                           + stack("previously allocated by thread T5 here:", 26, "allocated")
+                           + stack("Thread T5 created by T0 here:", 15, "created")
+                           + ["SUMMARY: AddressSanitizer: heap-use-after-free /work/repo/libs/use.cpp:1:1 in f()",
+                              "Shadow bytes around the buggy address:", "==2==ABORTING"])
+    v = judge([("asan.6", uaf_report)], None, None, root)
+    expect(not v.ok and v.report[0] == "the first sanitizer report (asan.6, 129 line(s)):" and len(v.report) == 130,
+           f"a heap-use-after-free report is printed whole, got {v.report[:1]} and {len(v.report)} line(s)")
+    expect(v.report[-1].startswith("  | SUMMARY: AddressSanitizer: heap-use-after-free ")
+           and "  | previously allocated by thread T5 here:" in v.report
+           and "  |     #14 0x55 in esses::created14() /work/repo/libs/created.cpp:15:1" in v.report,
+           "its allocated-by and thread-creation stacks and its SUMMARY line reach the job log")
+    # A longer report is cut, and says so.
+    frames = REPORT_LINES + 100
+    long_report = "\n".join(["==1==ERROR: AddressSanitizer: stack-overflow on address 0x7ffc"]
+                            + [f"    #{k} 0x55 in esses::f{k}() /work/repo/libs/x.cpp:{k}:1" for k in range(frames)]
+                            + [f"    #{frames} 0x55 in " + "std::vector<int>::" * 60 + "g() /work/repo/libs/y.cpp:7:3",
+                               "SUMMARY: AddressSanitizer: stack-overflow /work/repo/libs/x.cpp:1:1 in esses::f0()"])
+    v = judge([("asan.4", long_report)], None, None, root)
+    expect(not v.ok and len(v.report) == REPORT_LINES + 2, f"a long report is cut, got {len(v.report)} line(s)")
+    expect(v.report[0].endswith(f"{frames + 3} line(s); the first {REPORT_LINES} shown):")
+           and v.report[-1] == f"  | ... {frames + 3 - REPORT_LINES} more line(s) in asan.4", "the cut is said")
+    shown = shown_report("asan.4", error_reports(long_report)[0][-2:])
+    expect(len(shown[1]) < REPORT_LINE_CHARS + 50 and shown[1].endswith("g() /work/repo/libs/y.cpp:7:3"),
+           "a long frame keeps its head and its file and line")
+    expect(not judge([("asan.5", SELF_LOG)], None, None, root).report, "a leak report is not an error report")
     expect(not judge([], "Totals: 5 passed, 1 failed, 0 skipped", 1, root).ok, "a failed test fails the run")
     expect(not judge([], "PASS   : TstSaturday::initTestCase()", 134, root).ok, "no totals (a crash) fails the run")
     expect(judge([], "Totals: 6 passed, 0 failed, 1 skipped", 0, root).ok, "a clean run passes")

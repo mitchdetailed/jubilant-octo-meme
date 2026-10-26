@@ -31,9 +31,11 @@
 #include <atomic>
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <future>
 #include <latch>
 #include <memory>
+#include <optional>
 #include <string>
 #include <thread>
 #include <utility>
@@ -103,6 +105,22 @@ bool poolIdle(AppRuntime& rt) {
 // thread: what the tests wait for instead of a fixed time, which a loaded machine can always outlast.
 bool quiet(AppRuntime& rt) {
     return poolIdle(rt) && rt.dispatcher().pending() == 0;
+}
+
+// The tasks waiting in the pool's queues (none of them has started).
+std::size_t queuedTasks(AppRuntime& rt) {
+    std::size_t queued = 0;
+    for (const std::size_t q : rt.pool().stats().queued) {
+        queued += q;
+    }
+    return queued;
+}
+
+// Whether `id` lies inside the DataSource object that started at `source` (compared as addresses only: the
+// source may be gone).
+bool insideSource(const model::SourceId& id, std::uintptr_t source) {
+    const auto at = reinterpret_cast<std::uintptr_t>(&id);
+    return at >= source && at < source + sizeof(model::DataSource);
 }
 
 // Holds every worker of `pool` until release(), so that a task submitted meanwhile cannot have finished when
@@ -433,6 +451,85 @@ private Q_SLOTS:
         // The loader opens again afterwards.
         w.loader.open(ld);
         QTRY_COMPARE_WITH_TIMEOUT(published.count(), 1, 30000);
+    }
+
+    // The soak's heap-use-after-free (D-219): closeAll() closed each source through a reference to that
+    // source's own id, and the close let go of every owner of the source (open_, the maths, then the
+    // selection inside sourceClosed's emission) before its last use of the id. The loader now closes with a
+    // copy, so every receiver of sourceClosed gets an id that is no part of the closed source: a receiver
+    // connected after the selection (which let go of the last owner) still reads it. The same for close()
+    // given a reference into the source it closes.
+    void sourceClosedHandsACopyOfTheId() {
+        AppRuntime rt(runtimeOptions());
+        const std::filesystem::path ld = writeSynthetic("closed-copy", rt.cache());
+        Workspace w(rt);
+        w.loader.setUseSidecars(false);
+        int published = 0; // counted, not spied: a QSignalSpy would keep the sources alive
+        QObject::connect(&w.loader, &SourceLoader::sourcePublished, &w.loader,
+                         [&published](const std::shared_ptr<const model::DataSource>&) { ++published; });
+        std::uintptr_t source = 0; // where the open source lives
+        model::SourceId expected;
+        const auto openAndWait = [&] {
+            w.loader.open(ld);
+            QTRY_COMPARE_WITH_TIMEOUT(w.loader.sources().size(), std::size_t{1}, 30000);
+            QTRY_VERIFY_WITH_TIMEOUT(quiet(rt), 30000);
+            const std::shared_ptr<const model::DataSource> src = w.loader.sources().front();
+            source = reinterpret_cast<std::uintptr_t>(src.get());
+            expected = src->id;
+        };
+        int aliased = 0;
+        std::vector<model::SourceId> seen;
+        QObject::connect(&w.loader, &SourceLoader::sourceClosed, &w.loader, [&](const model::SourceId& id) {
+            aliased += insideSource(id, source) ? 1 : 0;
+            seen.push_back(id);
+        });
+
+        openAndWait();
+        w.loader.close(w.loader.sources().front()->id); // a reference into the source it closes
+        QCOMPARE(aliased, 0);
+        QCOMPARE(seen, std::vector<model::SourceId>{expected});
+        QVERIFY(w.selection.sources().empty());
+
+        openAndWait();
+        QCOMPARE(published, 2);
+        w.loader.closeAll(); // the soak's File > Close All
+        QCOMPARE(aliased, 0);
+        QCOMPARE(seen, (std::vector<model::SourceId>{expected, expected}));
+        QVERIFY(w.loader.sources().empty());
+        QVERIFY(w.selection.sources().empty());
+        QVERIFY(w.maths.sources().empty());
+    }
+
+    // D-190 at exit, with a write of an older edit still queued (D-219): the destructor flushed each pending
+    // edit through a reference to its own key in sidecarsDue_ / sidecarsInFlight_, which the flush erased
+    // before its last use of the id (a use after free: with the freed key unreadable the queued older edit
+    // was not taken over and was written last). The newest edit is on disk and stays there.
+    void destroyedWithAnOlderWriteQueuedKeepsTheNewestEdit() {
+        AppRuntime rt(runtimeOptions());
+        const std::filesystem::path ld = writeSynthetic("sidecar-exit", rt.cache());
+        const std::filesystem::path sidecar = model::SidecarDocument::pathFor(ld);
+        model::SidecarDocument last;
+        {
+            // No maths: the only task an edit queues is its sidecar write. The loader goes first (as in the
+            // window), then the held workers are released.
+            std::optional<WorkerHold> hold;
+            DataSelectionModel selection;
+            SourceLoader loader(rt.pool(), rt.dispatcher(), shippedUnits());
+            connectSourceLoader(loader, selection, nullptr);
+            loader.open(ld);
+            QTRY_COMPARE_WITH_TIMEOUT(selection.sources().size(), std::size_t{1}, 30000);
+            QTRY_VERIFY_WITH_TIMEOUT(quiet(rt), 30000);
+            const model::SourceId id = selection.sources().front()->id;
+            hold.emplace(rt.pool());
+            selection.setTrusted(rangeRef(*loader.source(id), 1), false);
+            // The coalescing timer hands the edit to a Background write, which waits behind the held workers.
+            QTRY_COMPARE_WITH_TIMEOUT(queuedTasks(rt), std::size_t{1}, 10000);
+            selection.setTrusted(rangeRef(*loader.source(id), 2), false); // a newer edit, due
+            last = loader.source(id)->sidecar;
+            QVERIFY(!last.empty());
+        } // ~SourceLoader writes the newest edit; the queued older write runs once the workers are released
+        QTRY_VERIFY_WITH_TIMEOUT(quiet(rt), 30000);
+        QCOMPARE(readWholeFile(sidecar).valueOr(std::string()), *last.toJson());
     }
 
     // AC-M1-12: the open pipeline, publication, maths and distance work on a NoBlock thread without a wait.

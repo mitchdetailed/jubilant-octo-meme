@@ -84,6 +84,7 @@ layers (Clang 18, Debug, ASan + UBSan, assertions), Qt 6.12.0 from ci.yml's aqti
 minutes and on manual dispatch with `soak_minutes` (120 on the release candidate, `docs/milestones/M4.md` §6.5).
 It runs `lsan_check.py --self-test`, then the leak pipeline's own check (`ESSES_SOAK_SELFTEST=leak`: an allocation
 in `esses::soak::leakOnPurpose`, made inside a Qt timer's callback, must be reported through `lsan.supp` and
-counted), then the soak, then `lsan_check.py` over the logs; the logs, `saturday-cycles.csv` and the summary are
-the artefact `soak-logs`. A leak without an Esses frame is a warning naming its library: add it to `lsan.supp`
+counted), then the soak, then `lsan_check.py` over the logs, which prints the first ASan or UBSan report in the job
+log (whole, from its rule to its `SUMMARY:` line, up to 200 lines); the logs, `saturday-cycles.csv` and the summary
+are the artefact `soak-logs`. A leak without an Esses frame is a warning naming its library: add it to `lsan.supp`
 only under the rule of its header (the self-test refuses anything else).

@@ -851,6 +851,7 @@ Rewritten on 2026-10-10 after the review. The list is deduplicated across this d
 | D-216 | The M4 integration as built: the commit stamped at a tag, the soak out of the normal runs with its guard's tests in them, the walkthrough and the CLI golden tests as CI steps of their own, the install rules with and without Qt and the release tree scanned in lint, every M4 keymap row implemented with M4 as the keymap checker's milestone, the demo's command line in a real process, one repository URL, the soak's restart check after a Close All (refines D-206, D-212 (b), D-213 (f), D-214, D-215; reads 07 §7.2, §7.5, 08 §3.10, §4.1, §4.4, §5; amends D-213 (f), 08 §4.1's qt-app and lint rows) | no | M4 integration, AC-M4-01/-03/-08/-09 |
 | D-217 | The M4 fix pass: PR #5's first CI failures fixed at the root (the main window's teardown, the formatter, the vendor-mark scan of optimised binaries, the Qt install with one aqtinstall worker), Reload that keeps the source until its file is open again, decode-time diagnostics in Messages, the activation check on the pool, forwarded requests at the top of the event loop and only after their answer, a salted per-user channel, the release stamped from its own tag and development builds marked, convert's companion, cut details, empty output and duplicate channels, the hosted bench without the reference gates, the three missing MVP bench rows, installer upgrades and uninstalls that keep what is not theirs; the deferrals (macOS strips, crisp 2 px lines at DPR 2, same-size same-mtime replacements, Qt's bundled notices) (refines D-208, D-209, D-212, D-214, D-215, D-216; reads 02 §1 behaviour 5, 05 §5, §9.2, 06 §6, §17, §18-19, 07 §1.5, §7.2, §12, 08 §3.10, §4, §7; amends D-208's "Reload as a close then an open", D-212 (b)'s channel name, D-216 (a)'s version of a build without a version tag) | **yes**: (n) only | M4 fix pass, AC-M4-01/-04/-05/-07/-08/-09/-10 |
 | D-218 | PR #5's second CI run: the reference decoder and the Python tools on Python 3.8 and later (the half floats of `memoryview.cast` from 3.12 only, `float_sum` as 3.12's compensated sum), the association scripts with Windows's `reg` by its full path and nothing else, two defects of the vendored ADS fixed in place with the rule for such changes and `AdsBackend`'s docks read by `qobject_cast`, the two macOS-only test faults (forwarded paths compared by file identity, a values list placed as on a worksheet); the deferral (ADS's side-bar restore of a damaged layout) (refines D-041, D-212, D-217 (d) and (l); reads 06 §19 item 2, 08 §9; amends D-147 (a) and D-153 for the vendored ADS's source files, and the licence policy of `GOVERNANCE.md`) | **yes**: (c) only | PR #5's second CI run, AC-M4-01/-03/-04/-06/-07 |
+| D-219 | PR #5's third CI run: an id copied before the source that holds it can go (the soak's heap-use-after-free at Close All, the sidecar flush at exit, the selection's close, the maths' removal, the Mapping panel's hand-off) with the soak's first sanitizer report in the job log, the lap-stretch tests reading the report as it is announced and the laps that wait for Corr Dist back at an earlier version built, the uninstaller's `.ld` step before `unins000.exe` returns with `smoke.py` waiting for the uninstall's end and a model of the installer's `.ld` rule (refines D-016, D-121, D-179 (a), D-190, D-213, D-217 (l)) | no | PR #5's third CI run, AC-M4-01/-03/-04 |
 
 ### A.1 Review amendments
 
@@ -3305,3 +3306,118 @@ strips' failure.
 **User must confirm:** yes: (c), the vendored ADS changed in place and the licence policy of `GOVERNANCE.md` that now
 allows it (0.1 proceeds with the change; (c)'s alternatives are what remains if the maintainer declines); the rest
 no.
+
+#### D-219 PR #5's third CI run: an id copied before the source that holds it can go, with the soak's first sanitizer report in the job log, the lap-stretch tests reading the report as it is announced and the laps that wait for Corr Dist back at an earlier version built, the uninstaller's `.ld` step before `unins000.exe` returns with `smoke.py` waiting for the uninstall's end and a model of the installer's `.ld` rule (refines D-016, D-121, D-179 (a), D-190, D-213, D-217 (l))
+**Context.** PR #5's third CI run, on 2d9a01c (D-218) of 2026-10-26, with the runs dispatched on the branch before
+the merge (M4.md §6.0 step 1): `ci` 40284591559 (pull request) and 40284599411 (dispatch, adds qt-app on macos-14),
+`package` 40284591582 and `bench` 40284602652 (the soak, 30 min). Green: core x3, `lint`, sanitize x2, fuzz-smoke x2
+and qt-matrix in both `ci` runs, qt-app ubuntu-24.04 in both and windows-2022 in the dispatch, package's source,
+ubuntu-24.04 and macos-14 jobs, and the hosted bench alarm. The runs confirm D-218 (a) (`formats_ld.oracle_synthetic`
+passed in every qt-app row), (b) (`smoke.py windows-portable` passed with its decoys, `unassociate-ld.cmd` included)
+and (d) (qt-app on macos-14 failed only `qtrender.tst_static_strips`, D-217 (n)'s deferral), and (c) as far as the
+soak went: its first main window and the restart of its second cycle passed without a sanitizer report. Failed:
+qt-app windows-2022 of the pull request at `qtmodel.tst_lap_stretch` (lap 3's length was 0 at `tst_lap_stretch.cpp`
+line 145; 1174/1175); package windows-2022 at `smoke.py windows-installer`'s "uninstall removes the .ld
+association", after its install, upgrade and runtime checks had passed; the soak at its second cycle's Close All,
+95 s in, on AddressSanitizer's heap-use-after-free in `DataSelectionModel::closeSource` (the read at
+`data_selection_model.cpp:1009`, the free one line before), which ended it before any leak was judged.
+**Decision.** (a) **An id is copied before what holds it can go** (refines D-179 (a), D-190, D-213). File > Close All
+(`SourceLoader::closeAll()`) called `close(open_.back()->id)`, a reference to the closed `DataSource`'s own id.
+`close()` let go of the loader's and the maths' owners and emitted `sourceClosed` with that reference; the selection,
+a direct receiver, held the last owner, freed it in `sources_.erase` and then read the id for `filters_.erase`. The
+receivers connected after it (`LapStretchService`, the Lap Editor) read freed memory too, and so did a headless
+`closeAll()`, where `MathsService::removeSource` drops the last owner. The soak's first cycle passed only because its
+driver uses Close All when `k % 5 == 1`. The rule: a function that closes, removes or erases what may own the id it
+was given copies the id first, and the signal that announces the close carries that copy. It now holds in five places:
+`SourceLoader::close()` (every `sourceClosed` receiver gets its copy) and `closeAll()`;
+`DataSelectionModel::closeSource()`; `MathsService::removeSource()` (its sources map and graphs own the source);
+`SourceLoader::flushSidecar()` and the destructor that called it with a key of `sidecarsDue_` or
+`sidecarsInFlight_`, which the flush erased; and `mappingRequired`, which now carries a copy of the pending entry,
+because a receiver may answer at once (`resolveMapping` and `cancelMapping` erase the entry), as `budgetExceeded`
+already did. The flush at exit was a second defect with an effect a user could meet: where freed memory no longer
+reads as the key (MSVC Debug overwrites it), an older sidecar write still queued was not taken over and ran last, so
+the newest edit made within the coalescing interval before exit was lost (D-190's flush at exit). Every other emission
+and slot of the Qt layers that takes a source id or a map entry by reference was read and keeps its argument alive
+(M4.md §8 "Third CI run (D-219)"). New tests: `qtmodel.tst_source_loader` `sourceClosedHandsACopyOfTheId` (a reference
+given to `close()`, and `closeAll()`) and `destroyedWithAnOlderWriteQueuedKeepsTheNewestEdit`,
+`qtmodel.tst_dataselection` `closeSourceOfAReferenceIntoTheClosedSource`, `qtmodel.tst_maths_service`
+`removeSourceOfAReferenceIntoTheRemovedSource` and `qtmodel.tst_mapping_handoff` `aReceiverMayAnswerAtOnce`. Four of
+them fail with their fix reverted in any build, with or without a sanitizer: `sourceClosedHandsACopyOfTheId` and
+`aReceiverMayAnswerAtOnce` compare addresses (the id a `sourceClosed` receiver is given must not lie inside the closed
+source, the entry a `mappingRequired` receiver is given must not be the one its answer erases), and the other two read
+an id through a reference that outlived its source with a new helper, `quarantinedCopy` (`qtmodel_test_support`): the
+source's bytes are overwritten when its last owner lets go, in storage kept until the process ends. The fifth,
+`destroyedWithAnOlderWriteQueuedKeepsTheNewestEdit`, depends on freed memory being overwritten or its read caught: with
+its fix reverted the destructor reads the key of the map entry its flush has just erased, which fails the test in MSVC
+Debug (the debug CRT fills freed memory with 0xDD; CI's windows-2022 `qt-app` job) and, by reasoning, under
+AddressSanitizer, which reports the read (not run: no CI job runs the Qt tests under it); a Clang 17 Debug build passes
+it 5 of 5 with the fix reverted, so on GCC, Clang and macOS it catches no regression. The soak job's log had shown only
+the report's first line, so `tests/soak/lsan_check.py` now prints the first AddressSanitizer, UBSan or ThreadSanitizer
+report of a failed run (from its rule to its `SUMMARY:` line, at most 200 lines, so that the soak's 129-line
+heap-use-after-free report prints whole with its four stacks; a line over 600 characters cut in its middle so that its
+file and line stay; paths as logged), with `--self-test` cases. (b) **The lap-stretch report read as it is announced;
+the laps that wait for Corr Dist back at an earlier version built** (refines D-016). `DistanceService` builds each lap's
+index as a Background task of its own, in the band the summary pass and the maths prefetch share, and each
+`distanceReady` updates `LapStretchService`. `qtmodel.tst_lap_stretch` waited until laps 1 and 2 were stretched and then
+read `report()`, which gives a lap whose index has not arrived a length of 0, as documented: a test race since M2 (no
+file of the distance or lap-stretch code has changed since `main` 59df0f8), lost by the pull request's windows-2022 row
+and won by the dispatch's. Reproduced in MSVC Debug under parallel load (8 of 240 and 9 of 280 runs), never in Clang 17
+(0 of 1,320). The test now keeps the report as a `reportChanged` receiver reads it and waits (QTRY) until every lap
+has its length, every check as strict as before; polling `report()` would itself ask for the indexes and hide a
+missing announcement. `ui.tst_walkthrough_saturday` item 8 read the lengths the same way after its Corrected Speed
+undo (1 failure in 48 loaded runs) and now reads them as announced too; `widgets.tst_channel_report`
+`hiddenReportsWaitForTheirShow` waited until the distance state left Pending, which happens at the first lap index,
+and now waits for the pool to settle. The product defect found on the way: `MathsService` announces `channelReady`
+once per (output, version) while a source is open, and `DistanceService` built the laps waiting for Corr Dist only on
+`channelReady`. Corr Dist back at a version it had before (a Corrected Speed settings edit undone) gets none, so a lap
+asked for while it was evaluated again was never built and no `distanceReady` followed: the stretch report, the Lap
+Editor's Stretch column and the lap prefetch stayed stale until something asked again. `DistanceService` now also
+builds the waiting laps, and a prefetching source's laps, when Corr Dist's `statusChanged` reports Ok or Warning;
+`statusChanged` comes first, so a later `channelReady` finds those builds pending and starts nothing. New
+`qtmodel.tst_maths_distance` `lapsWaitingForAnEarlierCorrDistVersionAreBuilt`: the pool's two workers are held while
+the edit is undone, so the request finds Corr Dist unevaluated, and the test waits for `distanceReady` without asking
+again; it fails without the fix. (c) **The uninstaller's `.ld` step before `unins000.exe` returns** (refines D-121,
+D-217 (l)). Inno Setup's `unins000.exe` copies itself to a temporary folder and the copy does the work: it processes
+the uninstall log (the files, the `Esses.LogFile` ProgId by `uninsdeletekey`, the OpenWithProgids value, the
+uninstall key), tells the shell that associations changed (`ChangesAssociations=yes`), ends the original process,
+whose caller then has exit code 0, waits 500 ms, deletes `unins000.exe` and only then raises `usPostUninstall` (Inno
+Setup's source, read at `main` and at the tag of 6.4.3, and its help's "Uninstaller Exit Codes": some uninstall code
+may still be running when the exit code comes back). D-217 (l)'s step removed `.ld`'s default at `usPostUninstall`, so
+when the exit code came back the ProgId was gone and HKLM's `.ld` still named it; the failing check ran 0.4 s after
+the upgrade's last one, within the copy's wait, and `smoke.py` did not check the exit code. The same order put the
+removal after the shell's notice, so Explorer was never told of it, and an uninstall cut short in that window (ended,
+crashed, a restart) left `.ld` naming a ProgId that no longer exists. `esses.iss`'s `RemoveOwnLdDefault()` now runs
+at `usUninstall`, before the log is processed, under `HKA64`, the root and view the `[Registry]` entries were written
+to (HKLM for an administrative install, HKCU for a per-user one); it removes the default only while it is exactly
+`Esses.LogFile` and logs a line starting `.ld:` for each outcome, and `usDone` logs `Esses: uninstall done`. Ruled
+out: the registry view (`Software\Classes\.ld` is shared between the 32- and 64-bit views), the tasks, the
+uninstaller's install mode, previous-install data and HKCR. `smoke.py windows-installer` runs each uninstall with
+`/LOG=`, requires exit code 0 and waits for that line (and fails at once on Inno's closing line without it); a failed
+association check prints `.ld`'s default, the OpenWithProgids entry, the ProgId and its open command in HKLM and HKCU,
+with the uninstall log's `.ld:` lines. The administrative uninstall must remove `.ld`'s default, the ProgId, its
+OpenWithProgids entry and the uninstall entry. The per-user section installs with the association
+(`/MERGETASKS=assocld`): its first uninstall must remove its own `.ld`, the uninstall of a second install after
+another program took `.ld` must leave it, and both must remove the ProgId and the uninstall entry; on 2d9a01c the
+per-user check that another program's `.ld` stays had read the registry before the `.ld` step ran, so it could not
+tell a correct rule from a wrong one. `smoke.py --self-test`
+(`packaging.smoke_self_test`) gains `iss_self_test`, which reads `esses.iss`'s `[Setup]`, `[Registry]` and `.ld`
+step and runs them on a model of Inno Setup's registry behaviour through installs, upgrades with and without the task,
+another program taking `.ld` (the package job's sequence among them) and the user's own HKCU choice under an
+administrative install, in both install modes. When `unins000.exe` returns and when the uninstall ends, the ProgId and
+its OpenWithProgids entry must be gone, and `.ld`'s default gone if it was Esses's and unchanged if not; an upgrade
+without the task must leave `.ld` as it was. The script passes, a parser check passes, and eight changed copies must
+fail: the step at `usPostUninstall`, D-217's handler, an `HKLM64` root, an `HKCR` root, `uninsdeletevalue` on `.ld`,
+no `uninsdeletekey` on the ProgId, `UsePreviousTasks=yes` and the `usDone` line removed.
+`uninstaller_self_test` checks the wait with a stand-in uninstaller that writes its log after it has returned.
+**Consequences.** Each failure of 2d9a01c's runs except the deferred macOS strips is fixed at its cause, and each
+product fix comes with a test that fails without it: the five tests of (a) (four in any build, the exit flush's in MSVC
+Debug), the new `tst_maths_distance` function of (b), and for (c) `iss_self_test` (2d9a01c's `esses.iss` gives 11
+problems on the model). The three tests (b) changed wait for what they read; none is loosened. None of this has had a CI
+run: CI's next run of the branch, with the macOS and soak dispatches again, is the record (M4.md §6.0 step 1). The real
+installer and uninstaller run only in the package job; the agents run no installer and do not touch the registry, and
+Inno Setup's order of uninstall steps was read from its source and help, not run here. A Close All, a close of a source
+by its own id and the exit read no freed memory; an edit made just before exit stays on disk; after a Corrected Speed
+settings edit is undone, the lap indexes, the stretch report and the Lap Editor follow without another request; the
+uninstaller gives `.ld` back before the ProgId goes and before the shell's notice. The soak is still the only CI job
+that runs AddressSanitizer over the Qt layers (M4.md §10).
+**User must confirm:** no.

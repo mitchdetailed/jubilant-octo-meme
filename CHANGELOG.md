@@ -249,6 +249,29 @@ All notable changes are recorded here, newest first. The project follows semanti
   folder. `widgets.tst_dpr_values_list` and `widgets.tst_values_list_goldens` place the list in a host as a worksheet
   does, and `belowTheTablesMinimumSize` is new. Deferred: ADS's restore of a damaged side-bar area in `layout.json`
   (`docs/milestones/M4.md` §10 item 58).
+- PR #5's third CI run (D-219): fixes for the failures of 2d9a01c's CI runs. **Close All** no longer reads freed
+  memory: the loader closed each source through a reference to that source's own id, and the selection, its last
+  owner, freed it before the id's last use (the soak's AddressSanitizer report, in its second cycle).
+  `SourceLoader::close()` and `closeAll()`, `DataSelectionModel::closeSource()` and `MathsService::removeSource()` copy
+  the id first, every `sourceClosed` receiver gets the copy, and `mappingRequired` carries a copy of the pending entry,
+  since a receiver may answer it at once. **Exit:** the loader's destructor flushed each pending sidecar edit through a
+  key that the flush erased; where that memory changed (MSVC Debug), an older queued write ran last and the newest edit
+  made within the coalescing interval before exit was lost. **Lap stretching:** after a Corrected Speed settings edit
+  is undone, the laps asked for while Corr Dist was evaluated again are built without another request (Corr Dist back
+  at an earlier version is announced by `statusChanged` alone), so the stretch report, the Lap Editor's Stretch column
+  and the lap prefetch follow. `qtmodel.tst_lap_stretch` and `ui.tst_walkthrough_saturday` item 8 read the stretch
+  report as `reportChanged` announces it, once every lap's length is in (a test race since M2), and
+  `widgets.tst_channel_report` waits for the pool to settle. **Installer:** the uninstaller removes `.ld`'s default
+  (still only while it is `Esses.LogFile`) at the start of the uninstall instead of after `unins000.exe` has returned,
+  so `.ld` never names the removed ProgId and the shell is told of the change. `smoke.py windows-installer` checks the
+  uninstaller's exit code, waits for the uninstall's end in its log, checks a per-user install's own association and
+  prints the registry values and the uninstall log's `.ld` lines when an association check fails; `smoke.py
+  --self-test` checks `esses.iss`'s `.ld` rule on a model of Inno Setup. **Soak:** `lsan_check.py` prints the first
+  sanitizer report in the job log, whole up to 200 lines. New tests: `qtmodel.tst_source_loader`
+  `sourceClosedHandsACopyOfTheId` and `destroyedWithAnOlderWriteQueuedKeepsTheNewestEdit`, `qtmodel.tst_dataselection`
+  `closeSourceOfAReferenceIntoTheClosedSource`, `qtmodel.tst_maths_service`
+  `removeSourceOfAReferenceIntoTheRemovedSource`, `qtmodel.tst_mapping_handoff` `aReceiverMayAnswerAtOnce` and
+  `qtmodel.tst_maths_distance` `lapsWaitingForAnEarlierCorrDistVersionAreBuilt`.
 
 ## Unreleased (M3)
 

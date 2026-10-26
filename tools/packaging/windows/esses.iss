@@ -26,7 +26,8 @@
 ; keeps its association unless the user opts in); a silent install associates only with /MERGETASKS="assocld".
 ; An upgrade does not take the earlier install's tasks again (UsePreviousTasks=no), so a silent upgrade never takes
 ; .ld back from a program that took it meanwhile; the uninstaller removes .ld's default only while it is
-; Esses.LogFile (D-217). .ldx is not associated; .csv only offers Esses in "Open with" (never the default).
+; Esses.LogFile (D-217), at usUninstall: before the ProgId goes and before unins000.exe returns to whoever started it
+; (see CurUninstallStepChanged). .ldx is not associated; .csv only offers Esses in "Open with" (never the default).
 ; Upgrades: [InstallDelete] first removes what Setup puts into {app} and an earlier package may have had that this
 ; one has not (app-local runtime DLLs of an earlier per-user install on an old runtime, Qt modules and plugin
 ; folders), so the files of the version installed are the ones it ships (D-217).
@@ -143,7 +144,7 @@ Root: HKA; Subkey: "Software\Classes\Esses.LogFile"; ValueType: string; ValueNam
 Root: HKA; Subkey: "Software\Classes\Esses.LogFile\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: """{app}\esses.exe"",0"
 Root: HKA; Subkey: "Software\Classes\Esses.LogFile\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\esses.exe"" -l ""%1"""
 Root: HKA; Subkey: "Software\Classes\.ld\OpenWithProgids"; ValueType: string; ValueName: "Esses.LogFile"; ValueData: ""; Flags: uninsdeletevalue
-; No uninsdeletevalue: the uninstaller removes .ld's default only while it is still Esses.LogFile (CurUninstallStepChanged).
+; No uninsdeletevalue: the uninstaller removes .ld's default only while it is still Esses.LogFile (RemoveOwnLdDefault).
 Root: HKA; Subkey: "Software\Classes\.ld"; ValueType: string; ValueName: ""; ValueData: "Esses.LogFile"; Tasks: assocld
 ; CSV files: a secondary handler only (in "Open with"), never the default.
 Root: HKA; Subkey: "Software\Classes\Esses.CsvFile"; ValueType: string; ValueName: ""; ValueData: "CSV file (Esses)"; Flags: uninsdeletekey
@@ -296,19 +297,38 @@ begin
   end;
 end;
 
-{ Uninstall (D-217): .ld's default handler is removed only while it is Esses's own; another program that took .ld
-  after Esses was installed keeps it. HKA is HKLM for an administrative install, HKCU for a per-user one. }
-procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+{ Uninstall (D-217 (l)): .ld's default handler is removed only while it is Esses's own; another program that took
+  .ld after Esses was installed keeps it. HKA64 is the root and view the [Registry] entries were written to (HKA in
+  64-bit install mode): HKLM for an administrative install, HKCU for a per-user one. Each line it logs starts ".ld:"
+  (smoke.py prints them when an association check fails). }
+procedure RemoveOwnLdDefault();
 var
-  Root: Integer;
-  ProgId: String;
+  Hive, ProgId: String;
 begin
-  if CurUninstallStep <> usPostUninstall then
-    exit;
   if IsAdminInstallMode() then
-    Root := HKLM64
+    Hive := 'HKLM'
   else
-    Root := HKCU;
-  if RegQueryStringValue(Root, 'Software\Classes\.ld', '', ProgId) and (ProgId = 'Esses.LogFile') then
-    RegDeleteValue(Root, 'Software\Classes\.ld', '');
+    Hive := 'HKCU';
+  if not RegQueryStringValue(HKA64, 'Software\Classes\.ld', '', ProgId) then
+    Log('.ld: ' + Hive + '\Software\Classes\.ld has no default handler; nothing to remove')
+  else if ProgId <> 'Esses.LogFile' then
+    Log('.ld: ' + Hive + '\Software\Classes\.ld belongs to ' + ProgId + ' (another program); kept')
+  else if RegDeleteValue(HKA64, 'Software\Classes\.ld', '') then
+    Log('.ld: ' + Hive + '\Software\Classes\.ld was Esses.LogFile; removed')
+  else
+    Log('.ld: ' + Hive + '\Software\Classes\.ld is Esses.LogFile and could not be removed');
+end;
+
+{ At usUninstall, before the uninstall log is processed: the uninstaller's clone ends the unins000.exe that its
+  caller waits for at the end of that processing, after the ProgId (uninsdeletekey) is gone and the shell has been
+  told of the change (ChangesAssociations), then sleeps, deletes unins000.exe and only then raises usPostUninstall
+  (Inno Setup help, "Uninstaller Exit Codes"). At usPostUninstall, .ld still named the deleted ProgId when the
+  caller had its exit code (PR #5's package job on 2d9a01c). usDone's line marks the end of the uninstall in its
+  log (/LOG=): smoke.py waits for it. }
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  case CurUninstallStep of
+    usUninstall: RemoveOwnLdDefault();
+    usDone: Log('Esses: uninstall done');
+  end;
 end;

@@ -61,6 +61,11 @@ std::filesystem::path writeLd(const model::DataSource& src, const std::filesyste
 // A fresh empty directory under the test binary directory.
 std::filesystem::path scratchDir(const std::string& name);
 
+// A copy of `src` whose bytes are overwritten (0xA5) when its last owner lets go of it, in storage that is
+// freed only at the end of the process: a read of its id through a reference that outlived the source (a
+// use after free) then sees the overwritten bytes instead of the id, in any build and without a fault.
+std::shared_ptr<const model::DataSource> quarantinedCopy(const model::DataSource& src);
+
 QString qs(const std::string& s);
 
 } // namespace esses::qt::test

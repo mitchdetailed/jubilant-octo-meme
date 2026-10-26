@@ -943,7 +943,10 @@ void DataSelectionModel::sourceReplaced(std::shared_ptr<const model::DataSource>
     commit(what);
 }
 
-void DataSelectionModel::closeSource(const model::SourceId& id) {
+void DataSelectionModel::closeSource(const model::SourceId& source) {
+    // A copy: `source` may be a member of the DataSource being closed (an emitter's own id, or one read from
+    // sources()), and sources_.erase below may drop its last owner before the last use of the id.
+    const model::SourceId id = source;
     const auto pos =
         std::find_if(sources_.begin(), sources_.end(), [&](const auto& s) { return s->id == id; });
     if (pos == sources_.end()) {
