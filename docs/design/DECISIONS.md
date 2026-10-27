@@ -852,7 +852,7 @@ Rewritten on 2026-10-10 after the review. The list is deduplicated across this d
 | D-217 | The M4 fix pass: PR #5's first CI failures fixed at the root (the main window's teardown, the formatter, the vendor-mark scan of optimised binaries, the Qt install with one aqtinstall worker), Reload that keeps the source until its file is open again, decode-time diagnostics in Messages, the activation check on the pool, forwarded requests at the top of the event loop and only after their answer, a salted per-user channel, the release stamped from its own tag and development builds marked, convert's companion, cut details, empty output and duplicate channels, the hosted bench without the reference gates, the three missing MVP bench rows, installer upgrades and uninstalls that keep what is not theirs; the deferrals (macOS strips, crisp 2 px lines at DPR 2, same-size same-mtime replacements, Qt's bundled notices) (refines D-208, D-209, D-212, D-214, D-215, D-216; reads 02 §1 behaviour 5, 05 §5, §9.2, 06 §6, §17, §18-19, 07 §1.5, §7.2, §12, 08 §3.10, §4, §7; amends D-208's "Reload as a close then an open", D-212 (b)'s channel name, D-216 (a)'s version of a build without a version tag) | **yes**: (n) only (confirmed 2026-10-26) | M4 fix pass, AC-M4-01/-04/-05/-07/-08/-09/-10 |
 | D-218 | PR #5's second CI run: the reference decoder and the Python tools on Python 3.8 and later (the half floats of `memoryview.cast` from 3.12 only, `float_sum` as 3.12's compensated sum), the association scripts with Windows's `reg` by its full path and nothing else, two defects of the vendored ADS fixed in place with the rule for such changes and `AdsBackend`'s docks read by `qobject_cast`, the two macOS-only test faults (forwarded paths compared by file identity, a values list placed as on a worksheet); the deferral (ADS's side-bar restore of a damaged layout) (refines D-041, D-212, D-217 (d) and (l); reads 06 §19 item 2, 08 §9; amends D-147 (a) and D-153 for the vendored ADS's source files, and the licence policy of `GOVERNANCE.md`) | **yes**: (c) only (confirmed 2026-10-26) | PR #5's second CI run, AC-M4-01/-03/-04/-06/-07 |
 | D-219 | PR #5's third CI run: an id copied before the source that holds it can go (the soak's heap-use-after-free at Close All, the sidecar flush at exit, the selection's close, the maths' removal, the Mapping panel's hand-off) with the soak's first sanitizer report in the job log, the lap-stretch tests reading the report as it is announced and the laps that wait for Corr Dist back at an earlier version built, the uninstaller's `.ld` step before `unins000.exe` returns with `smoke.py` waiting for the uninstall's end and a model of the installer's `.ld` rule (refines D-016, D-121, D-179 (a), D-190, D-213, D-217 (l)) | no | PR #5's third CI run, AC-M4-01/-03/-04 |
-| D-220 | macOS plot text independent of the thread and the DPR it first drew at: one subpixel position count, 4, for every font engine plot text is drawn with (Qt Gui private API; by default on macOS only, and only under the Qt version Esses was built against), the diagnostic probe and its dispatch-only workflow, the relinking page's exact Qt version; D-217 (n)'s macOS strips closed (refines D-209, D-217 (n); amends `docs/user/relinking.md`'s later-patch-release promise) | no | PR #5's macOS runs, AC-M4-06/-07 |
+| D-220 | macOS plot text independent of the thread and the DPR it first drew at: one subpixel position count, 4, for every font engine plot text is drawn with at subpixel positions (Qt Gui private API; by default on macOS only, and only under the Qt version Esses was built against), the diagnostic probe and its dispatch-only workflow, the relinking page's exact Qt version; D-217 (n)'s macOS strips closed (refines D-209, D-217 (n); amends `docs/user/relinking.md`'s later-patch-release promise) | no | PR #5's macOS runs, AC-M4-06/-07 |
 
 ### A.1 Review amendments
 
@@ -3186,7 +3186,7 @@ affected.
 builders' change and new DPR 2 goldens); the rest no. **Confirmed by the user on 2026-10-26: 0.1 ships the soft
 lines**, and its release note says so (M4.md §6.0 step 8, §6.5 item 7); centring even device widths on pixel edges,
 with new DPR 2 goldens, is left for a later release (M4.md §10 item 52).
-*Amended by D-220 (A.15, 2026-10-26): (n)'s macOS strips are fixed (one subpixel position count for the font engines
+*Refined by D-220 (A.15, 2026-10-26): (n)'s macOS strips are fixed (one subpixel position count for the font engines
 plot text is drawn with); that deferral is closed.*
 
 #### D-218 PR #5's second CI run: the reference decoder and the Python tools on Python 3.8 and later, the association scripts with Windows's `reg` by its full path and nothing else, two defects of the vendored ADS fixed in place and `AdsBackend`'s docks read by `qobject_cast`, the two macOS-only test faults, and the deferral (refines D-041, D-212, D-217 (d) and (l); reads 06 §19 item 2, 08 §9; amends D-147 (a) and D-153 for the vendored ADS's source files, and the licence policy of `GOVERNANCE.md`)
@@ -3439,42 +3439,46 @@ uninstaller gives `.ld` back before the ProgId goes and before the shell's notic
 that runs AddressSanitizer over the Qt layers (M4.md §10).
 **User must confirm:** no.
 
-#### D-220 macOS plot text independent of the thread and the DPR it first drew at, with a diagnostic probe in a workflow of its own and the relinking page's exact Qt version (refines D-209, D-217 (n))
+#### D-220 macOS plot text independent of the thread and the DPR it first drew at, with a diagnostic probe in a workflow of its own and the relinking page's exact Qt version (refines D-209, D-217 (n); amends `docs/user/relinking.md`'s later-patch-release promise)
 **Context.** The macOS qt-app job (nightly and dispatch; macOS is "builds green, not supported", D-116) had failed
 `qtrender.tst_static_strips` at DPR 1.5 and 2 since M1 (D-217 (n), M4.md §10 item 51): a Static layer painted in
 strips on TaskPool workers differed from one pass on the GUI thread, in text glyphs only. On 6691db2 (`ci`
 40395792892) `goldenCasesEqualOnePass` failed at 1x and 2x too, and `ui.tst_dpr_switch`'s `windowAcrossMonitors` and
-`floatingDockAcrossMonitors(qdockwidget)` differed by 78 and 81 pixels after the DPR 1 -> 2 -> 1.5 -> 1 trip. Windows
-and Linux (FreeType, offscreen) agreed to the pixel. In the golden-diffs artefact only glyphs differed, each an exact
-copy of the same glyph elsewhere in the image, shifted by half a device pixel at 2x.
+`floatingDockAcrossMonitors(qdockwidget)` differed by 78 and 81 pixels back at DPR 1 (after 1 -> 2 -> 1.25 -> 1.5 -> 1
+and 1 -> 2 -> 1.5 -> 1). Windows and Linux (FreeType, offscreen) agreed to the pixel. In the golden-diffs artefact only
+glyphs differed, each an exact copy of the same glyph elsewhere in the image, shifted by half a device pixel at 2x.
 **Decision.** (a) **The cause** (Qt 6.12.0, read from its source and measured). Qt's raster engine places a cached
 glyph at its device x position quantised into `QFontEngine::m_subPixelPositionCount` bins. FreeType's engine fixes the
 count at 4; CoreText's and DirectWrite's leave it 0, and `QTextureGlyphCache::populate` computes it at the engine's
-first glyph-cache fill, from the distinct images of the fill's first glyph at twelve offsets under that fill's
-transform, i.e. at the painter's DPR. Font engines belong to one thread (`QFontCache` is per thread; a TaskPool worker
-keeps its engines for its life), so the bins, and with them the glyph image a position picks, depended on what the
-thread drew first and at which DPR. The probe of (c) measured it on macos-14 (offscreen and cocoa): Qt's count for
-the axis font is 4 at 1x, 3 at 1.25x and 1.5x and 2 at 2x; workers whose first DPR differed drew the same DPR 1 text
-with 29,922 and 30,732 differing pixels, 268,886 over all its comparisons, with the same layout and faces on every
-thread and no font database change. (b) **The fix** (`libs/qtrender/src/glyph_bins.{hpp,cpp}`). `drawText` gives every
-font engine of the calling thread that the text is drawn with the count 4 before `drawStaticText`: the font's
-`Script_Common` engine and the fallbacks it has loaded and, for a text new to the thread's `QStaticText` cache or an
-engine not pinned yet, the engines of the text's glyph runs, laid out as `QStaticText` lays it out (every line,
-unbounded). The image a position picks then depends on the position alone, as with FreeType. On by default on macOS
-only: the probe found DirectWrite's count fixed at 6 at every scale under Qt 6.12 (windows-2022, also at
-`QT_SCALE_FACTOR=1.5`) and FreeType's at 4, and Windows and Linux output is unchanged (the 244 render artefacts of the
-local suites at e4dc523 are byte-identical to an earlier build's). It uses Qt Gui's private API (`Qt6::GuiPrivate`,
-linked privately by `esses_qtrender` alone; `tools/check_layering.py` allows it there and nowhere else) and touches no
-engine unless the Qt loaded at run time is exactly the version Esses was built against (`qVersion()` against
-`QT_VERSION_STR`); under another Qt the pinning stays off. (c) **The probe.** `qtrender.probe_text_engines`
-(`libs/qtrender/probes/`, built with `-DESSES_BUILD_PROBES=ON`, ctest label `probe`, never in the suites) reports per
-thread and DPR history which engine draws each scheme role, its count, Qt's own count per glyph and scale, and the
-differing pixels with the count pinned and not; it fails when pinned text still differs. It runs from
-`.github/workflows/probe.yml`, on manual dispatch only (`gh workflow run probe.yml --ref <branch>`, `-f windows=true`
-for windows-2022), not from `ci.yml`: a `ci.yml` dispatch that skipped its other jobs would report the skipped
-required checks (`lint`, `fuzz-smoke`) as passed for its commit and would share `ci.yml`'s concurrency group. GitHub
-dispatches a workflow only once its file is on the default branch, so `probe.yml` can be dispatched after the merge;
-the run recorded here used e4dc523's interim `ci.yml` input, removed since. (d) **Relinking** (amends
+first glyph-cache fill, from the distinct images of the fill's first glyph with an outline at twelve offsets under
+that fill's transform, i.e. at the painter's DPR. Font engines belong to one thread (`QFontCache` is per thread; a
+TaskPool worker keeps its engines for its life), so the bins, and with them the glyph image a position picks,
+depended on what the thread drew first and at which DPR. The probe of (c), as built at e4dc523 (the scheme's sizes
+only; it has a +3.3 pt font set since), measured it on macos-14, offscreen and cocoa alike: Qt's count for the axis
+font is 4 at 1x, 3 at 1.25x and 1.5x and 2 at 2x; workers whose first DPR differed drew the same DPR 1 text with
+29,922 and 30,732 differing pixels, 268,886 over all of an entry's comparisons, with the same layout and faces on
+every thread and no font database change. (b) **The fix** (`libs/qtrender/src/glyph_bins.{hpp,cpp}`). `drawText` gives
+every font engine of the calling thread that the text is drawn with, and that places glyphs at subpixel positions,
+the count 4 before `drawStaticText`: the font's `Script_Common` engine and the fallbacks it has loaded and, for a text
+new to the thread's `QStaticText` cache or an engine not pinned yet, the engines of the text's glyph runs, laid out
+as `QStaticText` lays it out (every line, unbounded). The image a position picks then depends on the position alone,
+as with FreeType. On by default on macOS only: under Qt 6.12 the probe found DirectWrite's count independent of the
+DPR history (windows-2022): 6 at every scale where it places glyphs at subpixel positions (no hinting, or
+`QT_SCALE_FACTOR=1.5`) and 1, whole pixels, with default hinting unscaled; FreeType's is 4. Windows and Linux output
+is unchanged (the 244 render artefacts of the local suites at e4dc523 are byte-identical to an earlier build's). It
+uses Qt Gui's private API (`Qt6::GuiPrivate`, linked privately by `esses_qtrender` and by the probe;
+`tools/check_layering.py` allows it in `esses_qtrender` and its tests only) and touches no engine unless the Qt
+loaded at run time is exactly the version Esses was built against (`qVersion()` against `QT_VERSION_STR`); under
+another Qt the pinning stays off. (c) **The probe.** `qtrender.probe_text_engines` (`libs/qtrender/probes/`, built
+with `-DESSES_BUILD_PROBES=ON`, ctest label `probe`, never in the suites) reports per thread and DPR history which
+engine draws each scheme role, its count, Qt's own count per glyph and scale, and the differing pixels with the
+count pinned and not; it fails when pinned text still differs or a pinned engine is not at 4 bins, and skips under a
+Qt other than the one it was built against. It runs from `.github/workflows/probe.yml`, on manual dispatch only
+(`gh workflow run probe.yml --ref <branch>`, `-f windows=true` for windows-2022), not from `ci.yml`: a `ci.yml`
+dispatch that skipped its other jobs would report the skipped required checks (`lint`, `fuzz-smoke`) as passed for
+its commit and would share `ci.yml`'s concurrency group. GitHub dispatches a workflow only once its file is on the
+default branch, so `probe.yml` can be dispatched after the merge; the run recorded here used e4dc523's interim
+`ci.yml` input, removed since. (d) **Relinking** (amends
 `docs/user/relinking.md`). The page no longer promises that a later Qt patch release works: only a build of the Qt
 version Esses was built against is supported (a modified build of it, which is what the LGPL right needs), because
 Esses and, on Linux, the docking library use Qt internals; About names that version for a replacement. (e)

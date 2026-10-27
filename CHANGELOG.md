@@ -289,9 +289,9 @@ All notable changes are recorded here, newest first. The project follows semanti
 - macOS: plot text no longer depends on the thread that paints it or on the DPR it painted at first (D-220; the macOS
   `qtrender.tst_static_strips` failures since M1 and `ui.tst_dpr_switch`'s round trip). Qt's CoreText font engines
   work out their subpixel position count at their first glyph-cache fill, at that DPR, and font engines are per
-  thread; plot text now gives every engine it is drawn with FreeType's count, 4, first (`libs/qtrender/src/
-  glyph_bins.*`, Qt Gui private API, on by default on macOS only and only under the Qt version Esses was built
-  against). Windows and Linux output is unchanged. New diagnostic probe `qtrender.probe_text_engines`
+  thread; plot text now gives every engine it is drawn with FreeType's count, 4, first
+  (`libs/qtrender/src/glyph_bins.*`, Qt Gui private API, on by default on macOS only and only under the Qt version
+  Esses was built against). Windows and Linux output is unchanged. New diagnostic probe `qtrender.probe_text_engines`
   (`-DESSES_BUILD_PROBES=ON`, ctest label `probe`) and the dispatch-only workflow `.github/workflows/probe.yml`. New
   test `qtrender.tst_static_strips` `textDoesNotDependOnThreadHistory`; `ui.tst_dpr_switch` saves both composites and
   their difference when its round trip differs. `docs/user/relinking.md` and About now ask for a build of exactly the

@@ -39,9 +39,9 @@ esses_add_qt_test_dir(qtrender DIR tests DEPS esses::qtrender)
 # draws the plot text on each thread, its subpixel position count after each DPR history, and whether pinning
 # the count (src/glyph_bins.hpp) makes the pixels independent of that history. ctest label probe (a suite run
 # with the option on can leave it out with -LE probe). More entries run it on other font engines: on macOS the
-# cocoa platform (CoreText as the application uses it) and the minimal platform with FreeType engines over the
-# CoreText database (a control, when the kit has FreeType); on Windows the windows platform's DirectWrite
-# engines, also at QT_SCALE_FACTOR=1.5 (a scaled monitor, where DirectWrite's default hinting is subpixel).
+# cocoa platform (CoreText as the application uses it) and the minimal platform (meant as a FreeType control; on
+# macos-14 with Qt 6.12.0 it finds no font and draws box engines, ci 40413826613); on Windows the windows platform's
+# DirectWrite engines, also at QT_SCALE_FACTOR=1.5 (a scaled monitor, where DirectWrite's default hinting is subpixel).
 if(ESSES_BUILD_PROBES)
   esses_add_qt_test(qtrender_probe_text_engines TEST_NAME qtrender.probe_text_engines
     SOURCES probes/probe_text_engines.cpp tests/qtrender_test_support.cpp tests/qtrender_test_support.hpp

@@ -539,6 +539,11 @@ private Q_SLOTS:
 
     void cleanupTestCase() {
         qInstallMessageHandler(gPreviousHandler);
+        if (QString::fromLatin1(qVersion()) != QStringLiteral(QT_VERSION_STR)) {
+            report(QStringLiteral("verdict skipped (run-time Qt %1, built against %2: nothing measured)")
+                       .arg(QString::fromLatin1(qVersion()), QStringLiteral(QT_VERSION_STR)));
+            return;
+        }
         QStringList log;
         {
             const std::scoped_lock lock(gLogMutex);

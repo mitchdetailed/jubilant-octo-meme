@@ -4,7 +4,8 @@
 # Diagnostic probes (D-220), on manual dispatch only: `gh workflow run probe.yml --ref <branch>`, with
 # `-f windows=true` for windows-2022 as well as macos-14. The Qt build of ci.yml's qt-app with ESSES_BUILD_PROBES=ON,
 # then `ctest -L probe` verbose, so every PROBE line of qtrender.probe_text_engines and its platform entries (macOS:
-# cocoa, and minimal with FreeType engines; Windows: the windows platform's DirectWrite, also at QT_SCALE_FACTOR=1.5)
+# cocoa, and minimal, which finds no font on macos-14 (box engines, no control); Windows: the windows platform's
+# DirectWrite, also at QT_SCALE_FACTOR=1.5)
 # is in the job log, in probe.log and, for the env and verdict lines, in the job summary; then the suites the probe is
 # about (qtrender.tst_*, ui.tst_dpr_switch). The report, the images and the test logs are uploaded as the artefact
 # probe-<os>. The same pinned actions and Qt kit as qt-app; never merge-blocking.
@@ -12,7 +13,7 @@
 # skipped required checks (lint, fuzz-smoke) as passed for its commit, and it would share ci.yml's concurrency group,
 # so it could cancel a push or nightly run of the same ref without replacing it. This one has no other trigger and a
 # concurrency group of its own. GitHub dispatches a workflow only once its file is on the default branch: this one
-# can be dispatched, for any --ref, from the merge that brings it to main.
+# can be dispatched from the merge that brings it to main, for any --ref whose tree has this file (c69c0d6 or later).
 name: probe
 
 on:
