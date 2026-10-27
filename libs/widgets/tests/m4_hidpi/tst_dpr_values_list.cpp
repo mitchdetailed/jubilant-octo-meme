@@ -16,10 +16,9 @@
 //   * pixel goldens tests/golden/images/dpr_sweep/values_list/<case>@1.5x.png, compared as the values_list
 //     goldens are (a pixel differs above 8/255 in a channel, an image fails above 0.5 %), but only where they
 //     are authoritative (D-127: Linux with goldens.json "generatedOn": "linux", or
-//     ESSES_PIXEL_GOLDENS_STRICT=1); elsewhere the difference is reported. The PNGs of this change were
-//     rendered on Windows and are provisional until replaced from the ubuntu qt-app artefact
-//     (<build>/libs/widgets/artefacts/dpr_sweep/ values_list/). ESSES_UPDATE_GOLDENS=1 rewrites the PNGs and
-//     goldens.json.
+//     ESSES_PIXEL_GOLDENS_STRICT=1); elsewhere the difference is reported. The PNGs are the ubuntu qt-app
+//     artefact's (<build>/libs/widgets/artefacts/dpr_sweep/values_list/, CI run 40424542613 on c69c0d6).
+//     ESSES_UPDATE_GOLDENS=1 rewrites the PNGs and goldens.json (then provisional on any OS but Linux).
 
 #include "components/component_test_support.hpp"
 

@@ -768,9 +768,9 @@ configuration (`tests/m4_hidpi/dpr_test_support.hpp`): `tests/m4_hidpi/tst_dpr_s
 worksheet at each DPR: the same logical placement, the layout within 3 logical px of DPR 1, layers and lists at the
 window's DPR, the widget and its window showing the layer composite pixel for pixel, whole device pixels for the
 axis-aligned geometry at 1.25 and 1.5), `tst_dpr_watcher.cpp` (the watcher, the reparent gap, the canvas placement),
-`tst_dpr_values_list.cpp` (values_list at DPR 1.5: the table text against the table goldens, provisional PNGs in
-`tests/golden/images/dpr_sweep/values_list/`) and `tests/ui/tst_dpr_switch.cpp` (`ui.tst_dpr_switch`, AC-M4-07 in
-the shell).
+`tst_dpr_values_list.cpp` (values_list at DPR 1.5: the table text against the table goldens, the ubuntu CI
+renders as PNGs in `tests/golden/images/dpr_sweep/values_list/`) and `tests/ui/tst_dpr_switch.cpp`
+(`ui.tst_dpr_switch`, AC-M4-07 in the shell).
 
 ## M4 followups of the widgets (D-211; `docs/milestones/M4.md` §5.1, M3.md §6 items 18-19, 21-22, 24, 26-27)
 

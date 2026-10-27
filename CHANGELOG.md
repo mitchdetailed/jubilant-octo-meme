@@ -296,6 +296,8 @@ All notable changes are recorded here, newest first. The project follows semanti
   test `qtrender.tst_static_strips` `textDoesNotDependOnThreadHistory`; `ui.tst_dpr_switch` saves both composites and
   their difference when its round trip differs. `docs/user/relinking.md` and About now ask for a build of exactly the
   Qt version Esses was built against.
+- The three DPR 1.5 `values_list` pixel goldens (`tests/golden/images/dpr_sweep/values_list/`) are the ubuntu CI
+  renders (D-127; `ci` 40424542613 on c69c0d6), no longer provisional Windows renders: Linux CI compares them strictly.
 
 ## Unreleased (M3)
 
