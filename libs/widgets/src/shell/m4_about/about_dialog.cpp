@@ -134,12 +134,14 @@ QString qtSourceArchiveUrl(const QString& qtVersion) {
 
 QString qtLicenceNotice() {
     const QString qt = QString::fromLatin1(qVersion());
+    // A replacement is a build of the Qt version Esses was built against (docs/user/relinking.md, D-220).
+    const QString built = QStringLiteral(QT_VERSION_STR);
     return QStringLiteral(
                "This application uses Qt %1 under the GNU LGPL v3. Qt is linked dynamically and is "
-               "not modified; you may replace its libraries with your own build of Qt %1 (NOTICES.md "
+               "not modified; you may replace its libraries with your own build of Qt %3 (NOTICES.md "
                "says how). The licence texts are licenses/LGPL-3.0-only.txt and "
                "licenses/GPL-3.0-only.txt beside NOTICES.md. Source of Qt %1: %2")
-        .arg(qt, qtSourceArchiveUrl(qt));
+        .arg(qt, qtSourceArchiveUrl(qt), built);
 }
 
 QString dockLibraryNotice() {

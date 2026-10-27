@@ -8,10 +8,14 @@ example modified) build of these libraries. This page says where the libraries a
 exact Qt version of your copy and where its source code is published, and `NOTICES.md` in the installation folder
 has the licence texts.
 
-Your replacement must be binary-compatible with the version Esses was built against: the same Qt major and minor
-version (a later patch release of it also works), built for the same platform with a compatible compiler (on
-Windows, 64-bit Microsoft Visual C++ 2022 or later), with the same Qt modules (Core, Gui, Widgets and Svg, and their
-plugins). The licence texts are in the `licenses` folder beside `NOTICES.md`.
+Your replacement must be a build of the same Qt version that Esses was built against: the version that Help > About
+Esses (or `esses --version`) shows after "built with", for example your own, modified build of Qt 6.12.0. Build it for
+the same platform with a compatible compiler (on Windows, 64-bit Microsoft Visual C++ 2022 or later) and with the same
+Qt modules (Core, Gui, Widgets and Svg, and their plugins). That is what the LGPL right needs, and it is the supported
+combination. Esses also uses a few of Qt's internal interfaces, which Qt may change in any release, so another Qt
+version, a later patch release included, is not supported. With one, Esses turns its use of those internals off where
+it can (on a Mac, the text in graphs may then shift by a fraction of a pixel from one redraw to the next), and where it
+cannot, it may fail to start or not work properly. The licence texts are in the `licenses` folder beside `NOTICES.md`.
 
 ## Windows (installer and portable zip)
 

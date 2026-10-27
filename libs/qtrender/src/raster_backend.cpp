@@ -650,8 +650,11 @@ bool mayDrawAsOutlines(const QPainter& p) {
 
 void resetOutlineState(const QFont& font, const QString& text) {
     QTextLayout layout(text, font);
+    layout.setCacheEnabled(true); // glyphRuns() below reads this shaping instead of shaping the text again
     layout.beginLayout();
-    layout.createLine(); // unbounded: the whole text on one line
+    // Every line, unbounded: a line ends only at a line separator (U+2028), as QStaticText lays text out.
+    for (QTextLine line = layout.createLine(); line.isValid(); line = layout.createLine()) {
+    }
     layout.endLayout();
     const QList<QGlyphRun> runs = layout.glyphRuns();
     for (const QGlyphRun& run : runs) {

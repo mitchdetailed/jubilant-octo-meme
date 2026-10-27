@@ -3,6 +3,7 @@
 
 #include "glyph_bins.hpp"
 
+#include <QByteArrayAlgorithms>
 #include <QChar>
 #include <QGlyphRun>
 #include <QList>
@@ -10,8 +11,10 @@
 #include <QTextLayout>
 #include <QtGlobal>
 #include <atomic>
+#include <climits>
 
-// Qt private API (Qt6::GuiPrivate, D-220): the engines' subpixel position count.
+// Qt private API (Qt6::GuiPrivate, D-220): the engines' subpixel position count, and QFIXED_MAX.
+#include <QtGui/private/qfixed_p.h>
 #include <QtGui/private/qfont_p.h>
 #include <QtGui/private/qfontengine_p.h>
 #include <QtGui/private/qrawfont_p.h>
@@ -27,6 +30,13 @@ constexpr bool kPinByDefault = false;
 #endif
 
 std::atomic<bool> gPinning{kPinByDefault};
+
+// Whether the Qt library loaded at run time is the version whose private headers this file was compiled
+// with: only then are the private classes laid out as this file reads and writes them (D-220).
+bool runtimeQtIsBuildQt() noexcept {
+    static const bool same = qstrcmp(qVersion(), QT_VERSION_STR) == 0;
+    return same;
+}
 
 // Pins one engine, or the loaded engines of a QFontEngineMulti (its primary and the fallbacks it has loaded;
 // a fallback not loaded yet is null). Engines that place glyphs at whole pixels only are left alone (Qt gives
@@ -53,7 +63,7 @@ int pinEngine(QFontEngine* engine) {
 } // namespace
 
 bool glyphBinPinning() noexcept {
-    return gPinning.load(std::memory_order_relaxed);
+    return gPinning.load(std::memory_order_relaxed) && runtimeQtIsBuildQt();
 }
 
 void setGlyphBinPinning(bool on) noexcept {
@@ -69,11 +79,17 @@ int pinGlyphSubpixelBins(const QFont& deviceFont, const QString& text, bool newT
     if (!newText && changed == 0) {
         return 0;
     }
-    // Shaped as QStaticTextPrivate::paintText shapes it (one unbounded line in this font, on this thread's
-    // font cache): loads the fallback and per-script engines the text needs; its glyph runs name them.
+    // Laid out as QStaticTextPrivate::paintText lays it out (lines until createLine() gives none, each
+    // QFIXED_MAX wide, in this font, on this thread's font cache), so text after a line separator (U+2028;
+    // plot text is not sanitised) is shaped too: loads the fallback and per-script engines the text needs;
+    // its glyph runs name them. The layout keeps its shaping (setCacheEnabled): glyphRuns() does not shape
+    // the text again.
     QTextLayout layout(text, deviceFont);
+    layout.setCacheEnabled(true);
     layout.beginLayout();
-    layout.createLine();
+    for (QTextLine line = layout.createLine(); line.isValid(); line = layout.createLine()) {
+        line.setLineWidth(QFIXED_MAX);
+    }
     layout.endLayout();
     const QList<QGlyphRun> runs = layout.glyphRuns();
     for (const QGlyphRun& run : runs) {

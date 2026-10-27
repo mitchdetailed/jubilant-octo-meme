@@ -187,7 +187,9 @@ private Q_SLOTS:
                  qPrintable(n));
         QVERIFY(n.contains(QStringLiteral("licenses/LGPL-3.0-only.txt")));
         QVERIFY(n.contains(QStringLiteral("licenses/GPL-3.0-only.txt")));
-        QVERIFY(n.contains(QStringLiteral("replace")));
+        // The replacement is a build of the Qt this was built against (docs/user/relinking.md, D-220).
+        QVERIFY(n.contains(QStringLiteral("replace its libraries with your own build of Qt ") +
+                           QStringLiteral(QT_VERSION_STR) + QLatin1Char(' ')));
         QVERIFY(n.endsWith(QStringLiteral("https://download.qt.io/official_releases/qt/") +
                            qt.section('.', 0, 1) + QLatin1Char('/') + qt +
                            QStringLiteral("/single/qt-everywhere-src-") + qt + QStringLiteral(".tar.xz")));

@@ -9,9 +9,11 @@
 // built with QtTextMetrics at DPR 1 and 2; text at fractional positions across every strip edge with glyphs
 // at subpixel positions (on every OS, see SubpixelGlyphs); the clear colour when the list does not start with
 // a Clear; one strip on a NoBlock thread (never waits); the spare buffer that LayerCache::storeStatic hands
-// back is reused; and a thread's text does not depend on the DPR it drew at first (D-220).
+// back is reused; and a thread's text does not depend on the DPR it drew at first (D-220; on macOS a control
+// also reports, without asserting, whether it does with the glyph bin pinning off).
 
 #include "../../plotcore/tests/td_golden_cases.hpp"
+#include "../src/glyph_bins.hpp"
 #include "qtrender_test_support.hpp"
 
 #include <esses/base/taskpool.hpp>
@@ -23,6 +25,7 @@
 
 #include <QFont>
 #include <QGuiApplication>
+#include <QScopeGuard>
 #include <QTest>
 #include <cmath>
 #include <memory>
@@ -199,6 +202,33 @@ private Q_SLOTS:
         expectEqual(afterDpr2, dpr1Only, QStringLiteral("history_worker_2then1@1x"));
         expectEqual(gui, dpr1Only, QStringLiteral("history_gui_2then1@1x"));
     }
+
+#if defined(Q_OS_MACOS)
+    // D-220 control, informational (asserts nothing): the two worker histories above with the pinning off, so
+    // the log shows whether CoreText's own bin counts make a worker's text depend on what it drew first. On
+    // fresh single-worker pools only, so no GUI-thread engine is created unpinned; at the sizes of the test
+    // above (+3.3 pt), as font engines belong to one thread and these workers' are new.
+    void textHistoryWithoutPinning() {
+        const SubpixelGlyphs subpixel;
+        const bool pinning = qt::detail::glyphBinPinning();
+        qt::detail::setGlyphBinPinning(false);
+        const auto restore = qScopeGuard([pinning] { qt::detail::setGlyphBinPinning(pinning); });
+        const auto fonts = qttest::testFonts(3.3);
+        const plot::DrawList at1 = subpixelTextScene(1.0F);
+        const plot::DrawList at2 = subpixelTextScene(2.0F);
+        TaskPool first(1);
+        const QImage afterDpr2 = onWorkerThread(first, [&] {
+            static_cast<void>(singlePass(at2, fonts, 0));
+            return singlePass(at1, fonts, 0);
+        });
+        TaskPool second(1);
+        const QImage dpr1Only = onWorkerThread(second, [&] { return singlePass(at1, fonts, 0); });
+        const qt::ImageDiff d = qt::compareImages(afterDpr2, dpr1Only, 0);
+        qInfo("D-220 control, pinning off: a worker's DPR 1 text after DPR 2 against a worker's DPR 1 text "
+              "alone: %s",
+              qPrintable(d.summary()));
+    }
+#endif
 
     void sceneEqualsOnePass_data() {
         QTest::addColumn<float>("dpr");

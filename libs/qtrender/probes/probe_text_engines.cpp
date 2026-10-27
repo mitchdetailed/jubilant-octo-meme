@@ -4,21 +4,26 @@
 // Diagnostic probe (ESSES_BUILD_PROBES; ctest qtrender.probe_text_engines and its platform entries, label
 // probe; D-220): why esses_qtrender's text differs between threads and DPR histories on macOS while lines and
 // fills match (D-217 (n), docs/milestones/M4.md section 10 item 51), and whether pinning the font engines'
-// subpixel position count (src/glyph_bins.hpp) removes the difference. Every finding is one line starting
-// with "PROBE ", so `grep PROBE` of the ctest log is the report. "PROBE env": the Qt version, the platform,
-// whether pinning is on by default, Qt's FreeType, the application font. "PROBE font": per scheme role and
-// hinting, the engine type that draws it, its pixel size, glyph format, whether it places glyphs at subpixel
-// positions or keeps its own glyph cache (FreeType), its bin count and face. "PROBE emulate": the bin count
-// Qt would compute at an engine's first glyph-cache fill (Qt's own calculateSubPixelPositionCount) per glyph
-// and scale, and where the glyph's image changes over 48 offsets of a pixel. "PROBE history": fresh threads
-// that draw one scene after different DPR histories (2 then 1, 1 alone, 1.5 then 1, 1 then 2, 2 alone), each
+// subpixel position count (src/glyph_bins.hpp) removes the difference. On CI: `gh workflow run probe.yml
+// --ref <branch>` runs it on macOS (with `-f windows=true` on Windows as well). Every finding is one line
+// starting with "PROBE ", so `grep PROBE` of the ctest log is the report. "PROBE env": the Qt version and
+// whether it is the one the probe was built against, the platform, whether pinning is on by default, Qt's
+// FreeType, the application font. "PROBE font": per scheme role and hinting, the engine type that draws it,
+// its pixel size, glyph format, whether it places glyphs at subpixel positions or keeps its own glyph cache
+// (FreeType), its bin count and face. "PROBE emulate": per font set (the test scheme's sizes, and 3.3 pt
+// larger: 15 and 16 px, tst_static_strips' textDoesNotDependOnThreadHistory's), role, hinting and glyph, the
+// format the raster engine draws the glyph in, the bin count Qt would compute at an engine's first
+// glyph-cache fill (Qt's own calculateSubPixelPositionCount) per scale or why Qt computes none, and where the
+// glyph's image changes over 48 offsets of a pixel. "PROBE history": fresh threads that draw one scene after
+// different DPR histories (2 then 1, 1 alone, 1.5 then 1, 1 then 2, 2 alone) with either font set, each
 // role's bins after each step and the differing pixels of images that should be equal, pinning off and on;
 // with pinning on also how many pixels pinning moves against Qt's own count. "PROBE strips": a Static layer
 // in strips on a fresh TaskPool's workers against one pass on a thread that drew at DPR 1 first
 // (qtrender.tst_static_strips' failing shape). "PROBE recreate": a thread's font cache cleared (what a font
 // database change does) between DPR 1 and DPR 2 draws. "PROBE layout": one run's glyphs and positions, and
-// each role's face, on the GUI thread and a worker. "PROBE log": the qt.qpa.fonts messages that bear on the
-// hypotheses (with their thread) and the fontDatabaseChanged signals. "PROBE verdict": the summary.
+// each role's face, on the GUI thread and a worker. "PROBE log": the qt.qpa.fonts and qt.text.font.db
+// messages that bear on the hypotheses (with their thread) and the fontDatabaseChanged signals. "PROBE
+// verdict": the summary, and whether textDoesNotDependOnThreadHistory's fonts tell pinned from unpinned code.
 // The probe fails only when pinning is on and an image still depends on its thread's history, or an engine
 // that places glyphs at subpixel positions is not at 4 bins: the fix's acceptance. With pinning off it
 // reports. Images that differ are written to <build>/libs/qtrender/artefacts/probe_*.png.
@@ -55,6 +60,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <set>
 #include <string>
 #include <thread>
@@ -90,7 +96,11 @@ struct Tally {
     bool recreated = false;            // an engine was recreated after the font cache was cleared
     bool layoutIdentical = true;       // glyphs, positions and faces
     int fontDatabaseChanges = 0;
-    int invalidations = 0; // "Invalidating font database" / "Fonts have changed"
+    int invalidations = 0; // QFontDatabasePrivate::invalidate ("Invalidating font database", qt.text.font.db)
+    // History A(2,1) against B(1) at DPR 1 with textDoesNotDependOnThreadHistory's fonts and hinting
+    // (+3.3 pt, none): its differing pixels, pinning off and on.
+    std::optional<std::int64_t> historyTestFontsWithoutPin;
+    std::optional<std::int64_t> historyTestFontsWithPin;
 };
 
 Tally& tally() {
@@ -232,6 +242,20 @@ constexpr Role kRoles[] = {{"axis", plot::TextStyleId::Axis},
                            {"caption", plot::TextStyleId::Caption},
                            {"key", plot::TextStyleId::Key}};
 
+// The font sets (qttest::testFonts' size offset): the test scheme's sizes, and tst_static_strips'
+// textDoesNotDependOnThreadHistory's, 3.3 pt larger (15 and 16 px at 96 dpi), whose engines are new to the
+// threads of that test.
+constexpr double kHistoryTestSizeOffset = 3.3;
+constexpr double kFontSizeOffsets[] = {0.0, kHistoryTestSizeOffset};
+
+QString fontsName(double sizeOffset) {
+    return QStringLiteral("fonts=+%1pt").arg(sizeOffset);
+}
+
+QString fontsTag(double sizeOffset) {
+    return QStringLiteral("plus%1pt").arg(sizeOffset);
+}
+
 // The bins of every role's engines on the calling thread, and how many engines that place glyphs at subpixel
 // positions are not at 4 (`collect`: their bins).
 QString binsOfRoles(const qt::SchemeFonts& fonts, int* not4 = nullptr, std::set<int>* collect = nullptr) {
@@ -267,6 +291,77 @@ public:
         return textureMapForGlyph(glyph, QFixedPoint(QFixed::fromReal(x), QFixed(0)));
     }
 };
+
+// The glyph format QRasterPaintEngine::drawCachedGlyphs draws `engine`'s glyphs in on the plot's
+// ARGB32-premultiplied images, and where it comes from. An engine with an internal cache (FreeType's) is
+// asked for A8. Otherwise the engine's glyphFormat or, when that is Format_None, the paint engine's
+// glyphCacheFormat (A32 on Windows with ClearType on, else A8): read back from the glyph cache that drawing
+// `logical` on the calling thread leaves on the engine (which also gives the engine its bin count there).
+struct DrawnFormat {
+    QFontEngine::GlyphFormat format = QFontEngine::Format_A8;
+    QString name;
+};
+
+DrawnFormat drawnFormat(const QFont& logical, QFontEngine* engine) {
+    if (engine->hasInternalCaching()) {
+        return {QFontEngine::Format_A8, QStringLiteral("A8 (asked of its internal cache)")};
+    }
+    if (engine->glyphFormat != QFontEngine::Format_None) {
+        return {engine->glyphFormat, formatName(engine->glyphFormat)};
+    }
+    QImage device(32, 32, QImage::Format_ARGB32_Premultiplied);
+    device.fill(Qt::white);
+    {
+        QPainter p(&device);
+        p.setFont(logical);
+        p.drawText(QPointF(4.0, 24.0), QStringLiteral("d"));
+    }
+    for (const QFontEngine::GlyphFormat format :
+         {QFontEngine::Format_A32, QFontEngine::Format_A8, QFontEngine::Format_Mono}) {
+        if (engine->glyphCache(nullptr, format, QTransform()) != nullptr) {
+            return {format, formatName(format) + QStringLiteral(" (engine None: the paint engine's)")};
+        }
+    }
+    return {QFontEngine::Format_A8, QStringLiteral("A8 (engine None, no glyph cache found: assumed)")};
+}
+
+// Qt's own bin count for `glyph` at a first glyph-cache fill in `format` per scale, and where its image
+// changes over 48 offsets of a pixel at scales 1, 1.5 and 2 (the rasteriser's grid at that scale). Qt
+// computes no count for an engine with an internal cache (drawCachedGlyphs asks it for each glyph at the
+// count the engine fixed itself, 4 for FreeType's) or for one that places glyphs at whole pixels (one bin).
+QString emulate(QFontEngine* engine, QFontEngine::GlyphFormat format, glyph_t glyph) {
+    const bool qtCounts = !engine->hasInternalCaching() && engine->supportsSubPixelPositions();
+    QStringList counts;
+    QStringList sweeps;
+    for (const qreal scale : {1.0, 1.25, 1.5, 2.0, 3.0}) {
+        BinCounter counter(format, QTransform::fromScale(scale, scale));
+        if (qtCounts) {
+            counts.append(QStringLiteral("%1x=%2").arg(scale).arg(counter.binCount(engine, glyph)));
+        }
+        if (scale == 1.0 || scale == 1.5 || scale == 2.0) {
+            QStringList changes;
+            QImage previous;
+            for (int k = 0; k < 48; ++k) {
+                QImage img = counter.mapAt(engine, glyph, k / 48.0);
+                if (k == 0 || img != previous) {
+                    changes.append(QString::number(k));
+                }
+                previous = std::move(img);
+            }
+            // Every step: the rasteriser takes the offset as it is (FreeType).
+            sweeps.append(QStringLiteral("%1x=%2").arg(scale).arg(
+                changes.size() == 48 ? QStringLiteral("every")
+                                     : QStringLiteral("[%1]").arg(changes.join(QLatin1Char(',')))));
+        }
+    }
+    QString count = counts.join(QLatin1Char(' '));
+    if (!engine->supportsSubPixelPositions()) {
+        count = QStringLiteral("whole pixels");
+    } else if (engine->hasInternalCaching()) {
+        count = QStringLiteral("n/a (internal cache, fixed %1)").arg(engine->m_subPixelPositionCount);
+    }
+    return QStringLiteral("count{%1} imageChangesAt/48{%2}").arg(count, sweeps.join(QLatin1Char(' ')));
+}
 
 // ---- scenes and threads ----
 
@@ -372,6 +467,21 @@ QString fileTag(bool noHinting, bool pin) {
                                        pin ? QStringLiteral("pin") : QStringLiteral("nopin"));
 }
 
+// addRows()' rows per font set, each pin=off row before its pin=on row (threadHistory compares them).
+void addHistoryRows() {
+    QTest::addColumn<double>("sizeOffset");
+    QTest::addColumn<bool>("noHinting");
+    QTest::addColumn<bool>("pin");
+    for (const double sizeOffset : kFontSizeOffsets) {
+        for (const bool noHinting : {false, true}) {
+            for (const bool pin : {false, true}) {
+                const QString name = fontsName(sizeOffset) + QLatin1Char(' ') + rowName(noHinting, pin);
+                QTest::newRow(qPrintable(name)) << sizeOffset << noHinting << pin;
+            }
+        }
+    }
+}
+
 // Adds one comparison's differing pixels to the tally of its pinning state.
 void tallyDiff(bool pin, std::int64_t diff) {
     if (pin) {
@@ -388,8 +498,10 @@ class ProbeTextEngines : public QObject {
 public:
     static void initMain() {
         qttest::prepareFontEnvironment();
-        // The font database's own account (CoreText: aliases, invalidation, smoothing), into the report.
-        QLoggingCategory::setFilterRules(QStringLiteral("qt.qpa.fonts.debug=true"));
+        // The font database's own account (CoreText: aliases, invalidation, smoothing; QFontDatabase's own
+        // invalidations, which only qt.text.font.db logs), into the report.
+        QLoggingCategory::setFilterRules(
+            QStringLiteral("qt.qpa.fonts.debug=true\nqt.text.font.db.debug=true"));
     }
 
 private Q_SLOTS:
@@ -404,15 +516,25 @@ private Q_SLOTS:
 #else
         const QString freetype = QStringLiteral("no");
 #endif
-        report(QStringLiteral("env qt=%1 platform=%2 pinByDefault=%3 freetypeInKit=%4 goldenFonts=%5 "
-                              "appFont=\"%6\" %7pt hint=%8")
-                   .arg(QString::fromLatin1(qVersion()), QGuiApplication::platformName(),
+        // The run-time Qt against the one the probe was built against: under any other Qt glyph_bins.cpp
+        // pins nothing (glyphBinPinning() is false, pinByDefault=off) and this probe's private reads are not
+        // safe.
+        const QString runtimeQt = QString::fromLatin1(qVersion());
+        const QString buildQt = QStringLiteral(QT_VERSION_STR);
+        const QString sameQt = runtimeQt == buildQt ? QStringLiteral("yes") : QStringLiteral("no");
+        report(QStringLiteral("env qt=%1 qtBuild=%2 qtMatchesBuild=%3 platform=%4 pinByDefault=%5 "
+                              "freetypeInKit=%6 goldenFonts=%7 appFont=\"%8\" %9pt hint=%10")
+                   .arg(runtimeQt, buildQt, sameQt, QGuiApplication::platformName(),
                         qt::detail::glyphBinPinning() ? QStringLiteral("on") : QStringLiteral("off"),
                         freetype)
                    .arg(files)
                    .arg(app.family())
                    .arg(app.pointSizeF())
                    .arg(hintName(app.hintingPreference())));
+        if (runtimeQt != buildQt) {
+            QSKIP(
+                "the run-time Qt is not the one this probe was built against: its private reads are unsafe");
+        }
     }
 
     void cleanupTestCase() {
@@ -422,21 +544,26 @@ private Q_SLOTS:
             const std::scoped_lock lock(gLogMutex);
             log = gFontLog;
         }
+        // One per QFontDatabasePrivate::invalidate. CoreText's "Fonts have changed" leads to one, and its
+        // database logs "Invalidating font database" as well (qt.qpa.fonts) as part of it: not counted again.
         for (const QString& line : std::as_const(log)) {
-            if (line.contains(QStringLiteral("Invalidating font database")) ||
-                line.contains(QStringLiteral("Fonts have changed"))) {
+            if (line.startsWith(QStringLiteral("qt.text.font.db ")) &&
+                line.contains(QStringLiteral("Invalidating font database"))) {
                 ++tally().invalidations;
             }
         }
-        // The lines that bear on the hypotheses (not the database's per-family registrations), at most 60.
+        // The lines that bear on the hypotheses (not the database's per-font and per-family registrations),
+        // at most 60.
         constexpr qsizetype kMaxLines = 60;
         const QStringList keys = {QStringLiteral("smoothing"),  QStringLiteral("alias"),
                                   QStringLiteral("Invalidat"),  QStringLiteral("changed"),
                                   QStringLiteral("Populating"), QStringLiteral("createEngine"),
                                   QStringLiteral("allback"),    QStringLiteral("warning:")};
-        const auto bearsOnHypotheses = [&keys](const QString& line) {
+        const QStringList registrations = {QStringLiteral("Registering "), QStringLiteral("Adding font")};
+        const auto bearsOnHypotheses = [&keys, &registrations](const QString& line) {
             const auto inLine = [&line](const QString& k) { return line.contains(k, Qt::CaseInsensitive); };
-            return std::any_of(keys.begin(), keys.end(), inLine);
+            return std::any_of(keys.begin(), keys.end(), inLine) &&
+                   std::none_of(registrations.begin(), registrations.end(), inLine);
         };
         // Each distinct line once, in the order first logged, with how often it was logged.
         QStringList distinct;
@@ -492,6 +619,24 @@ private Q_SLOTS:
             h1 = QStringLiteral("partial (pinning leaves differences: see layout, font and log lines)");
         }
         report(QStringLiteral("verdict H1=%1").arg(h1));
+        // Whether tst_static_strips' textDoesNotDependOnThreadHistory can tell pinned from unpinned code on
+        // this engine: its fonts and hinting, a fresh thread that drew at DPR 2 first against one that did
+        // not. A proxy, valid for the offscreen entry at 96 dpi: this probe's scene, whose runs start with
+        // the test's first glyphs but has none of its rotated runs.
+        QString historyTest;
+        if (!t.historyTestFontsWithoutPin || !t.historyTestFontsWithPin) {
+            historyTest = QStringLiteral("not-run");
+        } else if (*t.historyTestFontsWithoutPin == 0) {
+            historyTest = QStringLiteral("cannot-tell (no difference with pinning off)");
+        } else if (*t.historyTestFontsWithPin == 0) {
+            historyTest = QStringLiteral("tells (%1 pixels differ with pinning off, none with it on)")
+                              .arg(*t.historyTestFontsWithoutPin);
+        } else {
+            historyTest = QStringLiteral("fails-with-pin (%1 pixels differ with pinning on)")
+                              .arg(*t.historyTestFontsWithPin);
+        }
+        report(QStringLiteral("verdict historyTest=%1 (%2 hint=none A(2,1)-vs-B(1) at DPR 1)")
+                   .arg(historyTest, fontsName(kHistoryTestSizeOffset)));
         report(QStringLiteral("verdict H2=%1")
                    .arg(t.recreated ? QStringLiteral("engines recreated after a cache clear")
                                     : QStringLiteral("no recreation seen")));
@@ -554,71 +699,56 @@ private Q_SLOTS:
         }
     }
 
-    // Qt's own count at a first glyph-cache fill, per glyph and scale; and where each glyph's image changes
-    // over a pixel (the rasteriser's grid at that scale).
+    // Qt's own count at a first glyph-cache fill, per font set, glyph and scale, in the format the raster
+    // engine draws the engine's glyphs in, or why Qt computes none; and where each glyph's image changes over
+    // a pixel (the rasteriser's grid at that scale). 'C' and 'L' start the axis and caption runs of this
+    // probe's scene and of tst_static_strips' (the glyph Qt counts at a first fill; the key shares the axis's
+    // engine, the same pixel size and weight).
     void emulatedBinCounts() {
-        const Fonts fonts = qttest::testFonts();
-        for (const bool noHinting : {false, true}) {
-            const Conditions conditions(noHinting, qt::detail::glyphBinPinning());
-            QStringList lines;
-            onFreshThread([&] {
-                for (const Role& r : kRoles) {
-                    const Engines e = enginesOf(fonts->font(r.style));
-                    if (e.primary == nullptr) {
-                        continue;
-                    }
-                    const QFontEngine::GlyphFormat format = e.primary->glyphFormat != QFontEngine::Format_None
-                                                                ? e.primary->glyphFormat
-                                                                : QFontEngine::Format_A8;
-                    for (const char32_t ch : {U'd', U'j', U'f', U'C', U'1'}) {
-                        const glyph_t glyph = e.primary->glyphIndex(static_cast<uint>(ch));
-                        QStringList counts;
-                        QStringList sweeps;
-                        for (const qreal scale : {1.0, 1.25, 1.5, 2.0, 3.0}) {
-                            BinCounter counter(format, QTransform::fromScale(scale, scale));
-                            counts.append(
-                                QStringLiteral("%1x=%2").arg(scale).arg(counter.binCount(e.primary, glyph)));
-                            if (scale == 1.0 || scale == 1.5 || scale == 2.0) {
-                                QStringList changes;
-                                QImage previous;
-                                for (int k = 0; k < 48; ++k) {
-                                    QImage img = counter.mapAt(e.primary, glyph, k / 48.0);
-                                    if (k == 0 || img != previous) {
-                                        changes.append(QString::number(k));
-                                    }
-                                    previous = std::move(img);
-                                }
-                                // Every step: the rasteriser takes the offset as it is (FreeType).
-                                sweeps.append(QStringLiteral("%1x=%2").arg(scale).arg(
-                                    changes.size() == 48
-                                        ? QStringLiteral("every")
-                                        : QStringLiteral("[%1]").arg(changes.join(QLatin1Char(',')))));
-                            }
+        for (const double sizeOffset : kFontSizeOffsets) {
+            const Fonts fonts = qttest::testFonts(sizeOffset);
+            for (const bool noHinting : {false, true}) {
+                const Conditions conditions(noHinting, qt::detail::glyphBinPinning());
+                QStringList lines;
+                onFreshThread([&] {
+                    for (const Role& r : kRoles) {
+                        const QFont logical = fonts->font(r.style);
+                        const Engines e = enginesOf(logical);
+                        if (e.primary == nullptr) {
+                            continue;
                         }
-                        lines.append(QStringLiteral("emulate role=%1 hint=%2 engine=%3 glyph='%4' count{%5} "
-                                                    "imageChangesAt/48{%6}")
-                                         .arg(QString::fromLatin1(r.name),
-                                              noHinting ? QStringLiteral("none") : QStringLiteral("default"),
-                                              typeName(e.primary->type()),
-                                              QString(QChar(static_cast<char16_t>(ch))),
-                                              counts.join(QLatin1Char(' ')), sweeps.join(QLatin1Char(' '))));
+                        const DrawnFormat drawn = drawnFormat(logical, e.primary);
+                        for (const char32_t ch : {U'd', U'j', U'f', U'C', U'1', U'L'}) {
+                            const glyph_t glyph = e.primary->glyphIndex(static_cast<uint>(ch));
+                            lines.append(
+                                QStringLiteral(
+                                    "emulate %1 role=%2 hint=%3 engine=%4 px=%5 format=%6 glyph='%7' %8")
+                                    .arg(fontsName(sizeOffset), QString::fromLatin1(r.name),
+                                         noHinting ? QStringLiteral("none") : QStringLiteral("default"),
+                                         typeName(e.primary->type()))
+                                    .arg(e.primary->fontDef.pixelSize)
+                                    .arg(drawn.name, QString(QChar(static_cast<char16_t>(ch))),
+                                         emulate(e.primary, drawn.format, glyph)));
+                        }
                     }
+                });
+                for (const QString& l : std::as_const(lines)) {
+                    report(l);
                 }
-            });
-            for (const QString& l : std::as_const(lines)) {
-                report(l);
             }
         }
     }
 
-    // H1: the same DPR 1 (and DPR 2) scene drawn by fresh threads after different DPR histories.
-    void threadHistory_data() { addRows(); }
+    // H1: the same DPR 1 (and DPR 2) scene drawn by fresh threads after different DPR histories, with either
+    // font set.
+    void threadHistory_data() { addHistoryRows(); }
     void threadHistory() {
+        QFETCH(double, sizeOffset);
         QFETCH(bool, noHinting);
         QFETCH(bool, pin);
         const Conditions conditions(noHinting, pin);
-        const Fonts fonts = qttest::testFonts();
-        const QString row = rowName(noHinting, pin);
+        const Fonts fonts = qttest::testFonts(sizeOffset);
+        const QString row = fontsName(sizeOffset) + QLatin1Char(' ') + rowName(noHinting, pin);
         struct History {
             QString name;
             std::vector<float> dprs;
@@ -650,7 +780,7 @@ private Q_SLOTS:
                 tally().binsWithoutPin.insert(h.finalBins.begin(), h.finalBins.end());
             }
         }
-        const QString tag = fileTag(noHinting, pin);
+        const QString tag = fontsTag(sizeOffset) + QLatin1Char('_') + fileTag(noHinting, pin);
         const std::int64_t ab =
             differing(runs[0].last, runs[1].last, QStringLiteral("history_%1_A_vs_B").arg(tag));
         const std::int64_t cb =
@@ -667,10 +797,13 @@ private Q_SLOTS:
                      runs[3].finalBins != runs[4].finalBins)) {
             ++tally().historyRowsWithBinsSpread;
         }
-        // What pinning changes against Qt's own count (the pinned row against the unpinned one, threads B and
-        // E): how far the text a fresh thread draws moves with the fix.
-        static std::vector<QImage> unpinned[2];
-        std::vector<QImage>& base = unpinned[noHinting ? 1 : 0];
+        if (sizeOffset == kHistoryTestSizeOffset && noHinting) {
+            (pin ? tally().historyTestFontsWithPin : tally().historyTestFontsWithoutPin) = ab;
+        }
+        // What pinning changes against Qt's own count (the pinned row against the unpinned one of its font
+        // set and hinting, threads B and E): how far the text a fresh thread draws moves with the fix.
+        static std::map<QString, std::vector<QImage>> unpinned;
+        std::vector<QImage>& base = unpinned[fontsTag(sizeOffset) + fileTag(noHinting, false)];
         if (!pin) {
             base = {runs[1].last, runs[4].last};
         } else if (base.size() == 2) {

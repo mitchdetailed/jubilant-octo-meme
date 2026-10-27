@@ -251,6 +251,7 @@ ASan + UBSan + LeakSanitizer, 30 min nightly, `soak_minutes` on dispatch; AC-M4-
 builds and smoke-tests the packages on the three OSes (tags, dispatch, pull requests touching the packaging) and
 drafts the release on a `v*` tag (D-212). Required checks for `main`: `core` x3, `qt-app` on Windows and Linux,
 `lint`, `sanitize`, `fuzz-smoke` (08 §4.4); `package` and `bench` are not required.
+`.github/workflows/probe.yml` runs the diagnostic probes on manual dispatch only (D-220); it is not required either.
 
 ## 8. Working alongside other agents
 

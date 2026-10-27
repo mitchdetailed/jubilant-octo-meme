@@ -26,14 +26,17 @@ Internal (`src/`): `font_cache.*` (the one QFont construction rule, the style ->
 `QStaticText` caches), `paint_internal.hpp` (text placement, command bounds and `paintStaticList`, shared by
 `RasterBackend` and `LayerCache`), `span_raster.*` (the Static-layer line rasteriser), `glyph_bins.*` (one
 subpixel position count, 4, for every font engine that draws plot text, set before Qt computes one from the
-thread's first glyph-cache fill; on by default on macOS only, D-220).
+thread's first glyph-cache fill; on by default on macOS only, and only under the Qt version it was built against,
+D-220).
 
 Diagnostic probe (`probes/`, built only with `-DESSES_BUILD_PROBES=ON`, ctest label `probe`, never part of the
 suites; D-220): `probe_text_engines.cpp` (`qtrender.probe_text_engines`, plus `.cocoa` and `.freetype` on macOS
 and `.directwrite` and `.directwrite_scaled` on Windows) reports, as `PROBE ` lines, which font engine draws each
 scheme role on each thread, its subpixel position count after each DPR history, Qt's own count per glyph and
-scale, and the differing pixels of text drawn after different histories with the count pinned and not. ci.yml's
-manually dispatched job `probe` runs it.
+scale, and the differing pixels of text drawn after different histories with the count pinned and not. The workflow
+`.github/workflows/probe.yml` runs it, on manual dispatch only: `gh workflow run probe.yml --ref <branch>` (macos-14;
+`-f windows=true` adds windows-2022 and the DirectWrite entries). GitHub dispatches a workflow only once its file is
+on the default branch, so this works after the merge that brings `probe.yml` to `main`.
 
 ## Behaviour notes
 
@@ -110,7 +113,7 @@ the pixel references in `tests/reference/` are geometry-only scenes and therefor
 | Test | Covers |
 |---|---|
 | `tst_raster_backend` | layer life cycle and free-list; every command at DPR 1 and 2 (exact pixels); slices, gaps, dashes; text anchors, elision, background, rotation, DPR scaling against `QtTextMetrics`; compose order; straight-alpha readback; Static rasteriser == QPainter picture, single blend of translucent strokes, scissor clipping of huge coordinates; `geometry_scene@{1,1.5,2}x.png` references |
-| `tst_static_strips` | `RasterBackend::rasteriseStatic` in strips == one `LayerCache::rasteriseStatic` pass (tolerance 0): geometry scene, split traces and text at DPR 1, 2 and 1.5, text across every strip edge at subpixel glyph positions, the eight `time_distance` golden cases; clear colour; one strip on a NoBlock thread; spare-buffer reuse; text a thread draws at DPR 1 after DPR 2 == text a thread draws at DPR 1 first (D-220) |
+| `tst_static_strips` | `RasterBackend::rasteriseStatic` in strips == one `LayerCache::rasteriseStatic` pass (tolerance 0): geometry scene, split traces and text at DPR 1, 2 and 1.5, text across every strip edge at subpixel glyph positions, the eight `time_distance` golden cases; clear colour; one strip on a NoBlock thread; spare-buffer reuse; text a thread draws at DPR 1 after DPR 2 == text a thread draws at DPR 1 first (D-220; on macOS also an informational control with the pinning off) |
 | `tst_layer_cache` | the ChangeMask table of 04 §2.2 bit by bit (recomposition only on the right masks); resize; buffer reuse; damage = cursor strips + key column at DPR 1 and 2; `paint` == `RasterBackend::compose`; exposed-region clipping |
 | `tst_text_metrics_concurrency` | 8 threads measuring while the GUI thread swaps schemes (200 snapshots); per-snapshot caches; metrics == `SchemeFonts` fonts |
 | `tst_scheme_fonts` | style -> role table, QFont attributes, caption fallback, golden font registration |

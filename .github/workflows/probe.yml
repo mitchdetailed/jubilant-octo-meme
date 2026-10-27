@@ -1,0 +1,111 @@
+# SPDX-FileCopyrightText: 2026 the Esses contributors
+# SPDX-License-Identifier: MIT
+#
+# Diagnostic probes (D-220), on manual dispatch only: `gh workflow run probe.yml --ref <branch>`, with
+# `-f windows=true` for windows-2022 as well as macos-14. The Qt build of ci.yml's qt-app with ESSES_BUILD_PROBES=ON,
+# then `ctest -L probe` verbose, so every PROBE line of qtrender.probe_text_engines and its platform entries (macOS:
+# cocoa, and minimal with FreeType engines; Windows: the windows platform's DirectWrite, also at QT_SCALE_FACTOR=1.5)
+# is in the job log, in probe.log and, for the env and verdict lines, in the job summary; then the suites the probe is
+# about (qtrender.tst_*, ui.tst_dpr_switch). The report, the images and the test logs are uploaded as the artefact
+# probe-<os>. The same pinned actions and Qt kit as qt-app; never merge-blocking.
+# A workflow of its own, not a job of ci.yml: a dispatch of ci.yml that skipped every other job would report the
+# skipped required checks (lint, fuzz-smoke) as passed for its commit, and it would share ci.yml's concurrency group,
+# so it could cancel a push or nightly run of the same ref without replacing it. This one has no other trigger and a
+# concurrency group of its own. GitHub dispatches a workflow only once its file is on the default branch: this one
+# can be dispatched, for any --ref, from the merge that brings it to main.
+name: probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      windows:
+        description: "Also run on windows-2022 (the probe's DirectWrite entries), not only on macos-14"
+        type: boolean
+        default: false
+
+concurrency:
+  group: probe-${{ github.ref }}
+  cancel-in-progress: true # a new dispatch on the same branch replaces the one running
+
+permissions:
+  contents: read
+
+env:
+  # Both must match ci.yml's (its comments explain them: the CI and release Qt, D-006, D-126, and why aqtinstall comes
+  # from a master commit), so the probe measures the Qt kit that qt-app tests.
+  QT_VERSION: "6.12.0"
+  AQT_SOURCE: "git+https://github.com/miurahr/aqtinstall.git@076e1659807d0b362a3ed684d54c2e9c775eb9c7"
+
+jobs:
+  probe:
+    name: probe (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.windows && '[{"os":"macos-14","preset":"ci-mac-clang-qt","qtarch":"clang_64"},{"os":"windows-2022","preset":"ci-win-msvc-qt","qtarch":"win64_msvc2022_64"}]' || '[{"os":"macos-14","preset":"ci-mac-clang-qt","qtarch":"clang_64"}]') }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    env:
+      QT_QPA_PLATFORM: offscreen
+      ESSES_TEST_FONT_DIR: ${{ github.workspace }}/tests/golden/fonts # Noto Sans only (D-127)
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with: { submodules: false }
+      - uses: lukka/get-cmake@v3.31.6
+      - name: Install Qt ${{ env.QT_VERSION }} (aqtinstall)
+        id: qt
+        continue-on-error: true # a second try follows (D-217)
+        uses: jurplel/install-qt-action@v4.1.1
+        env:
+          AQT_CONFIG: ${{ runner.os == 'Windows' && format('{0}/.github/aqt-settings.ini', github.workspace) || '' }}
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: ${{ matrix.qtarch }}
+          cache: true
+          aqtsource: ${{ env.AQT_SOURCE }}
+          py7zrversion: "==1.1.3"
+          extra: ${{ runner.os == 'Windows' && '--external 7z' || '' }}
+      - name: Install Qt ${{ env.QT_VERSION }} (aqtinstall, second try)
+        if: steps.qt.outcome == 'failure'
+        uses: jurplel/install-qt-action@v4.1.1
+        env:
+          AQT_CONFIG: ${{ runner.os == 'Windows' && format('{0}/.github/aqt-settings.ini', github.workspace) || '' }}
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: ${{ matrix.qtarch }}
+          cache: true
+          aqtsource: ${{ env.AQT_SOURCE }}
+          py7zrversion: "==1.1.3"
+          extra: ${{ runner.os == 'Windows' && '--external 7z' || '' }}
+      - uses: ilammy/msvc-dev-cmd@v1.13.0 # no-op outside Windows
+      - name: Configure (ESSES_BUILD_QT=ON, ESSES_BUILD_PROBES=ON)
+        shell: bash
+        run: cmake --preset ${{ matrix.preset }} -DCMAKE_PREFIX_PATH="${QT_ROOT_DIR//\\//}" -DESSES_BUILD_PROBES=ON
+      - name: Build
+        id: build
+        run: cmake --build --preset ${{ matrix.preset }}
+      - name: Probes (ctest -L probe, verbose)
+        shell: bash
+        run: ctest --preset ${{ matrix.preset }} -L '^probe$' -V 2>&1 | tee build/${{ matrix.preset }}/probe.log
+      - name: The probe's env and verdict lines (job summary)
+        if: always() && steps.build.outcome == 'success'
+        shell: bash
+        run: |
+          { echo '### probe (${{ matrix.os }})'; echo '```'
+            grep -E 'PROBE (env|verdict)' build/${{ matrix.preset }}/probe.log || echo 'no PROBE lines'
+            echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: The suites the probe is about (qtrender.tst_*, ui.tst_dpr_switch)
+        if: always() && steps.build.outcome == 'success'
+        shell: bash
+        run: ctest --preset ${{ matrix.preset }} --parallel 4 -R '^(qtrender\.tst_|ui\.tst_dpr_switch$)'
+      - name: Upload the probe's report and images
+        if: always()
+        uses: actions/upload-artifact@v4.6.2
+        with:
+          name: probe-${{ matrix.os }}
+          path: |
+            build/${{ matrix.preset }}/probe.log
+            build/${{ matrix.preset }}/**/artefacts/
+            build/${{ matrix.preset }}/Testing/Temporary/LastTest*.log
+          if-no-files-found: ignore
+          retention-days: 14

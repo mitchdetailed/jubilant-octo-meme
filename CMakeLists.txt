@@ -17,7 +17,7 @@ option(ESSES_BUILD_BENCH "Build Google Benchmark targets (phase B: not vendored 
 option(ESSES_BUILD_FUZZ "Build libFuzzer targets (Clang only)" OFF)
 option(ESSES_BUILD_PLUGINS "Build plugins/ and sdk/ (v1.0)" OFF)
 # Diagnostic probes (D-220): Qt Test executables outside the suites that report what they measure (ctest label
-# probe); built only on request, as by ci.yml's manually dispatched probe job. Needs ESSES_BUILD_QT and tests.
+# probe); built only on request, as by the manually dispatched workflow probe.yml. Needs ESSES_BUILD_QT and tests.
 option(ESSES_BUILD_PROBES "Build the diagnostic probes (ctest label probe; with the Qt layers and tests)" OFF)
 option(ESSES_WARNINGS_AS_ERRORS "Treat warnings as errors (ON in the ci-* presets only)" OFF)
 option(ESSES_ENABLE_CLANG_TIDY "Run clang-tidy on Qt-free targets" OFF)
