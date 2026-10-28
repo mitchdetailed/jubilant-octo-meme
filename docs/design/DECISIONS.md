@@ -854,6 +854,7 @@ Rewritten on 2026-10-10 after the review. The list is deduplicated across this d
 | D-219 | PR #5's third CI run: an id copied before the source that holds it can go (the soak's heap-use-after-free at Close All, the sidecar flush at exit, the selection's close, the maths' removal, the Mapping panel's hand-off) with the soak's first sanitizer report in the job log, the lap-stretch tests reading the report as it is announced and the laps that wait for Corr Dist back at an earlier version built, the uninstaller's `.ld` step before `unins000.exe` returns with `smoke.py` waiting for the uninstall's end and a model of the installer's `.ld` rule (refines D-016, D-121, D-179 (a), D-190, D-213, D-217 (l)) | no | PR #5's third CI run, AC-M4-01/-03/-04 |
 | D-220 | macOS plot text independent of the thread and the DPR it first drew at: one subpixel position count, 4, for every font engine plot text is drawn with at subpixel positions (Qt Gui private API; by default on macOS only, and only under the Qt version Esses was built against), the diagnostic probe and its dispatch-only workflow, the relinking page's exact Qt version; D-217 (n)'s macOS strips closed (refines D-209, D-217 (n); amends `docs/user/relinking.md`'s later-patch-release promise) | no | PR #5's macOS runs, AC-M4-06/-07 |
 | D-221 | Print to Clipboard of a report without the keyboard-focus mark: the report table's cells are painted without the focus and hover states while Print to Clipboard paints them, so the picture does not depend on the focus (PR #5's ubuntu qt-app run on 750eae4; reads 04 §7.2 item 9, §12 item 1, §13) | no | PR #5's run on 750eae4 |
+| D-222 | The first public release's front page: the root README describes Esses, its alpha status, downloads, build and licences; TRADEMARK.md is restored; the alpha note is docs/releases/0.1.0.md; the user guide's file-replacement, Windows and macOS first-start and minimum-OS text corrected; the DMG's minimum macOS is 14.4 (completes D-192; amends D-125's class (e), 00 §8 rule 2, 08 §5 and §11's TRADEMARK.md row; refines D-217 (l)'s 14.0) | no | M4.md §6.5 item 9 |
 
 ### A.1 Review amendments
 
@@ -1327,6 +1328,7 @@ These entries record choices the documents adopted during the final cross-docume
 **Context.** D-003 allow-lists only importer ids and dialog labels. The MoTeC CSV writer must emit the format name (WU-70), D-019's round-trip bag is spelled `x-i2`/`xI2`, and prose files name the vendor. D-103 added only the CSV constant and the sniff regex.
 **Decision.** Exactly five classes (00 §8 rule 2, 08 §5): (a) importer ids `motec.ld`, `motec.csv` (and the v1.0 configuration-importer ids) with their dictionary and profile file names; (b) dialog format labels; (c) the MoTeC CSV writer's format-name constant and the `motec.csv` sniff pattern; (d) the D-019 bag: the JSON key `x-i2` in `workbook-1`/`maths-1` documents, schemas and fixtures, and its C++ member `xI2`; (e) prose in `CLEANROOM.md`, `NOTICES.md`, `TRADEMARK.md`, `docs/`, fixture READMEs and `fixture.json` `source` fields. The lint also splits identifiers into tokens, so `I2MathsImporter`, `xI2` and `IMtc…` are caught. Option for the user: rename the bag to a neutral key `x-import` with a `format` field, which removes class (d); the default keeps `x-i2`.
 **User must confirm:** yes (the optional rename only; Q-17).
+*Amended by D-222 (A.15, 2026-10-28): class (e) includes the root `README.md`; 00 §8 rule 2 also allows naming the maths syntax Esses is compatible with.*
 
 #### D-126 Qt 6.12 installed locally in M0 week 1 (amends D-006; changes the Q-13 default)
 **Context.** D-006 leaves the local kit to the developer, who has 6.7.2; CI builds on 6.12, so under the old Q-13 default (6.7.2 until M4) CI-only failures could appear for months.
@@ -2011,6 +2013,7 @@ next levers are in `esses_store` and the elementwise interpreter's non-vectorise
 **Decision.** The root `README.md` says only that the project is a work in progress. `TRADEMARK.md` is removed from the repository. Their full texts are kept locally in `docs/unpublished/` (git-ignored) and are restored before the first public release. Other documents point to the trademark policy in `00_OVERVIEW.md` section 8 instead. The vendor-mark rules themselves are unchanged and still enforced by `tools/check_vendor_marks.py`.
 **Consequences.** The repository history still contains the earlier README and TRADEMARK.md, and the design documents describe the project in full; hiding those as well needs a history rewrite and a decision on `docs/` before the repository is made public.
 **User must confirm:** no (requested by the user, 2026-10-13).
+*Completed by D-222 (A.15, 2026-10-28): the root `README.md` is the project's front page and `TRADEMARK.md` is restored for `v0.1.0`.*
 
 ### A.14 M3 (proposed, 2026-10-14)
 
@@ -3189,6 +3192,7 @@ lines**, and its release note says so (M4.md §6.0 step 8, §6.5 item 7); centri
 with new DPR 2 goldens, is left for a later release (M4.md §10 item 52).
 *Refined by D-220 (A.15, 2026-10-26): (n)'s macOS strips are fixed (one subpixel position count for the font engines
 plot text is drawn with); that deferral is closed.*
+*Refined by D-222 (A.15, 2026-10-28): (l)'s deployment target is 14.4, Qt 6.12's minimum, instead of 14.0.*
 
 #### D-218 PR #5's second CI run: the reference decoder and the Python tools on Python 3.8 and later, the association scripts with Windows's `reg` by its full path and nothing else, two defects of the vendored ADS fixed in place and `AdsBackend`'s docks read by `qobject_cast`, the two macOS-only test faults, and the deferral (refines D-041, D-212, D-217 (d) and (l); reads 06 §19 item 2, 08 §9; amends D-147 (a) and D-153 for the vendored ADS's source files, and the licence policy of `GOVERNANCE.md`)
 **Context.** PR #5's second CI run, on fe6cf07 (D-217) of 2026-10-19, with the runs dispatched on the branch before
@@ -3515,4 +3519,53 @@ the delegate's switch disabled it fails.
 **Consequences.** A report's Print to Clipboard and its pixel goldens no longer depend on the focus or on the window's
 activation; the goldens are unchanged (they had no mark). The component's own focus border (`setFocusFrame`, the
 worksheet's focused component) is still painted in a print, as the graphs' Chrome is.
+**User must confirm:** no.
+
+#### D-222 The first public release's front page (completes D-192; amends D-125's class (e), 00 §8 rule 2, 08 §5 and §11; refines D-217 (l); M4.md §6.5 item 9)
+**Context.** D-192 replaced the root `README.md` by a work-in-progress notice and withheld `TRADEMARK.md` until a
+working model, their texts kept in the git-ignored `docs/unpublished/` and "restored before the first public
+release". M4.md §6.5 item 9 asks for a README that says what Esses is, its alpha status, the support status per OS,
+the unsigned-package friction and links to the release and `docs/user/install.md`; `NOTICES.md` already pointed to
+the README for building from source. Two reviews of the drafts (a fact-check against the repository, then five
+lenses each checked by a skeptic: repository facts, consistency, outside facts, policy, the reader) found, besides
+wording in the drafts: the user guide's `open-files.md` contradicting D-208 (a) and M4.md §8's E-5 measurement (it
+said a rename-over writer may replace an open log; a classic `MoveFileExW(MOVEFILE_REPLACE_EXISTING)` is refused);
+the macOS first start described only for macOS 14 (macOS 15 removed the Control-click override for apps that are
+not notarised); no word on Windows 11's Smart App Control, which blocks unsigned programs without a Run anyway
+(Microsoft: "no way to bypass Smart App Control protection for individual apps"); the DMG declaring macOS 14.0 while
+Qt 6.12's minimum is 14.4 (qtbase `.cmake.conf` `QT_SUPPORTED_MIN_MACOS_VERSION`); several files still calling every
+vendored library unchanged after D-218 (c); and the repository's private vulnerability reporting turned off although
+`SECURITY.md` names it as the private route.
+**Decision.** (a) The root `README.md` is the project's front page: what Esses is (with the nominative use of 00 §8),
+0.1's status, the downloads with their minimum OS versions and the unsigned-package steps, what 0.1 does and does not
+do, building from source (presets, Qt Gui's private headers, the Linux system packages, the Qt version the pixel
+goldens need, the soak test), the documentation, contributing and the licences. D-125's class (e), 00 §8 rule 2(e),
+08 §5 and `tools/vendor_marks_allowlist.txt` list the root `README.md` as allowed prose (the scanner does not read
+it; the rule now says what the M0 README already did), and 00 §8 rule 2 and 08 §11's `TRADEMARK.md` row allow the
+nominative naming of the maths syntax Esses is compatible with (the README's and `docs/user/index.md`'s
+"the syntax of MoTeC i2"). (b) `TRADEMARK.md` is restored from `docs/unpublished/` with these updates: the name
+"may still change" (no longer "before the first public release"; `GOVERNANCE.md` and `cmake/naming.cmake` likewise);
+the application icon is the only logo; the name is a prefix throughout the code with every spelling in
+`cmake/naming.cmake` (the old text said it appeared as an identifier only there); the nominative uses include the
+maths syntax; the exceptions are 00 §8 rule 2's classes in full, with the allowed prose files named. (c) The public
+alpha note of `v0.1.0` is `docs/releases/0.1.0.md`, pasted into the draft release (M4.md §6.0 step 8); its links are
+absolute, since a release body has neither relative links nor heading anchors. (d) User-guide corrections:
+`open-files.md` says which writers Windows refuses while a log is open, that a change is also noticed while reading,
+and that a same-size, same-time replacement is not noticed (D-217 (n)); `install.md` gives Smart App Control, the
+macOS 15 route (System Settings > Privacy & Security > Open Anyway), the minimum OS versions (macOS 14.4; x86-64
+Linux at least as new as Ubuntu 24.04, on which the AppImage is built) and "little or no testing by hand" for the
+packages that are not supported (a short check of the AppImage on the clean Ubuntu VM of M4.md §6.1 step 11; for
+the DMG only with a Mac); `graph.md` says that 1 px lines look slightly soft at 200 % (D-217 (n)). (e) `package.yml`
+builds the DMG for macOS 14.4 (`MACOS_DEPLOYMENT_TARGET`, `smoke.py dmg`'s default and `apps/app`'s fallback
+for a build without a deployment target), not D-217 (l)'s 14.0. (f) `NOTICES.md`,
+`third_party/README.md` and `AGENTS.md` no longer call every vendored library unchanged (D-218 (c)); `AGENTS.md`'s
+vendor-mark rule names the restored `TRADEMARK.md` and the README; `SECURITY.md` no longer says that nothing has
+been released.
+**Consequences.** The root README and `TRADEMARK.md` are public with `v0.1.0`; `docs/unpublished/` has served its
+purpose. Before publishing, the maintainer turns on private vulnerability reporting or gives `SECURITY.md`, the
+troubleshooting page and the note another route (M4.md §6.0 step 8), and decides on `SECURITY.md`'s promised
+dedicated contact address. GitHub retires the `macos-14` runner on 2026-11-02 (M4.md §6.0 step 7): a tag after that
+needs the macOS jobs moved to `macos-15`, and then the README's and the guide's "launch-tested on macOS 14" changes.
+The macOS 15 and Smart App Control steps are not tested here (no macOS 15 hardware; no Windows with Smart App
+Control on).
 **User must confirm:** no.

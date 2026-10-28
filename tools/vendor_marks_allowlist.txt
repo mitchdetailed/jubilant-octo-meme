@@ -22,7 +22,9 @@ literal MoTeC CSV File
 literal x-i2
 ident xI2
 
-# (e) prose: CLEANROOM.md, NOTICES.md, TRADEMARK.md, docs/, fixture READMEs and fixture.json source fields
+# (e) prose: README.md, CLEANROOM.md, NOTICES.md, TRADEMARK.md, docs/, fixture READMEs and fixture.json source
+#     fields (README.md since D-222)
+path README.md
 path CLEANROOM.md
 path NOTICES.md
 path TRADEMARK.md

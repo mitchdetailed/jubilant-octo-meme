@@ -1,9 +1,10 @@
 # SPDX-FileCopyrightText: 2026 the Esses contributors
 # SPDX-License-Identifier: MIT
 #
-# Prefix table (D-003, 08 section 3.3). The codename appears as an identifier only here and in documentation,
-# so a later rename is a scripted search-and-replace driven by this table (tools/rename.py, planned).
-# The name may change before the first public release (Q-02: no trademark search scheduled).
+# Prefix table (D-003, 08 section 3.3). Every spelling of the codename is collected here; the sources use them
+# literally (the namespace esses, the esses_ targets, ESSES_ options), so a later rename is a scripted
+# search-and-replace driven by this table (tools/rename.py, planned).
+# The name may still change (D-003, D-222; Q-02: no trademark search scheduled).
 include_guard(GLOBAL)
 
 set(ESSES_PREFIX      "esses")          # CMake target prefix: ${ESSES_PREFIX}_base

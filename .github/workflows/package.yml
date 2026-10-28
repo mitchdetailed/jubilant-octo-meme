@@ -236,8 +236,9 @@ jobs:
     timeout-minutes: 120
     env:
       # The oldest macOS the bundle runs on: CMAKE_OSX_DEPLOYMENT_TARGET, which the Info.plist names as
-      # LSMinimumSystemVersion, and what smoke.py dmg expects there (D-217). The runner's macOS; Qt 6.12 supports it.
-      MACOS_DEPLOYMENT_TARGET: "14.0"
+      # LSMinimumSystemVersion, and what smoke.py dmg expects there (D-217): Qt 6.12's own minimum, macOS 14.4
+      # (qtbase .cmake.conf QT_SUPPORTED_MIN_MACOS_VERSION; D-222).
+      MACOS_DEPLOYMENT_TARGET: "14.4"
     steps:
       - uses: actions/checkout@v4.2.2
         with: { fetch-depth: 0 }

@@ -9,7 +9,7 @@ release.
 
 ## Supported versions
 
-No version has been released yet. After 0.1, the latest release receives security fixes.
+The latest release receives security fixes. 0.1.0 is the first release.
 
 ## Threat model in brief
 

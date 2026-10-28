@@ -34,7 +34,7 @@ Commands:
         extracted tree
   dmg --dmg <file> [--macos-minimum <x.y>]  mounted read-only (hdiutil), the bundle, the programs, Info.plist: the
         executable, the version, LSMinimumSystemVersion = --macos-minimum (the deployment target package.yml
-        builds for, 14.0 by default), .ld as an alternate handler of the log type the bundle exports (not
+        builds for, 14.4 by default), .ld as an alternate handler of the log type the bundle exports (not
         imports; D-217)
   cli --archive <zip or tar.gz>             the standalone esses-cli
 Common: --version <version> [--tag <vX.Y.Z>] [--fixture <a log file>]. --self-test checks the checks.
@@ -1345,7 +1345,7 @@ def main() -> int:
     parser.add_argument("--zip", type=pathlib.Path)
     parser.add_argument("--appimage", type=pathlib.Path)
     parser.add_argument("--dmg", type=pathlib.Path)
-    parser.add_argument("--macos-minimum", default="14.0",
+    parser.add_argument("--macos-minimum", default="14.4",
                         help="dmg: the LSMinimumSystemVersion expected (the build's CMAKE_OSX_DEPLOYMENT_TARGET)")
     parser.add_argument("--archive", type=pathlib.Path)
     parser.add_argument("--no-registry", action="store_true",

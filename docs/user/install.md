@@ -1,25 +1,30 @@
 # Installing Esses
 
 Every release on the project's GitHub Releases page has these downloads, with a `sha256sums.txt` that lists the
-checksum of each file:
+checksum of each package:
 
 | Download | For | Status |
 |---|---|---|
 | `esses-<version>-win64-setup.exe` | Windows 10 (22H2) and Windows 11, 64-bit | Supported |
 | `esses-<version>-win64-portable.zip` | The same, without installing (a USB stick, a locked-down PC) | Supported |
-| The Linux AppImage | 64-bit Linux (tested on Ubuntu 24.04) | Builds green, not supported |
-| `esses-<version>-macos.dmg` | macOS (launch-tested on macOS 14) | Builds green, not supported |
+| The Linux AppImage (x86-64) | Linux at least as new as Ubuntu 24.04 (built and tested on it; an older system such as Ubuntu 22.04 may not start it) | Builds green, not supported |
+| `esses-<version>-macos.dmg` | macOS 14.4 or later, Apple silicon or Intel (launch-tested on macOS 14) | Builds green, not supported |
 | `esses-cli` on its own | The command-line tool for scripts, per operating system | As its platform |
 
 "Builds green, not supported" means the package is built and launch-tested by the project's automated checks on
-every release, but nobody tests it by hand and problems on it do not hold up a release. Reports are still welcome.
+every release, but gets little or no testing by hand, and problems on it do not hold up a release. Reports are
+still welcome.
 
 The 0.1 packages are not code-signed, so each operating system warns the first time you run them (below).
 
 ## Windows installer
 
 1. Run `esses-<version>-win64-setup.exe`. Windows SmartScreen may say it protected your PC because the file is
-   unsigned: choose **More info**, then **Run anyway**.
+   unsigned: choose **More info**, then **Run anyway**. On Windows 11 with **Smart App Control** turned on, Windows
+   blocks unsigned programs and offers no Run anyway, for the installer and the portable zip alike. Esses then
+   runs only with Smart App Control turned off (Windows Security > App & browser control > Smart App Control
+   settings). That setting applies to every program, and on a Windows 11 without the latest updates it cannot be
+   turned on again without reinstalling Windows, so decide with that in mind.
 2. The installer offers two tasks:
    - **Associate .ld log files with Esses**: double-clicking a `.ld` file then opens it in Esses. If another
      program already opens `.ld` files, the box starts unticked so that program keeps them unless you tick it.
@@ -63,8 +68,10 @@ The AppImage contains `esses-cli` as well; it is also offered as a separate `tar
 ## macOS disk image (builds green, not supported)
 
 1. Open the `.dmg` and drag Esses to Applications.
-2. The app is not notarised, so the first start is refused. In Finder, Control-click (or right-click) Esses,
-   choose **Open**, then **Open** again in the dialog. Later starts work normally.
+2. The app is not notarised, so the first start is refused. On macOS 14, Control-click (or right-click) Esses in
+   Finder, choose **Open**, then **Open** again in the dialog. On macOS 15 or later, try to open Esses once, then
+   open System Settings > Privacy & Security, choose **Open Anyway** next to the message about Esses, and confirm.
+   Later starts work normally.
 
 ## Starting Esses from a command line
 

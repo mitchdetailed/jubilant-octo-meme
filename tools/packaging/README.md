@@ -77,8 +77,8 @@ deterministic (sorted entries, the time of `SOURCE_DATE_EPOCH`, else 2026-01-01;
   `/MERGETASKS="assocld"`) and the portable zip's `associate-ld.cmd`; `.csv` is only offered in "Open with".
   Linux: `esses.desktop` with `MimeType=application/x-esses-log;` (needs the desktop's integration of the
   AppImage). macOS: `CFBundleDocumentTypes` for `ld`, `LSHandlerRank Alternate`, and the type exported
-  (`UTExportedTypeDeclarations`); `LSMinimumSystemVersion` is the build's deployment target (14.0 in `package.yml`).
-  `smoke.py dmg` checks these on the built bundle (`--macos-minimum`, the job's `MACOS_DEPLOYMENT_TARGET`).
+  (`UTExportedTypeDeclarations`); `LSMinimumSystemVersion` is the build's deployment target (14.4 in
+  `package.yml`, Qt 6.12's minimum; D-222). `smoke.py dmg` checks these on the built bundle (`--macos-minimum`, the job's `MACOS_DEPLOYMENT_TARGET`).
   `associate-ld.cmd` hands the folder's path to `reg` through delayed expansion, so a folder named with `&`, `%` or
   `!` works. Both scripts call `reg` by its full path (`%SystemRoot%\System32\reg.exe`) and look no program up by
   its bare name, and `unassociate-ld.cmd` reads `reg query`'s output itself (`for /f`, whose cmd starts through

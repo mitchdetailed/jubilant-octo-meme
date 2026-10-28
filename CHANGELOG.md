@@ -301,6 +301,17 @@ All notable changes are recorded here, newest first. The project follows semanti
 - Print to Clipboard of a time or channel report no longer shows the keyboard-focus mark of the current cell (D-221):
   the picture depended on whether, and how, the table had the focus (PR #5's ubuntu qt-app run on 750eae4 failed
   `widgets.tst_reports_track_goldens` on it). New test `widgets.tst_time_report` `printIgnoresTheKeyboardFocus`.
+- The repository's front page for the first public release (D-222, completing D-192; M4.md section 6.5 item 9):
+  `README.md` says what Esses is, 0.1's alpha status and support per operating system, the downloads and the
+  unsigned-package steps, building from source, the documentation and the licences; `TRADEMARK.md` is back. The
+  public alpha note of `v0.1.0` is `docs/releases/0.1.0.md` (section 6.0 step 8).
+- User guide corrections (D-222): Opening files no longer says that Windows lets any program replace an open log
+  (a classic rename-over is refused, D-208 (a)) and says that a same-size, same-time replacement is not noticed;
+  Installing covers Windows 11's Smart App Control, the macOS 15 first start and the minimum macOS (14.4) and Linux
+  (Ubuntu 24.04) versions; Graphs says that 1 px lines look slightly soft at 200 % (D-217 (n)). `NOTICES.md`,
+  `third_party/README.md` and `AGENTS.md` no longer call the vendored ADS unchanged.
+- The macOS disk image declares macOS 14.4 as its minimum (`package.yml` `MACOS_DEPLOYMENT_TARGET`, `smoke.py dmg`'s
+  default, the fallback in `apps/app/CMakeLists.txt`), Qt 6.12's own minimum, instead of 14.0 (D-222).
 
 ## Unreleased (M3)
 

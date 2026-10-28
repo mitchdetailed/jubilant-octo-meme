@@ -88,7 +88,8 @@ deployment). The runtime is not part of the source tree.
 
 ## Third-party code in this repository
 
-Vendored under `third_party/`, unchanged; provenance (local copies, and the downloads the user approved on
+Vendored under `third_party/`, unchanged except the two fixes to the Qt Advanced Docking System listed in
+`third_party/qtads/UPSTREAM.md` (above); provenance (local copies, and the downloads the user approved on
 2026-10-10 and, for ADS, on 2026-10-11) and file hashes are in `third_party/README.md`.
 
 | Component | Version | Licence | Copyright | Used by | In distributed programs |

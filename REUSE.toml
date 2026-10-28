@@ -21,8 +21,9 @@ precedence = "override"
 SPDX-FileCopyrightText = "2004, 2006 The Linux Foundation and its contributors"
 SPDX-License-Identifier = "LicenseRef-DCO"
 
-# Vendored third-party code: upstream files unchanged, upstream licence (08 section 3.7.2). Provenance and file
-# hashes: third_party/README.md (project documentation, covered by the default above).
+# Vendored third-party code: upstream files, unchanged except the two Qt Advanced Docking System fixes listed in
+# third_party/qtads/UPSTREAM.md (D-218 (c)), upstream licence (08 section 3.7.2). Provenance and file hashes:
+# third_party/README.md (project documentation, covered by the default above).
 [[annotations]]
 path = "third_party/pugixml/**"
 precedence = "override"
