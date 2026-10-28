@@ -298,6 +298,9 @@ All notable changes are recorded here, newest first. The project follows semanti
   Qt version Esses was built against.
 - The three DPR 1.5 `values_list` pixel goldens (`tests/golden/images/dpr_sweep/values_list/`) are the ubuntu CI
   renders (D-127; `ci` 40424542613 on c69c0d6), no longer provisional Windows renders: Linux CI compares them strictly.
+- Print to Clipboard of a time or channel report no longer shows the keyboard-focus mark of the current cell (D-221):
+  the picture depended on whether, and how, the table had the focus (PR #5's ubuntu qt-app run on 750eae4 failed
+  `widgets.tst_reports_track_goldens` on it). New test `widgets.tst_time_report` `printIgnoresTheKeyboardFocus`.
 
 ## Unreleased (M3)
 

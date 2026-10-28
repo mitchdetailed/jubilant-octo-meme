@@ -20,6 +20,7 @@
 #include <QJsonObject>
 #include <QKeyEvent>
 #include <QMenu>
+#include <QScopeGuard>
 #include <QShowEvent>
 #include <QTableView>
 #include <QVBoxLayout>
@@ -189,6 +190,8 @@ bool TimeReport::exportData(ExportSink& sink, const ExportOptions&) const {
 
 QImage TimeReport::renderToImage(qreal dpr) const {
     table_->settleLayout();
+    table_->setExporting(true); // the picture does not depend on the focus (report_table.hpp)
+    const auto shown = qScopeGuard([this] { table_->setExporting(false); });
     return ComponentWidget::renderToImage(dpr); // QWidget::render of the table (04 section 7.2 item 9)
 }
 

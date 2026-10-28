@@ -853,6 +853,7 @@ Rewritten on 2026-10-10 after the review. The list is deduplicated across this d
 | D-218 | PR #5's second CI run: the reference decoder and the Python tools on Python 3.8 and later (the half floats of `memoryview.cast` from 3.12 only, `float_sum` as 3.12's compensated sum), the association scripts with Windows's `reg` by its full path and nothing else, two defects of the vendored ADS fixed in place with the rule for such changes and `AdsBackend`'s docks read by `qobject_cast`, the two macOS-only test faults (forwarded paths compared by file identity, a values list placed as on a worksheet); the deferral (ADS's side-bar restore of a damaged layout) (refines D-041, D-212, D-217 (d) and (l); reads 06 §19 item 2, 08 §9; amends D-147 (a) and D-153 for the vendored ADS's source files, and the licence policy of `GOVERNANCE.md`) | **yes**: (c) only (confirmed 2026-10-26) | PR #5's second CI run, AC-M4-01/-03/-04/-06/-07 |
 | D-219 | PR #5's third CI run: an id copied before the source that holds it can go (the soak's heap-use-after-free at Close All, the sidecar flush at exit, the selection's close, the maths' removal, the Mapping panel's hand-off) with the soak's first sanitizer report in the job log, the lap-stretch tests reading the report as it is announced and the laps that wait for Corr Dist back at an earlier version built, the uninstaller's `.ld` step before `unins000.exe` returns with `smoke.py` waiting for the uninstall's end and a model of the installer's `.ld` rule (refines D-016, D-121, D-179 (a), D-190, D-213, D-217 (l)) | no | PR #5's third CI run, AC-M4-01/-03/-04 |
 | D-220 | macOS plot text independent of the thread and the DPR it first drew at: one subpixel position count, 4, for every font engine plot text is drawn with at subpixel positions (Qt Gui private API; by default on macOS only, and only under the Qt version Esses was built against), the diagnostic probe and its dispatch-only workflow, the relinking page's exact Qt version; D-217 (n)'s macOS strips closed (refines D-209, D-217 (n); amends `docs/user/relinking.md`'s later-patch-release promise) | no | PR #5's macOS runs, AC-M4-06/-07 |
+| D-221 | Print to Clipboard of a report without the keyboard-focus mark: the report table's cells are painted without the focus and hover states while Print to Clipboard paints them, so the picture does not depend on the focus (PR #5's ubuntu qt-app run on 750eae4; reads 04 §7.2 item 9, §12 item 1, §13) | no | PR #5's run on 750eae4 |
 
 ### A.1 Review amendments
 
@@ -3493,4 +3494,25 @@ before: the probe's dispatch on e4dc523 (`ci` 40413826613) found 0 differing pix
 release a user's Esses runs without the pinning (macOS text may then shift by a fraction of a pixel between threads),
 or not at all where a private import changed. Widget text drawn outside `drawText` keeps Qt's own counts; no test
 compares it across threads.
+**User must confirm:** no.
+
+#### D-221 Print to Clipboard of a report without the keyboard-focus mark (reads 04 §7.2 item 9, §12 item 1, §13)
+**Context.** PR #5's qt-app ubuntu-24.04 run on 750eae4 (`ci` 40430103010) failed `widgets.tst_reports_track_goldens`
+`timeReport(bands_summaries)` at 1x and 2x (0.96 and 0.98 % of pixels) while its table text matched; it had passed on
+every earlier run. The run's `golden-diffs-ubuntu-24.04` artefact (downloaded with the maintainer's approval) showed
+one cell differing, the current cell (Lap 1, Turn 1), drawn with Qt Fusion's keyboard-focus mark: a gradient fill
+under a darker outline. Qt draws it on the current cell of a view that has the focus when its window took the focus
+by the keyboard, and a window activated with nothing focused focuses its first child with `Qt::TabFocusReason`, which
+counts. On the offscreen platform the activation arrives asynchronously, so whether it landed before the picture
+decided the picture; in the application Print to Clipboard likewise showed the mark or not, by how the table had got
+the focus.
+**Decision.** The report table's two views paint their cells through one `ReportCellDelegate` (`report_table.cpp`),
+which drops `State_HasFocus` and `State_MouseOver` while the table is painted for Print to Clipboard
+(`ReportTable::setExporting`, switched on by `TimeReport` and `ChannelReport::renderToImage` around `QWidget::render`).
+On screen the mark stays. New test `widgets.tst_time_report` `printIgnoresTheKeyboardFocus`: with the window active
+and the table focused with `Qt::TabFocusReason`, then not focused, the screen differs and the print does not; with
+the delegate's switch disabled it fails.
+**Consequences.** A report's Print to Clipboard and its pixel goldens no longer depend on the focus or on the window's
+activation; the goldens are unchanged (they had no mark). The component's own focus border (`setFocusFrame`, the
+worksheet's focused component) is still painted in a print, as the graphs' Chrome is.
 **User must confirm:** no.
