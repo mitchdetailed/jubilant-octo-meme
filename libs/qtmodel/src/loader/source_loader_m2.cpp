@@ -180,7 +180,10 @@ void SourceLoader::mappingPending(formats::PendingResolution pending) {
     const int id = nextPendingId_++;
     const auto [it, inserted] = pendingMappings_.emplace(id, std::move(pending));
     static_cast<void>(inserted);
-    Q_EMIT mappingRequired(id, it->second);
+    // A copy: a receiver may answer at once (resolveMapping, cancelMapping), which erases the entry while the
+    // later receivers still read the argument (as budgetExceeded).
+    const formats::PendingResolution announced = it->second;
+    Q_EMIT mappingRequired(id, announced);
 }
 
 const formats::PendingResolution* SourceLoader::pendingMapping(int pendingId) const {

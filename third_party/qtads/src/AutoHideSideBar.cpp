@@ -16,6 +16,8 @@
 ** License along with this library; If not, see <http://www.gnu.org/licenses/>.
 ******************************************************************************/
 
+// Changed by the Esses project on 2026-10-25 (LGPL-2.1 section 2): see
+// CAutoHideSideBar::insertDockWidget() and third_party/qtads/UPSTREAM.md.
 
 //============================================================================
 /// \file   AutoHideSideBar.cpp
@@ -214,7 +216,15 @@ void CAutoHideSideBar::insertTab(int Index, CAutoHideTab* SideTab)
 CAutoHideDockContainer* CAutoHideSideBar::insertDockWidget(int Index, CDockWidget* DockWidget)
 {
 	auto AutoHideContainer = new CAutoHideDockContainer(DockWidget, d->SideTabArea, d->ContainerWidget);
-	DockWidget->dockManager()->dockFocusController()->clearDockWidgetFocus(DockWidget);
+	// Esses change, 2026-10-25: the dock manager has a focus controller only
+	// if the FocusHighlighting config flag is set; without one, calling
+	// clearDockWidgetFocus() on the null pointer was undefined behaviour.
+	// Checked as CDockManager checks its own FocusController.
+	auto FocusController = DockWidget->dockManager()->dockFocusController();
+	if (FocusController)
+	{
+		FocusController->clearDockWidgetFocus(DockWidget);
+	}
 	auto Tab = AutoHideContainer->autoHideTab();
 	DockWidget->setSideTabWidget(Tab);
 	insertTab(Index, Tab);

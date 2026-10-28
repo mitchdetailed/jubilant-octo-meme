@@ -79,7 +79,8 @@ public:
     const plot::TrackPositionBody& body() const noexcept { return body_; }
     // The map of the last prepared inputs (null: none bound).
     std::shared_ptr<const analysis::TrackMap> trackMap() const { return inputs_.trackMap; }
-    // Tests: the prepared inputs, the builds, whether the Static layer shows the current state.
+    // Tests: the prepared inputs, the builds, whether the Static layer shows the current state (no build
+    // dirty, scheduled or in flight and no size change waiting in the 30 Hz throttle).
     const plot::ComponentBuildInputs& inputs() const noexcept { return inputs_; }
     int staticSubmitted() const noexcept { return staticSubmitted_; }
     int staticDelivered() const noexcept { return staticDelivered_; }
@@ -91,6 +92,8 @@ protected:
     void onFocusChanged(bool focused) override;
     int captionHeight() const override;
     void paintEvent(QPaintEvent* event) override;
+    // M4 (D-211 (f)): the Main slot's mapping of the prepared inputs (an unlinked part's own view).
+    std::optional<plot::DomainMapper> mainMapper() const override;
     void showEvent(QShowEvent* event) override;
     void hideEvent(QHideEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;

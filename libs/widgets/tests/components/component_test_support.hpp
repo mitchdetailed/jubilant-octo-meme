@@ -29,10 +29,15 @@
 #include <esses/widgets/components/component_widget.hpp>
 
 #include <QCoreApplication>
+#include <QDeadlineTimer>
 #include <QEventLoop>
 #include <QImage>
 #include <QRect>
+#include <QSize>
 #include <QString>
+#include <QTest>
+#include <QThread>
+#include <QWidget>
 #include <cstddef>
 #include <filesystem>
 #include <memory>
@@ -79,11 +84,62 @@ inline bool poolSettled(const TaskPool& pool) {
 }
 
 // The component's pool (its RenderService's: the World's or the shell's runtime) is settled and no Static
-// build is dirty, scheduled or in flight. `C` has the Static pipeline (LayeredComponent, TimeDistanceGraph,
-// TrackPosition).
+// build is dirty, scheduled or in flight, nor a size change waiting in its 30 Hz throttle (staticUpToDate).
+// `C` has the Static pipeline (LayeredComponent, TimeDistanceGraph, TrackPosition).
 template <class C> bool settled(C& c) {
     return poolSettled(c.context().render.pool()) && c.staticUpToDate();
 }
+
+// Delivers only the events already posted (a queued build request, a worker's result through the Dispatcher)
+// until `done` holds; false after `timeoutMs`. The event dispatcher does not run, so no timer fires: a 30 Hz
+// throttle that runs keeps what it holds.
+template <class Pred> bool postedEventsUntil(Pred done, int timeoutMs = 30000) {
+    const QDeadlineTimer deadline(timeoutMs);
+    while (!done()) {
+        if (deadline.hasExpired()) {
+            return false;
+        }
+        QCoreApplication::sendPostedEvents();
+        QThread::yieldCurrentThread(); // the worker builds meanwhile
+    }
+    return true;
+}
+
+// M4 (tests/ui/tst_dpr_switch.cpp, the floating graph on macOS): the Static image of a size is not up to date
+// while a later size waits in the 30 Hz throttle. `c` is a visible child (its resize events are synchronous),
+// settled, with its throttle idle; `submitted` and `landed` read its build counters (the Static builds
+// requested; the latest one delivered). Resized to `first`, delivered at once (the throttle starts), and once
+// that build is requested to `second`, which the throttle holds while the build of `first` lands: until the
+// throttle delivers `second` and it is rebuilt, staticUpToDate() is false.
+template <class C, class Submitted, class Landed>
+void checkQueuedSizeIsNotUpToDate(C& c, Submitted submitted, Landed landed, QSize first, QSize second) {
+    QVERIFY(!c.sizeThrottleActive());
+    const int before = submitted();
+    c.setGeometry(QRect(c.pos(), first));
+    QVERIFY(c.sizeThrottleActive());
+    QVERIFY(!c.sizeChangePending());
+    QVERIFY(postedEventsUntil([&] { return submitted() > before; })); // prepared at `first`
+    c.setGeometry(QRect(c.pos(), second));
+    QVERIFY(c.sizeChangePending());
+    QVERIFY(postedEventsUntil([&] { return landed(); }));
+    const qreal dpr = c.devicePixelRatioF();
+    QCOMPARE(c.layers().staticImage().size(), (QSizeF(first) * dpr).toSize());
+    QVERIFY(c.sizeThrottleActive()); // no timer ran: `second` still waits
+    QVERIFY(!c.staticUpToDate());    // the image of `first` in a component of `second`
+    QVERIFY(QTest::qWaitFor([&] { return settled(c); }, 30000));
+    QVERIFY(!c.sizeChangePending());
+    QCOMPARE(c.layers().staticImage().size(), (QSizeF(second) * dpr).toSize());
+}
+
+// Shows `component`, a child of `host`, as a worksheet holds a component: at (0, 0) with exactly `size`
+// (WorksheetCanvas::placement gives a component its rect, at least 1 px, and no minimum size) in `host`, a
+// window of that size; true once `host` is exposed. Not as a window of its own: Qt gives a window with a
+// layout that layout's minimum size (QLayout::SetDefaultConstraint), for a component holding a table the
+// table's QAbstractScrollArea::minimumSizeHint, made of the style's scroll bar metrics, and those differ by
+// platform under Qt Test: Fusion's 14 px extent and 26 px slider unscaled where QTEST_MAIN's Qt::AA_Use96Dpi
+// reaches the style (Windows, Linux), a third larger on macOS, where QStyleHelper ignores it (the offscreen
+// screen's 96 dpi over Darwin's base of 72). A values_list window of 280 x 70 came out 280 x 90 there.
+bool showPlaced(QWidget& host, QWidget& component, QSize size);
 
 std::filesystem::path repoRoot();
 // Before the QApplication exists (initMain): QT_QPA_FONTDIR = tests/golden/fonts unless set.

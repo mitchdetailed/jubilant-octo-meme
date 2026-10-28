@@ -16,6 +16,7 @@
 // esses does (AC-M1-12).
 
 #include "../../../qtmodel/tests/qtmodel_test_support.hpp"
+#include "m4_followups/legacy_csv_support.hpp"
 #include "properties_shell/shell_test_support.hpp"
 
 #include <esses/qtmodel/data_selection_model.hpp>
@@ -589,7 +590,11 @@ private Q_SLOTS:
         QTRY_VERIFY_WITH_TIMEOUT(QFileInfo(file).exists() && QFileInfo(file).size() > 100, 60000);
         QFile csv(file);
         QVERIFY(csv.open(QIODevice::ReadOnly));
-        QVERIFY(csv.readLine().startsWith("Time"));
+        // The legacy dialect (M4, D-211 (d)): the metadata lines first, the names row after them.
+        const QList<QByteArray> lines = legacycsv::lines(csv.readAll());
+        QVERIFY(lines.size() > legacycsv::kFirstDataRow);
+        QVERIFY(lines.front().startsWith("\"Format\","));
+        QVERIFY(lines[legacycsv::kNamesRow].startsWith("\"Time\","));
     }
 
     // The component rows are enabled by the focused component's key context, refreshed when the focus moves.

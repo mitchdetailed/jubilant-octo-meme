@@ -8,6 +8,7 @@
 // reference marker, the channel drop replacing the channel, Export Data as CSV and renderToImage.
 
 #include "components/plots_test_support.hpp"
+#include "m4_followups/legacy_csv_support.hpp"
 
 #include <esses/plotcore/gauge_geometry.hpp>
 #include <esses/store/column.hpp>
@@ -227,23 +228,35 @@ private Q_SLOTS:
         QVERIFY(waitQuiet(*rig.c));
         MemorySink sink;
         QVERIFY(rig.c->exportData(sink, ExportOptions{}));
-        const QList<QByteArray> lines = csvLines(sink.bytes);
-        QCOMPARE(lines.front(), QByteArray("Time [s],\"Throttle [%]\""));
-        QCOMPARE(lines.size(), 1 + 50 * 50);
-        const QList<QByteArray> f = lines[1].split(',');
-        QCOMPARE(f[0].toDouble(), 40.0);
-        QVERIFY(std::abs(f[1].toDouble() - throttleAt(1, 0.0)) < 1e-9);
+        // The legacy dialect (M4, D-211 (d); 05 section 6 "Writer"): metadata, names and units, then the 50 s
+        // lap at 50 Hz with Time from 0; the throttle at float precision (an F32 channel).
+        namespace lc = legacycsv;
+        QVERIFY(lc::crlfOnly(sink.bytes));
+        const QList<QByteArray> lines = lc::lines(sink.bytes);
+        QCOMPARE(lines.size(), lc::kLinesBeforeData + 50 * 50);
+        QVERIFY(lines[0].startsWith("\"Format\","));
+        QCOMPARE(lc::fields(lines[10]).value(1), QByteArray::fromStdString(lapAt(*src, 1).name)); // Range
+        QCOMPARE(lines[lc::kNamesRow], QByteArray("\"Time\",\"Throttle\""));
+        QCOMPARE(lines[lc::kUnitsRow], QByteArray("\"s\",\"%\""));
+        QVERIFY(lc::allQuoted(lines[lc::kFirstDataRow]));
+        const QList<QByteArray> f = lc::fields(lines[lc::kFirstDataRow]);
+        QCOMPARE(f.size(), 2);
+        QCOMPARE(f[0].toDouble(), 0.0);
+        QCOMPARE(static_cast<float>(f[1].toDouble()), static_cast<float>(throttleAt(1, 0.0)));
+        const QList<QByteArray> last = lc::fields(lines.back());
+        QCOMPARE(last[0].toDouble(), 49.98); // the last sample before the lap's end
+        QCOMPARE(static_cast<float>(last[1].toDouble()), static_cast<float>(throttleAt(1, 49.98)));
         // Selected range padded by 2 s.
         MemorySink padded;
         ExportOptions o;
         o.range = ExportOptions::Range::SelectedPadded;
         QVERIFY(rig.c->exportData(padded, o));
-        QCOMPARE(csvLines(padded.bytes).size(), 1 + 54 * 50);
+        QCOMPARE(lc::lines(padded.bytes).size(), lc::kLinesBeforeData + 54 * 50);
         Rig<NumericGauge> numeric(w, specOf("gauge_numeric", kNumeric), QSize(240, 160));
         QVERIFY(waitQuiet(*numeric.c));
         MemorySink n;
         QVERIFY(numeric.c->exportData(n, ExportOptions{}));
-        QCOMPARE(csvLines(n.bytes).size(), 1 + 50 * 50);
+        QCOMPARE(lc::lines(n.bytes).size(), lc::kLinesBeforeData + 50 * 50);
     }
 };
 

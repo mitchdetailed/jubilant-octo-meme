@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: MIT
 //
 // esses-cli (05 section 9.2; 07 section 3.1, M0 command set): info, channels, laps, validate, fixture add,
-// fixture verify; M2 (03 section 13): eval, maths check, maths functions, export, fixture diff. Every --json
+// fixture verify; M2 (03 section 13): eval, maths check, maths functions, export, fixture diff; M4 (D-214):
+// convert (csv, motec.csv, motec.ld through the built-in writers). Every --json
 // output is canonical JSON (02 section 6.5 rule 1). Exit status: 0 success, 1 a check failed (invalid
 // document, fixture mismatch, unreadable log, an expression or maths item with an error), 2 usage or
 // environment error.
 #include "app_context.hpp"
 #include "cli_common.hpp"
+#include "convert.hpp"
 #include "export.hpp"
 #include "fixture.hpp"
 #include "inspect.hpp"
@@ -130,6 +132,27 @@ int run(const std::vector<std::string>& args) {
     exportCmd->add_option("--options", exportOptions.optionsJson, "importer options as JSON");
     exportCmd->add_flag("--no-sidecar", exportOptions.noSidecar, "ignore <log>.sidecar.json");
     exportCmd->add_flag("--json", exportOptions.json, "a canonical JSON report");
+
+    // convert (05 section 9.2: reader -> writer; D-181 (e), D-214)
+    ConvertOptions convert;
+    std::string convertInput, convertChannels, convertOutput;
+    CLI::App* convertCmd = app.add_subcommand(
+        "convert",
+        "write a log's channels through a writer: csv, motec.csv or motec.ld (no project, no maths)");
+    convertCmd->add_option("input", convertInput, "the log")->required();
+    convertCmd->add_option("--format,--to", convert.format, "the writer: csv, motec.csv or motec.ld")
+        ->required();
+    convertCmd->add_option("--channels", convertChannels, "comma-separated channel names (default: all)");
+    convertCmd->add_option("--range", convert.range, "write one range, e.g. \"Outings:Laps/3\"");
+    convertCmd->add_option("--rate", convert.rate, "the CSV grid, Hz or num/den (csv and motec.csv only)");
+    convertCmd->add_option("--layer", convert.layer, "the layer (default Normal)");
+    convertCmd->add_option("--writer-options", convert.writerOptions,
+                           R"(writer options as JSON, e.g. {"ld":{"dialect":"m1"}})");
+    convertCmd->add_option("-o,--output", convertOutput, "the file to write (never the input)")->required();
+    convertCmd->add_option("--importer", convert.importerId, "importer id; skips sniffing");
+    convertCmd->add_option("--options", convert.optionsJson, "importer options as JSON");
+    convertCmd->add_flag("--no-sidecar", convert.noSidecar, "ignore <log>.sidecar.json");
+    convertCmd->add_flag("--json", convert.json, "a canonical JSON report");
 
     // maths check / functions (AC-M2-01, 03 section 13)
     CLI::App* mathsCmd = app.add_subcommand("maths", "maths modules and functions");
@@ -273,6 +296,12 @@ int run(const std::vector<std::string>& args) {
         exportOptions.units = splitList(exportUnits);
         exportOptions.output = p8(exportOutput);
         return runExport(ctx, exportOptions, std::cout, std::cerr);
+    }
+    if (convertCmd->parsed()) {
+        convert.input = p8(convertInput);
+        convert.channels = splitList(convertChannels);
+        convert.output = p8(convertOutput);
+        return runConvert(ctx, convert, std::cout, std::cerr);
     }
     if (checkCmd->parsed()) {
         for (const std::string& f : checkModules) {

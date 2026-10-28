@@ -74,10 +74,10 @@ on a `ThreadRole::NoBlock` thread with a recording assertion handler (AC-M1-12).
 | Test | Covers |
 |---|---|
 | `tst_dispatcher` | FIFO delivery, dead contexts, posts from 8 threads, `close`, `drain`, the NoBlock `Future::get` assertion (AC-M1-12), `AppRuntime` install/shutdown, shutdown with 20 builds and a 3-level chain in flight |
-| `tst_dataselection` | every 06 §5.2 row with its `changed()` bits, compact renumbering, D-109, N/P without wrap in the filtered order, the TT 2485 candidate rule (out/in never), CTRL+ALT+F tolerance, trust through the sidecar, `sourceReplaced` (by id, by lap number, dropped), close, restore keys, filters, lap-number syntax, invariants over 2,000 random operations |
+| `tst_dataselection` | every 06 §5.2 row with its `changed()` bits, compact renumbering, D-109, N/P without wrap in the filtered order, the TT 2485 candidate rule (out/in never), CTRL+ALT+F tolerance, trust through the sidecar, `sourceReplaced` (by id, by lap number, dropped), close (also of a reference into the closed source, D-219), restore keys, filters, lap-number syntax, invariants over 2,000 random operations |
 | `tst_worksheetviewmodel` | F9 through the Main lap's DistanceIndex and back within one sample, the fraction rule and the banner without Corr Dist (AC-M1-09), N/P zoom and cursor in both domains, W, Z, F2, zoom limits, pan clamping, cursor steps and edges, datum, animation (Cursor-only), the shared view across worksheets, offsets |
-| `tst_maths_distance` | Background prefetch observed in the pool's band (AC-M1-10), the settings schema examples, E-CSD-SETTINGS, no speed -> NoDistance, versions kept across a sidecar snapshot (D-140), enable/disable, the per-lap index (AC-M1-08 through the service), outing chains, the no-blocking path |
-| `tst_source_loader` | open/publish of a written .ld + .ldx, Import Log, maths and distance without a request, phase-2 stint annotation, a second open, failures to Messages, trust through `commitSidecar` read back on reopen, close, the no-blocking path, and the public ACC stand-in when its input is generated; D-190: sidecar writes coalesced on a Background task and flushed on close, `closeAll()` cancelling an open in flight |
+| `tst_maths_distance` | Background prefetch observed in the pool's band (AC-M1-10), the settings schema examples, E-CSD-SETTINGS, no speed -> NoDistance, versions kept across a sidecar snapshot (D-140), enable/disable, the per-lap index (AC-M1-08 through the service), outing chains, the no-blocking path; D-219: laps waiting for Corr Dist back at an earlier version (a settings edit undone) are built without another request |
+| `tst_source_loader` | open/publish of a written .ld + .ldx, Import Log, maths and distance without a request, phase-2 stint annotation, a second open, failures to Messages, trust through `commitSidecar` read back on reopen, close, the no-blocking path, and the public ACC stand-in when its input is generated; D-190: sidecar writes coalesced on a Background task and flushed on close, `closeAll()` cancelling an open in flight; D-219: `sourceClosed` receivers get the loader's copy of the id (never the closed source's own, from `close()` or `closeAll()`), and a loader destroyed with an edit due and an older write queued keeps the newest edit on disk |
 | `tst_project_session` | shipped defaults, user keymap and scheme, the new-project layout, save/reopen with D-070 backups, skipped workbooks, recent sources, the options the selection reads |
 | `tst_settings_messages` | settings-1 defaults, dotted keys, coalesced write, unknown members, MRU caps, load errors; the Messages cap, first error, Import Log rows, the Log sink |
 | `tst_commands_keymap` | registry semantics, the shipped keymap without conflicts, focus-chain resolution, normalisation, rejected rows, facade commands equal to their keymap rows, every qtmodel-bound batch-1 key driving its post-condition |
@@ -86,14 +86,16 @@ on a `ThreadRole::NoBlock` thread with a recording assertion handler (AC-M1-12).
 | `tst_undo_contract` | `QUndoStack` under `QCoreApplication`, document commands, merge, worksheet move (the M2 contract) |
 | `tst_undo_property` | AC-M2-09: 30 randomised sequences (seed `ESSES_TEST_SEED`) of every command kind, undo and redo, equal to an independent replay after every step; undo-all and redo-all; view-state operations (selection, zoom, cursor, F9, filters, the stretch toggle) never on the stack; file open/close not on the stack |
 | `tst_project_recovery` | every document saved and reopened, renamed/removed files retired, unreadable files kept, autosave writing only changed documents and never project files, the kill-and-recover path of AC-M2-06, the prompt's three answers, the timer, the selection, single-colour state and filters restored through `SessionRestore`; D-187 and D-190: a failed or killed save recovers without false conflicts, a journal holding only saved content is not offered, a failed backup copy keeps the save, the prompt's replay is the one recovered, `saveMathsModules` leaves other edits unsaved |
-| `tst_maths_service` | modules defined with only the edited cone re-versioned (AC-M2-04 through the service), every 03 §7.3 state, Recalculate, compat, mappings, local maths (explicit and from the sidecar), transient maths, GPS corrections, the live check and `LiveDiagnostics`, `connectProjectSession`, Channel Status rows with every trace kind and "(missing)" references (AC-M2-12) |
-| `tst_mapping_handoff` | AC-M2-11 at the model level: two unknown units wait for the panel, the decision as an undoable macro, the saved unit map applied silently to the next file, Cancel, Open anyway, headless opens, user text profiles; D-190: a project change cancels the opens in flight and those waiting for the panel |
+| `tst_maths_service` | modules defined with only the edited cone re-versioned (AC-M2-04 through the service), every 03 §7.3 state, Recalculate, compat, mappings, local maths (explicit and from the sidecar), transient maths, GPS corrections, the live check and `LiveDiagnostics`, `connectProjectSession`, Channel Status rows with every trace kind and "(missing)" references (AC-M2-12), `removeSource` of a reference into the removed source (D-219) |
+| `tst_mapping_handoff` | AC-M2-11 at the model level: two unknown units wait for the panel, the decision as an undoable macro, the saved unit map applied silently to the next file, Cancel, Open anyway, headless opens, user text profiles; D-190: a project change cancels the opens in flight and those waiting for the panel; D-219: a receiver may answer `mappingRequired` at once |
 | `tst_filters_search` | the lap-number syntax and its messages, filters persisted by source hash with the default and the apply-to-all flag, the word-prefix search, the Channels tree's Alias and Constants |
-| `tst_lap_stretch` | factors within the tolerance published and cleared by the toggle (view state), the tolerance as an undoable options edit, `Venue Length` as the track length, the report, `edit.undo`/`edit.redo` |
+| `tst_lap_stretch` | factors within the tolerance published and cleared by the toggle (view state), the tolerance as an undoable options edit, `Venue Length` as the track length, the report (read as `reportChanged` announces it, once every lap's length is in, D-219), `edit.undo`/`edit.redo` |
 
 `tests/qtmodel_test_support.*` builds synthetic circuit sources in memory (out lap, flying laps, in lap; wheel
 speeds whose integral is exactly the track length, optionally scaled per lap; optional GPS channels, a renamed
-throttle, a `Venue Length` detail) and writes them as .ld + .ldx through the motec.ld writer.
+throttle, a `Venue Length` detail) and writes them as .ld + .ldx through the motec.ld writer; `quarantinedCopy` gives a
+source whose bytes are overwritten when its last owner lets go of it (storage kept until the process ends), so a
+read of its id through a reference that outlived it fails a plain build's test (D-219).
 
 ## Deviations from the design text and open issues
 
@@ -118,7 +120,9 @@ throttle, a `Venue Length` detail) and writes them as .ld + .ldx through the mot
   joins a stale build; a pending build asked for again at a higher priority is raised to that band
   (`TaskPool::raise`), so F9 or W right after an open does not wait behind the Background prefetch; a lap without
   a valid Corr Dist sample stays without an index; `state()` is NoDistance when Corr Dist is in Error or no
-  lap could be indexed.
+  lap could be indexed. A lap asked for while Corr Dist evaluates is built when the evaluation is applied:
+  `channelReady`, or `statusChanged` in a finished state, since `channelReady` comes once per (output, version)
+  while the source is open and Corr Dist back at an earlier version (a settings edit undone) gets none (D-219).
 - `MathsService` adds `source`, `units`, `pool`, `descriptor`, `outputs`, the settings-schema calls,
   `setCorrectedSpeedEnabled` and `moduleMessage`.
 - `SourceLoader` submits the open task itself (the same key as `ImporterRegistry::load`) so that the task holds
@@ -297,3 +301,111 @@ No `M2-STUB` is left in this library.
   SidecarCommit hook (with a session one undoable `SidecarCommand` named `undoText`; `connectSourceLoader` reads
   `sidecarCommitText()`); `setTrusted` goes through it with its M2 text "Edit trust". The graph's annotation Edit /
   Remove use it.
+
+## M4 contract (07 §7.1; `docs/milestones/M4.md` §2-3; D-206)
+
+- `memory_budget.hpp` (budget package, `src/m4_budget/`): the budget setting (`kBudgetSettingKey`
+  `memory.chunkCacheBudgetBytes`, `kMinBudgetBytes`), `OpenBudgetCheck` (`exceeds()`: estimate > budget, final),
+  `PerformanceSnapshot` and `PerformanceMonitor` (final: polls `ChunkCache::stats()`, the budget and
+  `TaskPool::stats()` on a GUI timer); `budgetFromSettings`, `budgetWarningText`, `formatBytes`,
+  `performanceLine`, `performanceDetails`.
+- `SourceLoader` (`source_loader.hpp` is frozen; one marked section per package): budget
+  (`src/m4_budget/source_loader_budget.cpp`: the gate, Continue/Cancel, `budgetExceeded`, the hook `budgetHolds`
+  at the start of `published()`), reload (`src/m4_reload/source_loader_reload.cpp`: `checkChangedFiles`,
+  `isStale`, `reload`, `staleChanged`, `sourceReloaded`, the hooks at the end of `published()` and in `close()`),
+  followups (`summariesReady`, emitted from `source_loader.cpp`, which that package owns with the hook calls
+  kept). Each package keeps its state in its nested struct (`SourceLoader::M4Budget`, `M4Reload`).
+- `Message::altAction`/`altActionArgs` and `MessagesModel::AltActionRole` (final): a row's second action.
+- `DataWindowModel`: `StaleRole`, `setStaleQuery`/`isStale` (final), `refreshStale`
+  (`src/m4_reload/data_window_model_stale.cpp`).
+- Test: `tests/m4/tst_m4_contract.cpp` (`qtmodel.tst_m4_contract`); the packages' tests are in
+  `tests/m4_<package>/`. Every member above is implemented by its package (D-207, D-208, D-210; the sections below);
+  no contract stub is left (D-216).
+
+## M4 budget: the open-time warning and the Stats (AC-M4-02; D-207; 07 §7.1 row 1, 01 §7.2)
+
+- `memory_budget.hpp` (`src/m4_budget/memory_budget.cpp`): `budgetFromSettings` reads
+  `memory.chunkCacheBudgetBytes` (an integer or a double above 0, raised to `kMinBudgetBytes`, 1 GiB; nullopt
+  otherwise, so the runtime keeps its budget); `formatBytes` ("512 bytes", "1023 KB", "4.2 MB", "812 MB", "1.4 GB";
+  units of 2^10, 2^20, 2^30 bytes); `budgetWarningText` ("needs about 4.2 MB of memory once loaded, above the 2.0 MB
+  memory budget (0 bytes in use). Continue to open it anyway, or Cancel."); `performanceLine` ("Resident 412 MB of
+  4.0 GB", " (over budget)" above it) and `performanceDetails` (memory, chunks, hits and misses, evictions, the
+  pool's queues and workers); empty texts for an empty snapshot (the runtime shut down).
+- `SourceLoader`'s budget gate (`src/m4_budget/source_loader_budget.cpp`, state in `SourceLoader::M4Budget`): with
+  `setBudgetGate(&cache)`, `published()` holds an open whose `formats::estimateResident` exceeds the cache's budget
+  before it registers anything (no chunk decoded, no maths, no summary pass, no Import Log yet) and announces
+  `budgetExceeded(pendingId, check)` (the check carries the estimate, the budget and the resident bytes, reported,
+  not added). `continueOverBudget` publishes the same snapshot as the open's own publication (a second open of the
+  file published meanwhile gives `open.already_open`); `cancelOverBudget` and `cancelOpens()` drop it with an Import
+  Log row `open.budget_cancelled` (Info) and release the registry's decode log unless another open or waiting open
+  has the same source id; `close()` leaves the waiting opens of the file alone. A held open is not counted by
+  `pendingOpens()`; without a gate (the default) no open ever waits.
+- Test: `tests/m4_budget/tst_memory_budget.cpp` (`qtmodel.tst_memory_budget`): the texts and the setting by hand,
+  and the gate over a synthetic `.ld` whose 4.2 MB estimate (worked out by hand from 01 §7.1) exceeds a 2 MiB budget:
+  held with the cache never asked for a chunk, Continue, Cancel, `cancelOpens()`, two opens of one file, a close
+  while an open waits, an open within the budget and an open without a gate.
+
+## M4 followups: the loader, the track maps and the report model (D-210; `docs/milestones/M4.md` §5.1)
+
+- `TrackMapService` with a `MathsService` and a `Dispatcher` (the application's) does every file operation on
+  `MathsService::pool()` (Interactive) and none on the GUI thread (M3 item 23): `map()` on a cache miss gives
+  nullptr and reads on a worker (`isLoading`; `mapChanged` when it lands, found or not; a project change drops
+  the reads in flight); `setMap()` validates, replaces the cached map and announces it at once and queues the
+  write, one per venue file in flight with the next one held and merged (newest map, backed up if any merged
+  edit asked); a write that fails is a `logMessage` row, the venue is read back from its file, and the
+  `TrackMapCommand`s it carried become failed and obsolete (QUndoStack drops them at the next undo or redo);
+  writes still queued are made by the destructor; `venues()` answers from a scan on the pool
+  (`venuesChanged`); a generated map reaches `onGui` only once the venue's own map is known. `mapStamp(venue)`
+  identifies the cached map, `pendingIo()` counts what has not landed. Without a Dispatcher everything stays
+  synchronous (headless tools, the M3 tests). Tests: `qtmodel.tst_track_map_io`.
+- `SourceLoader`: the summary pass (`summary/<sourceId>/<first column id>`) posts `summariesReady(id)` when it
+  has run, after `sourcePublished`, only while the source is open with the columns it summarised (M3 item 18;
+  `qtmodel.tst_summaries_ready`). The phase-2 key holds the bound track map's identity
+  (`/t<setTrackMaps generation>-<mapStamp>/i...`), `mapChanged` no longer bumps a global generation, no run
+  starts while the venue's map is being read, and a sidecar edit that changes the Venue detail starts the pass
+  (M3 item 31; `qtmodel.tst_track_sections_pass` `aVenueEditRunsThePassForTheNewVenue`). The serial guard of
+  D-204 (d) has its own test, `aSupersededRunNeverPublishes` (M3 item 32).
+- `ReportModel`: a delivery or a display change that keeps the table's rows and columns is one `dataChanged`
+  over the table instead of a reset, so a view keeps its selection (M3 item 30;
+  `qtmodel.tst_report_model` `aRefreshOfTheSameShapeKeepsTheSelection`); `ReportTable` (widgets) re-measures
+  its columns on `dataChanged`.
+- `SessionRestore::check` also waits while an open is held at the memory budget warning
+  (`pendingBudgetOpens()`, D-207): Continue publishes it and Cancel announces it, and either runs the check
+  again, so the restored selection includes a file continued later (`qtmodel.tst_restore_budget`).
+- Not here: the components' rebuild on `summariesReady` (the widgets' Data path) belongs to the widgets
+  follow-ups; the frozen `source_loader.hpp` comment still names the M3 key form `/t<map generation>`.
+
+## M4 reload: changed source files and Reload (AC-M4-10; D-208; 06 §6 "Changed files")
+
+- `SourceLoader` (`src/m4_reload/source_loader_reload.cpp`): `checkChangedFiles()` runs `formats::checkSourceFile`
+  for every open source not yet stale; a Changed or Missing file marks it stale (until it is reloaded or closed)
+  and `staleChanged(id, true)` follows, once, after the pass. `checkChangedFilesInBackground()` (the shell's
+  activation check since D-217 (g)) runs the same re-stats on the pool and marks on the GUI thread
+  (`fileChecksPending()`; `staleState(id)` says Changed or Missing). `reload(id)` (D-217 (e), amends D-208) keeps
+  the source open: it writes its sidecar first (a failed write refuses the reload with `Io` and keeps the source)
+  and refuses a Missing file (`NotFound`); it opens the path again beside the stale source, and when the new open
+  publishes (`sourceReloaded(previous, source)`) the previous source is closed; a reload whose open fails or is
+  cancelled leaves the stale source as it was (`pendingReloads()`). A reload of an unchanged file
+  (`reloadSameContent`) is the same path. Every second the loader reads each open source's DecodeLog (D-217 (f)):
+  new entries go out as `importLog` (Messages), and `ld.io_fault` marks the source Missing, `ld.source_changed` or
+  `text.source_changed` Changed, at once rather than at the next activation.
+- `source_reload.hpp` (new): `connectSourceReload(loader, selection, messages)` appends the stale source's Messages
+  row (`staleSourceMessage`: Import, Warning, `open.file_changed`, the action `file.reload_source` with the id as
+  32 hex digits, `sourceIdArgument`/`parseSourceIdArgument`) and restores the selection on `sourceReloaded`; the
+  shell calls it beside `connectSourceLoader`, whose file another package owns.
+- `DataSelectionModel`: `closeSource` parks what it takes from the selection for the `kParkedCloses` (8) newest
+  closes, and `sourceReloaded(previous, source)` gives it to the reopened file: slots by RangeId, else by lap number
+  and class (06 §5.6), else dropped with a hint; a Main the close moved elsewhere back to its slot; the source's own
+  filter; its Data-window position (before the source that followed it). `closeAllSources` clears the parking.
+- `DataWindowModel`: a source row answers `StaleRole` and adds a stale line to its tool tip; `refreshStale(id)`
+  announces the row (`dataChanged`).
+- Test: `tests/m4_reload/tst_source_reload.cpp` (`qtmodel.tst_source_reload`).
+
+## M4 followups of the widgets (D-211)
+
+- The channel resolution of `RenderService::prepareInputs`, `ValuesModel` and `ReportModel` falls back to the
+  quantity's default display unit (`plot::defaultDisplayUnit`: a fraction stored in `ratio` shows in %) where the
+  component names none of the channel's quantity, and fills `ResolvedChannel::displayUnitId`; `ReportModel` passes
+  a report channel's `displayUnit`.
+- `ValuesModel::setViewSource`: the view a values_list component with an unlinked cursor or datum reads its values
+  at (the worksheet still gives the DistanceService).

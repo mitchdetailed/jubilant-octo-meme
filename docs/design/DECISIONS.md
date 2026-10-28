@@ -838,6 +838,22 @@ Rewritten on 2026-10-10 after the review. The list is deduplicated across this d
 | D-203 | The M3 fix pass: the review findings fixed, rejected or deferred (gCorrection's slip reference, the report engine's pairing, trust and units, the histogram's closed last band, the track-sections origin rule for stretched and unfinished laps, loop closure and the GPS seam, idle hidden worksheets, the shell's add, context menus and asynchronous export, heading pickers, rename and move without a rebuild, D-127 (a) amended, the deferrals) (refines D-194, D-195, D-197, D-198, D-199, D-200, D-201, D-202; amends D-127 (a), 04 §7.2 item 8, §8.2 item 4, §12 item 6, 06 §13.5 item 4, §14.4) | no | M3 fix pass, AC-M3-01 to AC-M3-12 |
 | D-204 | The Track Sections pass keyed by the identity of its lap indexes: a stretch published at the same index count runs it again, the dedupe is against the layer's latest run, only the latest run publishes, a closed source's runs are forgotten (refines D-195, D-199 (e); reads 02 §4.4 rule 13) | no | PR #4 review, AC-M3-04 |
 | D-205 | Track-map file names that keep the venue's identity: a readable slug and a hash of the exact venue, a file read only for the venue it holds, a write refused over another venue's file, the names of earlier builds read and moved (refines D-195 (e), D-199 (c); reads 02 §6.9 `trackmaps/<venue>.track.json`, amends outline §4) | no | PR #4 review, AC-M3-04 |
+| D-206 | The M4 contracts: one shell hook with an extension per package, frozen shared headers with per-package nested state and hook calls, the open-time budget check at publication with Continue and Cancel as a Messages row's two actions, a polled PerformanceMonitor, the re-stat check of every source, the Data window's stale query, DprWatcher and DockHost::windowOf, no new keymap rows, the wave-2 placeholders (refines D-011, D-043, D-193 (f); reads 07 §7.1, 01 §7.2, 02 §1 behaviour 5, 06 §6 and §17; amends 06 §2.2, §11, outline §4) | no | M4 contracts, AC-M4-02/-07/-09/-10 |
+| D-207 | The memory budget as built: the estimate as the upper bound of every chunk, Continue as the held open's own publication, Cancel releasing only an unshared decode log, the warning row's alternate action on SHIFT and in a row menu, Continue and Cancel enabled while an open waits, the setting floored and given back, the Options field in GB, the Performance field and the Stats line, the resident row as the peak resident set of a fresh process (refines D-011, D-043, D-206 (c)-(e); reads 07 §7.1, §7.2 AC-M4-02, §12, 01 §7.1-§7.2, §8.3, 06 §2.1, §11; amends 06 §11, outline §4) | no | M4 budget, AC-M4-02 |
+| D-208 | Changed source files as built: E-5's answer on NTFS (the POSIX-semantics, ReplaceFileW and rename-aside writers pass, a classic MoveFileExW replace is refused whatever the share mode, so the sharing policy stays), the stale mark sticky until reload or close, the Messages row added by connectSourceReload, Reload as a close then an open with the selection parked by the close, the command enabled while a source is stale, a fault-injection seam in the .ld provider and ld.io_fault once per source (refines D-206 (f); reads 02 §1 behaviour 5, §8 AC-4a, 06 §5.6, §6, §14.4, E-5; amends 06 §6 "Changed files", outline §4) | no | M4 reload, AC-M4-10 |
+| D-209 | HiDPI as built: per-monitor DPR through a watcher of every top-level window with a re-check after dock moves, crisp axis-aligned strokes on whole device pixels at a fractional DPR drawn by the backend, every layer painted from a whole device pixel, the definitions of crisp and no drift, the offscreen DPR sweep and its goldens (refines D-025, D-206 (g); reads 04 §6.6, 06 §1, §17, 07 §7.1 row 3, §7.2 AC-M4-07; amends 04 §6.6 items 1, 3 and 4, outline §4) | no | M4 hidpi, AC-M4-07 |
+| D-210 | The M3 follow-ups of esses_qtmodel and the Qt-free libraries as built: track-map files on the pool, summariesReady, the channel report's "ignore interpolated data", ReportModel's in-place refresh, the Track Sections pass keyed by its bound map, the missing report and variance tests (refines D-195, D-197, D-199 (c) and (e), D-203 (n), D-204; reads 01 §5.3 rules 3-4, 02 §3.2 rule 10, 04 §12 items 2-3 and 8, §13 item 5; amends 04 §12 items 2 and 8, outline §4) | no | M4 followups, M3.md §6 items 18, 23, 25, 29-32 |
+| D-211 | The M3 follow-ups of esses_widgets as built: a channel's default display unit (a fraction in %), display units of the scatter and channel report channels, unit pickers in the Properties pages, the Track Editor's speed class and Corr Dist unit, Export Data in the legacy dialect, the time_distance group headings, component links honoured, summariesReady reaching the components (refines D-010, D-177 (e), D-195, D-198 (e), D-200, D-201, D-203 (af) and (m), D-210 (b); reads 03 §9.1 item 6, 04 §2.4, §7.2 item 8, §8.2 item 4, 05 §6, 06 §12, §13.5 item 4; amends 04 §7.2 item 8's reading in D-198 (e), outline §4) | no | M4 followups (widgets), M3.md §6 items 18-19, 21-22, 24, 26-27 |
+| D-212 | Packaging and 0.1 identification as built: the About dialog and esses --version with the tag or commit source URL, release builds bound to their tag, single-instance forwarding over the operating system's local IPC with a channel per settings folder, --scheme and --keymap, the notices and the user guide beside the data in every package, a per-package third-party manifest and CycloneDX SBOM, the Qt licence texts outside LICENSES/, the installer's runtime check with an app-local runtime for per-user installs, the portable zip's association scripts, the release-tree vendor-mark scan, package.yml (refines D-006, D-034, D-055, D-113, D-116, D-206 (i); reads 06 §§2.2, 18-19, 22, 07 §7.1-§7.2, §7.5, 08 §§3.10-3.11, 4.1, 5, 7, 9, 10; amends 06 §18 step 1, §19 item 5, §24 item 9, 08 §3.11, §4.1, §7.1-§7.4, §10, outline §4) | no | M4 packaging, AC-M4-04/-06/-08/-09 |
+| D-213 | The Saturday soak as built: tests/soak/tst_saturday with its own driver over ten logs written at test time, a Dispatcher thread violation as a failed ESSES_ASSERT or a Qt thread-affinity warning made fatal, pending work and growth judged per cycle, LeakSanitizer suppressions limited to code that never calls back with lsan_check.py counting the leaks that have an esses frame, the soak job on linux-clang-asan with the Qt layers (refines D-031, D-123 (e), D-206 (i); reads 07 §7.1, §7.2 AC-M4-03, 08 §4.1, §6.10, 01 §5.3 rules 1, 3-4 and 11, 06 §18; amends 08 §4.1 soak row, §6.10) | no | M4 soak, AC-M4-03 |
+| D-214 | The Saturday walkthrough, the CLI golden tests, esses-cli convert and the Data finals as built: one test function per 0.1 item in the real shell over data written by the test, item 10's functional half beside the bench rows, golden-JSON tests per subcommand with expectations from the corpus and the reference decoder, convert with --format (alias --to), a CLI-side cut of a .ld range and the input never overwritten, "final" as the design's checks asserted by the walkthrough (refines D-155, D-181 (e), D-202 (a), D-206 (i), D-209; reads 05 §5, §9.2, 06 §4.3, §14.4, §16, §20, §22, 07 §2.2, §7.1 "Data", §7.2 AC-M4-01, §7.5; amends 05 §9.2's convert row, 07 §7.2 AC-M4-01's test path) | no | M4 walkthrough, AC-M4-01 (items 1-11), 07 §7.1 "Data" |
+| D-215 | The user guide and Help Contents as built: Markdown pages under docs/user/ with index.md as the start page, the installed page beside the data directory then the executable, the online page at the build's tag, the online page when the installed one does not open, a Messages warning when nothing opens, CLEANROOM.md completed for 0.1 (refines D-004, D-206 (h)-(i); reads 06 §2.2, §14.4, 07 §7.1, 08 §7, §9 item 4; amends 06 §14.4's "local HTML or URL") | no | M4 docs, 07 §7.1 "Docs", AC-M4-01 (help.contents row) |
+| D-216 | The M4 integration as built: the commit stamped at a tag, the soak out of the normal runs with its guard's tests in them, the walkthrough and the CLI golden tests as CI steps of their own, the install rules with and without Qt and the release tree scanned in lint, every M4 keymap row implemented with M4 as the keymap checker's milestone, the demo's command line in a real process, one repository URL, the soak's restart check after a Close All (refines D-206, D-212 (b), D-213 (f), D-214, D-215; reads 07 §7.2, §7.5, 08 §3.10, §4.1, §4.4, §5; amends D-213 (f), 08 §4.1's qt-app and lint rows) | no | M4 integration, AC-M4-01/-03/-08/-09 |
+| D-217 | The M4 fix pass: PR #5's first CI failures fixed at the root (the main window's teardown, the formatter, the vendor-mark scan of optimised binaries, the Qt install with one aqtinstall worker), Reload that keeps the source until its file is open again, decode-time diagnostics in Messages, the activation check on the pool, forwarded requests at the top of the event loop and only after their answer, a salted per-user channel, the release stamped from its own tag and development builds marked, convert's companion, cut details, empty output and duplicate channels, the hosted bench without the reference gates, the three missing MVP bench rows, installer upgrades and uninstalls that keep what is not theirs; the deferrals (macOS strips, crisp 2 px lines at DPR 2, same-size same-mtime replacements, Qt's bundled notices) (refines D-208, D-209, D-212, D-214, D-215, D-216; reads 02 §1 behaviour 5, 05 §5, §9.2, 06 §6, §17, §18-19, 07 §1.5, §7.2, §12, 08 §3.10, §4, §7; amends D-208's "Reload as a close then an open", D-212 (b)'s channel name, D-216 (a)'s version of a build without a version tag) | **yes**: (n) only (confirmed 2026-10-26) | M4 fix pass, AC-M4-01/-04/-05/-07/-08/-09/-10 |
+| D-218 | PR #5's second CI run: the reference decoder and the Python tools on Python 3.8 and later (the half floats of `memoryview.cast` from 3.12 only, `float_sum` as 3.12's compensated sum), the association scripts with Windows's `reg` by its full path and nothing else, two defects of the vendored ADS fixed in place with the rule for such changes and `AdsBackend`'s docks read by `qobject_cast`, the two macOS-only test faults (forwarded paths compared by file identity, a values list placed as on a worksheet); the deferral (ADS's side-bar restore of a damaged layout) (refines D-041, D-212, D-217 (d) and (l); reads 06 §19 item 2, 08 §9; amends D-147 (a) and D-153 for the vendored ADS's source files, and the licence policy of `GOVERNANCE.md`) | **yes**: (c) only (confirmed 2026-10-26) | PR #5's second CI run, AC-M4-01/-03/-04/-06/-07 |
+| D-219 | PR #5's third CI run: an id copied before the source that holds it can go (the soak's heap-use-after-free at Close All, the sidecar flush at exit, the selection's close, the maths' removal, the Mapping panel's hand-off) with the soak's first sanitizer report in the job log, the lap-stretch tests reading the report as it is announced and the laps that wait for Corr Dist back at an earlier version built, the uninstaller's `.ld` step before `unins000.exe` returns with `smoke.py` waiting for the uninstall's end and a model of the installer's `.ld` rule (refines D-016, D-121, D-179 (a), D-190, D-213, D-217 (l)) | no | PR #5's third CI run, AC-M4-01/-03/-04 |
+| D-220 | macOS plot text independent of the thread and the DPR it first drew at: one subpixel position count, 4, for every font engine plot text is drawn with at subpixel positions (Qt Gui private API; by default on macOS only, and only under the Qt version Esses was built against), the diagnostic probe and its dispatch-only workflow, the relinking page's exact Qt version; D-217 (n)'s macOS strips closed (refines D-209, D-217 (n); amends `docs/user/relinking.md`'s later-patch-release promise) | no | PR #5's macOS runs, AC-M4-06/-07 |
+| D-221 | Print to Clipboard of a report without the keyboard-focus mark: the report table's cells are painted without the focus and hover states while Print to Clipboard paints them, so the picture does not depend on the focus (PR #5's ubuntu qt-app run on 750eae4; reads 04 §7.2 item 9, §12 item 1, §13) | no | PR #5's run on 750eae4 |
 
 ### A.1 Review amendments
 
@@ -1428,6 +1444,7 @@ These entries record where M0, as built and accepted on the developer machine on
 **Consequences.** Builds are reproducible offline. Every vendored library is header-only or a static library built in the tree, so no third-party DLL has to be found at run time and D-124's triplet has nothing left to choose. Updating a dependency is a reviewed copy with new hashes instead of a baseline bump. 08 §1, §3.2, §3.6, §3.7, §4 and §12, 07 §3, 01 §1 and the outline's M0 row follow.
 **User must confirm:** no.
 *Amended by D-153 (A.12, decided 2026-10-11): ADS 5.1.1 is vendored here too, unmodified, but built by its own CMake project as a shared library (`cmake/qtads.cmake`), the one exception to (d); it is the one third-party library found at run time, beside the executables in `<build>/bin`.*
+*Amended by D-218 (c) (A.15, 2026-10-25; confirmed by the user on 2026-10-26): two source files of the vendored ADS are changed to fix defects upstream has not fixed, each listed in `third_party/qtads/UPSTREAM.md` and marked in the file; (a)'s "unchanged upstream files" holds for every other vendored file.*
 
 #### D-148 Catch2 3.7.1 amalgamated, with the project's own test discovery (refines D-033; amends D-120)
 **Context.** D-033 picks Catch2 v3, D-120 and 08 §3.7.1 take it from a vcpkg `tests` feature (3.5 or later), and 08 §6.2 registers each `TEST_CASE` with Catch2's `catch_discover_tests()`. M0 phase A could only use a local copy of Catch2 2.13.10 (single header). A Catch2 test spec matches names case-insensitively after trimming, treats a leading or trailing `*` as a wildcard and an `exclude:` prefix as a negation, and Catch2 v3 accepts one name twice when the tags differ, so a ctest entry built from a test name can run the wrong test case, several of them or none.
@@ -1468,6 +1485,7 @@ These entries record where M1, as built and reviewed on the developer machine on
 **Decision.** (a) ADS is the default `DockHost` backend (`AdsBackend`; `libs/widgets/src/shell/ads_backend.cpp` is the only translation unit that sees ADS). It is built as the shared library `qtadvanceddocking-qt6` (LGPL-2.1-or-later), aliased `esses::qtads`, and linked privately by `esses_widgets` only (`cmake/qt-free-check.cmake`, `tools/check_layering.py`). (b) The `QDockWidget` backend is kept on every OS, not only where S-3 fails as D-044 had it: the environment variable `ESSES_DOCK_BACKEND=qdockwidget` selects it at run time, and the CMake option `ESSES_DOCK_BACKEND=qdockwidget` builds without ADS for an OS on which ADS proves unusable (D-026's fallback rule). AC-M1-13's suite, `widgets.tst_dock_host`, runs on every backend the build has. (c) Acquisition (amends D-119 and 08 §3.7.3): ADS is vendored under D-147 instead of fetched, and it is built by its own unmodified CMake project (`add_subdirectory` with the options it declares: `BUILD_STATIC OFF`, `BUILD_EXAMPLES OFF`, `QT_VERSION_MAJOR` from our `find_package(Qt6)`; `cmake/qtads.cmake`), the one exception to D-147 (d). Its output directories are redirected to `<build>/bin`, beside every executable and test. ADS 5 names its target `qtadvanceddocking-qt6`, where 08 §3.7.3 has ADS 4's `qt6advanceddocking`, and the tree links the alias `esses::qtads`, where 08 has `esses::ads`. (d) A perspective names the backend that wrote it (`{"backend": "ads", ..., "state": <CDockManager::saveState>}` or `{"backend": "qdockwidget", ...}`); each backend refuses the other's, and `layout-1` records `dockBackend` and, for ADS, `adsVersion`.
 **Consequences.** Fly-outs are ADS's auto-hide side bars; the fallback keeps its emulation. A layout written by the other backend is replaced by the default layout, with an Info row in Messages naming the backend that wrote it. Spike S-3 has its Windows result (`docs/spikes/S-3.md`); the Linux and macOS results come from the `qt-app` CI runs, and an OS on which ADS fails is configured with the CMake option. `NOTICES.md` carries the LGPL notice and the replacement instructions for the ADS library (08 §9). 07 §4.1's widgets row, AC-M1-13 and R-10 read with this entry.
 **User must confirm:** no. Decided by the user on 2026-10-11 (ADS download approved; ADS is the default; the `QDockWidget` fallback is kept).
+*Amended by D-218 (c) (A.15, 2026-10-25; confirmed by the user on 2026-10-26): the vendored ADS is no longer unmodified. `src/AutoHideSideBar.cpp` and `src/DockManager.cpp` carry Esses changes that fix undefined behaviour upstream has not fixed (`third_party/qtads/UPSTREAM.md`); its CMake project is still unmodified.*
 
 #### D-154 The default `alternateList` ends with `Speed`; M1 uses the `alternateList` fallback (amends D-016, D-044)
 **Context.** D-044 moves `alternateList` and `gCorrection` to M3. The public ACC stand-in (`fixtures/motec.ld/synthetic-acc-dialect`, the sim-exporter dialect) logs its road speed as `SPEED` and has no wheel speeds. None of 03 §9.1's default channel lists names that channel, so the M1 data path (ACC `.ld` → Corr Speed/Corr Dist → distance mode; AC-M1-01, -09 and -10) showed "no distance data".
@@ -2266,4 +2284,1235 @@ write`, and `qtmodel.tst_track_map_service` `venuesOfOneSlugKeepTheirOwnMaps` (t
 `setMap`, a restart and `venues()`, the legacy file, the binding copy and the refused overwrite). Not chosen: a
 numeric suffix on a clash (the name would depend on what the folder held when it was written, and the file
 would still not say whose map it is) and the hash alone (unreadable names). No golden changes.
+**User must confirm:** no.
+
+### A.15 M4 (proposed, 2026-10-18)
+
+#### D-206 The M4 contracts: one shell hook with an extension per package, frozen shared headers with per-package nested state and hook calls, the open-time budget check at publication with Continue and Cancel as a Messages row's two actions, a polled PerformanceMonitor, the re-stat check of every source, the Data window's stale query, DprWatcher and DockHost::windowOf, no new keymap rows, the wave-2 placeholders (refines D-011, D-043, D-193 (f); reads 07 §7.1, 01 §7.2, 02 §1 behaviour 5, 06 §6 and §17; amends 06 §2.2, §11, outline §4)
+**Context.** M4 (07 §7) runs as several workflows: wave 1 builds the budget warning, changed-file detection and
+reload, the HiDPI work and the M3 follow-ups in parallel, wave 2 packaging, the soak, the Saturday walkthrough and
+the user docs. Every one of them touches the shell, and three of them `SourceLoader`; `main_window.cpp`,
+`main_window_m3.cpp`, `main_window_impl.hpp` and `source_loader.cpp` would otherwise be edited by several agents
+at once. The design text leaves open where the open-time budget check sits and what it compares ("the probe
+estimate (raw + pyramids) exceeds the budget", 07 §7.1; "with continue or cancel", 01 §7.2) while a Messages row
+carries one action (06 §11); how the Stats reach the GUI when the cache's own hook runs on workers; how a source
+whose importer keeps no mapping (the text importers) is checked for a change on disk (02 §1 behaviour 5 names
+`MappedFile::changedOnDisk()`); where the stale state lives; how a DPR change reaches the components of a
+floating dock (06 §17 items 3-4); and whether the M4 commands without a row in 06 §14.4 get keymap rows.
+**Decision.** (a) **One shell hook.** `ShellExtension` (`shell_extension.hpp`): `MainWindow` creates one per M4
+package in a fixed order (budget, reload, hidpi, followups, about, docs; `main_window_m4.cpp`) as direct
+`QObject` children named `m4.<key>` and calls `buildWidgets(central)`, `registerCommands()` (before the planned
+rows), `buildMenus()`, `windowReady()`, `worksheetActivated(i)` and `teardown()` (first thing in the destructor;
+the extensions are then deleted, before any widget or model) at fixed points; an extension reaches the window's
+private state through `impl()` (`MainWindow` befriends the base) and the window's `hint` and `showEditor`. The
+shell files listed in `docs/milestones/M4.md` §3 are frozen for the packages. (b) **Frozen shared headers.**
+`source_loader.hpp` gets one marked section per package; each package defines its section's members in its own
+file and keeps its private state in a nested struct (`SourceLoader::M4Budget`, `M4Reload`: members of the class,
+so they reach its private members without a header edit), created on first use behind a `shared_ptr`. The
+contract puts the hook calls into `source_loader.cpp` (`published()`: `budgetHolds` before anything else is done
+with the source, `reloadPublished` at the end; `close()`: `budgetForget`, `reloadForget`; `cancelOpens()`:
+`budgetDropPending`), and the followups package, which owns that file, keeps them. (c) **The open-time budget
+check** happens at publication (step 8, GUI thread), before the source is registered with the maths and before
+the summary pass, so no chunk of it is decoded; it compares `formats::estimateResident` of the opened source
+(every logged channel at its storage dtype and size, in the chunk layout of `esses_store`: samples, the factor-4
+pyramid, a bitmap per chunk as the upper bound, headers) with the cache's budget: `OpenBudgetCheck::exceeds()`
+is estimate > budget, and the resident bytes are reported, not added (07 §7.1's comparison). The "probe
+estimate" is read as this estimate from the probe's channel sizes and dtypes (`estimateResident(const
+ProbeResult&)` gives the same from a probe, for the CLI). The check is off unless the shell sets the gate
+(`setBudgetGate(&runtime.cache())`), so headless opens never wait. The budget setting is
+`memory.chunkCacheBudgetBytes` (02 §6.9), applied only when the key is present (the runtime's default, or a test
+runtime's small budget, stays otherwise) and raised to 1 GiB. (d) **Continue and Cancel** are the two actions of
+one Messages row (Budget, Warning): `qt::Message` gains `altAction`/`altActionArgs` (`MessagesModel::
+AltActionRole`), run by `MessagesWindow::invokeAltAction`; the commands are `file.continue_open` and
+`file.cancel_open` with the pending id, without a keymap row or a menu (06 §11: an action is a command id with
+arguments; no modal dialog for a diagnostic). (e) **Stats**: `qt::PerformanceMonitor` polls `ChunkCache::stats()`,
+the budget and `TaskPool::stats()` on a GUI timer (1 s by default) instead of a push from the cache, whose hook
+runs on workers; the status bar's Performance field is `statusField("performance")`, the Messages dock's Stats
+line `MessagesWindow::showPerformance`. (f) **Changed files.** `formats::checkSourceFile` re-stats a source's
+path against the size and mtime of its provenance for every importer (the text importers keep no mapping; the
+`.ld` provider's own check before each decode batch stays as built); `SourceLoader` holds the stale state
+(`checkChangedFiles`, `isStale`, `staleSources`, `staleChanged`), its Import Warning row `open.file_changed`
+carries `file.reload_source` with the source id, `reload()` is a close then an open through the pipeline with the
+selection restored on publication (`sourceReloaded`), and the Data window's model asks a stale query
+(`DataWindowModel::setStaleQuery`, `StaleRole`). (g) **HiDPI.** `DprWatcher` follows the device pixel ratio of
+the main window and of every floating dock window and asks the components under it to re-check theirs
+(`ComponentWidget::recheckDevicePixelRatio`: the rebuild `QEvent::DevicePixelRatioChange` already queues);
+`DockHost::windowOf(id)` names a dock's top-level window. (h) **Keymap.** No keymap row is added:
+`file.reload_source` and `help.contents` stay `planned` M4 until their package implements them (each package adds
+its `KEYMAP_TEST` entry to its own `tests/ui/keymap/keymap_m4_<package>_cases.hpp`), and the menu or action
+commands 06 §14.4 does not list (`help.about`, `file.continue_open`, `file.cancel_open`) get none, as
+`help.keyboard_shortcuts` (D-203 (ah)). (i) **Wave-2 placeholders.** `AboutShell` registers `help.about` in the
+Help menu and opens `AboutDialog` (06 §2.2 Help > About); `buildInfo()` and `versionReport()` are what
+`esses --version` prints (`main.cpp` prints `versionReport()`, whose first line stays "esses <version>");
+`DocsShell` will register `help.contents`; portable mode stays `esses::Paths`' `portable.marker`; the top-level
+`CMakeLists.txt` adds `tests/soak/` and `tools/packaging/` when they exist. (j) `SourceLoader::summariesReady`
+(M3.md §6 item 18) is declared for the followups package. (k) The Qt-free M4 tests of `esses_formats` are one
+globbed executable over `tests/m4/**` (`formats_m4.<test>`).
+**Consequences.** The packages edit disjoint files (`docs/milestones/M4.md` §3) and replace `M4-STUB`s; nothing of
+M4's behaviour exists yet: every hook is a no-op and every stub inert, so the application behaves as at M3 except
+that Help has an About entry. Final and tested now (`formats_m4.m4 contract: ...`, `qtmodel.tst_m4_contract`,
+`widgets.tst_m4_contract`): `ResidentEstimate`'s sum, the state names, the setting key and floor,
+`OpenBudgetCheck::exceeds`, `PerformanceMonitor`, the M4 signals, the alternate action, the stale query, the
+extension list, `DockHost::windowOf`, Help > About and `buildInfo()`. A later change of a frozen declaration is a
+coordinator edit together with its consumers. Names added: outline §4 "Names added by the M4 contracts". No
+golden changes.
+**User must confirm:** no.
+
+#### D-207 The memory budget as built: the estimate as the upper bound of every chunk, Continue as the held open's own publication, Cancel releasing only an unshared decode log, the warning row's alternate action on SHIFT and in a row menu, Continue and Cancel enabled while an open waits, the setting floored and given back, the Options field in GB, the Performance field and the Stats line, the resident row as the peak resident set of a fresh process (refines D-011, D-043, D-206 (c)-(e); reads 07 §7.1, §7.2 AC-M4-02, §12, 01 §7.1-§7.2, §8.3, 06 §2.1, §11; amends 06 §11, outline §4)
+**Context.** D-206 put the open-time check at publication and made Continue and Cancel a Messages row's two
+actions. It left open how a held open is published on Continue without meeting the gate again, what Cancel frees,
+how the alternate action is reached (06 §11 gives a row one action, run on double-click or ENTER), what the two
+commands do without a pending id (the command palette lists every enabled command), how the budget setting behaves
+below its floor, when the key goes away and when the runtime outlives the window, how the Options field shows a
+budget the user never set, which units the texts use, and what "resident" means in 07 §12's row "Resident memory,
+RW-2 + 20 maths channels <= 1 GB" (the chunk cache's count, the process's private bytes or its resident set) and how
+`bench/open_bench` measures it.
+**Decision.** (a) **The estimate** counts every chunk as `ChunkBuilder::allocate` lays it out with a validity bitmap,
+the upper bound: an AllValid chunk carries none, so once every chunk is resident the estimate exceeds
+`ChunkCache::Stats::residentBytes` by exactly the bitmaps of the AllValid chunks, and equals it when every chunk
+carries one; an I64 time column counts its samples and header only; a column several channels share counts once
+(`Column::id`); the probe estimate adds an I64 time column per timestamped channel. The texts use 1 KB = 2^10, 1 MB =
+2^20 and 1 GB = 2^30 bytes: whole KB, one decimal below 10 MB, whole MB, then GB with one decimal. (b) **The gate.**
+A held open waits in `SourceLoader::M4Budget` with its snapshot and its Import Log; Continue hands the same snapshot
+to `published()`, which lets it through once, so a second open of the file published meanwhile makes it
+`open.already_open` (06 §19 item 6), and only then are its Import Log rows posted, its maths registered and its
+summary pass started. A held open is not counted by `pendingOpens()`. Cancel and `cancelOpens()` post
+`open.budget_cancelled` (Import, Info) and release the registry's decode log only when no open source and no other
+waiting open has the same id; closing a source keeps the waiting opens of its file. (c) **The row**: Budget,
+Warning, code `budget.open_estimate`, the file as its source, the text "needs about <estimate> of memory once
+loaded, above the <budget> memory budget (<resident> in use). Continue to open it anyway, or Cancel."; action
+`file.continue_open`, alternate action `file.cancel_open`, both with the pending id. The Messages dock is shown and
+the status bar's message area says so. 06 §11 is amended: a row's alternate action is a second link-coloured suffix
+run with SHIFT+double-click or SHIFT+ENTER, and a row's context menu lists both actions with their enabled state.
+(d) **The commands** "Continue Opening" and "Cancel Opening" (Global, no menu, no keymap row, D-206 (h)) are enabled
+while an open waits; with the pending id they answer that open, without one (the palette) the newest open still
+waiting; an id that no longer waits leaves the hint "That open is no longer waiting". (e) **The setting** is applied
+at `windowReady` and on every `SettingsStore::changed` of its key: an integer or a double above 0, raised to 1 GiB
+(above SIZE_MAX: SIZE_MAX); absent or not a positive number, the runtime's budget of `windowReady`
+(`BudgetShell::runtimeBudget`) comes back, and `teardown` gives the runtime its own budget back when the setting had
+changed it (a runtime can outlive its window, as in the tests). Options > General "Memory budget": GB of 2^30 bytes
+with one decimal from 1.0 to 4096.0, showing the applied value, or `ChunkCache::defaultBudgetBytes()` while the key
+is absent; it is written, as an integer byte count, only when the user changes it. (f) **Stats**: the
+`PerformanceMonitor` samples every second and at `windowReady`, at a change of the setting and at Continue; the
+status bar's "performance" field shows `performanceLine` ("Resident 412 MB of 4.0 GB", " (over budget)" above it)
+with `performanceDetails` as its tool-tip, and a click shows the Messages dock (06 §2.1); the dock's Stats line above
+the list shows `performanceDetails`, hidden until the first snapshot. (g) **The resident row**
+`open.resident_rw2_20maths` (07 §12, AC-M4-02): RW-2 as `bench/workloads.md` defines it (the channel set of the maths
+readiness set), written once as a `.ld` with an `.ldx` holding a beacon every 90 s through the motec.ld writer; then
+each run is a fresh process (the bench started with `--resident-run`): `SourceLoader::open` with the circuit rules,
+the built-in maths and the lap indexes, the 20 expressions of the readiness set as one global module, every output
+evaluated, every chunk of every logged channel and of every output resident, the pool idle. "Resident" is read as
+the strictest figure, the process's peak resident set (Windows: the peak working set, which includes the mapped
+file's pages; Linux and macOS: `ru_maxrss`); the row is its median over the runs against 1 GB = 2^30 bytes, with the
+chunk cache's resident bytes and the private bytes recorded beside it. A byte row is written under "memory" in the
+JSON, not into the "benchmarks" array of timings. The bench reaches the writer through `formats::ImporterRegistry`
+as `SourceLoader`'s header exposes it (`open_bench` declares no `esses_formats` dependency in `bench/CMakeLists.txt`).
+**Consequences.** AC-M4-02's automated half passes (`ui.tst_budget_warning`, `qtmodel.tst_memory_budget`,
+`formats_m4.budget: ...`, `widgets.tst_budget_shell`, `widgets.tst_options_dialog`). On the reference machine of
+`bench/workloads.md` (Release, Qt 6.7.2, median of 5) RW-2 + 20 maths channels peak at 863,617,024 bytes resident
+(823.6 MiB), the chunk cache holding 552,863,744 bytes (527.3 MiB, 1,328 chunks) and the peak private bytes at
+619,896,832 (591.2 MiB). `SessionRestore` (a file of the followups package) does not wait for an open held at the
+gate, so a project's restored selection misses a file the user continues later. No golden changes, no keymap rows.
+New names: outline §4 "Names added by the M4 budget package".
+**User must confirm:** no.
+
+#### D-208 Changed source files as built: E-5's answer on NTFS (the POSIX-semantics, ReplaceFileW and rename-aside writers pass, a classic MoveFileExW replace is refused whatever the share mode, so the sharing policy stays), the stale mark sticky until reload or close, the Messages row added by connectSourceReload, Reload as a close then an open with the selection parked by the close, the command enabled while a source is stale, a fault-injection seam in the .ld provider and ld.io_fault once per source (refines D-206 (f); reads 02 §1 behaviour 5, §8 AC-4a, 06 §5.6, §6, §14.4, E-5; amends 06 §6 "Changed files", outline §4)
+**Context.** 02 §1 behaviour 5 and §8 AC-4a expect a writer that replaces a mapped log by rename-over to succeed
+while the view keeps the old bytes, and E-5 asks whether it does on NTFS, on older Windows 10 builds and on SMB.
+D-206 (f) left open where the stale source's Messages row is made (an Import Log entry carries no action, and
+`connectSourceLoader` lives in a file another package owns), how a reload keeps the selection when the close that
+starts it drops the source's slots (06 §5.2 closeSource), what "disabled unless the source is stale" means for a
+command the Messages row runs with an argument, and how the "a fault inside `guarded()` seals the chunk
+`AllInvalid`" half of AC-4a is tested where the system refuses the truncation that would cause a real fault.
+**Decision.** (a) **E-5 on NTFS** (measured on Windows 11 build 26300; the same Catch2 cases run on windows-2022):
+the sharing policy (`FILE_SHARE_READ | FILE_SHARE_DELETE`, never `FILE_SHARE_WRITE`) stays. A writer that replaces
+the file with POSIX semantics (`SetFileInformationByHandle(FileRenameInfoEx, REPLACE_IF_EXISTS |
+POSIX_SEMANTICS)`, what `AtomicFile` does), with `ReplaceFileW`, or by renaming the old file aside and moving the
+new one in succeeds, and the view keeps the old bytes; every in-place writer that opens the file for writing
+(`CREATE_ALWAYS`, `TRUNCATE_EXISTING`, `OPEN_EXISTING`, `OPEN_ALWAYS`, `std::ofstream`) gets
+`ERROR_SHARING_VIOLATION`. A classic `MoveFileExW(MOVEFILE_REPLACE_EXISTING)` (and MSVC's `std::filesystem::rename`,
+which uses it) is refused with `ERROR_ACCESS_DENIED` while any handle holds the target open, whatever that handle's
+share mode (an unmapped `FILE_SHARE_DELETE` reader too), so no share mode admits it: such a writer fails cleanly and
+changes nothing, and the user closes the log or the writer retries. The tests pin the writers that must pass and,
+for the classic one, the invariant (refused: nothing changed; replaced: the old bytes kept) with its outcome
+reported. SMB stays the maintainer's (`docs/milestones/M4.md` §6.2); the same cases run on a share through
+`ESSES_TEST_SMB_DIR`. (b) **The stale mark** is the loader's (`checkChangedFiles`, run on application focus):
+Changed or Missing marks a source once and stays until the source is reloaded or closed (a file that comes back
+unchanged stays stale); it is not taken from the providers' DecodeLog, whose own check before each decode batch is
+unchanged. (c) **The Messages row** (Import, Warning, `open.file_changed`, "file changed on disk ...", the action
+`file.reload_source` with the source id as 32 hex digits) is appended by the new `qt::connectSourceReload`
+(`source_reload.hpp`) on `staleChanged(id, true)`, which the shell calls beside `connectSourceLoader`; a missing
+file has its own text. (d) **Reload** is a close then an open (D-206 (f)). `DataSelectionModel::closeSource` parks
+what it takes from the selection for the eight newest closes (`kParkedCloses`): the source's slots with their
+positions and each range's lap number and class, its own filter, the source that followed it in the Data window,
+and the range it moved into Main with the slot that range held; `sourceReloaded(previous, source)` gives it back:
+each slot by RangeId, else by lap number and class (06 §5.6), else dropped with a hint, the moved Main back to its
+slot, the source before its old successor. Two reloads in flight hand Main over between their parked closes, so
+either publication order restores both; `closeAllSources` clears the parking. A reload ends without a publication
+when its open fails, is cancelled or finds the file already open (the loader's own `openFailed` and Import Log
+codes), and `pendingReloads()` drops it. (e) **`file.reload_source`** ("Reload File", File menu, data_window, no
+key) is enabled while any source is stale; with an argument (the Messages row, the Data window's Reload File,
+enabled on a stale row) it reloads that source, without one the highlighted source when it is stale, else the first
+stale source in Data-window order. The keymap row is implemented. (f) **The fault test.**
+`LdChunkProvider::setDecoder` (a private header of `esses_formats`) replaces `decodeConverted` so that the Windows
+test raises an in-page error inside `MappedFile::guarded()`; on POSIX the fault is real (the mapped file is
+truncated after a file of the same size and time took its name). `ld.io_fault` is logged once per source (the
+source's DecodeLog), as behaviour 5 says, no longer once per chunk; the check and the add are one step under a lock,
+so channels of a source faulting together on several workers still log it once. (g) **The badge** is an amber disc with an
+exclamation mark before the filter icon, with a tool-tip line; the row's text is unchanged.
+**Consequences.** The automated half of AC-M4-10 passes on NTFS and in its POSIX form; the SMB case and E-5's
+older-Windows-10 question stay on the VM checklist. A writer that replaces files with a classic `MoveFileExW`
+cannot replace a log Esses has open (the release note says so). Flipping the keymap row changes two tests outside
+this package: `widgets.tst_m4_contract` `plannedM4RowsStayPlanned` (no longer `file.reload_source`) and
+`project.keymap: hotkey batch 1 ...` (an implemented row of the milestone in progress, M4). New names: outline §4
+"Names added by the M4 reload package". No golden changes.
+**User must confirm:** no.
+#### D-209 HiDPI as built: per-monitor DPR through a watcher of every top-level window with a re-check after dock moves, crisp axis-aligned strokes on whole device pixels at a fractional DPR drawn by the backend, every layer painted from a whole device pixel, the definitions of crisp and no drift, the offscreen DPR sweep and its goldens (refines D-025, D-206 (g); reads 04 §6.6, 06 §1, §17, 07 §7.1 row 3, §7.2 AC-M4-07; amends 04 §6.6 items 1, 3 and 4, outline §4)
+**Context.** 07 §7.1 asks for a sweep at DPR 1, 1.25, 1.5 and 2, mixed-DPI floating docks and a relayout on a
+per-monitor DPR change, with the goldens at 1 and 2 staying authoritative (D-025); AC-M4-07 asks that a floating
+time_distance dragged between a DPR 1 and a DPR 2 monitor re-render with no blur and no layout drift. As built at M3,
+a component rebuilt on Qt's `DevicePixelRatioChange` and `ScreenChangeInternal` widget events (04 §6.6 item 3 names
+the `QWindow` signals), but Qt sends no such event to widgets moved into another window (a dock floated or docked
+back). At a fractional DPR the builders' widths of logical x DPR (1.25, 1.5 or round(DPR) = 2 px) on pixel centres or
+data positions were drawn antialiased over a pixel more than their width (soft grid lines, ticks, cursor and
+outlines), and a widget at a fractional device position painted its Dynamic and Chrome lists a fraction of a pixel
+off the Static image, which the raster engine blits at the rounded position. "No blur" and "no layout drift" had no
+testable definition.
+**Decision.** (a) **The watcher.** `DprWatcher` follows top-level windows through an event filter on the top-level
+widget (`DevicePixelRatioChange`, `ScreenChangeInternal`, `Show`; no `QWindow` is forced into existence) and runs one
+coalesced check per window on the next event-loop turn: every `ComponentWidget` under it re-checks its DPR
+(`recheckDevicePixelRatio`: laid out at another DPR than its window's, it queues the `Size | Scheme` rebuild a DPR
+event queues, at most once) and every `WorksheetCanvas` applies its 1 % placement again (`refreshGeometry`, new: the
+coalesced relayout and a repaint); a changed window DPR is counted and announced (`dprChanged`). `HiDpiShell` watches
+the main window from `windowReady` and each dock's window (`DockHost::windowOf`) on every `DockHost::stateChanged`,
+and re-checks every watched window one turn after a dock change (the reparent gap). Qt's widget events stay the
+first path (04 §6.6 item 3 is read as "on the window's screen or DPR change", which Qt delivers as those events); the
+watcher never rebuilds a component Qt already rebuilt. (b) **Crisp strokes at a fractional DPR.** `RasterBackend`
+draws a `Polyline` or `Lines` command of a list whose DPR is not whole, wider than 1 px and made only of horizontal
+and vertical segments `lround(width)` px wide (at least 1) on whole device pixels: across a segment its centre c
+covers the W pixels from floor(c + (1 - W) / 2), along it a free end goes to the pixel edge ceil(e - 1/2), and a
+polyline's corners snap both ways and are mitred. The rounding is the backend's, at draw time, not the builders'
+(04 §6.6 items 1 and 4 have widths of logical x DPR rounded at emission): the `DrawList` is unchanged, both raster
+paths draw the same pixels, slanted strokes, dots and text stay antialiased, and DPR 1 and 2 are drawn exactly as
+before, so every golden at 1 and 2 (pixel and `DrawList` JSON) is unchanged and stays authoritative. (c)
+**Whole-pixel painting.** `LayerCache::paint` moves the painter by the fraction between its device origin and the
+nearest whole device pixel when there is one (a fractional DPR only), so the Dynamic and Chrome lists land on the
+pixels of the Static image and a widget shows `composite()` pixel for pixel. (d) **What the tests hold.** *No blur*:
+what a widget paints equals its layer composite pixel for pixel, in the widget and in its window at the device
+rectangle Qt gives it (no image of another DPR scaled into place); the layers and lists are at the window's DPR and
+the Static image is lround(logical x DPR) device pixels; at a fractional DPR the opaque axis-aligned geometry
+(clears, scissors, opaque rectangles and axis-aligned quads, solid axis-aligned strokes) covers whole device pixels
+(reported, not enforced, at 1 and 2). *No layout drift*: the canvas places a component at the same logical rectangle
+at every DPR; its own layout (the time_distance caption, key column, trace area and x axis, every panel scissor, the
+table rows and columns) stays within 3 logical px of DPR 1 in the widgets (two roundings and one hinted text line)
+and within 2 in the builders with fixed metrics; back at the first DPR the layout and the pixels are identical. (e)
+**The offscreen sweep.** Four screens of the offscreen platform's screen configuration at 96, 120, 144 and 192
+logical dpi over 96 give DPR 1, 1.25, 1.5 and 2, as Windows reports 100 to 200 % monitors; a window moved between
+them changes screen and DPR as a drag does. The offscreen platform keeps a window's native size across the move where
+Windows keeps its logical size (`WM_DPICHANGED`), so `ui.tst_dpr_switch` sets the logical size again; a scale
+changed in place cannot be simulated there and is a step of the manual check. (f) **AC-M4-07's floating
+time_distance.** The shell has no dock that holds a time_distance (worksheets live in the central widget, 06 §1):
+`ui.tst_dpr_switch` floats one in a dock of its own on both dock backends, and the manual check
+(`docs/milestones/M4.md` §6.3) drags the main window's graph and the floating Track Map dock. (g) **Goldens.** New and
+exact on every OS: the builders' `DrawList` JSON of the seven drawn MVP types at DPR 1.25 and 1.5
+(`tests/golden/images/dpr_sweep/<type>/<case>@<dpr>x.json`, with 04 §6.6 item 5's time_distance at 1.5); new and
+provisional (`"generatedOn": "windows"`, report mode): values_list at DPR 1.5 (`tests/golden/images/dpr_sweep/
+values_list/`, its table text exact against the DPR-free table goldens); re-rendered: the geometry-only reference
+`geometry_scene@1.5x.png` of `esses_qtrender` (its axis-aligned strokes now on whole pixels).
+**Consequences.** AC-M4-07's automated half passes offscreen (`ui.tst_dpr_switch`, `widgets.tst_dpr_sweep`,
+`widgets.tst_dpr_watcher`, `widgets.tst_dpr_values_list`, `golden.tst_dpr_goldens`, `qtrender.tst_crisp_strokes`);
+the two-monitor drag and a display scale changed in place are the maintainer's (§6.3), and 07 §7.6 lets mixed-DPI
+floating docks slip with the limitation documented if they fail there. At DPR 2 the builders' 2 px lines on pixel
+centres stay drawn over three device columns (50/100/50 %) as the authoritative goldens show; making them crisp is a
+builder change with new DPR 2 goldens (`docs/milestones/M4.md` §10). Tables drawn by Qt (values_list, the reports)
+keep Qt's own rendering at a fractional DPR. New names: outline §4 "Names added by the M4 hidpi package".
+**User must confirm:** no.
+#### D-210 The M3 follow-ups of esses_qtmodel and the Qt-free libraries as built: track-map files on the pool, summariesReady, the channel report's "ignore interpolated data", ReportModel's in-place refresh, the Track Sections pass keyed by its bound map, the missing report and variance tests (refines D-195, D-197, D-199 (c) and (e), D-203 (n), D-204; reads 01 §5.3 rules 3-4, 02 §3.2 rule 10, 04 §12 items 2-3 and 8, §13 item 5; amends 04 §12 items 2 and 8, outline §4)
+**Context.** `docs/milestones/M4.md` §5.1 gives the followups package M3.md §6 items 18, 23, 25 and 29-32 for the
+Qt-free libraries and `esses_qtmodel` (the widgets follow-ups are a package of their own, D-211). Item 23: a cache
+miss of `TrackMapService` read the track file on the GUI thread and every edit wrote it there. Item 18: the
+loader's summary pass announced nothing, so a component built before it kept the extents of incomplete
+pyramids. Item 25: the channel report had no "ignore interpolated data" switch; the research names the switch and
+nothing more. Item 30: `ReportModel` reset the model on every delivery, so a refresh lost the table's selection.
+Item 31: a Venue detail edit did not run the Track Sections pass again, and the phase-2 key held a global map
+generation rather than which map the source is bound to. Items 29 and 32: tests the M3 engine review asked for.
+**Decision.** (a) **Track maps on the pool** (item 23). With a `MathsService` and a `Dispatcher` (the
+application's service) every read, write and scan of `trackmaps/` runs on `MathsService::pool()` at Interactive
+and none on the GUI thread. `map(venue)` on a cache miss returns null at once and reads the venue's own file
+(D-205) on a worker (`isLoading`); when it lands the result is cached, found or not, and `mapChanged(venue)`
+fires; a project change drops the reads in flight. `setMap` validates and replaces the cached map and announces
+it at once, as before, and queues the write: one write per venue file is in flight, the next one is held and
+merged (the newest map, backed up when any merged edit asked), so the file always ends as the last edit left it.
+A write that fails is a `logMessage` row, the venue's map is read back from its file, and the `TrackMapCommand`s
+whose edits it carried are marked failed and obsolete, so `QUndoStack` drops them at their next undo or redo
+without running them: D-203 (n)'s "no step that did not happen stays on the stack", reached when the failure is
+known instead of inside `push` (an invalid map is still refused at once). A parent command (the Track Editor's
+rename) is not marked; its undo writes both files back. Writes still queued when the service is destroyed are
+made by the destructor, on that thread, behind the slot mutex that orders them (SourceLoader's sidecar rule,
+D-190). `venues()` answers from the cache and the last scan of the folder, which the first call after a project
+change starts on a worker (`venuesChanged`). A map from `generate()` reaches `onGui` only once the venue's own
+map is known (read, or set meanwhile), so the shell's auto-generation, which generates while `mapFor()` is null
+and writes when it is still null, never writes over a file that was still being read. New members:
+`asynchronous()`, `isLoading()`, `mapStamp()` (the identity of the cached map, unique within the service),
+`pendingIo()`, the signal `venuesChanged()`. Without a Dispatcher (headless tools, the M3 tests) every operation
+stays synchronous. A local event loop around the write (D-198 (e)'s Export Data wait) was rejected: the shell's
+auto-generation writes from inside a Dispatcher closure, and a nested loop there breaks the FIFO drain of 01 §5.3
+rule 3. (b) **`summariesReady`** (item 18). The summary pass is one `summary/<sourceId>/<first column id>` task
+(the column id is process-unique, so the pass of a file closed and opened again never joins the closed source's
+cancelled run under the shared `summary/` key; `close()` still cancels by the `summary/<sourceId>` prefix); when it
+has run, `summariesReady(id)` is posted, after `sourcePublished`, and emitted only while the source is open with
+the columns it summarised. A source a `sourcePublished` listener closed again gets no pass. The components'
+rebuild on the signal is the widgets' (their Data path). (c) **`options.ignoreInterpolated`** (item 25,
+`ReportOptions::ignoreInterpolated`, default false). Esses' statistics read the channel's own samples (D-197 (a)),
+so the one interpolated value a channel report can show is the range-edge value of `interpolateBoundaries`; with
+the switch on, `start`, `end` and `change` take the range's samples (the probe still applies) whatever
+`interpolateBoundaries` says, and the cells share the StatCache key of `interpolateBoundaries` off (they are
+equal). A maths output evaluated above an input's rate holds that input's up-sampled values as its own samples;
+0.1 keeps no per-sample provenance, so the switch does not reach them (a v1.0 question). JSON: `channel_report-1`
+gains the optional boolean, written by `ReportSpec::toJson` only when true, so every M3 body reads and writes back
+unchanged (no schema version); the Properties dialog's Report page binds it ("Ignore interpolated values").
+(d) **The Track Sections pass keyed by its bound map** (items 31, 32). While the pass is on, the phase-2 key
+holds `/t<setTrackMaps generation>-<mapStamp of the source's venue>` instead of a generation every map change
+bumped, so an edited, reloaded or another venue's map changes the key and a change of one venue's map no longer
+changes every other source's key; no run starts while the venue's map is still being read (its `mapChanged`
+starts the pass, so the groups never drop to "no map" in between); a sidecar edit that changes the Venue detail
+starts the pass for every layer of the source. D-204 (d)'s serial guard gets its test without a hook: the test
+lets run A finish on the pool while holding the event loop, starts run B, and checks that A's result never
+publishes. (e) **`ReportModel`'s in-place refresh** (item 30). A delivery or a display change (highlight, time
+format) whose table has the same header labels, row labels and row kinds as the one on display is one
+`dataChanged` over the table instead of a reset, so a view's selection and current cell survive; any other table
+resets. The widgets' `ReportTable` re-measures its columns on `dataChanged` as it does on a reset. (f) **Tests**
+(item 29): `analysis.report_time: TrackSectionsRule output reaches the eclectic without the in lap's cut-off
+section` (the time report fed from `RuleRunner::runPhase2` with the track-sections rule: the in lap's section that
+would be cut at the lap end is absent, so the eclectic takes its complete section and nothing short, with untrusted
+laps included) and `plotcore.variance: the table equals what the traces' DomainMapper::xOf shows (M3 item 29)` (both
+domains, two overlay pairs with offsets and stretch, blank columns included; the expectation inverts `xOf` by
+bisection, never `DistanceIndex::timeAt`).
+**Consequences.** The GUI thread does no track-map I/O in the application; a track-map edit is on disk once the
+pool has run it (milliseconds) rather than when `setMap` returns, and its failure is a Messages row and a dropped
+undo step instead of a refusal; the Track Editor's tests wait for the files (`widgets.tst_track_editor`). Components
+can rebuild their extents when the pyramids exist. The channel report has the switch of the research list. A
+report refresh keeps the selection. A Venue detail edit moves the Track Sections to the new venue's map, or
+removes them without one. The frozen `source_loader.hpp` comment still describes the M3 key form (`/t<map
+generation>`); the coordinator refreshes it. Regression tests: `qtmodel.tst_track_map_io` (5 functions),
+`qtmodel.tst_summaries_ready` (3), `qtmodel.tst_track_sections_pass` `aVenueEditRunsThePassForTheNewVenue` and
+`aSupersededRunNeverPublishes`, `qtmodel.tst_report_model` `aRefreshOfTheSameShapeKeepsTheSelection`,
+`analysis.report_stats: ignoreInterpolated ...`, `analysis.report_cells: ignoreInterpolated ...`,
+`analysis.report_spec: options.ignoreInterpolated ...`, the two of (f). No golden changes.
+**User must confirm:** no.
+
+#### D-211 The M3 follow-ups of esses_widgets as built: a channel's default display unit (a fraction in %), display units of the scatter and channel report channels, unit pickers in the Properties pages, the Track Editor's speed class and Corr Dist unit, Export Data in the legacy dialect, the time_distance group headings, component links honoured, summariesReady reaching the components (refines D-010, D-177 (e), D-195, D-198 (e), D-200, D-201, D-203 (af) and (m), D-210 (b); reads 03 §9.1 item 6, 04 §2.4, §7.2 item 8, §8.2 item 4, 05 §6 "Writer", 06 §12, §13.5 item 4; amends 04 §7.2 item 8's reading in D-198 (e), outline §4)
+**Context.** `docs/milestones/M4.md` §5.1 gives the followups package M3.md §6 items 19, 21, 22, 24, 26 and 27 for
+`esses_widgets` (with the body schemas and `esses_plotcore` where they need it; the Qt-free and `esses_qtmodel`
+items are D-210). Item 19: samples are stored in the SI base unit of their quantity (D-010), so a logged
+percentage stored as a ratio showed as 0-1 wherever no display unit was named, and `scatter-1` and
+`channel_report-1` had no per-channel display unit. Item 21: 04 §8.2 item 4's group headings (drag to reorder,
+double-click for Group Properties) were not built and no `GroupHeading` hit was registered. Item 22: the Track
+Editor had no speed-class column (`TrackSection` and `track-1` had no member) and edited its bounds in metres.
+Item 24: a component's Export Data wrote the plain time-and-channels table of D-198 (e), not the legacy dialect of
+04 §7.2 item 8 that `esses-cli export --format motec.csv` writes. Item 26: display units were free text in the
+Properties pages. Item 27: `links.zoom`, `links.cursor` and `links.datum` were stored and edited but not honoured
+(D-203 (m)). D-210 (b) left the components' rebuild on `SourceLoader::summariesReady` (item 18) to the widgets.
+**Decision.** (a) **The default display unit** (item 19). Where a component names no display unit (a trace's,
+row's, gauge's or channel's `displayUnit`, or one that is not a unit of the channel's quantity), a channel is shown
+in its quantity's default display unit, `plot::defaultDisplayUnit` (`esses_plotcore` `display_units.hpp`): the
+stored unit, except that a fraction stored in the Ratio base unit `ratio` is shown in `%` (a throttle, brake or
+duty reads 0-100). The reference product shows a channel in its logged unit; that is the better default, but it
+needs the channel descriptor to keep the file's unit (05 `ChannelInfo::vendorUnit` reaches no model type) and is
+left to v1.0; until then only Ratio's base unit is not a reading unit, so only it gets another default (every
+other quantity's SI base unit is a real reading unit, and a broader table would change what M1-M3 show).
+`RenderService`'s channel resolution applies it, so the graphs, gauges, scatter, histogram, track view, the Values
+window and model, the reports (their columns, D-197 (g)) and Export Data all agree; `plot::ResolvedChannel` gains
+`displayUnitId` (the unit `toDisplay` converts to). The Channel Editor's Unit cell without an override shows the
+same default (amends D-177 (e)'s "the stored unit"), and so do the Maths Editor's channel insertion (`'Duty'
+[%]`) and the unit CTRL+SHIFT+O and CTRL+SHIFT+Z write their offset in (the unit of the value on screen, D-186).
+The project's channel override display units still reach only the Channel Editor (as in M2-M3). `scatter-1` gains
+the optional `xDisplayUnit`, `traces[].displayUnit` and `colourChannel.displayUnit`, `channel_report-1`
+`report.channels[].displayUnit` (`analysis::ReportChannel::displayUnit`); all are written only when set, so every
+M3 body reads and writes back unchanged (no schema version). The shipped workbook names `G` for the Corners
+scatter's lateral and longitudinal G and `km/h` for the Reports worksheet's Corr Speed; M1's Overlay worksheet,
+unchanged, now reads its throttle and brake in % (AC-M1-05's render parity holds: both sides resolve alike).
+(b) **Unit pickers** (item 26). `FieldKind::Unit` is an editable combo of the unit symbols of the quantity of the
+channel its sibling Channel field names (`FieldRow::unitOf`; `setUnitOf`, `linkUnitPickers`, `setUnitChoices`,
+`unitChoices` in `field_editors.hpp`): `""` (the default display unit) first, then the quantity's units without the
+compat ones (06 §13.1 item 1's rule); it follows a change of the channel field and of the open sources (the
+dialog's channel choices); free text stays allowed (an alias). Every `displayUnit` row uses it: the
+time_distance and outing traces, the scatter's x, y and colour channels, the channel report's channels, the
+values list's rows and the two gauges. `UnitValue` units (limits, bands) stay free text. (c) **The Track Editor**
+(item 22). `TrackSection::speedClass` is `""` (none), `slow` or `fast` (`TrackMap::kSpeedClasses`; the classes of
+the parity panel's proposal, nothing more being known), `track-1`'s optional `sections[].speedClass` (written only
+when set, so earlier maps are written unchanged; `validate()` refuses another value at its pointer); the editor
+has a Speed class column and field, `addSection`/`editSection` take it (an edit without one keeps the section's).
+The bounds are shown and edited in the Corr Dist display unit, `plot::corrDistDisplayUnit`: the project's Corr
+Dist override when it is a length, else following Corr Speed's override display unit (km/h -> km, mph -> mi, 03
+§9.1 item 6), else m; the table's headers and cells, the fields' suffix and decimals (enough for 0.1 m) follow,
+and change when the overrides change; the editor's API and the file stay in metres. The graphs' distance axis
+stays in metres (unchanged). (d) **Export Data in the legacy dialect** (item 24). The time-series exports (the
+time_distance and outing graphs, the gauges) write 05 §6's legacy CSV through `formats::makeLegacyCsvWriter`, the
+writer of `esses-cli export --format motec.csv`: a source of their own holding the component's Main-slot channels
+under the component's names (maths outputs included; repeats left out), the Main source's details with `Export
+Range` (the Main range's name) and `Export Worksheet` (the worksheet's name; no workbook is known), the span of the
+export range, each channel in its display unit (the writer's `csv.units`), one grid at the highest uniform rate
+capped at 1 kHz, Time from 0. The writer writes files only, so the bytes pass through a temporary file (read back
+with `readWholeFile` and removed) on the worker the export already runs on (D-203 (x)). This supersedes D-198
+(e)'s plain table for those components; the scatter's sets and the histogram's bins (D-198 (e)) and the reports'
+tables are derived tables, not channels over time, and stay as they are. No second format is offered (the shell's
+export prompts are frozen in M4, D-206). (e) **Group headings** (item 21). A group's heading is its part of the
+key column (`TdGroupLayout::key`): the Static build registers it as a `GroupHeading` hit beneath the group's label,
+value and measurement hits, so nothing new is drawn and no golden changes; an open-hand pointer shows over it
+(hover events, mouse tracking unchanged). Dragging a heading 4 logical px or more shows a dashed line where the
+group would go (between the keys, across the key column and the panels; `groupDropIndex`); the release moves it
+there, `TimeDistanceGraph::moveGroup`: one undoable spec edit "Move group <name>", the group's traces, its unknown
+members (the body's `rest`, which `toJson` merges by index) and its vertical zoom going along; panels laid out by
+explicit `edges` keep their heights, stacked again from the first top in the new order; overlapped `lo`/`hi`
+regions are kept. A double-click opens Group Properties: the Properties dialog with the group's record selected
+on the Channels tab (name, scale, limits, lines, edges, Lo/Hi; `PropertiesDialog::focusRecord`,
+`openGroupProperties`). (f) **Links** (item 27, 04 §2.4). `ComponentWidget` keeps the own zoom, cursor and datum
+of the parts whose link is off, taken from the worksheet's when the component is created or the link is switched
+off, never persisted; `viewState()` is the worksheet's state with them in place (its version the worksheet's
+plus the own changes), and it is what `onViewChanged` receives; a worksheet change of an unlinked part is not
+delivered; switching a link on again delivers the worksheet's. `domain` and `offsetAxis` stay the worksheet's; on
+F9 an own zoom restarts from the worksheet's zoom converted into the new domain (an own zoom has no domain rule of
+its own). The outing graph's zoom is always linked (04 §9 item 2). The components' own edits go through
+`setViewCursor`, `setViewZoom`, `viewPanBy` and `viewZoomFull` (their mouse: clicks, drags, the wheel, the rubber
+band, band and scrollbar double-clicks; the scatter's point stepping): the worksheet's when linked, else the own
+state, an own zoom clamped to the Main outing (`mainMapper`). The worksheet keyboard rows the shell offers the
+focused component (`cursor.*`, `zoom.in`/`out`/`default_range`/`datum_main`, `pan.*`, `datum.*`) act on its
+unlinked parts in `ComponentWidget::handleCommand`'s default, by the WorksheetViewModel's rules on the own state: a
+cursor step is one device pixel of the component's width, at least one sample period of the worksheet's active
+period; zoom x0.5 / x2 about the own cursor; W `[0, |Main|)`; Z the cursor-datum span; pan 10 % and 90 % of the
+span; H centres; SPACE, D and X on the own datum (X only when cursor and datum are both the component's own).
+Rows the shell does not offer components (F2 and the like) act on the worksheet only. The values list reads its
+values at its own cursor and datum (`ValuesModel::setViewSource`); a zoom-linked channel report clips to its own
+zoom when `links.zoom` is off. The Properties dialog's link tooltips say so. (g) **`summariesReady`** (item 18,
+D-210 (b)). `FollowupsShell` gives every component of the window, shown or kept hidden, `onDataChanged(source,
+0)` when the loader's summary pass of a source has run, so one built while the source's SummaryPyramids were
+incomplete rebuilds its extents; the other `FollowupsShell` virtuals stay the base's (nothing else needs shell
+wiring).
+**Consequences.** New public names: outline §4 "Names added by the M4 followups of esses_widgets". Tests:
+`plotcore.followups D-211: ...` (6: the default and named display units against data/units.json, the Corr Dist
+unit rule, the scatter members, the report channels' units, the GroupHeading regions), `analysis.followups D-211:
+...` (2: the speed class, the report channel's unit), `widgets.tst_followups_units` (the default in the Values
+model, the scatter inputs and the channel report; the unit pickers of six types; the Track Editor's speed class and
+units; the legacy export's layout and display units), `widgets.tst_followups_view` (the heading drag, Group
+Properties, explicit heights and members; the links of a graph, the outing graph and a values list; summariesReady
+through the shell); the export expectations of `widgets.tst_gauges`, `tst_outing_graph`, `tst_time_distance_m3`
+and `tst_shell_m3` follow (d), and `widgets.tst_channel_editor` and `tst_active_channel` follow (a). No DrawList or
+pixel golden changes.
+**User must confirm:** no.
+
+#### D-212 Packaging and 0.1 identification as built: the About dialog and `esses --version` with the tag or commit source URL, release builds bound to their tag, single-instance forwarding over the operating system's local IPC with a channel per settings folder, `--scheme` and `--keymap`, the install layout with the notices beside the data, the per-package third-party manifest and CycloneDX SBOM, the Qt licence texts outside `LICENSES/`, the installer's runtime check with app-local runtime for per-user installs, the portable zip's association scripts, the release-tree vendor-mark scan, `package.yml` (refines D-006, D-034, D-055, D-113, D-116, D-206 (i); reads 06 §§2.2, 18-19, 22, 07 §7.1-§7.2 AC-M4-04/-06/-08/-09, §7.5, 08 §§3.10-3.11, 4.1, 5, 7, 9, 10; amends 06 §18 step 1, §19 item 5, §24 item 9, 08 §3.11, §4.1 `package`, §7.1-§7.4, §10, outline §4)
+**Context.** Wave 2's packaging package (`docs/milestones/M4.md` §3) turns the contract's About placeholders into the
+real dialog and `--version` (AC-M4-06, AC-M4-09), builds 06 §§18-19's last deferrals for `apps/app` (single-instance
+forwarding with `--new-instance`, `--scheme`, `--keymap`), ships portable mode, and writes the packages of 07 §7.1
+(installer, portable zip, AppImage, DMG, the CLI everywhere and standalone; D-034), their notices, manifest, SBOM and
+checksums, the release-tree vendor-mark check (AC-M4-08) and their CI. The design leaves open: the exact source URL
+the About dialog shows (the maintainer's §6.5 decision: "the tag URL of the public repository"), how a build knows it
+is a release, what `--version` prints beyond the four fields, how D-113's forwarding is carried when the application
+must not link Qt Network (01 §2.2 rule 4 lists Core, Gui, Widgets, Svg, PrintSupport, OpenGL for `esses`;
+`tools/check_layering.py` enforces it), what `--scheme` and `--keymap` mean, where the Qt licence texts live when
+nothing in the tree is under them (`reuse lint` fails on an unused file in `LICENSES/`), where `NOTICES.md` sits in
+each package, where the third-party manifest is generated (08 §7.4 names `cmake/notices.cmake` and
+`tools/gen_notices.py`, neither of which can see the Qt files a deployment tool copies), what the installer does for a
+per-user install on a machine with an old runtime, and the workflow's triggers and runners.
+**Decision.** (a) **Build identification.** `buildInfo()` fills `dockLibrary` with the backend in use (`ADS <version>`
+from ADS's own `ads_version.h`, included by `about_dialog.cpp` for its version macros only, or `QDockWidget`) and the
+new `releaseTag`. `versionReport()` prints `esses <version>` (unchanged first line), then `commit:`, `Qt: <runtime>
+(built with <build>)`, `build date:`, `dock library:` and `source:`. `qtLicenceNotice()` begins with 08 §9 item 2's
+statement and gives the licence files and the exact Qt source archive (`qtSourceArchiveUrl`, the `official_releases`
+path of 08 §9 item 3, for the Qt version run against); `dockLibraryNotice()` does the same for ADS. (b) **The source
+URL scheme** (default of the maintainer's §6.5 decision): a release build shows
+`https://github.com/mitchdetailed/jubilant-octo-meme/tree/<tag>`, any other build `.../commit/<sha>` (a `-dirty`
+suffix dropped), and the repository when the commit is unknown (`sourceUrlFor`, `kRepositoryUrl`). (c) **Release
+builds** are configured with `-DESSES_RELEASE_TAG=v<version>` (`tools/packaging/CMakeLists.txt`, which defines it for
+`about_dialog.cpp` only); configure fails unless the tag is "v" + the version `cmake/version.cmake` stamped, so a
+release build cannot carry another tag and the installer's version (the stamped version) equals the tag (AC-M4-09).
+The package workflow sets it from `refs/tags/v*`. (d) **Single-instance forwarding** (D-113) runs over the operating
+system's local IPC driven by Qt Core's `QWinEventNotifier`/`QSocketNotifier` instead of `QLocalSocket`: a
+single-instance named pipe for local clients only on Windows (client at identification level, both sides check the
+other process's user SID, the client grants the server the foreground), a Unix-domain socket in a private directory
+(`$XDG_RUNTIME_DIR`, `$TMPDIR`, else `/tmp/esses-<uid>` created 0700; used only when owned by the user and closed to
+others; the peer's uid checked; a stale socket file replaced) on POSIX. No thread, no new Qt module. The channel's
+name is `esses-<user>-<12 hex digits of SHA-256 of the settings folder>` (06 §18 step 1 said `esses-<user>`): a
+portable copy, the installed program and a run with `ESSES_CONFIG_DIR` are separate instances; `ESSES_INSTANCE_NAME`
+replaces it for tests. One line of JSON (`protocol` 1, an absolute project, absolute logs, at most 1 MiB, 4096 logs)
+answered `ok` or `error`; a refused, silent (20 s) or foreign instance makes the launch start its own window. Only
+files are forwarded (D-113's "-w/-l"); a launch without files raises the running window; a forwarded project that is
+already open adds the logs; print-only runs neither forward nor listen; `--new-instance` never forwards but listens
+when the name is free. The server answers before it opens anything (a project prompt cannot keep the client waiting)
+and drops a client that sends nothing complete within 5 s. (e) **`--scheme <name>`** selects a scheme of the scheme
+selector by name (any case) or `light`/`dark` for the shipped ones, as the toolbar's selector does (it stays active);
+**`--keymap <name|file>`** loads a `keymap-1` file (a path, else `<config>/keymaps/<name>.json`, else
+`<data>/keymaps/<name>.json`) over the shipped default for this run only (the binder; settings and `keymap.json`
+untouched); problems are Messages warnings (`launch.scheme`, `launch.keymap`). (f) **Portable mode** keeps D-055's
+`portable.marker` (the task's example name is not needed: the marker is decided); the zip ships it empty and About
+names the settings folder and the portable state. (g) **Install layout** (all install rules in
+`tools/packaging/CMakeLists.txt`, components `app` and `cli`): `NOTICES.md`, `THIRD_PARTY_LICENSES.md`, `LICENSE`,
+`licenses/` and the user guide (`docs/user/`, where D-215's Help Contents looks) sit beside the `data` folder in every
+package (the installation folder on Windows, `share/esses/` on Linux instead of 08 §3.11's `share/esses/licenses/`,
+`Esses.app/Contents/Resources/` on macOS), so the About dialog finds NOTICES.md at `<data>/../NOTICES.md`; only ADS's
+runtime file (and its SONAME link) is installed, not its headers or CMake package; windeployqt leaves out the PDF
+image-format plugin and the TUIO touch, TLS and network-information plugin types, so neither Qt Pdf nor Qt Network is
+shipped; the macOS bundle is the `esses` target's own bundle, renamed `Esses.app`; the standalone CLI archives are
+flat (`esses-cli`, `data/`, notices). (h) **Manifest and SBOM** are generated per package at package time by
+`tools/packaging/gen_third_party.py` from `tools/packaging/third_party.json`, the licence files of the tree and the
+files actually staged (the deployed Qt modules and plugins, ICU on Linux, the system libraries linuxdeploy copied with
+their Debian copyright files), instead of `cmake/notices.cmake` + `tools/gen_notices.py` at build time; the SBOM is
+CycloneDX 1.5 JSON per package (deterministic serial and timestamp), and the source job adds `reuse spdx`'s SPDX
+document (08 §7.4 named only the latter). `--check` keeps the list, `NOTICES.md` and `third_party/` in step. (i) **The
+Qt licence texts** (LGPL-3.0-only, GPL-3.0-only; the SPDX texts from Qt 6.7.2's `qtbase/LICENSES/`, line ends LF, as
+`LICENSES/Apache-2.0.txt` before them) are `tools/packaging/licenses/LICENSE.<id>.txt`, installed as
+`licenses/<id>.txt`: in `LICENSES/` `reuse lint` would count them unused (no file of the tree is under them), and
+`LICENSE.*` names are licence files to REUSE (08 §10's list of `LICENSES/` amended). (j) **The installer's runtime
+check** compares the installed x64 runtime (Major, Minor, Bld) with `VcRequired`, by default the bundled
+redistributable's own version: an administrative install runs the bundled `vc_redist.x64.exe` first and refuses
+("cannot proceed", exit code 7 silent; nothing copied) when it fails or the runtime is still older; a per-user install
+(`PrivilegesRequiredOverridesAllowed`) gets the runtime DLLs beside `esses.exe` (app-local, as the zips; 08 §7.1 had
+the redistributable path only). CI builds a second installer with `VcRequired=99.0.0` to exercise both paths. The
+`assocld` task is preselected in the wizard unless another program owns `.ld`, and a silent install associates only
+with `/MERGETASKS="assocld"`; `.csv` is offered in "Open with" only; App Paths registers `esses`; Windows 10 1809 is
+the minimum. (k) **The portable zip** carries the runtime DLLs, `portable.marker` and `associate-ld.cmd` /
+`unassociate-ld.cmd` (per-user `.ld` association, 06 §19 item 5's "script"); the CLI zip carries the runtime too. (l)
+**Vendor marks of the release tree** (AC-M4-08): `check_vendor_marks.py --tree` scans every name, every text file and
+the strings of our programs (only the long marks in binaries; third-party binaries by name), and the source scan
+covers the release metadata's file types and `package.yml`; `package.py` runs it on every staged tree; the allow-list
+gains the notices' and the user guide's paths in a release tree (class (e)). (m) **The icon** is our own geometric
+drawing, written by `tools/packaging/icons/make_icons.py` (PNG, ICO, ICNS, SVG; `--check` compares the committed files
+with a fresh render by pixels). (n) **CI**: `.github/workflows/package.yml` (08 §4.1's `release.yml`) runs on tags
+`v*`, manual dispatch and pull requests touching `tools/packaging/**`, `apps/app/**` or itself; windows-2022,
+ubuntu-24.04 (08 §4.1 said 22.04 for an older glibc; the AppImage targets the Ubuntu 24.04 VM of AC-M4-04 and is built
+where ci.yml builds the Linux kit) and macos-14 (a universal binary, ad hoc signed because arm64 runs nothing
+unsigned; not a developer signature); smoke tests per package; a draft GitHub release on tags with every artefact and
+one `sha256sums.txt` that needs the Windows job only (D-116: Linux and macOS never block it). Signing steps are not
+present (U-11 default: unsigned 0.1; no workflow step needs a secret, so forks run it too); actions, linuxdeploy
+(dated release tags), Inno Setup (6.4.3 when the image lacks it) and `reuse` are pinned.
+**Consequences.** New public names (outline §4 "Names added by the M4 packaging package"): `BuildInfo::releaseTag`,
+`kRepositoryUrl`, `dockLibraryNotice`, `sourceUrlFor`, `qtSourceArchiveUrl`, `noticesUrl`, `AboutDialog(const Paths&,
+QWidget*)`, `AboutDialog::html`/`noticesLink`/`copyButton`; in `apps/app` (no library): `esses::app::LaunchRequest`,
+`CommandLine`, `shouldForward`, `InstanceServer`, `forwardToInstance`, `instanceName`, `instanceAddress`,
+`openRequestedFiles`, `applyScheme`, `applyKeymap`, `applyStartOptions`, `bringToFront`; Messages codes
+`launch.scheme`, `launch.keymap`; the cache variable `ESSES_RELEASE_TAG`; the install components `app` and `cli`.
+`esses` gains `esses::project` in its DEPS (keymap loading). `cmake/version.cmake` (the coordinator's) stamps
+`ESSES_GIT_SHA` "unknown" when the build stands exactly on a tag (`git describe` prints no hash there) and reads a
+dirty tree at a tag as the prerelease "-dirty"; `smoke.py` requires a real commit, so the tag build's smoke test fails
+until `ESSES_GIT_SHA` comes from `git rev-parse --short HEAD` in every case (`docs/milestones/M4.md` §10). The SMB, VM
+and old-runtime checks stay the maintainer's (§6.1); the Qt source archive's SHA-256 and its copy as a release asset
+are the release step's (§6.5). No golden changes; no keymap row.
+**User must confirm:** no (the source-offer wording and the URL scheme are the maintainer's §6.5 decision; (b) is the
+default applied until then).
+
+#### D-213 The Saturday soak as built: tests/soak/tst_saturday with its own driver over ten logs written at test time, a Dispatcher thread violation as a failed ESSES_ASSERT or a Qt thread-affinity warning made fatal, pending work and growth judged per cycle, LeakSanitizer suppressions limited to code that never calls back with lsan_check.py counting the leaks that have an esses frame, the soak job on linux-clang-asan with the Qt layers (refines D-031, D-123 (e), D-206 (i); reads 07 §7.1 "Soak", §7.2 AC-M4-03, 08 §4.1, §6.10, 01 §5.3 rules 1, 3-4 and 11, 06 §18; amends 08 §4.1's soak row and §6.10's "parameterised version of the Saturday walkthrough")
+**Context.** 07 §7.1 and AC-M4-03 ask for a Qt Test with ten files open under ASan/UBSan, 30 minutes nightly and 2
+hours on the release candidate, with no crash, no `Dispatcher` thread violation and no leak whose stack has an
+`esses_*` frame, Qt, fontconfig and glib stacks being suppressed by `tests/soak/lsan.supp`. 08 §6.10 describes it as a
+parameterised version of the Saturday walkthrough looping over ten files, 08 §4.1 puts the job in `bench.yml` on
+ubuntu-24.04 with "linux-gcc + sanitizer". The walkthrough is written at the same time (wave 2) and asserts each 0.1
+item once. Nothing defined what a thread violation is, how "a leak counts only if its stack has an esses_* frame"
+maps onto LeakSanitizer (which drops a leak when any frame of its stack matches a suppression), or how a soak sees
+memory that is still owned at exit and so is no leak for LeakSanitizer. Agents download nothing and this machine has
+no Linux, so the sanitizer run itself is CI's.
+**Decision.** (a) **Its own driver.** `tests/soak/tst_saturday.cpp` (ctest `soak.tst_saturday`, labels `qt;soak`)
+drives the real shell offscreen (a `MainWindow` on a private configuration and a project folder, the shipped
+workbook, a runtime as `esses` makes it: default workers and cache budget, the GUI thread NoBlock) through a cycle
+of the day (`tests/soak/README.md` "One cycle"): a restart every fourth cycle (save, exit, a new window, the session
+restore); ten logs open, one of them through the memory-budget gate answered by Continue or Cancel; the selection
+from the Data window's keys and from the model, N, P, Q, J, F4, CTRL+F and a lap-number filter; every worksheet with
+the time/distance graph's zoom, pan, cursor and datum keys, F3, M, F9, a wheel step and a click, the reports copied,
+the Track Map dock shown and drawn; a global maths module pushed and its channel drawn, the expression changed and
+recalculated, a trust edit, the Maths Editor; undo to the cycle's start, redo, a journal entry written by autosave
+(every 250 ms here), undo, save; one `.ld` replaced on disk by a rename-over writer (another version or the same
+bytes) and reloaded from the Messages row or File > Reload File; three closes or Close All. It does not reuse the
+walkthrough (amends 08 §6.10). The ten logs (eight `.ld` + `.ldx` sessions on two venues, 41 channels from 10 to
+200 Hz, GPS at 20 Hz, about 1,000 s and 9 MB each; two CSV exports, one per CSV writer, with a lap counter) are
+written from closed-form kinematics at test time on a pool of their own, once per build tree
+(`<build>/tests/soak/saturday-logs-v<n>-x<scale>`, moved into place when complete) and copied for each run; they
+are never committed.
+(b) **A `Dispatcher` thread violation** is a failed `ESSES_ASSERT` of the Dispatcher's own check (`drain()` on a
+thread other than the one that owns it) or of the GUI thread's NoBlock checks (a Future wait, `Column::require` or a
+summary build on the GUI thread; D-123 (e)), or one of Qt's thread-affinity warnings (a QObject parented, timed or
+sent events across threads, a timer on a thread Qt did not start such as a TaskPool worker, a pixmap off the GUI
+thread, a queued argument type that cannot cross). In the soak the assertion handler and the Qt message handler
+print `soak: fatal <class>: <text>` and abort at once, so the failure carries the offending thread's stack (ASan with
+`handle_abort=1`); the guard's tests record one violation of each kind in-process and check the fatal path in a child
+process. Every other `ESSES_ASSERT` is fatal too. A build without assertions sees only Qt's half; the soak job builds
+Debug with `ESSES_FORCE_ASSERTS`.
+(c) **Pending work and growth.** Every step ends on the pool settled with every posted result delivered and the
+loader idle (`ESSES_SOAK_SETTLE_SECONDS`, 900 s); a step that cannot finish fails at its timeout (the soak's waits
+are `QTest::qWaitFor`, not QTRY, which waits three times its timeout before it fails). Once per cycle, in the same
+state (ten logs open, worksheet 0 drawn), the soak samples the heap (the ASan allocator, the MSVC debug CRT, glibc's
+`mallinfo2`, macOS's malloc zones, else Windows's private bytes), the resident set, the chunk cache, the widgets, the
+window's objects and the peaks of queued tasks and Dispatcher closures since the last sample. A series grows when the
+smallest of its last third exceeds the largest of its first third, after a warm-up of a fifth of the run and at least
+two cycles, by more than max(absolute, relative) slack: heap 48 MiB/10 %, resident set 192 MiB/25 %, chunk cache
+64 MiB/10 %, widgets 40/5 %, objects 80/5 %, the peaks 2,000/200 %. Cycles that began with a restart are left out of
+the heap, resident and object series (a new window has not yet made its on-demand dialogs). At the end, with every
+log closed and the window gone, the chunk cache must hold no byte and no pin. Fewer than warm-up + 3 samples are
+reported, not judged.
+(d) **Leaks.** `lsan.supp` may name only Qt, fontconfig and glib code that allocates for itself and never calls back
+into the application: fontconfig as a module, glib's type, quark and interned-string tables (never its main loop),
+Qt's font database and engines, platform plugin and plugin loader. `lsan_check.py --self-test` (ctest
+`soak.lsan_check.self_test`, and the job) refuses every other pattern, and any pattern that matches a frame through
+which Qt or glib calls the application. `lsan_check.py` judges the run from the sanitizer logs, the Qt Test log and
+the exit status: an ASan or UBSan error, a failed or missing Qt Test result, an exit status nothing explains, or a
+printed leak with an esses frame (a function in namespace `esses`, a source file under `libs/` or `apps/`, an
+unsymbolized frame of an `esses*` executable or library) fails it; a printed leak without one is a warning that names
+where it was allocated, to be added to `lsan.supp` under the rule after review (08 §4.1 "counts only if its stack has
+an esses_* frame"). Before the soak the job proves the pipeline: an allocation in `esses::soak::leakOnPurpose`, made
+inside a Qt timer's callback, must be reported through `lsan.supp` and counted.
+(e) **The job.** `bench.yml` job `soak` (the only edit outside it: `workflow_dispatch` gains the input
+`soak_minutes`): ubuntu-24.04, the `linux-clang-asan` preset as ci.yml's sanitize job with `-DESSES_BUILD_QT=ON
+-DESSES_FORCE_ASSERTS=ON`, Clang 18; Qt 6.12.0 installed by aqtinstall at ci.yml's commit, CMake 3.31.4, Ninja
+1.11.1.1 and py7zr 1.1.3 from pip, `actions/checkout@v4.2.2` and `actions/upload-artifact@v4.6.2`; nightly for 30
+minutes (`schedule`) and on manual dispatch for `soak_minutes` (120 on the release candidate: the "2 h before each
+release tag" is a dispatch on the candidate before the tag, M4.md §6.5); no secret, no pull_request trigger, the
+artefact `soak-logs` (the sanitizer logs, the Qt Test log, `saturday-cycles.csv`, `saturday-summary.txt`). The
+main run calls only the `saturday` function (the guard's tests make a QObject on a pool worker and kill child
+processes on purpose; ci.yml's qt-app runs them). (Amends 08 §4.1's soak row: Clang with ASan + UBSan, not GCC.)
+(f) **ctest.** `soak.tst_saturday` stays in the default ctest run and so in qt-app on every OS: 60 s and at least two
+cycles, so that every step runs once; ctest gives it 1,800 s and `initMain` raises Qt Test's per-function watchdog
+(`QTEST_FUNCTION_TIMEOUT`, 5 minutes by default) above the soak's duration. Longer runs call the executable
+(`ESSES_SOAK_SECONDS`, `ESSES_SOAK_LOG_DIR`, `ESSES_SOAK_SCALE`); `ESSES_SOAK_CRT_CHECK` adds the MSVC debug CRT's
+heap checks.
+**Consequences.** A leak, a thread violation, work that never drains or growth fails the nightly job with the logs
+and the per-cycle samples to read. The suppressions start from the families above without a Linux run: the first
+nightly runs may list leaks without an esses frame (warnings) to review, and a Qt-internal leak whose stack also
+reaches an esses frame counts until its Qt function is added under the rule; the soak's own Qt code runs under ASan
+and UBSan for the first time there. The growth rule needs at least six samples: the 60 s ctest run judges no growth
+and MSVC Debug, at about 135 s a cycle on the reference machine, makes it about five minutes there. The project's
+recent sources hold every log ever opened in the project (06 §18 "reopens the MRU sources"), so a restart reopens
+all ten logs, and a project used for a season would reopen every log at its next open: an open issue
+(`docs/milestones/M4.md` §10), not changed here. No golden, keymap row or library code changes.
+**User must confirm:** no.
+
+#### D-214 The Saturday walkthrough, the CLI golden tests, `esses-cli convert` and the Data finals as built: one test function per 0.1 item in the real shell over data written by the test, item 10's functional half beside the `bench` rows, golden-JSON tests per subcommand with expectations from the corpus and the reference decoder, `convert` with `--format` (alias `--to`), a CLI-side cut of a `.ld` range and the input never overwritten, "final" as the design's checks asserted by the walkthrough (refines D-155, D-181 (e), D-202 (a), D-206 (i), D-209; reads 05 §5, §9.2, 06 §4.3, §14.4, §16, §20 item 3, §22 (M4), 07 §2.2, §7.1 "Data", §7.2 AC-M4-01, §7.5; amends 05 §9.2's `convert` row, 07 §7.2 AC-M4-01's test path)
+**Context.** AC-M4-01 maps the twelve items of 07 §2.2 to named tests: items 1-10 in the Qt Test walkthrough
+`tests/ui/walkthrough_saturday` with one test function per item (required on Windows and Linux), item 11 as ctest
+golden-JSON tests of each `esses-cli` subcommand, item 12 on the VM checklist; 06 §22 (M4) asks that the scripted
+walkthrough drive the shell through command ids. 05 §9.2 lists `convert <in> --to <writerId> [-o out] [--rate]
+[--channels]` (reader to writer through `ExportView`), never built: D-181 (e) left `motec.ld` output to it, and the
+export-only `.ld` writer writes whole layers without resampling (`ld_export.cpp`, M0). 07 §7.1 "Data" asks for the
+default circuit workbook, the default schemes and `keymap.json` "final" without saying what final means. Item 10
+names the `RasterBackend` budgets, which are absolute limits on the reference machine (07 §12, D-042), not something
+an offscreen test may time. The demo of 07 §7.5 had no offscreen form.
+**Decision.** (a) **The walkthrough** is `tests/ui/tst_walkthrough_saturday.cpp` (ctest `ui.tst_walkthrough_saturday`:
+every Qt Test of `tests/ui` is a `tst_<name>.cpp`, so it is AC-M4-01's `tests/ui/walkthrough_saturday`), one function per item named `itemNN_<what>` so a
+failure names the item, plus `demo75_offscreenWithoutTheInstaller`. Its data are written by the test from formulas
+(`tests/ui/saturday/saturday_log.hpp`): the day's `.ld` + `.ldx` on the AC-M3-04 synthetic circuit (an out lap,
+flying laps of 70, 68 and 68.5 s, an in lap, one profile per lap fraction, the shipped workbook's channel names), a
+second logger's legacy CSV (Esses' own writer) and a generic CSV with an unknown unit; every expected value comes from
+the formulas, the design or the shipped files read as data (D-041). Each function starts its own runtime, window and
+project over a copy of the logs (the sidecar edits of one item never reach another). The helpers are header-only,
+because every non-`tst_` `.cpp` under `tests/ui` is compiled into every ui test. The shell is driven through command
+ids, keys through the `KeyEventRouter` and the public accessors; a prompt is replaced only where the shell asks a
+question (the channel label's scale/offset and filter). No fixed waits: generous `QTRY_*` and the runtime settling
+(`runtimeQuiet`, `waitQuiet`). It runs on the configured offscreen screens of D-209 (the windows open on the DPR 1
+screen). Where an M1-M3 test covers a behaviour in depth, the item exercises it once end to end through the shell and
+`docs/milestones/M4.md` §1 names the deeper test. (b) **Item 10**: the budgets stay the `bench` rows
+(`plot.cursor_move`, `plot.zoom_pan_step` on 20 traces; AC-M4-05 on the reference machine); the walkthrough asserts
+the functional half: a 20-trace graph built, a cursor move rebuilding the Dynamic layer only, a zoom step rebuilding
+the Static layer, and at DPR 2 and back at 1 (the window moved between the configured screens as `ui.tst_dpr_switch`
+moves it) a Static image of the logical size times the DPR laid out at that DPR. (c) **Item 11** is
+`cli.golden.<command>` for `info`, `channels`, `laps`, `eval`, `convert`, `export`, `validate` and `fixture`
+(`apps/cli/tests/cli_golden.py`, label `cli`, `fixtures` too where the generated inputs are needed): the fixtures'
+committed `expected.probe.json`/`expected.laps.json`/oracle CSVs, `tools/ld_ref_decode.py` (with 05 §3.4's unit rule
+(c) applied to its raw fields), the schema examples' directory layout and `expect.json` pointers, and hand formulas
+(`2 v + 1`) are the expectations; `bench` is the benchmark executables' (D-155). (d) **`convert`** as built:
+`esses-cli convert <input> --format csv|motec.csv|motec.ld -o <out> [--channels] [--range] [--rate] [--layer]
+[--writer-options] [--importer] [--options] [--no-sidecar] [--json]`; `--to` is kept as an alias of `--format`. It
+opens the log through the open pipeline with the circuit rules (phase 2 included) and writes logged channels only (by
+name, then logged name; the project-aware path with maths stays `export`, D-181). `csv`/`motec.csv` go through the CSV
+writers (`--rate` grid, `--range` from time 0). `motec.ld` goes through the export-only writer: a whole `.ld` keeps
+every channel's stored bytes (read, write, read bit-exact for samples and validity, 05 §5 item 8); `--range` is cut in
+the CLI because the writer writes whole layers: each uniform channel keeps the samples whose time lies in [start,
+end), starting at time 0 (a `.ld` channel always starts at 0, so a channel whose first sample in the range lies after
+its start moves earlier by less than one of its periods), re-quantised with its stored encoding; the markers in
+[start, end] move by -start (the closing beacon of a lap stays with it), SOL/EOL and the ranges are rebuilt by the
+reader. `--rate` with `motec.ld` is refused (exit 2: no resampling in 0.1, 05 §5 item 4 comes with the export UI at
+v1.0) and a channel the writer cannot hold is skipped with `ld.channel_skipped` and listed as skipped. The output
+never replaces the input: an output (or, for `motec.ld`, its `.ldx`) that is the input, the input's `.ldx` or its
+sidecar, lexically after normalisation, case-folded on Windows, or the same file by `std::filesystem::equivalent`
+(another case on a case-insensitive file system, a hard link), is exit 2 before the log is read. `export --format
+motec.ld` stays refused and names `convert`. (e) **"Final" for the Data of 07 §7.1** means checked against the
+design and kept checked by the walkthrough: the workbook against 07 §2.1-§2.2 items 2 and 5 (every MVP component
+type, the worksheets of D-202 (a)) and 06 §4.3 item 2 (every rectangle on its worksheet's grid, at least 4 x 4 cells,
+every type registered) — the Overview gauges sat at 0.775, off the 1 % grid, and now sit at 0.78; the schemes against
+06 §16 (all 36 roles and 16 font roles, palettes of at least 10 and exactly 9) and 06 §20 item 3 with §13.9 item 4's
+3:1 (every foreground/background pair and every palette colour against its background; the lowest pairs are 3.08:1
+and 3.10:1 in the light scheme) — unchanged; their grid lines stay faint by design (§13.9 item 4's flag belongs to the
+v1.0 scheme editor, and darker grids would change every golden); `keymap.json` against 06 §14.4 (the file's command
+ids are the table's 141, every implemented row registered and bound in its context, planned and reserved rows
+registered and disabled) — unchanged by this package (`file.reload_source` is D-208's, `help.contents` D-215's).
+(f) The walkthrough keeps the `ui` directory's ctest `TIMEOUT` of 600 s (`esses_add_qt_test_dir`); it runs in about
+140 to 190 s in MSVC Debug here, each function in 12 to 25 s.
+**Consequences.** A failure of AC-M4-01 names the item. Item 6 checks a channel override in the document and the
+Channel Editor: the components and the Values window do not follow overrides in 0.1 (D-211 (a), §10 item 16 of the
+milestone note). A project mapping applies at the next open (item 6 reopens the log). The demo's offscreen form
+covers `-w -l` through `MainWindow::openProject`, the budget warning, About and the portable layout; the installer and
+the association stay on the VM checklist. `convert` of a CSV with a fractional rate to `motec.ld` writes no channel
+until the writer resamples (v1.0).
+**User must confirm:** no.
+
+#### D-215 The user guide and Help Contents as built: Markdown pages under docs/user/ with index.md as the start page, the installed page looked up beside the data directory then beside the executable, the online page at the build's tag, the online page when the installed one does not open, a Messages warning when nothing opens, CLEANROOM.md completed for 0.1 (refines D-004, D-206 (h)-(i); reads 06 §2.2, §14.4 help.contents, 07 §7.1 "Docs", 08 §7, §9 item 4; amends 06 §14.4's "local HTML or URL")
+**Context.** 07 §7.1 asks for a `docs/user/` skeleton (install, open files, selection, graph, maths,
+troubleshooting) and a `CLEANROOM.md` complete for every 0.1 behaviour; 06 §2.2 puts Help Contents in the Help menu
+and 06 §14.4 gives `help.contents` (F1) "Open the user documentation (local HTML or URL)". D-206 (i) left
+`DocsShell`'s lookup, its fallback and the format of the pages open. The packaging package (wave 2, in parallel)
+installs the files and needs their expected place; nothing in the build generates HTML; 08 §9 item 4 names
+`docs/user/relinking.md` for the LGPL re-linking right.
+**Decision.** (a) **Plain Markdown.** The guide is Markdown under `docs/user/`: `index.md` (the start page),
+`install.md`, `open-files.md`, `selection.md`, `graph.md`, `maths.md`, `troubleshooting.md` and `relinking.md` (08
+§9 item 4), with relative links, readable in any text editor and rendered by the repository host; no HTML is
+generated in 0.1 (amends 06 §14.4's "local HTML"). The pages are written in our own words from the design set and
+the built application (menu and command titles from `esses --dump-commands`, the Options, Messages and dialog
+strings of the source), never from the vendor's help text; the vendor's product is named once, in a nominative
+compatibility statement with a non-affiliation notice (`index.md`), and otherwise only through the importer ids.
+(b) **The installed start page** is the first regular file of `<data dir>/../docs/user/index.md` and
+`<exe dir>/docs/user/index.md` (`DocsShell::installedStartPage`, `kStartPage`): `docs/user/` is installed as a
+whole beside the shipped data directory, i.e. `<install dir>\docs\user\` on Windows (installer and portable zip),
+`<prefix>/share/esses/docs/user/` in the AppImage and `Esses.app/Contents/Resources/docs/user/` in the bundle
+(`docs_shell.hpp`; `docs/milestones/M4.md` §8 "Package docs (wave 2)", for the packaging package). The source tree
+has the same layout, so a run with the repository's `data/` finds the repository's pages. (c) **Not installed**
+(a build tree, whose data directory is `<build>/bin/data`): the start page in the public repository,
+`https://github.com/mitchdetailed/jubilant-octo-meme/blob/<ref>/docs/user/index.md` with `<ref>` = `v<version>`
+when the build's version is exactly a tag (`0.1.0`, `0.1.0-m4`) and `main` otherwise (after a tag, dirty, or an
+unexpected form; `DocsShell::onlineUrl`). (d) **Opening.** `help.contents` ("Help Contents", Help menu, F1,
+Global; its keymap row implemented in M4) hands the installed page's file URL to the shell's URL opener
+(`setUrlOpener`; by default `QDesktopServices::openUrl`), then the online URL when there is no installed page or
+the opener refuses the file (a system with no program for `.md` files); when neither opens, a Messages warning
+(System, source "Help", code `help.not_opened`) names both places, the Messages dock is shown and the status bar
+says so. `contentsUrl()` keeps the contract's meaning (the installed page, empty when not installed);
+`openContents()` returns the URL that opened. (e) **`CLEANROOM.md`** gains the rows of 2026-10-19 (the key
+assignments; the Data window and the selection with its chosen readings; workbooks, worksheets and docks; the
+time/distance core and the values; rendering; corrected speed and distance; laps; channels; the command line; the
+schemes; the project folder; the runtime; the D-211 follow-ups; the M4 behaviours; the CLI; packaging; the
+dictionaries; the guide itself) and a coverage table from the twelve items of 07 §2.2 to the rows, with the
+categories of D-128/D-145 and "own design" where no i2-derived behaviour exists.
+**Consequences.** F1 works in every build: an installed package opens its local page (if the packaging package
+does not install `docs/user/` as in (b), the online page opens instead), a build tree the online one, and the
+tests replace the opener (`widgets.tst_docs_shell`; the `help.contents` KEYMAP_TEST, whose fixture's repository
+data directory finds the repository's pages). Where no program opens `.md` files the browser shows the online
+page. A build after a tag opens `main`, which may describe newer behaviour than the build. The repository URL is a
+constant of `docs_shell.hpp` beside the About dialog's `sourceUrl()` (one constant in `cmake/naming.cmake` would
+remove the duplicate; the coordinator's). `widgets.tst_m4_contract` `plannedM4RowsStayPlanned` still lists
+`help.contents` as planned and must drop it (the coordinator's file). The new prose is a release-checklist item of
+`tools/check_text_overlap.py` (08 §5, §8; the maintainer's, with the private reference corpus). No golden changes.
+**User must confirm:** no.
+
+#### D-216 The M4 integration as built: the commit stamped at a tag, the soak out of the normal runs with its guard's tests in them, the walkthrough and the CLI golden tests as CI steps of their own, the install rules with and without Qt and the release tree scanned in lint, every M4 keymap row implemented with M4 as the keymap checker's milestone, the demo's command line in a real process, one repository URL, the soak's restart check after a Close All (refines D-206, D-212 (b), D-213 (f), D-214, D-215; reads 07 §7.2, §7.5, 08 §3.10, §4.1, §4.4, §5; amends D-213 (f), 08 §4.1's qt-app and lint rows)
+**Context.** Wave 2 of M4 (packaging D-212, soak D-213, walkthrough D-214, docs D-215) was built by four packages in
+parallel, each in its own files; the integration makes them one tree and proves M4 locally. The packages left the
+coordinator these points (`docs/milestones/M4.md` §10): `cmake/version.cmake` stamped the commit "unknown" when the
+checkout stands exactly on a tag (`git describe` prints the tag alone), so a release build's `esses --version` and
+About would say "commit: unknown" and the tag build's smoke test (which refuses it) would fail, and it read a
+modified tree at a tag (`v0.1.0-dirty`) as the pre-release "-dirty" (item 28); the soak entry ran in the default
+ctest run, about 5.5 minutes in MSVC Debug (D-213 (f), item 36), while the integration's brief keeps it out of the
+normal runs; the walkthrough ran under the `ui` directory's 600 s on CI runners slower than this machine (item 39);
+AC-M4-08 names `lint` as its proof while the release tree was scanned only by `package.yml` and `package.py`;
+AC-M4-01 names `ctest -L cli` and the walkthrough as required checks; `widgets.tst_m4_contract` still expected
+`help.contents` to be planned (items 22, 43); the repository URL had two constants (item 24); a keymap case file
+closed `tst_keymap.cpp`'s anonymous namespace around its includes (item 25); and the demo of 07 §7.5 had no run of
+the real `esses -w <project> -l <log>` command line.
+**Decision.** (a) **The version stamp.** `cmake/version.cmake` runs `git describe --tags --dirty --always` and `git
+rev-parse --short HEAD`; `esses_version_from_git` (`cmake/version_parse.cmake`, no side effects) takes a trailing
+"-dirty" off first, parses `vMAJOR.MINOR.PATCH[-pre][-N-gHASH]` into the version (`+N-gHASH`, and `.dirty` for a
+modified tree) and takes the commit from `rev-parse` in every case, exact tags included, with "-dirty" for a modified
+tree; "unknown" only without git or a commit. A release build at its tag is `0.1.0` with the tag's commit; a
+modified tree at the tag is `0.1.0.dirty`, which `ESSES_RELEASE_TAG` refuses (D-212). ctest `lint.version_stamp`
+checks 17 hand-written cases (11 of them fail with the old parsing). (b) **ctest and CI.** `soak.tst_saturday` runs
+the `saturday` function alone (labels `qt;soak`) and is left out of the normal runs: ci.yml's qt-app and the
+integration's full local runs use `ctest -LE soak`; the soak is bench.yml's nightly job (D-213 (e)), and `ctest -L
+soak` or the executable locally. The guard's own tests (`growthRule`, `threadViolationMessages`,
+`guardRecordsDispatcherViolations`, `violationsAreFatal`) are the new entry `soak.guard` (label `qt`) of the same
+executable, in every run on every OS, and `soak.lsan_check.self_test` is labelled `lint` only. `esses_add_qt_test`
+gains `ARGS`, and `esses_add_qt_test_entry` registers another entry of an executable (amends D-213 (f)).
+`ui.tst_walkthrough_saturday` gets a ctest TIMEOUT of 1,500 s and is a step of its own in qt-app ("Saturday
+walkthrough", every matrix row: Windows and Linux on every pull request and push, macOS nightly; left out of the
+main test step); core runs every test but the label `cli`, then `ctest -L cli` as its own step ("esses-cli golden
+tests", AC-M4-01 item 11); both extra steps run after a successful build even when the step before failed. qt-app's
+timeout goes from 45 to 60 minutes (the M4 suites in MSVC Debug). (c) **The release tree in lint.** The top-level
+`CMakeLists.txt` adds `tools/packaging/` with and without the Qt layers: a Qt-free tree installs `esses-cli`, the
+data, `NOTICES.md`, the licence texts, the user guide and, on Linux, the desktop entry, the MIME type and the icons
+(the application's rules apply when its targets exist; the packaging self-tests join the core runs). The lint job
+installs its Qt-free build into `build/release-tree` and runs `check_vendor_marks.py --tree` on it (AC-M4-08 in
+`lint`; the application's tree with Qt stays `package.py`'s scan on each OS, D-212), and `reuse lint` is pinned to
+5.0.2 as in `package.yml`. (d) **Demo 7.5 offscreen** is `ui.tst_walkthrough_saturday`
+`demo75_offscreenWithoutTheInstaller` (D-214: `MainWindow::openProject(folder, {log})` in process, the Budget
+warning with the estimate, Continue and the Performance field, Help > About with the Qt LGPL notice and the source
+URL, the portable layout) plus `app.tst_demo_command_line`: a real `esses --new-instance -w <project> -l <log>`
+(a private configuration and channel name) opens the project, then the log, as its settings' recent lists show. The
+installer, the association and the USB stick stay on the VM checklist. (e) **The contract as built.**
+`widgets.tst_m4_contract` `plannedM4RowsStayPlanned` becomes `everyM4RowIsImplemented`: the shipped keymap's M4
+rows are exactly `file.reload_source` and `help.contents`, both implemented, registered by their packages without
+the generic row's "planned for M4" note, Help Contents enabled and Reload File disabled while nothing is stale.
+`tools/check_keymap_coverage.py`'s current milestone is M4 (every M1-M4 row implemented with its KEYMAP_TEST; v1.0
+in progress), and `project.keymap: hotkey batch 1 ...` accepts a planned row only for v1.0 or later. The comments of
+the contract tests, the frozen headers and the READMEs describe the members as implemented; no contract stub
+marker is left (`grep -rn` of the marker over `libs apps tests tools bench` finds nothing). (f) **Small
+cross-package fixes.** `DocsShell::kRepositoryUrl` is the About dialog's `kRepositoryUrl` (one URL in C++);
+`tst_keymap.cpp` includes what `keymap_m4_docs_cases.hpp` needs, so the case file no longer closes the anonymous
+namespace; the application's tests read a child's `settings.json` through `esses::readWholeFile`
+(`app_test_support.hpp` `fileText`), which shares delete access on Windows, where a `QFile` read held the name
+against the child's `AtomicFile` rename. (g) **Deferred explicitly** (`docs/milestones/M4.md` §5): the M3 items of
+M3.md §6 not taken in M4 (1, 5, 9, 11, 13, 14, 20) stay open there for v1.0 (item 5 waits for the maintainer's real
+GPS and IMU lap); the hosted bench baselines at the milestone tag (M3.md §4 item 3) wait for
+`tools/bench_compare.py`, which no milestone has written yet (`bench.yml` uploads the results and skips the
+comparison), and move to M5 with the v1.0 gates; `tools/check_text_overlap.py` (08 §5, release checklist item 5) is
+not written: before the tag the maintainer reviews the new prose against the private reference corpus by hand
+(M4.md §6.5). (h) **The soak's restart after a Close All.** A five-minute Clang run of `soak.tst_saturday` (24
+cycles) failed at cycle 17 with "restart: Main was not restored": cycle 16 ends with Close All (every fifth cycle
+from 1) and cycle 17 restarts (every fourth from 1), which no shorter run had reached; with nothing open Main is the
+nil `RangeRef`, which the driver kept as the Main to find again, while the restore, which reopens the project's
+previous data (M4.md §10 item 33), sets a Main again. The driver now checks Main after a restart only when there was
+one (`DataSelectionModel::hasMain()`); every 20 cycles the nightly and the 2 h runs pass that point (a test fix: no
+product behaviour changes).
+**Consequences.** A tag build names its commit and passes its smoke test's commit line; a release can only be built
+from a clean checkout of its tag. Pull requests no longer run the soak anywhere (the guard's tests still run on all
+three OSes); the soak's runs are the nightly job and the maintainer's pre-tag dispatch (M4.md §6.5), so a Windows
+or macOS soak is a local run only. A failing walkthrough or CLI golden test shows as a step of its own. Core
+configures gain the five packaging self-tests. The keymap checker refuses a planned M1-M4 row. The changed CI steps
+run first in CI (none of them can run here); M4.md §6 lists what the maintainer still runs. Three MVP rows of 07
+§12 have no benchmark (full relayout, the Values window's refresh of 250 channels, startup to an empty workspace;
+M4.md §10 item 46): AC-M4-05 needs them measured or moved under 07 §1.5 by the maintainer.
+**User must confirm:** no.
+
+#### D-217 The M4 fix pass: PR #5's first CI failures fixed at the root, Reload that keeps the source until its file is open again, decode-time diagnostics in Messages, the activation check on the pool, forwarded requests at the top of the event loop and only after their answer, a salted per-user channel, the release stamped from its own tag and development builds marked, convert's companion, cut details, empty output and duplicate channels, the hosted bench without the reference gates, the three missing MVP bench rows, installer upgrades and uninstalls that keep what is not theirs, and the deferrals (refines D-208, D-209, D-212, D-214, D-215, D-216; reads 02 §1 behaviour 5, 05 §5, §9.2, 06 §6, §17, §18-19, 07 §1.5, §7.2, §12, 08 §3.10, §4, §7; amends D-208's "Reload as a close then an open", D-212 (b)'s channel name, D-216 (a)'s version of a build without a version tag)
+**Context.** PR #5 (M4 waves 1 and 2, head 32b7795) failed its first CI run: `lint` at clang-format (three lines that
+19.1.5 lays out differently from the 18.1.7 the packages used locally; every later lint step skipped), both required
+`qt-app` rows in `ui.tst_dpr_switch` (SIGSEGV on ubuntu, 0xc0000005 on windows-2022, Qt 6.12), and every `package`
+job (Windows at the Qt install, Linux and macOS at the vendor-mark scan of the Release tree). The milestone audit and
+two reviews (`build/m4-review/*.json`, 44 findings) added: Reload lost a source whose file was missing or did not
+reopen; decode-time faults reached no one; the activation check stat'ed every file on the GUI thread; forwarded
+launches ran inside modal prompts; `convert` kept another file's `.ldx`, copied stale details into a cut, refused
+`run.csv -> run.ld` and wrote empty `.ld` files; a second `v*` tag on the release commit could change the release
+build's version; the hosted bench alarm failed on the reference limits; three MVP rows of 07 §12 had no benchmark;
+and smaller points in the installer, the association script, Help Contents, the badge, the reports and the docs.
+**Decision.** (a) **The main window's teardown.** `~MainWindow` deleted every direct child one by one while
+QMainWindow's layout lived; that layout keeps raw pointers to the `QDockWidget` frames and to the tab bars of tabbed
+docks, and a dock newer than its group's tab bar (added later into a tabbed area, or floated and docked back) met the
+deleted tab bar when it was removed (Qt 6.12 crashes there; 6.7.2 happens not to touch it). Now only the docks' contents
+(which reference the models) go there; the frames and the tab bars go in `~QWidget`, after the layout, as in any
+QMainWindow (`widgets.tst_main_window` `dockFramesGoAfterTheMainWindowLayout`). (b) **The formatter.** The three
+declarations are written `struct stat st = {};`, which 18.1.7, 19.1.5 and 22.1.3 format alike; AGENTS.md names the local
+formatters (Qt Creator's 18.1.7 and Visual Studio 2026's 22.1.3) and the rule: CI's 19.1.5 is the reference, and a line
+the two local ones format differently is rewritten into a form both accept. (c) **Vendor marks in optimised binaries.**
+GCC and Apple Clang at -O2 store the allow-listed literal `motec.csv` as the 8-byte immediate `motec.cs`, an opcode,
+then `v`; `check_vendor_marks.py --tree` now also blanks a prefix of an allow-listed literal that is a whole number of
+8-byte words and is cut off there (a cut of another length and a bare mark are still reported; self-test cases). (d)
+**The Qt install.** With `--external 7z`, aqtinstall's 4 default workers ran a 7-Zip process per archive into the kit's
+folder, and they raced to create it. The Windows installs of `package.yml` and `ci.yml`'s `qt-app` now give aqtinstall
+one worker (`.github/aqt-settings.ini` through `AQT_CONFIG`, read on top of aqtinstall's own settings; checked against
+aqtinstall 3.3.0's code here), so the archives are extracted one after another; a failed first install still gets a
+second try over what it left (`continue-on-error`). Neither has run in CI yet: the next package run is the evidence.
+Every action of `ci.yml` and `bench.yml` is pinned as `package.yml`'s are, and `package.yml` runs on every pull request
+(what is deployed depends on more than the packaging, and its Release-tree scan proves (c) on what ships). (e)
+**Reload** (amends D-208): `SourceLoader::reload` keeps the stale source until its file is open again. It is refused
+while the file cannot be stat'ed (Missing) and while the source's due sidecar edits cannot be written (the document then
+stays due); otherwise the sidecar is flushed and the path opened beside the stale source. When the reopen publishes, the
+stale source is closed (its selection parked) and `sourceReloaded` hands the selection on; a reopen with the same
+content id replaces it in `published()` (its decode log kept). A reopen that fails, is cancelled or is held and
+cancelled (Mapping panel, budget gate) leaves everything as it was; the shell says why a reload was refused. (f)
+**Decode-time diagnostics.** The loader reads every open source's `DecodeLog` on a 1 s GUI timer: new entries reach the
+Messages dock through `importLog`, and `ld.io_fault` (Missing) or `ld.source_changed`/`text.source_changed` (Changed)
+marks the source stale at once, so a source a dropped share sealed is offered Reload; `ld.source_changed` is logged once
+per source, as `ld.io_fault`. (g) **The activation check on the pool.** The shell's `Qt::ApplicationActive` runs
+`SourceLoader::checkChangedFilesInBackground()`: one TaskPool task re-stats every open source (one pass at a time), the
+result comes back through the Dispatcher, and the Messages row reads the state the check recorded (`staleState`) instead
+of stat-ing again; `checkChangedFiles()` stays the synchronous pass for tools and tests. (h) **Forwarded launches.**
+`InstanceServer` emits a request only once its "ok" reached the client (a launch that gave up waiting opens its own
+window, and the files never open twice), and a launch tries a second forward only when the first found no instance. The
+application applies forwarded requests through `app::RequestQueue`: only with no modal widget or popup open and the
+event loop at its top level, one at a time. A forwarded project switch the user cancels opens none of its logs into the
+project that stays (`MainWindow::projectOpenCancelled`). The channel (amends D-212 (b)): the Windows pipe gets a
+protected DACL for this user alone, the name mixes in a random salt kept in the settings folder (`instance.salt`,
+written once by an atomic rename), and a launch that would forward but ends without the channel says so in Messages
+(`launch.instance`); `--scheme`/`--keymap` given to a launch that forwards are reported on the terminal. On POSIX,
+connects are non-blocking and bounded by the caller's deadline. (i) **The version stamp** (amends D-216 (a)). With
+`ESSES_RELEASE_TAG`, the stamp describes that very tag when HEAD carries it (`git describe --tags --dirty --exact-match
+--match <tag>`), so another `v*` tag on the release commit (the milestone tag) cannot change the release's version; a
+build without a version tag (a shallow clone, a non-version tag) is `<project version>+g<hash>` (`.dirty` when
+modified), never the bare release version; pre-release tags may hold hyphens. (j) **convert.** The motec.ld writer
+removes a `.ldx` already beside its output when it writes none; a `.ld` cut carries its own details (Log Time and, past
+midnight, Log Date moved to the cut's time 0; Start Lap the first flying lap of the cut) and does not reuse the input's
+verbatim header; only a `.ld` input's companion is protected; a conversion that writes no channel leaves no file and
+exits 1; a channel named twice is a usage error. The cut stays the half-open `[start, end)` of D-214 (d): its closing
+beacon is the new end of log, so the circuit rule calls that single lap the In lap, and a slower channel has no sample
+after its last one in the range (05 §5: no resampling in 0.1). (k) **Benchmarks.** `bench/CMakeLists.txt` gains
+`ESSES_BENCH_GATE` (ON); the hosted preset sets it OFF, so the hosted alarm records results instead of failing on the
+reference limits, and its comparison and upload always run. The three missing MVP rows of 07 §12 are measured:
+`plot.relayout_resize_20tr` (`plot_bench`, the 20-trace graph resized between 4,200 x 1,000 and 3,000 x 800, each step
+from its leading edge to the repaint), `values.refresh_250ch` (`plot_bench`, the Values window over 250 channels, 60
+cursor moves to the repaint) and `app.startup_empty_warm` (`open_bench`, `esses --new-instance` to its
+`ESSES_STARTUP_PROBE` ready line); the §1.5 option M4.md offered for them is withdrawn (07 §1.5 never moves a budget row
+but for a machine cause). The Values row failed at first (2.6 ms): `ValuesModel` now reads the view once per refresh and
+computes a row when a view asks for its cells, the window sizes its value columns to the rows on screen, and its cells
+are drawn by one positioned `drawText` each over the style's item panel (the style's per-cell text layout was most of a
+repaint), with selection, focus, alignment, elision and the pending colour unchanged. (l) **Packaging.** The installer's
+`[InstallDelete]` removes before `[Files]` what it and earlier packages put into `{app}` (runtime DLLs, Qt modules and
+plugin folders); an upgrade no longer takes the previous tasks (`UsePreviousTasks=no`), and the uninstaller removes
+`.ld`'s default only while it is `Esses.LogFile`. `associate-ld.cmd` passes the folder's path to `reg` through delayed
+expansion. The macOS Info.plist names `LSMinimumSystemVersion` (the deployment target, 14.0 in `package.yml`) and
+exports the log type; `smoke.py dmg` checks both on the built bundle (`--macos-minimum`, the job's
+`MACOS_DEPLOYMENT_TARGET`). `smoke.py windows-portable` compares `%APPDATA%\esses` file by file and runs the scripts
+from a folder whose name holds `&` and `%`. (m) **Smaller fixes.** Moving a time_distance group, its undo and its redo
+carry the group's vertical zoom, and a group edited in place keeps it (`applySpec`: a group still in its place keeps its
+zoom, the others are found by their name and channels, and those left over on both sides are paired in order when there
+are as many of each, so adding or removing a channel or renaming a group does not drop it); the Track Editor keeps a
+bound whose field still shows it (the last section's end) and keeps edited bounds on the track; Help Contents goes
+online at once when no program opens `.md` files (Windows: the association); the Data window's badge and funnel are
+drawn at each DPR and cached; a channel report keys its channels by display unit too; File > Export Data holds the
+component by QPointer across its prompts. (n) **Deferred** (`docs/milestones/M4.md` §10): the macOS nightly's
+`qtrender.tst_static_strips` at DPR 1.5 and 2 (red since M1: text painted on a pool thread differs from the GUI thread's
+under CoreText; needs a Mac or CI iterations; macOS is "builds green, not supported", and the walkthrough step still
+runs after it); **crisp 2 px lines at DPR 2** (the builders centre them on pixel centres, so they spread over three
+device columns, D-209 (d)'s "no blur" admits it): centring even widths on pixel edges changes every DPR 2 golden and
+needs the ubuntu artefact, so the maintainer decides before the tag whether 0.1 ships the soft lines with a line in the
+release note or waits for that change (the user-confirm part of this ADR); a same-size replacement that keeps the mtime
+(02 §1's `changedOnDisk()` is a re-stat of size and mtime by design; a content or identity check is a design change for
+v1.0); the binary-distribution notices of Qt's bundled third-party code in `THIRD_PARTY_LICENSES.md` (they need the Qt
+6.12.0 sources the maintainer attaches at the release, M4.md §6.0 step 8).
+**Consequences.** PR #5's four CI failures are fixed at their cause: (a) and (c) with tests that fail without the fix,
+(b) in a form both local clang-format releases accept, (d) by construction (one aqtinstall worker). None has had a CI
+run since: the first runs of the new and changed steps are CI's (M4.md §8 "Fix pass (wave 3)"). A reload never loses a
+source, its selection or its edits; for a moment during a reload both files are open. Decode faults and changes made
+while Esses stays active show at once. A forwarded request waits while a prompt or menu is open (at most until it
+closes); a second Esses launched while the first is hung waits once, not twice. A build from a shallow clone reports
+`+g<hash>`; the release build's version comes from its tag whatever other tags the commit carries. `esses-cli convert`
+changes behaviour for empty outputs (exit 1) and duplicate channels (exit 2). The hosted bench job is green unless a run
+fails to run; its regression signal waits for `tools/bench_compare.py` (M5). AC-M4-05 has a benchmark for every MVP row;
+their verdict is the reference machine's (§6.4). Package runs cost every pull request about 12 minutes per OS. The
+settings folder gains `instance.salt`. A local soak of fewer than about 16 cycles can judge the widget series grown from
+the Maths Editor's first use in a restart epoch, not a leak (M4.md §10 item 57); the nightly's 30 minutes are not
+affected.
+**User must confirm:** yes: (n)'s crisp 2 px lines at DPR 2 (ship 0.1 with them soft and say so, or wait for the
+builders' change and new DPR 2 goldens); the rest no. **Confirmed by the user on 2026-10-26: 0.1 ships the soft
+lines**, and its release note says so (M4.md §6.0 step 8, §6.5 item 7); centring even device widths on pixel edges,
+with new DPR 2 goldens, is left for a later release (M4.md §10 item 52).
+*Refined by D-220 (A.15, 2026-10-26): (n)'s macOS strips are fixed (one subpixel position count for the font engines
+plot text is drawn with); that deferral is closed.*
+
+#### D-218 PR #5's second CI run: the reference decoder and the Python tools on Python 3.8 and later, the association scripts with Windows's `reg` by its full path and nothing else, two defects of the vendored ADS fixed in place and `AdsBackend`'s docks read by `qobject_cast`, the two macOS-only test faults, and the deferral (refines D-041, D-212, D-217 (d) and (l); reads 06 §19 item 2, 08 §9; amends D-147 (a) and D-153 for the vendored ADS's source files, and the licence policy of `GOVERNANCE.md`)
+**Context.** PR #5's second CI run, on fe6cf07 (D-217) of 2026-10-19, with the runs dispatched on the branch before
+the merge (M4.md §6.0 step 1): `ci` 39302403071 (pull request) and 39302398363 (dispatch, adds qt-app on macos-14),
+`package` 39302403090 and `bench` 39302401850 (the soak's first run, 30 min). Green: core x3, `lint` (its
+clang-format step, the release-tree scan and `reuse lint` 5.0.2), sanitize x2, fuzz-smoke x2, qt-matrix, package's
+source, ubuntu-24.04 and macos-14 jobs (the AppImage and DMG smoke tests, the vendor-mark scans of the Release trees)
+and the hosted bench alarm; `ui.tst_dpr_switch` and the "Saturday walkthrough" step passed in all three qt-app rows.
+Failed: every qt-app row at `formats_ld.oracle_synthetic` (the reference decoder's `memoryview.cast` raised
+`ValueError` on the half floats of `pairs.ld`); qt-app on macOS also at `app.tst_instance_channel`,
+`widgets.tst_dpr_values_list` and `qtrender.tst_static_strips` (deferred, D-217 (n)); package windows-2022 at
+`smoke.py windows-portable`'s "unassociate-ld.cmd removes it"; the soak at its first main window, UBSan's "member
+call on null pointer of type 'ads::CDockFocusController'" at `third_party/qtads/src/AutoHideSideBar.cpp:217:52`.
+**Decision.** (a) **Python 3.8 and later.** D-217 (d) pinned `jurplel/install-qt-action@v4.1.1`, whose setup-python
+step takes `3.6.x - 3.11.x` and exports `Python3_ROOT_DIR`, so `find_package(Python3 3.8)` found Python 3.11 in qt-app
+and package (3.11.17 on ubuntu, 3.11.9 on Windows and macOS; main's nightly, on the floating `@v4`, had 3.14.8; core
+does not use the action), and `memoryview.cast` accepts the half-float code `'e'` only from Python 3.12. The tools
+that ctest and CI run keep to the minimum the CMake files declare, Python 3.8; neither the minimum nor CI's
+interpreter changes. `tools/ld_ref_decode.py` reads samples through `SampleView`: `memoryview.cast` where it gives the
+little-endian `struct` values (`_cast_ok`: a little-endian host, the native size equal to the standard size, a probe
+cast), `struct` with `<` otherwise, with `cast`'s slicing and clamping and only the requested samples built. Its
+float statistics use `float_sum`, CPython 3.12's compensated `sum` on every version (3.8 to 3.11 add left to right, so
+the means depended on the interpreter). On 3.12 and later no value or statistic changes and nothing moves toward the
+reader (D-041); only the payload bits of NaN samples in `.f64` dumps follow the interpreter's float conversion. New
+ctest `formats_ld.oracle_self_test` (`--self-test`, labels `unit;oracle-synthetic`): both sample paths for every code
+over unaligned buffers and 1,210 slice shapes, the 65,536 half patterns against an independent binary16 formula,
+`float_sum`, and a file with a channel of every code decoded through both paths (one of them a mean that only the
+compensated sum gets right). In the other scripts,
+`Path.write_text(newline=)` (3.10) becomes `write_bytes` of the UTF-8 text, which writes the same bytes
+(`check_vendor_marks.py`, `trend_ref.py`, `build_private_fixtures.py`, `packaging/package.py`, `gen_third_party.py`,
+`icons/make_icons.py`). `maths_ref.py`'s `Rate` is `typing.Tuple` (a subscripted `tuple` at import needs 3.9), and
+`build_private_fixtures.py` reads through `SampleView` (it cast `'e'` too). (b) **The association scripts** (refines
+D-212, D-217 (l)). The windows-2022 smoke step runs under Git for Windows' `bash.exe`, which puts `Git\usr\bin` before
+System32 on `PATH`. There `unassociate-ld.cmd`'s `reg query ... | find "Esses.LogFile"` met GNU `find` ("find:
+'Esses.LogFile': No such file or directory", exit 1), so `.ld`'s default stayed `Esses.LogFile` while the script said
+it was removed and exited 0. Any user with Git, MSYS2 or Cygwin tools before System32 met the same, and `find`'s
+substring match would also have removed another program's `MyEsses.LogFile` or `Esses.LogFileOld`. Both scripts now
+call `%SystemRoot%\System32\reg.exe` by its full path and exit 1 when it is missing. cmd looks a bare name up in the
+current folder first and then along `PATH`, and Explorer starts a script in its own folder; `%SystemRoot%` is the
+trust boundary, since whoever can change it can change `PATH`. The scripts look no program up by its bare name (the
+cmd of `for /f` starts through `%ComSpec%`, a full path behind the same boundary). `unassociate-ld.cmd`
+reads `reg query`'s output with `for /f` and removes `.ld`'s default only when the text after `REG_SZ` is exactly
+`Esses.LogFile`, whatever the language of Windows names the default value. It stores each line with delayed expansion
+off, so a `!` in another program's value cannot make it a match, and it exits 1 when that removal fails. As before,
+OpenWithProgids and the ProgId are always removed. `tools/dev/build-core.cmd` and `build-qt.cmd` call
+`%SystemRoot%\System32\where.exe` the same way. The new `esses_reg_stub` (`tools/packaging/windows/reg_stub.cpp`)
+stands in for `reg.exe`. It is Windows only, built with the tests and never installed, and it logs its own path and
+arguments, prints a given `query` listing and fails a given verb. The new ctest `packaging.association_scripts`
+(`smoke.py --script-test`; labels `packaging;lint`; exit 77, skipped, off Windows) runs the two scripts against the
+stub as `reg.exe` of a temporary `SystemRoot`, so the registry is never written. It runs them from six folder names
+with `&`, `%`, `!`, `^`, parentheses and accents, with `.bat` decoys of `reg`, `find`, `findstr`, `sort`, `more`,
+`where`, `timeout`, `choice` and `icacls` in their folder and first on `PATH`. It asserts the exact `reg` argument
+lists, that every call reached the stub, and nine `.ld` default values: `(Standard)` and `(par défaut)` count as
+Esses's; `Other.Program`, `Esses.LogFileOld`, `MyEsses.LogFile`, `Esses.LogFile!`, a value full of cmd's special
+characters, `(value not set)` and a missing key do not. It also asserts the exit codes of a failed delete, a failed add,
+a missing `esses.exe` and a missing `reg.exe`, and that no decoy ran. `smoke.py windows-portable` runs the real scripts
+with the decoys in place, now including the case of a program that took `.ld` between associate and unassociate. When
+a check fails, it prints the script's exit code and output, the registry values read and the decoys that ran.
+`smoke.py --self-test` (`packaging.smoke_self_test`) no longer runs `associate-ld.cmd`. fe6cf07's ran it with only
+the text `reg add ` turned into an echo, which the new `"!REG!" add` does not match, so over the new script it
+reached the real registry (M4.md §8 "Second CI run (D-218)"). It now checks windows-portable's checks and its
+failure report with Python stand-ins for the scripts and the registry: it runs no script and passes with either
+version of them. (c) **The vendored ADS changed** (amends D-147 (a) and D-153 for ADS's source files;
+`GOVERNANCE.md`'s licence policy).
+ADS 5.1.1 has two defects that are still in upstream `master` (087b35a, 2026-10-23) and that no upstream issue or pull
+request reports. Both are fixed in place in `third_party/qtads/src`. First, `CAutoHideSideBar::insertDockWidget()`
+called `clearDockWidgetFocus()` on the dock manager's focus controller. That controller exists only with
+`FocusHighlighting`, which Esses leaves off, so every pin to a side bar was undefined behaviour: Messages at
+registration, `setState`, the pin button, a restored side bar. The pointer is now checked as `CDockManager` checks its
+own. Second, after `~CDockManager()` had finished, `~CDockContainerWidget()` downcast the container's back-pointer to
+that same object to call `removeDockContainer()` on it. This happened at every destruction of a dock manager,
+including the soak's restart and teardown. `~CDockManager()` now clears the pointer with `removeFromDockManager()`
+while the object is still a `CDockManager`. Without the sanitizer, neither change alters behaviour: the skipped call
+only set a `focused` property that no stylesheet without focus highlighting reads, and `removeDockContainer()`
+ignores the manager itself. The rule for such changes: a vendored ADS file is changed only to fix a defect that
+upstream has not fixed. Each change is listed in `third_party/qtads/UPSTREAM.md` with its date, its reason and its
+upstream status, and marked below the file's licence header and at the change (LGPL-2.1 section 2(b)). No CMake file
+is changed, and a change is dropped once an upstream release fixes it and the copy is updated. `third_party/README.md`
+keeps the tree digest as downloaded (`5f5cca0a...`), the one now (`a72b087a...`, 104 files) and each changed file's
+SHA-256 now and in the archive. `GOVERNANCE.md`, `NOTICES.md`, `REUSE.toml`, `tools/packaging/third_party.json`,
+`docs/user/relinking.md` and the About dialog's `dockLibraryNotice()` say that the library is built from
+`third_party/qtads`, the upstream tag with the changes `UPSTREAM.md` lists, and no longer say "unmodified"
+(`widgets.tst_about_dialog`). The source offer is the upstream archive kept as a release asset together with the
+release's own tag, which holds the changed files (08 §9). Rejected: `FocusHighlighting` on, because it changes the UI
+(ADS's focus stylesheet, plus an application-wide focus tracker that sets the focus when a fly-out opens and works
+against the fly-out collapse) and leaves the second defect; excluding ADS from `-fsanitize=null`, because it hides
+undefined behaviour and the second defect is a vptr check anyway; the flag on only during construction, because it is
+fragile and changes behaviour the same way. In Esses's own code, `AdsBackend` held its docks as
+`QPointer<ads::CDockWidget>`. Each read was a `static_cast`, undefined while a dock is being destroyed: deleting its
+content moves the focus, and `DockHost::onFocusChanged` then asks `dockIdOf`. It now holds `QPointer<QWidget>` and
+reads through `qobject_cast` (`Entry::adsDock()`), which finds no dock in one being destroyed. The `QDockWidget`
+backend is clean under UBSan. New `widgets.tst_dock_host` functions: `autoHideWithoutAdsFocusController` (ADS row) and
+`teardownWithTheFocusInADock` (both rows). (d) **The macOS-only test faults** (the product was right both times).
+`app.tst_instance_channel` `secondLaunchHandsItsFilesOver` compared the forwarded paths as text, but
+`QDir::currentPath()` is `getcwd()`, the physical path on POSIX, and macOS's `/var` is a link to `/private/var`.
+Relative paths resolve against the physical current directory (reads 06 §19 item 2 with D-212 (d)'s absolute logs;
+`$PWD` is stale in a process started without a shell). The test now compares each path's folder by file identity
+(`std::filesystem::equivalent`) and gains a row started through a link to the folder (a symlink on POSIX, a junction
+on Windows), which brings the macOS case to Linux. `widgets.tst_dpr_values_list` `valuesListAt1_5(main_only_fixed)`
+showed the list as a window of its own, and Qt gives such a window its layout's minimum size. On Darwin only,
+`QStyleHelper::dpi` ignores `QTEST_MAIN`'s `AA_Use96Dpi`, so the offscreen Fusion metrics grow by 4/3 and that minimum
+is 90 px rather than 70 px. On a worksheet a component takes its rect through `setGeometry`, whatever its table's
+minimum. The tests now place it that way (`cmptest::showPlaced`) and check its size. A new
+`belowTheTablesMinimumSize` renders a list at half its table's minimum on every OS, and
+`widgets.tst_values_list_goldens` places it the same way (on macOS its `main_only_fixed` pixel checks had been
+skipped as "size differs"). (e)
+**Deferred** (M4.md §10): ADS's `restoreSideBar` casts a saved "Area" to `SideBarLocation`, and `autoHideSideBar()`
+inserts a null side bar for an unknown one, so a damaged or hand-edited `layout.json` with an Area outside 0-3 passes
+ADS's dry run and then dereferences that null. The soak cannot reach it. The macOS strips stay D-217 (n)'s.
+**Consequences.** Each failure of fe6cf07's runs is fixed at its cause, and each fix comes with a test that fails
+without it: `formats_ld.oracle_synthetic` under Python 3.11 here (fe6cf07's decoder raises CI's error) and the new
+self-test; for (b), `packaging.association_scripts` alone (fe6cf07's scripts start its decoys: over 100 problems),
+since `smoke.py --self-test` runs no script and passes with either version of them; the two `tst_dock_host` functions
+(the first in any build, the second under UBSan); and the rows of (d). None has had a CI run yet. CI's next run of
+the branch, with the macOS and soak dispatches again, is the record (M4.md §6.0 step 1, §8 "Second CI run"). The
+tools run on Python 3.8 and later, but no CI job runs an interpreter older than 3.11 (M4.md §10). The vendored ADS
+differs from its upstream archive in two files, so updating ADS means checking `UPSTREAM.md`'s changes against the new
+release, and the release's corresponding ADS source is the archive together with the tag. The association scripts
+trust `%SystemRoot%` and no `PATH` entry; a failed removal of `.ld`'s default now exits 1. The macOS nightly keeps the
+strips' failure.
+**User must confirm:** yes: (c), the vendored ADS changed in place and the licence policy of `GOVERNANCE.md` that now
+allows it (0.1 proceeds with the change; (c)'s alternatives are what remains if the maintainer declines); the rest
+no. **Confirmed by the user on 2026-10-26: the two changes and `GOVERNANCE.md`'s policy stay** (M4.md §6.5 item 10);
+reporting the two defects upstream stays the maintainer's (M4.md §10 item 60).
+
+#### D-219 PR #5's third CI run: an id copied before the source that holds it can go, with the soak's first sanitizer report in the job log, the lap-stretch tests reading the report as it is announced and the laps that wait for Corr Dist back at an earlier version built, the uninstaller's `.ld` step before `unins000.exe` returns with `smoke.py` waiting for the uninstall's end and a model of the installer's `.ld` rule (refines D-016, D-121, D-179 (a), D-190, D-213, D-217 (l))
+**Context.** PR #5's third CI run, on 2d9a01c (D-218) of 2026-10-26, with the runs dispatched on the branch before
+the merge (M4.md §6.0 step 1): `ci` 40284591559 (pull request) and 40284599411 (dispatch, adds qt-app on macos-14),
+`package` 40284591582 and `bench` 40284602652 (the soak, 30 min). Green: core x3, `lint`, sanitize x2, fuzz-smoke x2
+and qt-matrix in both `ci` runs, qt-app ubuntu-24.04 in both and windows-2022 in the dispatch, package's source,
+ubuntu-24.04 and macos-14 jobs, and the hosted bench alarm. The runs confirm D-218 (a) (`formats_ld.oracle_synthetic`
+passed in every qt-app row), (b) (`smoke.py windows-portable` passed with its decoys, `unassociate-ld.cmd` included)
+and (d) (qt-app on macos-14 failed only `qtrender.tst_static_strips`, D-217 (n)'s deferral), and (c) as far as the
+soak went: its first main window and the restart of its second cycle passed without a sanitizer report. Failed:
+qt-app windows-2022 of the pull request at `qtmodel.tst_lap_stretch` (lap 3's length was 0 at `tst_lap_stretch.cpp`
+line 145; 1174/1175); package windows-2022 at `smoke.py windows-installer`'s "uninstall removes the .ld
+association", after its install, upgrade and runtime checks had passed; the soak at its second cycle's Close All,
+95 s in, on AddressSanitizer's heap-use-after-free in `DataSelectionModel::closeSource` (the read at
+`data_selection_model.cpp:1009`, the free one line before), which ended it before any leak was judged.
+**Decision.** (a) **An id is copied before what holds it can go** (refines D-179 (a), D-190, D-213). File > Close All
+(`SourceLoader::closeAll()`) called `close(open_.back()->id)`, a reference to the closed `DataSource`'s own id.
+`close()` let go of the loader's and the maths' owners and emitted `sourceClosed` with that reference; the selection,
+a direct receiver, held the last owner, freed it in `sources_.erase` and then read the id for `filters_.erase`. The
+receivers connected after it (`LapStretchService`, the Lap Editor) read freed memory too, and so did a headless
+`closeAll()`, where `MathsService::removeSource` drops the last owner. The soak's first cycle passed only because its
+driver uses Close All when `k % 5 == 1`. The rule: a function that closes, removes or erases what may own the id it
+was given copies the id first, and the signal that announces the close carries that copy. It now holds in five places:
+`SourceLoader::close()` (every `sourceClosed` receiver gets its copy) and `closeAll()`;
+`DataSelectionModel::closeSource()`; `MathsService::removeSource()` (its sources map and graphs own the source);
+`SourceLoader::flushSidecar()` and the destructor that called it with a key of `sidecarsDue_` or
+`sidecarsInFlight_`, which the flush erased; and `mappingRequired`, which now carries a copy of the pending entry,
+because a receiver may answer at once (`resolveMapping` and `cancelMapping` erase the entry), as `budgetExceeded`
+already did. The flush at exit was a second defect with an effect a user could meet: where freed memory no longer
+reads as the key (MSVC Debug overwrites it), an older sidecar write still queued was not taken over and ran last, so
+the newest edit made within the coalescing interval before exit was lost (D-190's flush at exit). Every other emission
+and slot of the Qt layers that takes a source id or a map entry by reference was read and keeps its argument alive
+(M4.md §8 "Third CI run (D-219)"). New tests: `qtmodel.tst_source_loader` `sourceClosedHandsACopyOfTheId` (a reference
+given to `close()`, and `closeAll()`) and `destroyedWithAnOlderWriteQueuedKeepsTheNewestEdit`,
+`qtmodel.tst_dataselection` `closeSourceOfAReferenceIntoTheClosedSource`, `qtmodel.tst_maths_service`
+`removeSourceOfAReferenceIntoTheRemovedSource` and `qtmodel.tst_mapping_handoff` `aReceiverMayAnswerAtOnce`. Four of
+them fail with their fix reverted in any build, with or without a sanitizer: `sourceClosedHandsACopyOfTheId` and
+`aReceiverMayAnswerAtOnce` compare addresses (the id a `sourceClosed` receiver is given must not lie inside the closed
+source, the entry a `mappingRequired` receiver is given must not be the one its answer erases), and the other two read
+an id through a reference that outlived its source with a new helper, `quarantinedCopy` (`qtmodel_test_support`): the
+source's bytes are overwritten when its last owner lets go, in storage kept until the process ends. The fifth,
+`destroyedWithAnOlderWriteQueuedKeepsTheNewestEdit`, depends on freed memory being overwritten or its read caught: with
+its fix reverted the destructor reads the key of the map entry its flush has just erased, which fails the test in MSVC
+Debug (the debug CRT fills freed memory with 0xDD; CI's windows-2022 `qt-app` job) and, by reasoning, under
+AddressSanitizer, which reports the read (not run: no CI job runs the Qt tests under it); a Clang 17 Debug build passes
+it 5 of 5 with the fix reverted, so on GCC, Clang and macOS it catches no regression. The soak job's log had shown only
+the report's first line, so `tests/soak/lsan_check.py` now prints the first AddressSanitizer, UBSan or ThreadSanitizer
+report of a failed run (from its rule to its `SUMMARY:` line, at most 200 lines, so that the soak's 129-line
+heap-use-after-free report prints whole with its four stacks; a line over 600 characters cut in its middle so that its
+file and line stay; paths as logged), with `--self-test` cases. (b) **The lap-stretch report read as it is announced;
+the laps that wait for Corr Dist back at an earlier version built** (refines D-016). `DistanceService` builds each lap's
+index as a Background task of its own, in the band the summary pass and the maths prefetch share, and each
+`distanceReady` updates `LapStretchService`. `qtmodel.tst_lap_stretch` waited until laps 1 and 2 were stretched and then
+read `report()`, which gives a lap whose index has not arrived a length of 0, as documented: a test race since M2 (no
+file of the distance or lap-stretch code has changed since `main` 59df0f8), lost by the pull request's windows-2022 row
+and won by the dispatch's. Reproduced in MSVC Debug under parallel load (8 of 240 and 9 of 280 runs), never in Clang 17
+(0 of 1,320). The test now keeps the report as a `reportChanged` receiver reads it and waits (QTRY) until every lap
+has its length, every check as strict as before; polling `report()` would itself ask for the indexes and hide a
+missing announcement. `ui.tst_walkthrough_saturday` item 8 read the lengths the same way after its Corrected Speed
+undo (1 failure in 48 loaded runs) and now reads them as announced too; `widgets.tst_channel_report`
+`hiddenReportsWaitForTheirShow` waited until the distance state left Pending, which happens at the first lap index,
+and now waits for the pool to settle. The product defect found on the way: `MathsService` announces `channelReady`
+once per (output, version) while a source is open, and `DistanceService` built the laps waiting for Corr Dist only on
+`channelReady`. Corr Dist back at a version it had before (a Corrected Speed settings edit undone) gets none, so a lap
+asked for while it was evaluated again was never built and no `distanceReady` followed: the stretch report, the Lap
+Editor's Stretch column and the lap prefetch stayed stale until something asked again. `DistanceService` now also
+builds the waiting laps, and a prefetching source's laps, when Corr Dist's `statusChanged` reports Ok or Warning;
+`statusChanged` comes first, so a later `channelReady` finds those builds pending and starts nothing. New
+`qtmodel.tst_maths_distance` `lapsWaitingForAnEarlierCorrDistVersionAreBuilt`: the pool's two workers are held while
+the edit is undone, so the request finds Corr Dist unevaluated, and the test waits for `distanceReady` without asking
+again; it fails without the fix. (c) **The uninstaller's `.ld` step before `unins000.exe` returns** (refines D-121,
+D-217 (l)). Inno Setup's `unins000.exe` copies itself to a temporary folder and the copy does the work: it processes
+the uninstall log (the files, the `Esses.LogFile` ProgId by `uninsdeletekey`, the OpenWithProgids value, the
+uninstall key), tells the shell that associations changed (`ChangesAssociations=yes`), ends the original process,
+whose caller then has exit code 0, waits 500 ms, deletes `unins000.exe` and only then raises `usPostUninstall` (Inno
+Setup's source, read at `main` and at the tag of 6.4.3, and its help's "Uninstaller Exit Codes": some uninstall code
+may still be running when the exit code comes back). D-217 (l)'s step removed `.ld`'s default at `usPostUninstall`, so
+when the exit code came back the ProgId was gone and HKLM's `.ld` still named it; the failing check ran 0.4 s after
+the upgrade's last one, within the copy's wait, and `smoke.py` did not check the exit code. The same order put the
+removal after the shell's notice, so Explorer was never told of it, and an uninstall cut short in that window (ended,
+crashed, a restart) left `.ld` naming a ProgId that no longer exists. `esses.iss`'s `RemoveOwnLdDefault()` now runs
+at `usUninstall`, before the log is processed, under `HKA64`, the root and view the `[Registry]` entries were written
+to (HKLM for an administrative install, HKCU for a per-user one); it removes the default only while it is exactly
+`Esses.LogFile` and logs a line starting `.ld:` for each outcome, and `usDone` logs `Esses: uninstall done`. Ruled
+out: the registry view (`Software\Classes\.ld` is shared between the 32- and 64-bit views), the tasks, the
+uninstaller's install mode, previous-install data and HKCR. `smoke.py windows-installer` runs each uninstall with
+`/LOG=`, requires exit code 0 and waits for that line (and fails at once on Inno's closing line without it); a failed
+association check prints `.ld`'s default, the OpenWithProgids entry, the ProgId and its open command in HKLM and HKCU,
+with the uninstall log's `.ld:` lines. The administrative uninstall must remove `.ld`'s default, the ProgId, its
+OpenWithProgids entry and the uninstall entry. The per-user section installs with the association
+(`/MERGETASKS=assocld`): its first uninstall must remove its own `.ld`, the uninstall of a second install after
+another program took `.ld` must leave it, and both must remove the ProgId and the uninstall entry; on 2d9a01c the
+per-user check that another program's `.ld` stays had read the registry before the `.ld` step ran, so it could not
+tell a correct rule from a wrong one. `smoke.py --self-test`
+(`packaging.smoke_self_test`) gains `iss_self_test`, which reads `esses.iss`'s `[Setup]`, `[Registry]` and `.ld`
+step and runs them on a model of Inno Setup's registry behaviour through installs, upgrades with and without the task,
+another program taking `.ld` (the package job's sequence among them) and the user's own HKCU choice under an
+administrative install, in both install modes. When `unins000.exe` returns and when the uninstall ends, the ProgId and
+its OpenWithProgids entry must be gone, and `.ld`'s default gone if it was Esses's and unchanged if not; an upgrade
+without the task must leave `.ld` as it was. The script passes, a parser check passes, and eight changed copies must
+fail: the step at `usPostUninstall`, D-217's handler, an `HKLM64` root, an `HKCR` root, `uninsdeletevalue` on `.ld`,
+no `uninsdeletekey` on the ProgId, `UsePreviousTasks=yes` and the `usDone` line removed.
+`uninstaller_self_test` checks the wait with a stand-in uninstaller that writes its log after it has returned.
+(d) **One launch at a time decides who listens** (POSIX; refines D-212 (b), D-217; the Codex review of PR #5 on
+`instance_channel.cpp`). A launch whose bind found the socket file taken and whose probe was refused unlinked the file
+as stale, but a refused probe also means a launch that has bound and not listened yet: the second then bound the name
+while the first listened on a file no longer reachable, and both took launch requests' place as the primary.
+`InstanceServer::listen()` now binds, checks and listens under an advisory `flock` on `<socket file>.lock` beside the
+socket (waiting at most 3 s for another launch's election, then failing with "another instance is starting", after
+which `main` forwards once more as before); the kernel drops the lock of an instance that died, so a socket file it
+left is still reclaimed, and the lock file stays. New test `app.tst_instance_channel`
+`aLaunchBetweenBindAndListenKeepsItsSocket` (POSIX: the test holds the lock and binds; the second `listen()` must fail
+and leave the file's inode, and once the first listens it must find it listening); it fails without the lock. The
+Windows named pipe is unaffected (`FILE_FLAG_FIRST_PIPE_INSTANCE`).
+**Consequences.** Each failure of 2d9a01c's runs except the deferred macOS strips is fixed at its cause, and each
+product fix comes with a test that fails without it: the five tests of (a) (four in any build, the exit flush's in MSVC
+Debug), the new `tst_maths_distance` function of (b), and for (c) `iss_self_test` (2d9a01c's `esses.iss` gives 11
+problems on the model). The three tests (b) changed wait for what they read; none is loosened. None of this has had a CI
+run: CI's next run of the branch, with the macOS and soak dispatches again, is the record (M4.md §6.0 step 1). The real
+installer and uninstaller run only in the package job; the agents run no installer and do not touch the registry, and
+Inno Setup's order of uninstall steps was read from its source and help, not run here. A Close All, a close of a source
+by its own id and the exit read no freed memory; an edit made just before exit stays on disk; after a Corrected Speed
+settings edit is undone, the lap indexes, the stretch report and the Lap Editor follow without another request; the
+uninstaller gives `.ld` back before the ProgId goes and before the shell's notice. The soak is still the only CI job
+that runs AddressSanitizer over the Qt layers (M4.md §10).
+**User must confirm:** no.
+
+#### D-220 macOS plot text independent of the thread and the DPR it first drew at, with a diagnostic probe in a workflow of its own and the relinking page's exact Qt version (refines D-209, D-217 (n); amends `docs/user/relinking.md`'s later-patch-release promise)
+**Context.** The macOS qt-app job (nightly and dispatch; macOS is "builds green, not supported", D-116) had failed
+`qtrender.tst_static_strips` at DPR 1.5 and 2 since M1 (D-217 (n), M4.md §10 item 51): a Static layer painted in
+strips on TaskPool workers differed from one pass on the GUI thread, in text glyphs only. On 6691db2 (`ci`
+40395792892) `goldenCasesEqualOnePass` failed at 1x and 2x too, and `ui.tst_dpr_switch`'s `windowAcrossMonitors` and
+`floatingDockAcrossMonitors(qdockwidget)` differed by 78 and 81 pixels back at DPR 1 (after 1 -> 2 -> 1.25 -> 1.5 -> 1
+and 1 -> 2 -> 1.5 -> 1). Windows and Linux (FreeType, offscreen) agreed to the pixel. In the golden-diffs artefact only
+glyphs differed, each an exact copy of the same glyph elsewhere in the image, shifted by half a device pixel at 2x.
+**Decision.** (a) **The cause** (Qt 6.12.0, read from its source and measured). Qt's raster engine places a cached
+glyph at its device x position quantised into `QFontEngine::m_subPixelPositionCount` bins. FreeType's engine fixes the
+count at 4; CoreText's and DirectWrite's leave it 0, and `QTextureGlyphCache::populate` computes it at the engine's
+first glyph-cache fill, from the distinct images of the fill's first glyph with an outline at twelve offsets under
+that fill's transform, i.e. at the painter's DPR. Font engines belong to one thread (`QFontCache` is per thread; a
+TaskPool worker keeps its engines for its life), so the bins, and with them the glyph image a position picks,
+depended on what the thread drew first and at which DPR. The probe of (c), as built at e4dc523 (the scheme's sizes
+only; it has a +3.3 pt font set since), measured it on macos-14, offscreen and cocoa alike: Qt's count for the axis
+font is 4 at 1x, 3 at 1.25x and 1.5x and 2 at 2x; workers whose first DPR differed drew the same DPR 1 text with
+29,922 and 30,732 differing pixels, 268,886 over all of an entry's comparisons, with the same layout and faces on
+every thread and no font database change. (b) **The fix** (`libs/qtrender/src/glyph_bins.{hpp,cpp}`). `drawText` gives
+every font engine of the calling thread that the text is drawn with, and that places glyphs at subpixel positions,
+the count 4 before `drawStaticText`: the font's `Script_Common` engine and the fallbacks it has loaded and, for a text
+new to the thread's `QStaticText` cache or an engine not pinned yet, the engines of the text's glyph runs, laid out
+as `QStaticText` lays it out (every line, unbounded). The image a position picks then depends on the position alone,
+as with FreeType. On by default on macOS only: under Qt 6.12 the probe found DirectWrite's count independent of the
+DPR history (windows-2022): 6 at every scale where it places glyphs at subpixel positions (no hinting, or
+`QT_SCALE_FACTOR=1.5`) and 1, whole pixels, with default hinting unscaled; FreeType's is 4. Windows and Linux output
+is unchanged (the 244 render artefacts of the local suites at e4dc523 are byte-identical to an earlier build's). It
+uses Qt Gui's private API (`Qt6::GuiPrivate`, linked privately by `esses_qtrender` and by the probe;
+`tools/check_layering.py` allows it in `esses_qtrender` and its tests only) and touches no engine unless the Qt
+loaded at run time is exactly the version Esses was built against (`qVersion()` against `QT_VERSION_STR`); under
+another Qt the pinning stays off. (c) **The probe.** `qtrender.probe_text_engines` (`libs/qtrender/probes/`, built
+with `-DESSES_BUILD_PROBES=ON`, ctest label `probe`, never in the suites) reports per thread and DPR history which
+engine draws each scheme role, its count, Qt's own count per glyph and scale, and the differing pixels with the
+count pinned and not; it fails when pinned text still differs or a pinned engine is not at 4 bins, and skips under a
+Qt other than the one it was built against. It runs from `.github/workflows/probe.yml`, on manual dispatch only
+(`gh workflow run probe.yml --ref <branch>`, `-f windows=true` for windows-2022), not from `ci.yml`: a `ci.yml`
+dispatch that skipped its other jobs would report the skipped required checks (`lint`, `fuzz-smoke`) as passed for
+its commit and would share `ci.yml`'s concurrency group. GitHub dispatches a workflow only once its file is on the
+default branch, so `probe.yml` can be dispatched after the merge; the run recorded here used e4dc523's interim
+`ci.yml` input, removed since. (d) **Relinking** (amends
+`docs/user/relinking.md`). The page no longer promises that a later Qt patch release works: only a build of the Qt
+version Esses was built against is supported (a modified build of it, which is what the LGPL right needs), because
+Esses and, on Linux, the docking library use Qt internals; About names that version for a replacement. (e)
+**Tests.** `tst_static_strips` `textDoesNotDependOnThreadHistory` (a worker that drew at DPR 2 first, a fresh worker
+and the GUI thread draw the same DPR 1 text alike) and, on macOS, an informational control with the pinning off;
+`tst_dpr_switch` saves the two composites and their difference when its round trip differs.
+**Consequences.** On macOS, plot text no longer depends on the thread that paints it or on the DPRs it painted at
+before: the probe's dispatch on e4dc523 (`ci` 40413826613) found 0 differing pixels with the pinning on, and
+`qtrender.tst_static_strips` (red since M1) and `ui.tst_dpr_switch` passed there. D-217 (n)'s macOS strips are closed
+(M4.md §10 item 51). A new text costs one more `QTextLayout` shaping on macOS. A Qt version bump re-checks
+`glyph_bins.cpp` against the new private headers and re-runs the probe (M4.md §10 item 67). With another Qt patch
+release a user's Esses runs without the pinning (macOS text may then shift by a fraction of a pixel between threads),
+or not at all where a private import changed. Widget text drawn outside `drawText` keeps Qt's own counts; no test
+compares it across threads.
+**User must confirm:** no.
+
+#### D-221 Print to Clipboard of a report without the keyboard-focus mark (reads 04 §7.2 item 9, §12 item 1, §13)
+**Context.** PR #5's qt-app ubuntu-24.04 run on 750eae4 (`ci` 40430103010) failed `widgets.tst_reports_track_goldens`
+`timeReport(bands_summaries)` at 1x and 2x (0.96 and 0.98 % of pixels) while its table text matched; it had passed on
+every earlier run. The run's `golden-diffs-ubuntu-24.04` artefact (downloaded with the maintainer's approval) showed
+one cell differing, the current cell (Lap 1, Turn 1), drawn with Qt Fusion's keyboard-focus mark: a gradient fill
+under a darker outline. Qt draws it on the current cell of a view that has the focus when its window took the focus
+by the keyboard, and a window activated with nothing focused focuses its first child with `Qt::TabFocusReason`, which
+counts. On the offscreen platform the activation arrives asynchronously, so whether it landed before the picture
+decided the picture; in the application Print to Clipboard likewise showed the mark or not, by how the table had got
+the focus.
+**Decision.** The report table's two views paint their cells through one `ReportCellDelegate` (`report_table.cpp`),
+which drops `State_HasFocus` and `State_MouseOver` while the table is painted for Print to Clipboard
+(`ReportTable::setExporting`, switched on by `TimeReport` and `ChannelReport::renderToImage` around `QWidget::render`).
+On screen the mark stays. New test `widgets.tst_time_report` `printIgnoresTheKeyboardFocus`: with the window active
+and the table focused with `Qt::TabFocusReason`, then not focused, the screen differs and the print does not; with
+the delegate's switch disabled it fails.
+**Consequences.** A report's Print to Clipboard and its pixel goldens no longer depend on the focus or on the window's
+activation; the goldens are unchanged (they had no mark). The component's own focus border (`setFocusFrame`, the
+worksheet's focused component) is still painted in a print, as the graphs' Chrome is.
 **User must confirm:** no.

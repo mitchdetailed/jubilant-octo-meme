@@ -13,9 +13,12 @@ any other private converter code:
   * gotzl/ldparser (GPL-3): read for understanding only; no code or struct
     format strings are reproduced here.
 
-Python standard library only (struct, mmap, xml.etree, json, argparse, ...).
-Run with ``python -I``. Large files are memory-mapped; samples are decoded in
-bounded chunks and never materialised as one Python list.
+Python standard library only (struct, mmap, xml.etree, json, argparse, ...), Python
+3.8 or later (the find_package(Python3 3.8) of the CMake tests); every version gives
+the same values and statistics (SampleView, float_sum; only the payload bits of NaN
+samples in .f64 dumps follow the interpreter's float conversion). Run with
+``python -I``. Large files are memory-mapped; samples are decoded in bounded chunks
+and never materialised as one Python list.
 
 Every heuristic emits a warning with a stable code (see WARNING_CODES); the
 codes are documented in docs/formats/ld.md.
@@ -33,6 +36,7 @@ Usage:
   python -I tools/ld_ref_decode.py FILE.ld [FILE.ld ...] [--json] [-o OUT]
   python -I tools/ld_ref_decode.py FILE.ld --dump-channel "Ground Speed" \
       --dump-format csv --dump-dir out/
+  python -I tools/ld_ref_decode.py --self-test
 """
 
 from __future__ import annotations
@@ -248,6 +252,134 @@ def raw_width(code):
     return struct.calcsize("<" + code)
 
 
+# --------------------------------------------------------------------------- sample access
+
+# "auto": memoryview.cast where _cast_ok(code), else struct; "struct": struct for every code (the self-test).
+SAMPLE_ACCESS = "auto"
+_CAST_OK = {}
+
+
+def _cast_ok(code):
+    """True when memoryview.cast(code) gives exactly the little-endian struct "<code" values here.
+
+    cast decodes in the host's byte order and native sizes, and accepts the half-float code 'e' only from
+    Python 3.12; struct decodes every code with an explicit '<' on every supported version (3.8+).
+    """
+    ok = _CAST_OK.get(code)
+    if ok is None:
+        ok = sys.byteorder == "little" and struct.calcsize(code) == raw_width(code)
+        if ok:
+            try:
+                with memoryview(bytes(raw_width(code))) as probe:
+                    probe.cast(code).release()
+            except (TypeError, ValueError):
+                ok = False
+        _CAST_OK[code] = ok
+    return ok
+
+
+class SampleView:
+    """Read-only view of n little-endian samples of struct code `code` stored at buf[ptr:].
+
+    view[k] is one sample and view[a:b:s] a list of samples: memoryview.cast(code)[a:b:s].tolist(), with the
+    same index clamping. It reads through memoryview.cast where that gives the struct values (_cast_ok) and
+    through struct otherwise (the half-float 'e' before Python 3.12, any code on a big-endian host), so every
+    channel code decodes on Python 3.8+ with the same values. Either way only the requested samples are
+    materialised. use_cast None follows SAMPLE_ACCESS; False forces struct, True forces cast.
+    """
+
+    def __init__(self, buf, ptr, n, code, use_cast=None):
+        if use_cast is None:
+            use_cast = SAMPLE_ACCESS == "auto" and _cast_ok(code)
+        self.code = code
+        self.width = raw_width(code)
+        self.ptr = ptr
+        self._range = range(n)
+        self._one = struct.Struct("<" + code)
+        self._base = memoryview(buf)
+        self._cast = None
+        if use_cast:
+            try:
+                with self._base[ptr:ptr + n * self.width] as raw:
+                    self._cast = raw.cast(code)
+            except BaseException:
+                self._base.release()                # leave no export on the caller's mmap
+                raise
+
+    def __len__(self):
+        return len(self._range)
+
+    def __getitem__(self, key):
+        if isinstance(key, slice):
+            r = self._range[key]
+            if self._cast is not None:
+                return self._cast[key].tolist()
+            return self._unpack(r)
+        k = self._range[key]                        # IndexError past the end, as a memoryview
+        if self._cast is not None:
+            return self._cast[k]
+        return self._one.unpack_from(self._base, self.ptr + k * self.width)[0]
+
+    def _unpack(self, r):
+        if r.step < 0:
+            return self._unpack(r[::-1])[::-1]
+        cnt = len(r)
+        if cnt == 0:
+            return []
+        w = self.width
+        off = self.ptr + r.start * w
+        if r.step == 1:
+            return list(struct.unpack_from("<%d%s" % (cnt, self.code), self._base, off))
+        # every r.step-th sample: a unit of one sample plus the bytes up to the next, then the last sample
+        span = (cnt - 1) * r.step * w
+        unit = struct.Struct("<%s%dx" % (self.code, (r.step - 1) * w))
+        with self._base[off:off + span] as part:
+            out = [t[0] for t in unit.iter_unpack(part)]
+        out.append(self._one.unpack_from(self._base, off + span)[0])
+        return out
+
+    def release(self):
+        if self._cast is not None:
+            self._cast.release()
+            self._cast = None
+        self._base.release()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.release()
+
+
+# CPython 3.12 made sum() of floats Neumaier-compensated; 3.8-3.11 add left to right. float_sum gives the
+# 3.12 result on every version, so the statistics do not depend on the interpreter.
+_SUM_COMPENSATED = sys.implementation.name == "cpython" and sys.version_info >= (3, 12)
+
+
+def float_sum(xs, compensated=None):
+    """sum(xs) of floats as CPython 3.12+ computes it: int 0 start, then Neumaier compensation."""
+    if compensated is None:
+        compensated = _SUM_COMPENSATED
+    if compensated:
+        return sum(xs)
+    it = iter(xs)
+    s = 0
+    for x in it:
+        s = 0 + x
+        break
+    c = 0.0
+    for x in it:
+        t = s + x
+        if abs(s) >= abs(x):
+            c += (s - t) + x
+        else:
+            c += (x - t) + s
+        s = t
+    if c and math.isfinite(c):
+        s += c
+    return s
+
+
 # --------------------------------------------------------------------------- scaling
 
 def scaling_params(ch):
@@ -296,9 +428,7 @@ def is_identity(ch):
 def raw_stats(mm, ch, max_samples):
     """Min/max/sum over raw values in bounded chunks; strided when count > max_samples."""
     code = ch["_code"]
-    w = raw_width(code)
     n = ch["count_decoded"]
-    ptr = ch["data_ptr"]
     res = {"n": n, "nonfinite": 0, "nan": 0}
     if n == 0:
         return res
@@ -311,34 +441,30 @@ def raw_stats(mm, ch, max_samples):
     vmax = None
     total = 0.0 if is_float else 0
     used = 0
-    with memoryview(mm) as base:
-        view = base[ptr:ptr + n * w].cast(code)
-        try:
-            res["first"] = view[:5].tolist()
-            res["last"] = view[max(0, n - 5):].tolist()
-            step = STATS_CHUNK * stride
-            for i in range(0, n, step):
-                chunk = view[i:min(n, i + step):stride].tolist()
-                if is_float:
-                    s = sum(chunk)
-                    if not math.isfinite(s):
-                        fin = [x for x in chunk if math.isfinite(x)]
-                        res["nan"] += sum(1 for x in chunk if x != x)
-                        res["nonfinite"] += len(chunk) - len(fin)
-                        chunk = fin
-                        s = sum(chunk)
-                    if not chunk:
-                        continue
-                else:
-                    s = sum(chunk)
-                cmin = min(chunk)
-                cmax = max(chunk)
-                vmin = cmin if vmin is None or cmin < vmin else vmin
-                vmax = cmax if vmax is None or cmax > vmax else vmax
-                total += s
-                used += len(chunk)
-        finally:
-            view.release()
+    with SampleView(mm, ch["data_ptr"], n, code) as view:
+        res["first"] = view[:5]
+        res["last"] = view[max(0, n - 5):]
+        step = STATS_CHUNK * stride
+        for i in range(0, n, step):
+            chunk = view[i:min(n, i + step):stride]
+            if is_float:
+                s = float_sum(chunk)
+                if not math.isfinite(s):
+                    fin = [x for x in chunk if math.isfinite(x)]
+                    res["nan"] += sum(1 for x in chunk if x != x)
+                    res["nonfinite"] += len(chunk) - len(fin)
+                    chunk = fin
+                    s = float_sum(chunk)
+                if not chunk:
+                    continue
+            else:
+                s = sum(chunk)
+            cmin = min(chunk)
+            cmax = max(chunk)
+            vmin = cmin if vmin is None or cmin < vmin else vmin
+            vmax = cmax if vmax is None or cmax > vmax else vmax
+            total += s
+            used += len(chunk)
     res["used"] = used
     res["min"] = vmin
     res["max"] = vmax
@@ -869,8 +995,6 @@ def _safe(name):
 
 def dump_channel(mm, e, dump_dir, fmt, shift_order):
     os.makedirs(dump_dir, exist_ok=True)
-    code = e["_code"]
-    w = raw_width(code)
     n = e["count_decoded"]
     orders = [shift_order]
     if e["shift"] != 0 and e["mul"] not in (0, 1):
@@ -879,35 +1003,31 @@ def dump_channel(mm, e, dump_dir, fmt, shift_order):
     meta = {"name": e["name"], "index": e["index"], "count": n, "freq": e["freq"],
             "dtype_a": e["dtype_a"], "dtype": e["dtype"], "shift": e["shift"], "mul": e["mul"],
             "scale": e["scale"], "dec": e["dec"], "unit": e["unit"], "files": {}}
-    with memoryview(mm) as base:
-        view = base[e["data_ptr"]:e["data_ptr"] + n * w].cast(code)
-        try:
-            for o in orders:
-                f = make_scaler(e, o)
-                suffix = "" if len(orders) == 1 else "." + o
-                if fmt in ("f64", "both"):
-                    p = stem + suffix + ".f64"
-                    with open(p, "wb") as fh:
-                        for i in range(0, n, STATS_CHUNK):
-                            vals = [f(x) for x in view[i:min(n, i + STATS_CHUNK)].tolist()]
-                            fh.write(struct.pack("<%dd" % len(vals), *vals))
-                    meta["files"][o + ".f64"] = os.path.basename(p)
-                if fmt in ("csv", "both"):
-                    p = stem + suffix + ".csv"
-                    with open(p, "w", encoding="ascii", newline="\n") as fh:
-                        fh.write("index,timeUs,value,valid\n")
-                        for i0 in range(0, n, STATS_CHUNK):
-                            vals = view[i0:min(n, i0 + STATS_CHUNK)].tolist()
-                            lines = []
-                            for k, x in enumerate(vals):
-                                i = i0 + k
-                                v = f(x)
-                                ok = 1 if math.isfinite(v) else 0
-                                lines.append("%d,%d,%r,%d\n" % (i, time_us(i, e["freq"]), v, ok))
-                            fh.write("".join(lines))
-                    meta["files"][o + ".csv"] = os.path.basename(p)
-        finally:
-            view.release()
+    with SampleView(mm, e["data_ptr"], n, e["_code"]) as view:
+        for o in orders:
+            f = make_scaler(e, o)
+            suffix = "" if len(orders) == 1 else "." + o
+            if fmt in ("f64", "both"):
+                p = stem + suffix + ".f64"
+                with open(p, "wb") as fh:
+                    for i in range(0, n, STATS_CHUNK):
+                        vals = [f(x) for x in view[i:min(n, i + STATS_CHUNK)]]
+                        fh.write(struct.pack("<%dd" % len(vals), *vals))
+                meta["files"][o + ".f64"] = os.path.basename(p)
+            if fmt in ("csv", "both"):
+                p = stem + suffix + ".csv"
+                with open(p, "w", encoding="ascii", newline="\n") as fh:
+                    fh.write("index,timeUs,value,valid\n")
+                    for i0 in range(0, n, STATS_CHUNK):
+                        vals = view[i0:min(n, i0 + STATS_CHUNK)]
+                        lines = []
+                        for k, x in enumerate(vals):
+                            i = i0 + k
+                            v = f(x)
+                            ok = 1 if math.isfinite(v) else 0
+                            lines.append("%d,%d,%r,%d\n" % (i, time_us(i, e["freq"]), v, ok))
+                        fh.write("".join(lines))
+                meta["files"][o + ".csv"] = os.path.basename(p)
     with open(stem + ".json", "w", encoding="utf-8") as fh:
         json.dump(meta, fh, indent=1)
 
@@ -942,13 +1062,9 @@ def read_channels(path, indices=None, order="beforeMul", start=0, stop=None, ent
                     a = max(0, start)
                     z = n if stop is None else min(n, stop)
                     f = make_scaler(e, order)
-                    with memoryview(mm) as base:
-                        view = base[e["data_ptr"]:e["data_ptr"] + n * w].cast(e["_code"])
-                        try:
-                            for k in range(a, z, STATS_CHUNK):
-                                vals.extend(f(x) for x in view[k:min(z, k + STATS_CHUNK)].tolist())
-                        finally:
-                            view.release()
+                    with SampleView(mm, e["data_ptr"], n, e["_code"]) as view:
+                        for k in range(a, z, STATS_CHUNK):
+                            vals.extend(f(x) for x in view[k:min(z, k + STATS_CHUNK)])
                 out[i] = (e, vals)
         finally:
             mm.close()
@@ -1114,6 +1230,228 @@ def _fmt(x):
     return str(x)
 
 
+# --------------------------------------------------------------------------- self-test
+
+SELF_TEST_CODES = ("b", "h", "i", "q", "e", "f", "d")
+
+
+def _f16_value(u):
+    """IEEE 754 binary16 bit pattern -> float, from the format's definition (neither struct nor cast)."""
+    sign = -1.0 if u & 0x8000 else 1.0
+    e = (u >> 10) & 0x1F
+    m = u & 0x3FF
+    if e == 0x1F:
+        return sign * math.inf if m == 0 else math.copysign(math.nan, sign)
+    if e == 0:
+        return sign * math.ldexp(m, -24)
+    return sign * math.ldexp(m | 0x400, e - 25)
+
+
+def _same_sample(a, b, nan_bits=True):
+    """Equal ints, or floats with equal bits; with nan_bits False two NaNs need only the same sign (a C
+    float-to-double conversion may quiet a signalling NaN where struct keeps its payload)."""
+    if isinstance(a, float) and isinstance(b, float):
+        if not nan_bits and a != a and b != b:
+            return math.copysign(1.0, a) == math.copysign(1.0, b)
+        return struct.pack("<d", a) == struct.pack("<d", b)
+    return type(a) is type(b) and a == b
+
+
+def _same_samples(xs, ys, nan_bits=True):
+    return len(xs) == len(ys) and all(_same_sample(x, y, nan_bits) for x, y in zip(xs, ys))
+
+
+def _pattern_samples(code, rng, n):
+    """n stored samples of `code`: edge bit patterns (zero, all ones, sign bit, max, 1; for floats also
+    +-inf, quiet and signalling NaN, -0.0), then random bytes."""
+    w = raw_width(code)
+    edge = [bytes(w), b"\xff" * w, bytes(w - 1) + b"\x80", b"\xff" * (w - 1) + b"\x7f", b"\x01" + bytes(w - 1)]
+    if code in ("e", "f", "d"):
+        edge += [struct.pack("<" + code, v) for v in (1.0, -2.5, math.inf, -math.inf, math.nan, -0.0)]
+        edge.append({"e": b"\x01\x7c", "f": b"\x01\x00\x80\x7f", "d": b"\x01" + bytes(5) + b"\xf0\x7f"}[code])
+    k = (n - len(edge)) * w
+    return b"".join(edge) + rng.getrandbits(8 * k).to_bytes(k, "little")
+
+
+def _self_test_ld(path, chans):
+    """A minimal .ld from the layout this decoder reads: header, 124-byte channel records, sample arrays."""
+    meta = HEADER_SIZE
+    out = bytearray(meta + len(chans) * ENTRY_BASE)
+    struct.pack_into("<III", out, 0x00, MAGIC, 0, meta)
+    struct.pack_into("<I", out, 0x0C, len(out))
+    struct.pack_into("<I", out, 0x56, len(chans))
+    out[0x05E:0x05E + 10] = b"25/10/2026"
+    out[0x07E:0x07E + 8] = b"12:00:00"
+    for i, c in enumerate(chans):
+        off = meta + i * ENTRY_BASE
+        struct.pack_into("<IIIIHHHHhhhh", out, off, off - ENTRY_BASE if i else 0,
+                         off + ENTRY_BASE if i + 1 < len(chans) else 0, len(out),
+                         len(c["data"]) // c["dtype"], COUNTER_BASE + i, c["dtype_a"], c["dtype"], 100,
+                         c.get("shift", 0), c.get("mul", 1), c.get("scale", 1), c.get("dec", 0))
+        name = c["name"].encode("ascii")
+        out[off + 0x20:off + 0x20 + len(name)] = name
+        out += c["data"]
+    with open(path, "wb") as fh:
+        fh.write(out)
+
+
+def _dump_files(d):
+    files = {}
+    for name in sorted(os.listdir(d)):
+        with open(os.path.join(d, name), "rb") as fh:
+            files[name] = fh.read()
+    return files
+
+
+def self_test():
+    """Sample access (SampleView, both paths, every code), float_sum and an end-to-end decode."""
+    global SAMPLE_ACCESS
+    import random
+    import shutil
+    import tempfile
+    rng = random.Random(20261025)
+    failures = []
+    count = [0]
+
+    def check(ok, what):
+        count[0] += 1
+        if not ok:
+            failures.append(what)
+            print("self-test FAILED: %s" % what)
+
+    # 1. SampleView against struct "<code" over unaligned buffers: every slice shape the callers use and more,
+    #    integer indexing and IndexError, through struct and (where this interpreter allows it) through cast.
+    n = 61
+    marks = [None, 0, 1, 2, 5, n - 5, n - 1, n, n + 3, -1, -4]
+    steps = [None, 1, 2, 3, 7, n - 1, n, n + 1, -1, -3]
+    for code in SELF_TEST_CODES:
+        data = b"\xa5" * 3 + _pattern_samples(code, rng, n) + b"\x5a" * 7
+        ref = list(struct.unpack_from("<%d%s" % (n, code), data, 3))
+        for use_cast in ([False, True] if _cast_ok(code) else [False]):
+            path_name = "cast" if use_cast else "struct"
+            bad = []
+            with SampleView(data, 3, n, code, use_cast=use_cast) as v:
+                check(len(v) == n, "%s view of %r: len %d != %d" % (path_name, code, len(v), n))
+                for a in marks:
+                    for b in marks:
+                        for s in steps:
+                            if not _same_samples(v[a:b:s], ref[a:b:s], nan_bits=not use_cast):
+                                bad.append("[%s:%s:%s]" % (a, b, s))
+                for k in (0, 1, n - 1, -1, -n):
+                    if not _same_sample(v[k], ref[k], nan_bits=not use_cast):
+                        bad.append("[%d]" % k)
+                for k in (n, -n - 1):
+                    try:
+                        v[k]
+                        bad.append("[%d] did not raise IndexError" % k)
+                    except IndexError:
+                        pass
+            check(not bad, "%s view of %r differs from struct at %s" % (path_name, code, " ".join(bad[:8])))
+
+    # 2. Half floats: all 65,536 patterns through struct equal the binary16 definition, whole and strided;
+    #    through cast (Python 3.12+) equal the struct values.
+    halves = struct.pack("<65536H", *range(65536))
+    want = [_f16_value(u) for u in range(65536)]
+    with SampleView(halves, 0, 65536, "e", use_cast=False) as v:
+        whole, strided = v[:], v[5::7]
+    check(_same_samples(whole, want, nan_bits=False), "struct half floats differ from the binary16 definition")
+    check(_same_samples(strided, want[5::7], nan_bits=False), "strided struct half floats differ")
+    if _cast_ok("e"):
+        with SampleView(halves, 0, 65536, "e", use_cast=True) as v:
+            check(_same_samples(v[:], whole, nan_bits=False), "cast and struct half floats differ")
+
+    # 3. float_sum: the compensated sum of CPython 3.12 on every version.
+    cases = [[1.0, 1e100, 1.0, -1e100], [], [-0.0], [-0.0, -0.0], [0.1] * 10, [1e308, 1e308], [1.0, math.nan],
+             [math.inf, -1.0], [2.0 ** -1074] * 3]
+    cases += [[rng.uniform(-1, 1) * 10.0 ** rng.randint(-30, 30) for _ in range(500)] for _ in range(20)]
+    check(float_sum(cases[0], compensated=False) == 2.0, "float_sum: [1, 1e100, 1, -1e100] is not 2.0")
+    check(float_sum([], compensated=False) == 0 and type(float_sum([], compensated=False)) is int,
+          "float_sum of nothing is not int 0")
+    check(_same_sample(float_sum([-0.0], compensated=False), 0.0), "float_sum([-0.0]) is not +0.0")
+    check(float_sum([0.1] * 10, compensated=False) == 1.0, "float_sum: ten 0.1 do not make 1.0")
+    check(float_sum([1e308, 1e308], compensated=False) == math.inf, "float_sum: overflow is not +inf")
+    if _SUM_COMPENSATED:
+        check(all(_same_sample(float_sum(c, compensated=False), sum(c), nan_bits=False) for c in cases),
+              "float_sum differs from this interpreter's compensated sum()")
+
+    # 4. End to end: a .ld with one channel per code decodes to the same JSON, dumps and values through
+    #    struct as through the default access, and the half floats to the binary16 definition.
+    def stored(code, values):
+        return struct.pack("<%d%s" % (len(values), code), *values)
+
+    finite = [rng.uniform(-1, 1) * 10.0 ** rng.randint(-20, 20) for _ in range(1500)]
+    chans = [
+        {"name": "Half", "dtype_a": 0x07, "dtype": 2, "data": halves},
+        {"name": "Half Scaled", "dtype_a": 0x07, "dtype": 2, "data": halves[:6002], "shift": -1, "mul": 3,
+         "scale": 2},
+        {"name": "Single", "dtype_a": 0x07, "dtype": 4,
+         "data": stored("f", [x for x in finite if abs(x) < 1e30] + [math.inf, -math.inf, math.nan, -0.0])},
+        {"name": "Double", "dtype_a": 0x08, "dtype": 8, "data": stored("d", finite + [math.nan, -math.inf])},
+        {"name": "Int8", "dtype_a": 0x00, "dtype": 1, "data": _pattern_samples("b", rng, 300)},
+        {"name": "Int16", "dtype_a": 0x00, "dtype": 2, "data": _pattern_samples("h", rng, 3001), "shift": 3,
+         "mul": 2, "scale": 4, "dec": 1},
+        {"name": "Int32", "dtype_a": 0x03, "dtype": 4, "data": _pattern_samples("i", rng, 2000)},
+        {"name": "Raw64", "dtype_a": 0x00, "dtype": 8, "data": _pattern_samples("q", rng, 999)},
+        # raw_stats sums with float_sum: a left-to-right sum of these makes the mean 0.0 instead of 0.5.
+        {"name": "Cancel", "dtype_a": 0x08, "dtype": 8, "data": stored("d", [1.0, 1e100, 1.0, -1e100])},
+    ]
+    tmp = tempfile.mkdtemp(prefix="ld_ref_decode_selftest_")
+    try:
+        ld = os.path.join(tmp, "codes.ld")
+        _self_test_ld(ld, chans)
+        for max_samples in (0, 1000):
+            got = {}
+            for mode in ("auto", "struct"):
+                SAMPLE_ACCESS = mode
+                for code in SELF_TEST_CODES:
+                    with SampleView(bytes(8), 0, 1, code) as probe:
+                        check((probe._cast is not None) == (mode == "auto" and _cast_ok(code)),
+                              "SAMPLE_ACCESS %r does not choose the %r path" % (mode, code))
+                d = os.path.join(tmp, "%s-%d" % (mode, max_samples))
+                r = decode_file(ld, max_samples=max_samples, dump=["*"] if max_samples == 0 else None, dump_dir=d,
+                                dump_format="both", ldx=False)
+                r.pop("timing_ms", None)
+                got[mode] = (json.dumps(r, sort_keys=True), _dump_files(d) if max_samples == 0 else {},
+                             read_channels(ld, order="afterMul"))
+            SAMPLE_ACCESS = "auto"
+            (ja, fa, va), (js, fs, vs) = got["auto"], got["struct"]
+            check(ja == js, "decode_file JSON differs between the default access and struct (max %d)" % max_samples)
+            check(sorted(fa) == sorted(fs), "the dumps are different files")
+            for name in sorted(set(fa) & set(fs)):
+                if name.endswith(".f64"):
+                    ok = _same_samples(list(struct.unpack("<%dd" % (len(fa[name]) // 8), fa[name])),
+                                       list(struct.unpack("<%dd" % (len(fs[name]) // 8), fs[name])), nan_bits=False)
+                else:
+                    ok = fa[name] == fs[name]
+                check(ok, "dump %s differs between the default access and struct" % name)
+            check(all(_same_samples(list(va[i][1]), list(vs[i][1]), nan_bits=False) for i in range(len(chans))),
+                  "read_channels differs between the default access and struct")
+            res = json.loads(ja)
+            half = res["channels"][0]
+            check(half["sample_type"] == "f16" and half["count"] == 65536, "the Half channel is not 65,536 f16")
+            if max_samples == 0:
+                rs = half["raw_stats"]
+                check(rs["nan"] == 2046 and rs["nonfinite"] == 2048 and rs["min"] == -65504.0
+                      and rs["max"] == 65504.0, "Half statistics: %r" % {k: rs.get(k) for k in
+                                                                       ("nan", "nonfinite", "min", "max")})
+            types = [c["sample_type"] for c in res["channels"]]
+            check(types == ["f16", "f16", "f32", "f64", "i8", "i16", "i32", "raw_i64", "f64"],
+                  "sample types %r" % types)
+            mean = res["channels"][8]["raw_stats"]["mean"]
+            check(mean == 0.5, "the mean of [1, 1e100, 1, -1e100] is %r, not 0.5 (max %d)" % (mean, max_samples))
+        vals = read_channels(ld, indices=[0])[0][1]
+        check(_same_samples(list(vals), want, nan_bits=False), "decoded Half values differ from binary16")
+    finally:
+        SAMPLE_ACCESS = "auto"
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    paths = ", ".join("%s:%s" % (c, "cast" if _cast_ok(c) else "struct") for c in SELF_TEST_CODES)
+    print("ld_ref_decode self-test: %d checks, %d failure(s) (Python %s; default access %s; sum %s)"
+          % (count[0], len(failures), sys.version.split()[0], paths,
+             "builtin compensated" if _SUM_COMPENSATED else "emulated compensated"))
+    return 1 if failures else 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Independent reference decoder for .ld/.ldx (D-041).")
     ap.add_argument("files", nargs="*", help=".ld files to decode")
@@ -1133,7 +1471,11 @@ def main(argv=None):
     ap.add_argument("--no-ldx", action="store_true")
     ap.add_argument("--enum-labels", action="store_true", help="include enum labels in the output")
     ap.add_argument("--list-codes", action="store_true", help="print the warning code table and exit")
+    ap.add_argument("--self-test", action="store_true",
+                    help="check the sample access paths and statistics of this decoder and exit")
     a = ap.parse_args(argv)
+    if a.self_test:
+        return self_test()
     if a.list_codes:
         for k, (sev, d) in sorted(WARNING_CODES.items()):
             print("%s\t%s\t%s" % (k, sev, d))

@@ -13,8 +13,9 @@ Reads <build-dir>/esses_targets.json (written at configure time by cmake/esses_t
   3. the Qt-free set (01 section 2.3: base, units, store, model, formats, analysis, maths, project, plotcore and
      the CLI) is declared Qt-free whenever its targets exist;
   4. a library or executable links only the Qt modules of its layer (01 section 2.2 rule 4): esses_qtmodel Qt
-     Core and Qt Gui (D-161); esses_qtrender and esses-render Qt Gui; esses_widgets and esses Qt Widgets (plus
-     Svg, PrintSupport, OpenGL); every other non-test target none; Qt Concurrent and Qt Sql nowhere (D-031);
+     Core and Qt Gui (D-161); esses_qtrender Qt Gui and Qt Gui's private API (its glyph bin pinning, D-220);
+     esses-render Qt Gui; esses_widgets and esses Qt Widgets (plus Svg, PrintSupport, OpenGL); every other
+     non-test target none; Qt Concurrent and Qt Sql nowhere (D-031);
   5. only esses_widgets and the esses application link the docking library (esses::qtads, the LGPL Qt Advanced
      Docking System as a shared library, D-026, D-153); tests may link what their library links;
   6. esses_qtmodel uses Qt Gui for the undo framework only (D-161): its sources and headers include no Qt Gui
@@ -41,7 +42,7 @@ _WIDGET_MODULES = frozenset({"Core", "Gui", "Widgets", "Svg", "SvgWidgets", "Pri
                              "OpenGLWidgets"})
 QT_MODULES_ALLOWED = {
     "qtmodel": frozenset({"Core", "Gui"}),  # Gui: QUndoStack/QUndoCommand only (D-161, rule 6)
-    "qtrender": frozenset({"Core", "Gui"}),
+    "qtrender": frozenset({"Core", "Gui", "GuiPrivate"}),  # GuiPrivate: src/glyph_bins.cpp only (D-220)
     "render": frozenset({"Core", "Gui"}),
     "widgets": _WIDGET_MODULES,
     "app": _WIDGET_MODULES,
@@ -292,9 +293,11 @@ def self_test() -> int:
         # tests.
         widgets = qt_lib("widgets", 5, ["Qt6::Widgets", "Qt6::Gui", "Qt6::Svg"])
         widgets["privateDeps"] = ["esses::qtads"]
+        qtrender = qt_lib("qtrender", 4, ["Qt6::Gui"])
+        qtrender["privateDeps"] = ["Qt6::GuiPrivate"]  # D-220
         manifest["targets"] = base_targets + [
             qt_lib("qtmodel", 4, ["esses::low", "Qt6::Core", "Qt6::Gui"]),
-            qt_lib("qtrender", 4, ["Qt6::Gui"]),
+            qtrender,
             widgets,
             {"name": "esses_widgets_tst_dock_host", "kind": "test", "layer": None,
              "sourceDir": str(root / "libs" / "a"), "deps": ["esses::widgets", "esses::qtads"], "privateDeps": [],
@@ -302,6 +305,18 @@ def self_test() -> int:
             qt_lib("plotcore", 3, ["esses::low"], qt_free=True)]
         (build / "esses_targets.json").write_text(json.dumps(manifest), encoding="utf-8")
         ok = ok and check(build) == []
+
+        # Negative: Qt Gui's private API is esses_qtrender's alone (D-220), not esses_qtmodel's or esses-render's.
+        manifest["targets"] = base_targets + [
+            qt_lib("qtmodel", 4, ["Qt6::Core", "Qt6::Gui", "Qt6::GuiPrivate"]),
+            {"name": "esses_render", "kind": "executable", "layer": 4, "sourceDir": str(root / "apps" / "render"),
+             "deps": ["Qt6::Gui"], "privateDeps": ["Qt6::GuiPrivate"], "qtFree": False}]
+        (build / "esses_targets.json").write_text(json.dumps(manifest), encoding="utf-8")
+        findings = sorted(check(build))
+        expected_private = sorted([
+            "esses_qtmodel links Qt6::GuiPrivate; its layer allows only Core, Gui (01 section 2.2 rule 4)",
+            "esses_render links Qt6::GuiPrivate; its layer allows only Core, Gui (01 section 2.2 rule 4)"])
+        ok = ok and findings == expected_private
 
         # Negative: the docking library linked by another library and, under ADS's own name, by an executable.
         manifest["targets"] = base_targets + [

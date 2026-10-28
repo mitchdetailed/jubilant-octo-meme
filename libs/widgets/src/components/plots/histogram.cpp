@@ -182,7 +182,7 @@ bool Histogram::handleCommand(const QString& id, const QVariantList& args) {
         if (!prepared()) {
             return false;
         }
-        plots::zoomAboutCursor(context_, inputs(),
+        plots::zoomAboutCursor(*this, inputs(),
                                std::pow(kWheelZoomIn, args.isEmpty() ? 1 : args.front().toInt()));
         return true;
     }
@@ -227,7 +227,7 @@ void Histogram::wheelEvent(QWheelEvent* event) {
     event->accept();
     const int notches = plots::wheelNotches(wheelRemainder_, event->angleDelta().y());
     if (notches != 0) {
-        plots::zoomAboutCursor(context_, inputs(), std::pow(kWheelZoomIn, notches));
+        plots::zoomAboutCursor(*this, inputs(), std::pow(kWheelZoomIn, notches));
     }
 }
 

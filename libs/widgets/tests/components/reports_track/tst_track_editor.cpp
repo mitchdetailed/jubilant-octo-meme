@@ -7,7 +7,9 @@
 // measured here through the editor against the true centreline from tools/gen_track_fixtures.py), Accept
 // writing the file with default sections as one undoable command, user sections (add, from the cursor span,
 // edit, delete, the 10 m minimum refused), regenerating defaults and the track keeping user sections, rename
-// and delete of the track file, the auto-generate project option, a missing Speed+LatG input reported.
+// and delete of the track file, the auto-generate project option, a missing Speed+LatG input reported. The
+// service is the application's (a MathsService and a Dispatcher): its files are read and written on the pool
+// (D-210 (a)), so the file checks wait for the writes to land.
 
 #include "components/reports_track/rt_support.hpp"
 
@@ -18,10 +20,13 @@
 #include <esses/widgets/components/track_editor.hpp>
 
 #include <QCoreApplication>
+#include <QDoubleSpinBox>
+#include <QPushButton>
 #include <QSignalSpy>
 #include <QTableWidget>
 #include <QTest>
 #include <QUndoStack>
+#include <algorithm>
 
 using namespace esses;
 using namespace esses::widgets;
@@ -126,7 +131,7 @@ private Q_SLOTS:
         QCOMPARE(editor.result(), 0); // modeless: Accept writes and never closes it
         QCOMPARE(e.session.undoStack().count(), 1);
         const std::filesystem::path path = e.maps.pathFor(kVenue);
-        QVERIFY(std::filesystem::exists(path));
+        QTRY_VERIFY_WITH_TIMEOUT(std::filesystem::exists(path), 30000);
         const auto map = editor.currentMap();
         QVERIFY(map != nullptr);
         QVERIFY(map->sections.size() >= 7);
@@ -137,12 +142,48 @@ private Q_SLOTS:
         QCOMPARE(editor.sectionsTable()->rowCount(), static_cast<int>(map->sections.size()));
         // Undo removes the file, redo writes it again.
         e.session.undoStack().undo();
-        QVERIFY(!std::filesystem::exists(path));
         QVERIFY(editor.currentMap() == nullptr);
         QCOMPARE(editor.sectionsTable()->rowCount(), 0);
+        QTRY_VERIFY_WITH_TIMEOUT(!std::filesystem::exists(path), 30000);
         e.session.undoStack().redo();
-        QVERIFY(std::filesystem::exists(path));
+        QTRY_VERIFY_WITH_TIMEOUT(std::filesystem::exists(path), 30000);
         QCOMPARE(editor.sectionsTable()->rowCount(), static_cast<int>(map->sections.size()));
+    }
+
+    // Regression (PR #5 review U6, D-217): Apply on the section that ends at the track's end (its end is the
+    // centreline's last distance, no round number) keeps that end: the field shows it rounded, which would
+    // leave the track (refused) or shrink the section. A field edited past the end is kept on the track.
+    void applyKeepsTheBoundTheFieldShows() {
+        EditorWorld e("te-apply-end");
+        TrackEditor editor(e.session, e.w.selection, e.w.maths, e.maps);
+        QVERIFY(generated(editor));
+        editor.accept();
+        const auto map = editor.currentMap();
+        QVERIFY(map != nullptr);
+        const auto last = std::max_element(map->sections.begin(), map->sections.end(),
+                                           [](const auto& a, const auto& b) { return a.endM < b.endM; });
+        QVERIFY(last != map->sections.end());
+        QCOMPARE(last->endM, map->lengthM);
+        const int row = static_cast<int>(last - map->sections.begin());
+        editor.sectionsTable()->setCurrentCell(row, 0);
+        QCOMPARE(editor.endField()->value(),
+                 QString::number(map->lengthM, 'f', editor.endField()->decimals()).toDouble());
+        auto* apply = editor.findChild<QPushButton*>(QStringLiteral("trackEditorApply"));
+        QVERIFY(apply != nullptr);
+        const int before = e.session.undoStack().count();
+        apply->click();
+        QVERIFY2(editor.lastError().isEmpty(), qPrintable(editor.lastError()));
+        QCOMPARE(e.session.undoStack().count(), before + 1);
+        const analysis::TrackSection& kept = editor.currentMap()->sections[static_cast<std::size_t>(row)];
+        QCOMPARE(kept.endM, map->lengthM); // exactly the stored end, not the field's rounding
+        QCOMPARE(kept.startM, last->startM);
+        // An end typed beyond the track is the track's end.
+        editor.sectionsTable()->setCurrentCell(row, 0);
+        editor.endField()->setValue(editor.endField()->maximum());
+        editor.startField()->setValue(editor.startField()->value() - 1.0);
+        apply->click();
+        QVERIFY2(editor.lastError().isEmpty(), qPrintable(editor.lastError()));
+        QVERIFY(editor.currentMap()->sections[static_cast<std::size_t>(row)].endM <= map->lengthM);
     }
 
     void userSectionsPersistAndReload() {
@@ -185,6 +226,7 @@ private Q_SLOTS:
         QVERIFY(!editor.deleteSection(QStringLiteral("nope")));
 
         // AC-M3-04: user sections persist in trackmaps/<venue>.track.json and reload.
+        QTRY_COMPARE_WITH_TIMEOUT(e.maps.pendingIo(), 0, 30000);
         {
             std::vector<std::string> log;
             const auto file = project::TrackMapFile::load(e.maps.pathFor(kVenue), log);
@@ -247,7 +289,9 @@ private Q_SLOTS:
         editor.accept(); // regenerate the track: still there
         QVERIFY(sectionNamed(*editor.currentMap(), "My corner") != nullptr);
 
-        // A write that fails (a folder stands where the file goes): no step to undo or redo.
+        // A write that fails (a folder stands where the file goes): reported when it lands, and its step is
+        // dropped, so there is none to undo or redo (D-203 (n), on the pool since D-210 (a)).
+        QTRY_COMPARE_WITH_TIMEOUT(e.maps.pendingIo(), 0, 30000);
         const auto path = e.maps.pathFor(editor.currentMap()->venue);
         std::error_code ec;
         std::filesystem::remove(path, ec);
@@ -256,11 +300,20 @@ private Q_SLOTS:
         QUndoStack& stack = e.session.undoStack();
         const int count = stack.count();
         const int index = stack.index();
-        QVERIFY(!editor.addSection(QStringLiteral("Blocked"), 20.0, 60.0, QStringLiteral("corner")));
-        QVERIFY(!editor.lastError().isEmpty());
+        QSignalSpy log(&e.maps, &qt::TrackMapService::logMessage);
+        QVERIFY(editor.addSection(QStringLiteral("Blocked"), 20.0, 60.0, QStringLiteral("corner")));
+        QCOMPARE(stack.count(), count + 1);
+        const QUndoCommand* blocked = stack.command(index);
+        QVERIFY(blocked != nullptr);
+        QTRY_VERIFY_WITH_TIMEOUT(blocked->isObsolete(), 30000);
+        QVERIFY(std::any_of(log.begin(), log.end(), [](const QList<QVariant>& line) {
+            return line.at(0).toString().contains(QStringLiteral("could not be written"));
+        }));
+        stack.undo(); // drops the obsolete step without running it
         QCOMPARE(stack.count(), count);
         QCOMPARE(stack.index(), index);
         QVERIFY(!stack.canRedo());
+        QTRY_COMPARE_WITH_TIMEOUT(e.maps.pendingIo(), 0, 30000);
         std::filesystem::remove_all(path, ec);
     }
 
@@ -275,16 +328,16 @@ private Q_SLOTS:
         QVERIFY(e.maps.map(kVenue) == nullptr);
         QVERIFY(e.maps.map("Other Circuit") != nullptr);
         QCOMPARE(e.maps.map("Other Circuit")->venue, std::string("Other Circuit"));
-        QVERIFY(std::filesystem::exists(e.maps.pathFor("Other Circuit")));
+        QTRY_VERIFY_WITH_TIMEOUT(std::filesystem::exists(e.maps.pathFor("Other Circuit")), 30000);
         e.session.undoStack().undo();
         QVERIFY(e.maps.map(kVenue) != nullptr);
         QVERIFY(e.maps.map("Other Circuit") == nullptr);
         QVERIFY(!editor.renameVenue(QString::fromStdString(kVenue)));
         // Delete, undo.
         QVERIFY(editor.deleteMap());
-        QVERIFY(!std::filesystem::exists(e.maps.pathFor(kVenue)));
+        QTRY_VERIFY_WITH_TIMEOUT(!std::filesystem::exists(e.maps.pathFor(kVenue)), 30000);
         e.session.undoStack().undo();
-        QVERIFY(std::filesystem::exists(e.maps.pathFor(kVenue)));
+        QTRY_VERIFY_WITH_TIMEOUT(std::filesystem::exists(e.maps.pathFor(kVenue)), 30000);
         // "Auto-generate on open": the project option, one command.
         QVERIFY(editor.autoGenerateOnOpen()); // the default
         const int before = e.session.undoStack().index();

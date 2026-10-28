@@ -339,12 +339,15 @@ private Q_SLOTS:
             QVERIFY(QTest::qWaitFor([&] { return w.distanceReady(src); }, 30000));
         }
         w.view->setCursor(c.cursor, qt::CursorSource::Programmatic);
-        ValuesList list(withBody(valuesListSpec({}, {}, 0, "5c3f1a52-8d7e-4b8e-9a51-0c6d2f4e7a10"), c.body),
-                        *w.context);
-        list.resize(c.size);
-        list.show();
-        QVERIFY(QTest::qWaitForWindowExposed(&list));
-        qt::ValuesModel& m = list.model();
+        // Placed as a worksheet places it (showPlaced): as a window of its own, main_only_fixed (280 x 70)
+        // was held at its table's minimum on macOS (280 x 90).
+        QWidget host;
+        auto* list = new ValuesList(
+            withBody(valuesListSpec({}, {}, 0, "5c3f1a52-8d7e-4b8e-9a51-0c6d2f4e7a10"), c.body), *w.context,
+            &host);
+        QVERIFY(showPlaced(host, *list, c.size));
+        QCOMPARE(list->size(), c.size);
+        qt::ValuesModel& m = list->model();
         QTRY_VERIFY_WITH_TIMEOUT(settled(m, c.reference.has_value()), 30000);
         QTest::qWait(1);
 
@@ -361,9 +364,9 @@ private Q_SLOTS:
             // (1 + 0.3 sin(pi / 2)) = 54.1667 m/s = 195.0 km/h.
             QCOMPARE(m.cellText(0, qt::ValuesModel::MainCol), QStringLiteral("50"));
             QCOMPARE(m.cellText(1, qt::ValuesModel::MainCol), QStringLiteral("195.0"));
-            QVERIFY(list.table().horizontalHeader()->isHidden());
-            QVERIFY(list.table().isColumnHidden(qt::ValuesModel::DeltaCol));
-            QVERIFY(list.table().isColumnHidden(qt::ValuesModel::UnitCol));
+            QVERIFY(list->table().horizontalHeader()->isHidden());
+            QVERIFY(list->table().isColumnHidden(qt::ValuesModel::DeltaCol));
+            QVERIFY(list->table().isColumnHidden(qt::ValuesModel::UnitCol));
         }
         if (c.name == QLatin1String("corr_speed_delta")) {
             // By hand: Corr Speed follows the faster wheel (FL); at 20 s of the 48 s lap u = 5/12, so 2000 m
@@ -374,9 +377,9 @@ private Q_SLOTS:
         }
         checkText(repoRoot() / "tests" / "golden" / "tables" / "values_list" /
                       (c.name.toStdString() + ".json"),
-                  tableJson(c.name, m, list.table()));
+                  tableJson(c.name, m, list->table()));
         for (const qreal dpr : {1.0, 2.0}) {
-            checkPixels(c.name, dpr, list.renderToImage(dpr), list.renderToImage(dpr));
+            checkPixels(c.name, dpr, list->renderToImage(dpr), list->renderToImage(dpr));
         }
         writeManifest();
     }

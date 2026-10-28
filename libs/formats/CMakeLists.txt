@@ -126,6 +126,24 @@ if(TARGET ${ESSES_PREFIX}_formats_text_tests)
                              "ESSES_TEST_REPO_ROOT=\"${CMAKE_SOURCE_DIR}\"")
 endif()
 
+# M4 (D-206, docs/milestones/M4.md section 3): the M4 packages' tests, one Catch2 executable over tests/m4/**
+# (formats_m4.<test>), so the budget package (resident_estimate) and the reload package (source_file_check,
+# the providers' changed-file checks) add files without editing this list. Test names start with the package
+# key ("budget: ...", "reload: ...", "m4 contract: ...").
+file(GLOB_RECURSE _esses_formats_m4_tests CONFIGURE_DEPENDS
+     "${CMAKE_CURRENT_SOURCE_DIR}/tests/m4/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/tests/m4/*.hpp")
+esses_add_test(formats_m4_tests QT_FREE TIMEOUT 900
+  SOURCES ${_esses_formats_m4_tests}
+  DEPS
+    esses::formats
+    esses::nlohmann_json)
+if(TARGET ${ESSES_PREFIX}_formats_m4_tests)
+  target_include_directories(${ESSES_PREFIX}_formats_m4_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src"
+                             "${CMAKE_CURRENT_SOURCE_DIR}/tests")
+  target_compile_definitions(${ESSES_PREFIX}_formats_m4_tests PRIVATE
+                             "ESSES_TEST_REPO_ROOT=\"${CMAKE_SOURCE_DIR}\"")
+endif()
+
 find_package(Python3 3.8 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND AND TARGET ${ESSES_PREFIX}_formats_ld_tests)
   add_test(NAME formats_ld.oracle_synthetic
@@ -134,6 +152,12 @@ if(Python3_Interpreter_FOUND AND TARGET ${ESSES_PREFIX}_formats_ld_tests)
                    --oracle "${CMAKE_SOURCE_DIR}/tools/ld_ref_decode.py"
                    --work "${CMAKE_CURRENT_BINARY_DIR}/oracle-synthetic")
   set_tests_properties(formats_ld.oracle_synthetic PROPERTIES LABELS "unit;oracle-synthetic" TIMEOUT 600)
+  # The oracle's own checks, on whichever Python CMake found (3.8 or later): its struct and memoryview.cast
+  # sample paths agree for every code (cast takes half floats only from 3.12), float_sum, and a decode of a
+  # file with every code through both paths.
+  add_test(NAME formats_ld.oracle_self_test
+           COMMAND "${Python3_EXECUTABLE}" -I "${CMAKE_SOURCE_DIR}/tools/ld_ref_decode.py" --self-test)
+  set_tests_properties(formats_ld.oracle_self_test PROPERTIES LABELS "unit;oracle-synthetic" TIMEOUT 300)
   add_test(NAME lint.check_ld_codes
            COMMAND "${Python3_EXECUTABLE}" -I "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_ld_codes.py"
                    --root "${CMAKE_SOURCE_DIR}")

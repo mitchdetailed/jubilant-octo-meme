@@ -56,7 +56,10 @@ public:
     // either list holds a Clear.
     QRegion dynamicDamage(const plot::DrawList& before, const plot::DrawList& after) const;
     // paintEvent: blit the exposed part of the Static image, then paint the Dynamic and Chrome lists, all
-    // clipped to `exposed` (logical pixels; an empty region paints nothing).
+    // clipped to `exposed` (logical pixels; an empty region paints nothing). At a fractional DPR the
+    // painter's device origin may fall inside a device pixel; every layer is then painted from the nearest
+    // whole device pixel, where the raster engine blits the Static image, so the widget shows composite()
+    // pixel for pixel (M4 hidpi, D-209).
     void paint(QPainter& widgetPainter, const QRegion& exposed) const;
     // The current composite (Static image, Dynamic and Chrome lists) as a DPR-tagged image of deviceSize(),
     // transparent where nothing is painted: Print to Clipboard of the component's current layers (04 section

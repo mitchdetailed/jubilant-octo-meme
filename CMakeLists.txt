@@ -16,6 +16,9 @@ option(ESSES_BUILD_TESTS "Build the Catch2 test executables and enable ctest" ON
 option(ESSES_BUILD_BENCH "Build Google Benchmark targets (phase B: not vendored yet)" OFF)
 option(ESSES_BUILD_FUZZ "Build libFuzzer targets (Clang only)" OFF)
 option(ESSES_BUILD_PLUGINS "Build plugins/ and sdk/ (v1.0)" OFF)
+# Diagnostic probes (D-220): Qt Test executables outside the suites that report what they measure (ctest label
+# probe); built only on request, as by the manually dispatched workflow probe.yml. Needs ESSES_BUILD_QT and tests.
+option(ESSES_BUILD_PROBES "Build the diagnostic probes (ctest label probe; with the Qt layers and tests)" OFF)
 option(ESSES_WARNINGS_AS_ERRORS "Treat warnings as errors (ON in the ci-* presets only)" OFF)
 option(ESSES_ENABLE_CLANG_TIDY "Run clang-tidy on Qt-free targets" OFF)
 option(ESSES_LTO "Interprocedural optimisation" OFF)
@@ -85,6 +88,12 @@ include(qt-free-check)    # deferred configure-time check over every QT_FREE tar
 if(ESSES_BUILD_QT)
   # Qt is found only here; with ESSES_BUILD_QT=OFF there is no find_package(Qt6) at all (D-007).
   find_package(Qt6 6.7 REQUIRED COMPONENTS Core Gui Widgets Svg PrintSupport Test)
+  # Qt Gui's private API, for esses_qtrender's glyph bin pinning (D-220). From Qt 6.9 the private modules are
+  # packages of their own; found here, so Qt6::GuiPrivate is defined wherever esses_qtrender (a static library
+  # that hands its link on) is linked.
+  if(Qt6_VERSION VERSION_GREATER_EQUAL 6.9)
+    find_package(Qt6 REQUIRED COMPONENTS GuiPrivate)
+  endif()
   message(STATUS "Qt ${Qt6_VERSION} from ${Qt6_DIR}")
   include(qtads)          # esses::qtads, the docking library (shared, LGPL), when ESSES_DOCK_BACKEND is "ads"
 endif()
@@ -127,14 +136,23 @@ if(ESSES_BUILD_QT)
     endif()
   endforeach()
   # Qt Test suites that span the Qt layers (07 section 4.2: tests/ui walkthrough, F9, render parity; tests/golden
-  # pixel goldens). Added after every library and application so their targets exist.
+  # pixel goldens; M4: tests/soak, the Saturday soak of 07 section 7.1, added when the soak package creates it,
+  # D-206). Added after every library and application so their targets exist.
   if(ESSES_BUILD_TESTS)
-    foreach(_esses_qt_test_dir tests/ui tests/golden)
+    foreach(_esses_qt_test_dir tests/ui tests/golden tests/soak)
       if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_esses_qt_test_dir}/CMakeLists.txt")
         add_subdirectory(${_esses_qt_test_dir})
       endif()
     endforeach()
   endif()
+endif()
+# M4 (D-212): tools/packaging/ (every install rule, windeployqt, the Inno Setup installer, the portable zip, the
+# AppImage and DMG scripts, the third-party manifest; 07 section 7.1 "Packaging", 08 sections 2 and 7). Added with
+# and without the Qt layers (D-216 (c)): a Qt-free tree installs the command-line tool, the data, the notices and
+# the user guide, which the lint job stages and scans for vendor marks (AC-M4-08); the application's rules apply
+# when its targets exist.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/packaging/CMakeLists.txt")
+  add_subdirectory(tools/packaging)
 endif()
 
 # bench/: the budget benchmarks (07 section 12): the Qt ones of M1 (plot_bench, open_bench, AC-M1-02/03) with the

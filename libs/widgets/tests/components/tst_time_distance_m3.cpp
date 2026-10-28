@@ -15,6 +15,7 @@
 
 #include "components/component_test_support.hpp"
 #include "components/plots_test_support.hpp"
+#include "m4_followups/legacy_csv_support.hpp"
 
 #include <esses/analysis/rule_runner.hpp>
 #include <esses/base/hash.hpp>
@@ -556,10 +557,10 @@ private Q_SLOTS:
         QVERIFY(waitQuiet(g));
         Sink sink;
         QVERIFY(g.exportData(sink, ExportOptions{}));
-        const QList<QByteArray> lines = sink.data.trimmed().split('\n');
-        QVERIFY(lines.size() >= 100); // 2 s at 50 Hz
-        QVERIFY(lines.front().contains("Wheel Speed FL"));
-        QVERIFY(lines.front().contains("Throttle"));
+        // The legacy dialect (M4, D-211 (d)): the names row after the metadata, 2 s at 50 Hz of data.
+        const QList<QByteArray> lines = legacycsv::lines(sink.data);
+        QCOMPARE(lines.size(), legacycsv::kLinesBeforeData + 100);
+        QCOMPARE(lines[legacycsv::kNamesRow], QByteArray("\"Time\",\"Wheel Speed FL\",\"Throttle\""));
     }
 
     // Tooltips: annotations from the Main source's sidecar, device events and status rows.

@@ -466,6 +466,35 @@ private Q_SLOTS:
         QCOMPARE(f.selection.snapshot().main.src, f.a->id);
     }
 
+    // closeSource given a reference into the source it closes, whose last owner is the selection (D-219: an
+    // emitter's own id, the soak's heap-use-after-free): the id is read after sources_ let go of the source,
+    // so it is copied first. The source frees into overwritten storage: a read of the dead id would miss its
+    // filter.
+    void closeSourceOfAReferenceIntoTheClosedSource() {
+        Fixture f;
+        std::shared_ptr<const model::DataSource> a = quarantinedCopy(*f.a);
+        const model::SourceId id = a->id;
+        f.selection.sourcePublished(a);
+        f.selection.sourcePublished(f.b);
+        f.selection.setMain(f.lapA(2));
+        FilterSpec laps;
+        laps.kind = FilterSpec::Kind::LapNumbers;
+        laps.laps = "1-2";
+        f.selection.setFilter(id, laps);
+        QCOMPARE(f.selection.filter(id), laps);
+        const model::DataSource* raw = a.get();
+        a.reset(); // the selection holds the only owner
+        f.selection.closeSource(raw->id);
+        QVERIFY(f.selection.source(id) == nullptr);
+        QCOMPARE(f.selection.filter(id), FilterSpec{}); // its own filter left with it
+        QCOMPARE(f.selection.snapshot().main.src, f.b->id);
+        checkInvariants(f.selection);
+        // The close was parked under the right id: a reload of the file gives the filter and Main back.
+        f.selection.sourceReloaded(id, f.a);
+        QCOMPARE(f.selection.filter(id), laps);
+        QCOMPARE(f.selection.snapshot().main, f.lapA(2));
+    }
+
     // restore: by (hash, layer, groupPath, startMarker), else (path, layer, groupPath, name); drops the rest.
     void restoreRoundTripsTheKeys() {
         Fixture f;

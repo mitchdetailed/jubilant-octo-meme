@@ -200,7 +200,10 @@ void MathsService::replaceSource(std::shared_ptr<const model::DataSource> source
     prefetchSource(source->id);
 }
 
-void MathsService::removeSource(const model::SourceId& source) {
+void MathsService::removeSource(const model::SourceId& sourceRef) {
+    // A copy: `sourceRef` may be a member of the DataSource being removed, whose owners (the sources map and
+    // the graphs) go below before the last use of the id.
+    const model::SourceId source = sourceRef;
     if (impl_->sources.erase(source) == 0) {
         return;
     }

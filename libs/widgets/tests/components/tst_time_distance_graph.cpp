@@ -681,6 +681,22 @@ private Q_SLOTS:
         QCOMPARE(g.layout().bounds.w, static_cast<float>(std::lround(900 * dpr)));
     }
 
+    // M4: a size the 30 Hz throttle still holds is an input the Static layer does not show yet; the image of
+    // the size before is not up to date (staticUpToDate, cmptest::checkQueuedSizeIsNotUpToDate).
+    void queuedSizeIsNotUpToDate() {
+        World w;
+        const auto a = w.publish(SourceOptions{});
+        selectMain(w, lapRef(*a, 1));
+        Rig rig(w, timeDistanceSpec({{"Throttle"}}));
+        TimeDistanceGraph& g = *rig.graph;
+        QVERIFY(waitQuiet(g));
+        QTRY_VERIFY(!g.sizeThrottleActive());
+        checkQueuedSizeIsNotUpToDate(
+            g, [&g] { return g.staticBuildsSubmitted(); },
+            [&g] { return g.staticBuildShown() == g.staticBuildsSubmitted(); }, QSize(600, 300),
+            QSize(700, 350));
+    }
+
     // 04 section 7.2 item 9: Print to Clipboard paints the current layers; another DPR scales Static.
     void renderToImageUsesCurrentLayers() {
         World w;

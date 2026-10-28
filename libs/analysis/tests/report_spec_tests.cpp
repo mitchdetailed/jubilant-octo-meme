@@ -64,7 +64,7 @@ TEST_CASE("report_spec: the channel_report example body reads, writes and round-
     CHECK(spec->scope == ReportScope::SelectedRanges);
     CHECK(spec->headers == std::vector<std::string>{"Outings:Laps"});
     REQUIRE(spec->channels.size() == 1);
-    CHECK(spec->channels[0] == ReportChannel{"Corr Speed", {ReportStat::Max, ReportStat::Avg}});
+    CHECK(spec->channels[0] == ReportChannel{"Corr Speed", {ReportStat::Max, ReportStat::Avg}, ""});
     CHECK(spec->options == ReportOptions{});
     const Result<ReportSpec> again = ReportSpec::fromJson(spec->toJson());
     REQUIRE(again.ok());
@@ -74,9 +74,9 @@ TEST_CASE("report_spec: the channel_report example body reads, writes and round-
     custom.scope = ReportScope::AllOutings;
     custom.headers = {"Driver", "Outings:Laps:Track Sections:Default:Corners", "Outings:Laps"};
     custom.channels = {
-        ReportChannel{"Brake Pres", {ReportStat::AbsMax, ReportStat::Delta, ReportStat::StdDev}},
-        ReportChannel{"Gear", {}}};
-    custom.options = ReportOptions{true, true, true, 2.5, true};
+        ReportChannel{"Brake Pres", {ReportStat::AbsMax, ReportStat::Delta, ReportStat::StdDev}, ""},
+        ReportChannel{"Gear", {}, ""}};
+    custom.options = ReportOptions{true, true, true, 2.5, true, true};
     const Result<ReportSpec> back = ReportSpec::fromJson(custom.toJson());
     REQUIRE(back.ok());
     CHECK(*back == custom);
@@ -101,6 +101,32 @@ TEST_CASE("report_spec: a wrong member is Invalid with its pointer", "[unit]") {
     CHECK(failure(R"({"options": {"probeSeconds": -1}})") == "/options/probeSeconds");
     CHECK(failure(R"({"channels": [{"name": 7}]})") == "/channels/0/name");
     CHECK(failure(R"([1, 2])").empty());
+}
+
+// M3 item 25 (D-210 (c)): "ignore interpolated data" is options.ignoreInterpolated, false when absent and
+// written only when true, so the M3 bodies (the schema example, the shipped workbook) read and write back
+// unchanged.
+TEST_CASE("report_spec: options.ignoreInterpolated reads, writes only when set and checks its type",
+          "[unit]") {
+    const Result<ReportSpec> on = ReportSpec::fromJson(doc(R"({"options": {"ignoreInterpolated": true}})"));
+    REQUIRE(on.ok());
+    CHECK(on->options.ignoreInterpolated);
+    CHECK_FALSE(on->options.interpolateBoundaries);
+    const nlohmann::json written = jsonio::fromDoc(on->toJson());
+    CHECK(written.at("options").at("ignoreInterpolated") == true);
+    const Result<ReportSpec> back = ReportSpec::fromJson(on->toJson());
+    REQUIRE(back.ok());
+    CHECK(*back == *on);
+
+    const Result<ReportSpec> off = ReportSpec::fromJson(doc(R"({"options": {"ignoreInterpolated": false}})"));
+    REQUIRE(off.ok());
+    CHECK(*off == ReportSpec{});
+    CHECK_FALSE(jsonio::fromDoc(off->toJson()).at("options").contains("ignoreInterpolated"));
+
+    const Result<ReportSpec> wrong = ReportSpec::fromJson(doc(R"({"options": {"ignoreInterpolated": 1}})"));
+    REQUIRE_FALSE(wrong.ok());
+    CHECK(wrong.error().code == ErrorCode::Invalid);
+    CHECK(detailOf(wrong.error()) == "/options/ignoreInterpolated");
 }
 
 TEST_CASE("report_spec: the time_report example body and its errors", "[unit]") {

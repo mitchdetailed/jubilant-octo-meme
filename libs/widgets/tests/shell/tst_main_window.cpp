@@ -43,6 +43,7 @@
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDockWidget>
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QFile>
@@ -658,6 +659,65 @@ private Q_SLOTS:
             rt->cache().setBudgetBytes(std::size_t{128} << 20);
         }
         rt->shutdown();
+    }
+
+    // Regression (PR #5 CI, Qt 6.12: SIGSEGV in ~QDockWidget from ~MainWindow; D-217): the QDockWidget frames
+    // and the tab bars of tabbed docks belong to QMainWindow's layout, which keeps raw pointers to both, so
+    // none of them is destroyed while that layout lives. The case that crashed: a dock newer than the tab bar
+    // of its group (added later into a tabbed area, or floated and docked back), so that a one-by-one
+    // deletion in creation order removed the tab bar before the dock that still used it.
+    void dockFramesGoAfterTheMainWindowLayout() {
+        const QByteArray previous = qgetenv("ESSES_DOCK_BACKEND");
+        qputenv("ESSES_DOCK_BACKEND", "qdockwidget");
+        QTemporaryDir config;
+        auto rt = runtime();
+        int frames = 0;
+        int tabBars = 0;
+        int beforeTheLayout = 0;
+        bool contentGone = false;
+        {
+            auto w = std::make_unique<MainWindow>(*rt, pathsFor(config.path()));
+            w->setSaveLayoutOnExit(false);
+            QCOMPARE(QString::fromLatin1(w->docks().backend().name()), QStringLiteral("qdockwidget"));
+            QVERIFY(showAndActivate(*w));
+            auto* content = new QLineEdit;
+            const QPointer<QLineEdit> watched(content);
+            w->docks().addDock(QStringLiteral("test.late"), QStringLiteral("Late"), content, DockArea::Left,
+                               DockState::Docked); // tabbed with Data and Channels, whose tab bar is older
+            w->docks().setState(QStringLiteral("test.late"), DockState::Floating);
+            QTRY_VERIFY(w->docks().windowOf(QStringLiteral("test.late")) != w.get());
+            w->docks().setState(QStringLiteral("test.late"), DockState::Docked);
+            QTRY_COMPARE(w->docks().windowOf(QStringLiteral("test.late")), static_cast<QWidget*>(w.get()));
+            QWidget* window = w.get();
+            for (QWidget* kid : w->findChildren<QWidget*>(Qt::FindDirectChildrenOnly)) {
+                const bool frame = qobject_cast<QDockWidget*>(kid) != nullptr;
+                const bool bar = qobject_cast<QTabBar*>(kid) != nullptr;
+                if (!frame && !bar) {
+                    continue;
+                }
+                frames += frame ? 1 : 0;
+                tabBars += bar ? 1 : 0;
+                // `window` is inside its own destruction here; QWidget::layout() reads QWidget's own state.
+                connect(kid, &QObject::destroyed, [window, &beforeTheLayout](QObject*) {
+                    beforeTheLayout += window->layout() != nullptr ? 1 : 0;
+                });
+            }
+            connect(content, &QObject::destroyed, [window, &contentGone](QObject*) {
+                contentGone = window->layout() != nullptr; // a dock's content goes before the models
+            });
+            QVERIFY(watched != nullptr);
+            w.reset();
+        }
+        if (previous.isEmpty()) {
+            qunsetenv("ESSES_DOCK_BACKEND");
+        } else {
+            qputenv("ESSES_DOCK_BACKEND", previous);
+        }
+        rt->shutdown();
+        QVERIFY(frames >= 7); // the six shell docks and the late one
+        QVERIFY(tabBars >= 1);
+        QCOMPARE(beforeTheLayout, 0);
+        QVERIFY(contentGone);
     }
 };
 

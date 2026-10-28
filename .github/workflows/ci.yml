@@ -3,7 +3,11 @@
 #
 # CI (08_REPO_AND_BUILD.md section 4). Jobs: core (3 OSes, no Qt), lint, sanitize, fuzz-smoke (plus an MSVC
 # variant) and, from M1 (D-150), qt-app: Windows and Linux on every pull request and push, macOS nightly and on
-# manual dispatch only, never merge-blocking (D-124, 08 section 4.4). The benchmarks are in bench.yml (D-042).
+# manual dispatch only, never merge-blocking (D-124, 08 section 4.4). The benchmarks are in bench.yml (D-042), with
+# the Saturday soak of M4 (AC-M4-03, its job `soak`, nightly); the packages are package.yml's (D-212). M4 (D-216):
+# core runs the esses-cli golden tests as a step of their own (`ctest -L cli`, AC-M4-01 item 11), qt-app the Saturday
+# walkthrough (ui.tst_walkthrough_saturday, AC-M4-01 items 1-10) and leaves the soak out (`-LE soak`), lint stages
+# the release tree of the Qt-free build and scans it for vendor marks (AC-M4-08) and runs a pinned `reuse lint`.
 # The build itself uses only code vendored in third_party/ (pugixml, xxHash, nlohmann-json, json-schema-validator,
 # CLI11, fast_float, Catch2 v3 and, in qt-app, the Qt Advanced Docking System built as a shared library through its
 # own CMake project; see third_party/README.md); CI fetches nothing but the toolchain (actions, apt packages, the
@@ -54,18 +58,28 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
         with: { submodules: false } # fixtures/private only when the deploy-key secret exists (section 4.5)
-      - uses: lukka/get-cmake@latest # CMake and Ninja
-      - uses: ilammy/msvc-dev-cmd@v1 # no-op outside Windows
+      - uses: lukka/get-cmake@v3.31.6 # CMake and Ninja (as package.yml)
+      - uses: ilammy/msvc-dev-cmd@v1.13.0 # no-op outside Windows
       - name: Configure (ESSES_BUILD_QT=OFF, no Qt on the runner)
         run: cmake --preset ${{ matrix.preset }}
       - name: Build
+        id: build
         run: cmake --build --preset ${{ matrix.preset }}
       # Includes the DrawList JSON goldens of the M1 worksheet cases, the strict cross-platform half of AC-M1-04
       # (plotcore.*, tests/golden/drawlist/), and the BeaconPairRule laps goldens of AC-M1-07 (fixtures.laps_golden).
+      # Everything but the label cli, which the next step runs.
       - name: Test
-        run: ctest --preset ${{ matrix.preset }} --parallel 4
+        shell: bash
+        run: ctest --preset ${{ matrix.preset }} --parallel 4 -LE '^cli$'
+      # AC-M4-01 item 11 (D-214): the golden-JSON test of each esses-cli subcommand (cli.golden.info, channels, laps,
+      # eval, convert, export, validate, fixture) with the earlier cli.* entries; ctest runs fixtures.generate_inputs
+      # first for those that need the generated inputs. It runs even when the step above failed.
+      - name: esses-cli golden tests (AC-M4-01 item 11, ctest -L cli)
+        if: always() && steps.build.outcome == 'success'
+        shell: bash
+        run: ctest --preset ${{ matrix.preset }} --parallel 4 -L '^cli$'
       # ctest above already ran fixtures.generate_inputs and fixtures.verify_public; this step repeats the fixture
       # verification visibly (AC-M0-01..03). The synthetic inputs are generated, not committed (05 section 9.1).
       - name: Fixture corpus (AC-M0-01..03)
@@ -87,7 +101,7 @@ jobs:
       # A DrawList golden mismatch writes <case>@<dpr>x.actual.json next to the test binary (libs/plotcore/README.md).
       - name: Upload DrawList golden diffs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: drawlist-diffs-${{ matrix.os }}
           path: |
@@ -132,16 +146,26 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.qt-matrix.outputs.include) }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    # 60, not 45: M4 adds the Saturday walkthrough (about 3 minutes in MSVC Debug on the reference machine) and the
+    # other M4 suites to the MSVC Debug run, whose shell suites already take several minutes each.
+    timeout-minutes: 60
     env:
       QT_QPA_PLATFORM: offscreen
       ESSES_TEST_FONT_DIR: ${{ github.workspace }}/tests/golden/fonts # Noto Sans only (D-127)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
         with: { submodules: false }
-      - uses: lukka/get-cmake@latest
+      - uses: lukka/get-cmake@v3.31.6
+      # On Windows, aqtinstall's parallel 7-Zip processes (--external 7z, below) can race to create the kit's folder
+      # ("Cannot create output directory : ... already exists", package.yml's first run on PR #5; D-217):
+      # .github/aqt-settings.ini (AQT_CONFIG) gives aqtinstall one worker there. A failed first install still gets a
+      # second try over what it left.
       - name: Install Qt ${{ env.QT_VERSION }} (aqtinstall)
-        uses: jurplel/install-qt-action@v4 # sets QT_ROOT_DIR, puts the kit's bin on PATH (08 section 3.7.5)
+        id: qt
+        continue-on-error: true # a second try follows (D-217)
+        uses: jurplel/install-qt-action@v4.1.1 # sets QT_ROOT_DIR, puts the kit's bin on PATH (08 section 3.7.5)
+        env:
+          AQT_CONFIG: ${{ runner.os == 'Windows' && format('{0}/.github/aqt-settings.ini', github.workspace) || '' }}
         with:
           version: ${{ env.QT_VERSION }}
           arch: ${{ matrix.qtarch }}
@@ -152,6 +176,18 @@ jobs:
           # aqtinstall #995; fixed upstream in py7zr 329b83de, not released yet). On Windows, extract with the
           # 7-Zip preinstalled on the runner instead, the action's documented example for this.
           extra: ${{ runner.os == 'Windows' && '--external 7z' || '' }}
+      - name: Install Qt ${{ env.QT_VERSION }} (aqtinstall, second try)
+        if: steps.qt.outcome == 'failure'
+        uses: jurplel/install-qt-action@v4.1.1
+        env:
+          AQT_CONFIG: ${{ runner.os == 'Windows' && format('{0}/.github/aqt-settings.ini', github.workspace) || '' }}
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: ${{ matrix.qtarch }}
+          cache: true
+          aqtsource: ${{ env.AQT_SOURCE }}
+          py7zrversion: "==1.1.3"
+          extra: ${{ runner.os == 'Windows' && '--external 7z' || '' }}
       # libxcb1-dev: ADS includes <xcb/xcb.h> and links libxcb on Linux (its floating windows talk to X11 when the
       # platform is xcb; offscreen they do not). Its other Linux need, Qt6::GuiPrivate (Qt 6.9+), is in the kit.
       - name: Qt build and runtime dependencies (Linux)
@@ -160,13 +196,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libgl-dev libegl-dev libglx-dev libopengl-dev \
             libxkbcommon-dev libfontconfig1-dev libfreetype-dev libdbus-1-3 libxcb1-dev
-      - uses: ilammy/msvc-dev-cmd@v1 # no-op outside Windows
+      - uses: ilammy/msvc-dev-cmd@v1.13.0 # no-op outside Windows
       # The kit comes from install-qt-action; on Windows this overrides the local C:/Qt kit of ci-win-msvc-qt.
       - name: Configure (ESSES_BUILD_QT=ON)
         id: configure
         shell: bash
         run: cmake --preset ${{ matrix.preset }} -DCMAKE_PREFIX_PATH="${QT_ROOT_DIR//\\//}"
       - name: Build
+        id: build
         run: cmake --build --preset ${{ matrix.preset }}
       - name: Docking library beside the executables (D-026, 08 section 3.7.5)
         shell: bash
@@ -174,8 +211,19 @@ jobs:
           bin=build/${{ matrix.preset }}/bin
           ls "$bin" | grep -E '^(lib)?qtadvanceddocking-qt6d?[.0-9]*\.(dll|so|dylib)' \
             || { echo "::error::the ADS shared library is not in $bin"; exit 1; }
+      # Every test but the soak (label soak: soak.tst_saturday, about 5.5 minutes in MSVC Debug; it is bench.yml's
+      # soak job, nightly under ASan + UBSan; its guard's tests, soak.guard, stay here) and the walkthrough, which the
+      # next step runs (D-216 (b)).
       - name: Test (offscreen)
-        run: ctest --preset ${{ matrix.preset }} --parallel 4
+        shell: bash
+        run: ctest --preset ${{ matrix.preset }} --parallel 4 -LE '^soak$' -E '^ui\.tst_walkthrough_saturday$'
+      # AC-M4-01 items 1-10 and the offscreen demo of 07 section 7.5 (D-214): one test function per item, so a
+      # failure names the item; required with qt-app on Windows and Linux, nightly on macOS. It runs even when the
+      # step above failed.
+      - name: Saturday walkthrough (AC-M4-01 items 1-10, ui.tst_walkthrough_saturday)
+        if: always() && steps.build.outcome == 'success'
+        shell: bash
+        run: ctest --preset ${{ matrix.preset }} -R '^ui\.tst_walkthrough_saturday$'
       # The lint job's layering check sees only the Qt-free targets (ESSES_BUILD_QT=OFF); this one adds the Qt layers
       # and their allowed Qt modules (01 section 2.2 rule 4).
       - name: Layering with the Qt layers (01 section 2.3)
@@ -187,7 +235,7 @@ jobs:
       # The ubuntu renders are uploaded on every run, so new pixel goldens can be taken from a passing run too.
       - name: Upload golden diffs
         if: failure() || matrix.os == 'ubuntu-24.04'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: golden-diffs-${{ matrix.os }}
           path: |
@@ -205,13 +253,14 @@ jobs:
     # about a fifth more tidied units (154 -> 185) plus their tests; it grows with every library.
     timeout-minutes: 75
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
         with: { fetch-depth: 0 }
-      - uses: lukka/get-cmake@latest
-      # The same LLVM release as the maintainer's machine (Visual Studio 2022's bundled LLVM 19.1.5, AGENTS.md section
-      # 4): clang-format 18 and 19 lay out some constructs differently, so a tree formatted locally failed here with 18.
-      # Exact PyPI wheels; clang-tidy falls back, with a warning, to the newest 19.1.x of LLVM's apt repository when
-      # its wheel is missing or cannot compile a standard header. CLANG_FORMAT and CLANG_TIDY carry absolute paths.
+      - uses: lukka/get-cmake@v3.31.6
+      # LLVM 19.1.5, the release the tree is formatted for (AGENTS.md section 4): clang-format 18 and 19 lay out some
+      # constructs differently (`struct stat st {}` against `st{}`: PR #5's first run, D-217), so a local check runs
+      # 18.1.7 and 22.1.3 and keeps only forms both accept. Exact PyPI wheels; clang-tidy falls back, with a warning, to
+      # the newest 19.1.x of LLVM's apt repository when its wheel is missing or cannot compile a standard header.
+      # CLANG_FORMAT and CLANG_TIDY carry absolute paths.
       - name: Install LLVM tools (clang-format and clang-tidy 19.1.5)
         shell: bash
         run: |
@@ -256,8 +305,18 @@ jobs:
         run: python3 -I tools/check_layering.py --self-test && python3 -I tools/check_layering.py --build-dir build/ci-linux-lint
       - name: Qt-free and layer-check negative tests (AC-M0-07)
         run: ctest --preset ci-linux-lint
+      # The same reuse release as package.yml (AC-M4-06).
       - name: REUSE / SPDX
-        run: pipx run reuse lint
+        run: pipx run --spec "reuse==5.0.2" reuse lint
+      # AC-M4-08: the release tree, not only the sources. The Qt-free build installs what tools/packaging/CMakeLists.txt
+      # gives a Linux package without Qt (esses-cli, the data, NOTICES.md, the licence texts, the user guide, the
+      # desktop entry, the MIME type and the icons; D-216 (c)); check_vendor_marks.py --tree scans its file names,
+      # text files and the strings of esses-cli. The application's tree with Qt is scanned by package.yml on each OS
+      # before it is archived (D-212).
+      - name: Vendor marks of the release tree (AC-M4-08)
+        run: |
+          cmake --install build/ci-linux-lint --prefix build/release-tree
+          python3 -I tools/check_vendor_marks.py --tree build/release-tree
       - name: Schema validation of data/, fixtures/, tests/maths/ and schemas/ (08 section 5, AC-M0-10, AC-M2-08)
         shell: bash
         run: ./build/ci-linux-lint/bin/esses-cli validate --all --root .
@@ -278,7 +337,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
         with: { fetch-depth: 0 }
       # Every commit of the pull request needs a Signed-off-by: line (CONTRIBUTING.md, DCO). On pull_request the
       # checkout is GitHub's synthetic merge of the PR into its base (refs/pull/<n>/merge), so HEAD is that merge
@@ -326,8 +385,8 @@ jobs:
       UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
       TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
     steps:
-      - uses: actions/checkout@v4
-      - uses: lukka/get-cmake@latest
+      - uses: actions/checkout@v4.2.2
+      - uses: lukka/get-cmake@v3.31.6
       - run: cmake --preset ${{ matrix.preset }}
       - run: cmake --build --preset ${{ matrix.preset }}
       - run: ctest --preset ${{ matrix.preset }} --parallel 2
@@ -336,8 +395,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30 # build with ASan + UBSan + coverage, generate the seeds, 5 targets x 60 s
     steps:
-      - uses: actions/checkout@v4
-      - uses: lukka/get-cmake@latest
+      - uses: actions/checkout@v4.2.2
+      - uses: lukka/get-cmake@v3.31.6
       - run: cmake --preset linux-clang-fuzz
       - run: cmake --build --preset linux-clang-fuzz
       - name: Seeds from the synthetic fixture families (tools/fuzz_seeds.py)
@@ -358,9 +417,9 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: lukka/get-cmake@latest
-      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: actions/checkout@v4.2.2
+      - uses: lukka/get-cmake@v3.31.6
+      - uses: ilammy/msvc-dev-cmd@v1.13.0
       - name: Build the generator (Qt-free core, release)
         run: |
           cmake --preset win-msvc-core-rel -DESSES_BUILD_TESTS=OFF

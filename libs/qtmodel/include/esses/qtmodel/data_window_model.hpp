@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 //
 // DataWindowModel (06 section 6): the tree behind the Data window (F8). Level 1 = source rows (details
-// template, stale badge later), level 2 = outings when the linked view has more than one, level 3 = the
+// template, stale badge since M4), level 2 = outings when the linked view has more than one, level 3 = the
 // ranges of the worksheet's linkTo view in start-time order. Columns: M (red dot on Main), O (Overlay 0), 1
 // (overlay number), Name (italic when untrusted), Time (lap time), Delta Fastest (analysis::fastestLap rule),
 // Offset, Trusted (checkbox -> DataSelectionModel::setTrusted), Local maths. M1: selection slots, lap time,
@@ -21,6 +21,7 @@
 #include <QAbstractItemModel>
 #include <QString>
 #include <QVariant>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -32,7 +33,8 @@ class DataSelectionModel;
 class DataWindowModel final : public QAbstractItemModel {
     Q_OBJECT
 public:
-    enum Role { UntrustedRole = Qt::UserRole + 1, SlotRole, FilteredInRole };
+    // StaleRole (M4, D-206): true on the source row of a source whose file changed on disk (below).
+    enum Role { UntrustedRole = Qt::UserRole + 1, SlotRole, FilteredInRole, StaleRole };
     enum Column {
         MainCol = 0,
         Overlay0Col,
@@ -64,6 +66,17 @@ public:
     // The source of any row (source, outing or range), or nullopt.
     std::optional<model::SourceId> sourceAt(const QModelIndex& index) const;
 
+    // ---- M4 reload (D-206; package reload, src/m4_reload/data_window_model_stale.cpp) ----
+    // The stale badge (06 section 6 item 1, 02 section 1 behaviour 5): the query answers whether a source's
+    // file changed on disk after it was opened (the shell passes SourceLoader::isStale). isStale is final
+    // (the query's answer, false without one). refreshStale(source) re-announces the source row after the
+    // loader's staleChanged; data() of a source row answering StaleRole, and the badge in
+    // its Name cell and tool tip, are the reload package's (data_window_model.cpp).
+    using StaleQuery = std::function<bool(const model::SourceId&)>;
+    void setStaleQuery(StaleQuery stale);
+    bool isStale(const model::SourceId& source) const;
+    void refreshStale(const model::SourceId& source);
+
 private:
     struct Node;
     void rebuild();
@@ -73,6 +86,7 @@ private:
 
     DataSelectionModel& selection_;
     std::vector<std::unique_ptr<Node>> roots_;
+    StaleQuery stale_; // M4 reload
 };
 
 } // namespace esses::qt

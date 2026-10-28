@@ -5,7 +5,8 @@
 // with the lap time and the Eclectic / Rolling minimum / Total rows in the views, the % bands as cell tints
 // and the fastest time bold, ALT+n toggling band n as one spec edit (a band beyond the list a no-op), the
 // untrusted laps italic when included, the time format from the body, refresh on Selection, Export Data and
-// Copy as TSV. Expected times come from the hand-written section ranges of the fixture.
+// Copy as TSV, and Print to Clipboard's picture without the keyboard focus. Expected times come from the
+// hand-written section ranges of the fixture.
 
 #include "components/reports_track/rt_support.hpp"
 
@@ -194,6 +195,34 @@ private Q_SLOTS:
                  QStringLiteral("Lap\tTurn 1\tStraight 1\tLap Time\nLap 3\t0:02.500\t0:07.500\t0:10.000\n"));
         const QImage img = report.renderToImage(1.0);
         QVERIFY(!img.isNull());
+    }
+
+    // Print to Clipboard (04 section 7.2 item 9) paints the same picture whether the table has the keyboard
+    // focus or not (PR #5, the ubuntu qt-app run of 750eae4: the window was activated before the picture,
+    // Qt focused the table with Qt::TabFocusReason, and the current cell carried the style's keyboard-focus
+    // mark, so tst_reports_track_goldens' bands_summaries differed from its golden). On screen it stays.
+    void printIgnoresTheKeyboardFocus() {
+        World w;
+        const auto src = threeLaps(w);
+        w.selection.setMain(refOf(*src, kLaps, "Lap 1"));
+        TimeReport report(componentSpec(TimeReport::kType, timeBody()), *w.context);
+        report.resize(420, 210);
+        report.show();
+        QVERIFY(settle(report.model(), 0));
+        report.activateWindow();
+        QVERIFY(QTest::qWaitForWindowActive(&report));
+        QTableView* body = report.tableView();
+        body->setFocus(Qt::TabFocusReason); // as an activated window focuses its first child
+        QVERIFY(body->hasFocus());
+        body->setCurrentIndex(body->model()->index(0, 1));
+        const QImage focusedScreen = report.grab().toImage();
+        const QImage focusedPrint = report.renderToImage(1.0);
+        body->clearFocus();
+        QVERIFY(!body->hasFocus());
+        const QImage unfocusedScreen = report.grab().toImage();
+        const QImage unfocusedPrint = report.renderToImage(1.0);
+        QVERIFY(focusedScreen != unfocusedScreen); // the style marks the focused current cell on screen
+        QCOMPARE(focusedPrint, unfocusedPrint);
     }
 };
 

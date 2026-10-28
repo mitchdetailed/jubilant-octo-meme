@@ -126,7 +126,7 @@ bool LayeredComponent::showsSource(const model::SourceId& source) const {
 void LayeredComponent::applySpec(const project::ComponentSpec& spec) {
     ComponentWidget::applySpec(spec);
     onSpecApplied();
-    onViewChanged(context_.view.state(), plot::kFullRebuild);
+    onViewChanged(viewState(), plot::kFullRebuild);
 }
 
 void LayeredComponent::onViewChanged(const plot::ViewState& view, plot::ChangeMask what) {
@@ -158,12 +158,12 @@ void LayeredComponent::onViewChanged(const plot::ViewState& view, plot::ChangeMa
 void LayeredComponent::onSelectionChanged(const plot::SelectionSnapshot&) {
     // The snapshot is read again when the build is prepared (the WorksheetViewModel's Selection bit, which
     // may arrive first, coalesces with this one).
-    onViewChanged(context_.view.state(), plot::mask(plot::Change::Selection));
+    onViewChanged(viewState(), plot::mask(plot::Change::Selection));
 }
 
 void LayeredComponent::onDataChanged(const model::SourceId& source, std::uint64_t) {
     if (showsSource(source)) {
-        onViewChanged(context_.view.state(), plot::mask(plot::Change::Data));
+        onViewChanged(viewState(), plot::mask(plot::Change::Data));
     }
 }
 
@@ -179,7 +179,7 @@ void LayeredComponent::onChannelDataChanged(const maths::ChannelKey& key) {
 
 void LayeredComponent::onSchemeChanged(const project::Scheme& scheme) {
     setScheme(std::make_shared<const project::Scheme>(scheme));
-    onViewChanged(context_.view.state(), plot::mask(plot::Change::Scheme));
+    onViewChanged(viewState(), plot::mask(plot::Change::Scheme));
 }
 
 QStringList LayeredComponent::channelNames() const {
@@ -206,7 +206,7 @@ void LayeredComponent::requestBody(const JsonDoc& body, const QString& undoText)
 // ---- layers
 
 bool LayeredComponent::staticUpToDate() const noexcept {
-    return prepared_ && !staticDirty_ && !buildScheduled_ && !buildInFlight_ &&
+    return prepared_ && !staticDirty_ && !buildScheduled_ && !buildInFlight_ && !sizeChangePending() &&
            !layers_.staticImage().isNull();
 }
 
@@ -227,8 +227,8 @@ void LayeredComponent::prepare() {
     layers_.resize(size(), dpr);
     const QSize device = layers_.deviceSize();
     const plot::LayoutContext layout{device.width(), device.height(), static_cast<float>(dpr)};
-    inputs_ = context_.render.prepareInputs(spec_, context_.view.state(), context_.selection.snapshot(),
-                                            layout, scheme_, metrics_);
+    inputs_ = context_.render.prepareInputs(spec_, viewState(), context_.selection.snapshot(), layout,
+                                            scheme_, metrics_);
     inputs_.focused = isFocusedComponent();
     adjustInputs(inputs_);
     prepared_ = true;
@@ -237,7 +237,7 @@ void LayeredComponent::prepare() {
 
 plot::ComponentBuildInputs LayeredComponent::liveInputs() const {
     plot::ComponentBuildInputs in = inputs_;
-    in.view = context_.view.state();
+    in.view = viewState();
     in.focused = isFocusedComponent();
     return in;
 }
@@ -322,7 +322,7 @@ void LayeredComponent::rebuildDynamic() {
         return;
     }
     dynamicDirty_ = false;
-    inputs_.view = context_.view.state();
+    inputs_.view = viewState();
     plot::DrawList next = builders_.buildDynamic ? builders_.buildDynamic(inputs_) : plot::DrawList{};
     next.widthPx = inputs_.layout.widthPx;
     next.heightPx = inputs_.layout.heightPx;
@@ -443,6 +443,11 @@ plot::HitResult LayeredComponent::hitAt(QPointF logical) const {
     }
     const QPointF p = devicePoint(logical);
     return hits_.hit(static_cast<float>(p.x()), static_cast<float>(p.y()));
+}
+
+// M4 (D-211 (f)): an unlinked zoom, cursor or datum is mapped through the prepared inputs' Main slot.
+std::optional<plot::DomainMapper> LayeredComponent::mainMapper() const {
+    return mainMapperOf(inputs_, viewState().domain);
 }
 
 } // namespace esses::widgets

@@ -373,7 +373,8 @@ private Q_SLOTS:
         });
         const int stack = ws.session.undoStack().count();
         QVERIFY(d.commands.invoke(QStringLiteral("channel.scale_offset")));
-        QCOMPARE(askedUnit, QStringLiteral("ratio")); // the stored unit (no trace display unit)
+        // No trace display unit: the channel's default display unit, % for a fraction stored in ratio (D-211)
+        QCOMPARE(askedUnit, QStringLiteral("%"));
         QCOMPARE(ws.session.undoStack().count(), stack + 1);
         const std::optional<maths::MathModule> local = localMaths(ws, src->id);
         QVERIFY(local.has_value());

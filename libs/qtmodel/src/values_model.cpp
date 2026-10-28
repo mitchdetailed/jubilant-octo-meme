@@ -146,6 +146,7 @@ void ValuesModel::reset() {
     beginResetModel();
     rows_ = effectiveRows();
     cells_.assign(rows_.size(), RowCells{});
+    computedAt_.assign(rows_.size(), 0);
     endResetModel();
     recompute();
 }
@@ -189,15 +190,24 @@ void ValuesModel::setWorksheet(WorksheetViewModel* worksheet) {
     recompute();
 }
 
+void ValuesModel::setViewSource(ViewSource source) {
+    viewSource_ = std::move(source);
+    recompute();
+}
+
 void ValuesModel::refresh(plot::ChangeMask) {
     recompute();
 }
 
 void ValuesModel::recompute() {
-    bool pending = false;
-    const plot::SelectionSnapshot& snap = selection_.snapshot();
-    const bool live = worksheet_ != nullptr && selection_.hasMain();
-    const plot::ViewState view = live ? worksheet_->state() : plot::ViewState{};
+    // The view once per refresh; the rows when a view asks for them (computeRow; D-217).
+    Context c;
+    c.snap = selection_.snapshot();
+    const plot::SelectionSnapshot& snap = c.snap;
+    c.live = worksheet_ != nullptr && selection_.hasMain();
+    const bool live = c.live;
+    c.view = !live ? plot::ViewState{} : viewSource_ ? viewSource_() : worksheet_->state();
+    const plot::ViewState& view = c.view;
     DistanceService* distance = live ? &worksheet_->distanceService() : nullptr;
 
     // The mapper of a slot (04 section 3.2): its range geometry with offsets, outing and chain.
@@ -214,20 +224,27 @@ void ValuesModel::recompute() {
         return plot::DomainMapper(view.domain, detail::geomOf(*r), outing,
                                   distance->chain(ref, Priority::Visible), Rate{}, 0);
     };
-    std::optional<plot::DomainMapper> mainMap;
-    std::optional<model::RangeRef> reference;
-    std::optional<plot::DomainMapper> refMap;
-    double xc = 0.0;
     if (live) {
-        mainMap = mapperOf(snap.main);
-        reference = snap.referenceOverlay();
-        if (reference) {
-            refMap = mapperOf(*reference);
+        c.mainMap = mapperOf(snap.main);
+        c.reference = snap.referenceOverlay();
+        if (c.reference) {
+            c.refMap = mapperOf(*c.reference);
         }
-        if (mainMap) {
-            xc = mainMap->xOf(mainMap->range().start + view.cursorT);
+        if (c.mainMap) {
+            c.xc = c.mainMap->xOf(c.mainMap->range().start + view.cursorT);
         }
     }
+    context_ = std::move(c);
+    ++generation_;
+    if (!rows_.empty()) {
+        Q_EMIT dataChanged(index(0, MainCol), index(static_cast<int>(rows_.size()) - 1, UnitCol));
+    }
+}
+
+void ValuesModel::computeRow(std::size_t row) const {
+    const Context& ctx = context_;
+    const plot::ViewState& view = ctx.view;
+    const double xc = ctx.xc;
     const auto cellFor = [&](const model::RangeRef& ref, const std::optional<plot::DomainMapper>& map,
                              const ChannelRequest& request, bool isMain) {
         Cell c;
@@ -265,30 +282,25 @@ void ValuesModel::recompute() {
         }
         return c;
     };
-    for (std::size_t i = 0; i < rows_.size(); ++i) {
-        RowCells cells;
-        if (live) {
-            const Cell m = cellFor(snap.main, mainMap, rows_[i], true);
-            const Cell r = reference ? cellFor(*reference, refMap, rows_[i], false) : Cell{};
-            cells.main = text(m);
-            cells.reference = text(r);
-            cells.unit = m.unit;
-            if (m.state == Cell::State::Valid && r.state == Cell::State::Valid) {
-                const double d = m.value - r.value;
-                cells.delta = (d >= 0.0 ? QStringLiteral("+") : QString()) +
-                              QString::number(d, 'f', std::clamp(m.dps, 0, 9));
-            }
-            cells.pending = m.state == Cell::State::Pending || r.state == Cell::State::Pending;
-            pending = pending || cells.pending;
+    RowCells cells;
+    if (ctx.live) {
+        const Cell m = cellFor(ctx.snap.main, ctx.mainMap, rows_[row], true);
+        const Cell r = ctx.reference ? cellFor(*ctx.reference, ctx.refMap, rows_[row], false) : Cell{};
+        cells.main = text(m);
+        cells.reference = text(r);
+        cells.unit = m.unit;
+        if (m.state == Cell::State::Valid && r.state == Cell::State::Valid) {
+            const double d = m.value - r.value;
+            cells.delta = (d >= 0.0 ? QStringLiteral("+") : QString()) +
+                          QString::number(d, 'f', std::clamp(m.dps, 0, 9));
         }
-        cells_[i] = std::move(cells);
+        cells.pending = m.state == Cell::State::Pending || r.state == Cell::State::Pending;
     }
-    if (pending) {
-        retry_->start();
+    if (cells.pending && !retry_->isActive()) {
+        retry_->start(); // a cell on screen waits for a chunk or a maths output
     }
-    if (!rows_.empty()) {
-        Q_EMIT dataChanged(index(0, MainCol), index(static_cast<int>(rows_.size()) - 1, UnitCol));
-    }
+    cells_[row] = std::move(cells);
+    computedAt_[row] = generation_;
 }
 
 QString ValuesModel::cellText(int row, int column) const {
@@ -296,6 +308,9 @@ QString ValuesModel::cellText(int row, int column) const {
         return {};
     }
     const auto r = static_cast<std::size_t>(row);
+    if (column != NameCol && computedAt_[r] != generation_) {
+        computeRow(r);
+    }
     switch (column) {
     case NameCol:
         return QString::fromStdString(rows_[r].name);

@@ -138,6 +138,40 @@ TEST_CASE("report_stats: interpolateBoundaries evaluates the edges by the channe
     CHECK(measure(s, ReportStat::End, 1.85, 2.5, interp) == StatValue{190.0, sec(1.9), true});
 }
 
+// M3 item 25 (D-210 (c)): ignoreInterpolated keeps every statistic on the channel's own samples, so the edge
+// values of interpolateBoundaries are not used. The 10 Hz ramp v(i) = 10 i over [0.25 s, 1.05 s) holds
+// samples 3..10 (30 .. 100): start 30, end 100, change 70 by the samples; interpolated, 25, 105 and 80.
+TEST_CASE("report_stats: ignoreInterpolated reads the range's samples even with interpolated edges",
+          "[unit]") {
+    TestCache tc;
+    std::vector<double> ramp(20);
+    for (std::size_t i = 0; i < ramp.size(); ++i) {
+        ramp[i] = 10.0 * static_cast<double>(i);
+    }
+    const store::Series s = tc.uniform(Rate::fromHz(10), ramp);
+    ReportOptions both;
+    both.interpolateBoundaries = true;
+    both.ignoreInterpolated = true;
+    for (const store::Interp interp :
+         {store::Interp::Linear, store::Interp::Previous, store::Interp::Next, store::Interp::Closest}) {
+        CHECK(measure(s, ReportStat::Start, 0.25, 1.05, both, interp) == StatValue{30.0, sec(0.3), true});
+        CHECK(measure(s, ReportStat::End, 0.25, 1.05, both, interp) == StatValue{100.0, sec(1.0), true});
+        CHECK(measure(s, ReportStat::Change, 0.25, 1.05, both, interp).value == 70.0);
+    }
+    // The statistics that read samples anyway: mean of 30..100 is 65, min 30, max 100.
+    CHECK(measure(s, ReportStat::Avg, 0.25, 1.05, both).value == 65.0);
+    CHECK(measure(s, ReportStat::Min, 0.25, 1.05, both) == StatValue{30.0, sec(0.3), true});
+    CHECK(measure(s, ReportStat::Max, 0.25, 1.05, both) == StatValue{100.0, sec(1.0), true});
+    // The probe still finds the nearest sample: [0.25 s, 1.05 s) of a series without samples 3 and 10 (both
+    // invalid) starts at sample 4 (40, 0.15 s in) and ends at sample 9 (90, 0.15 s before the end).
+    std::vector<bool> valid(20, true);
+    valid[3] = false;
+    valid[10] = false;
+    const store::Series gaps = tc.uniform(Rate::fromHz(10), ramp, valid);
+    CHECK(measure(gaps, ReportStat::Start, 0.25, 1.05, both) == StatValue{40.0, sec(0.4), true});
+    CHECK(measure(gaps, ReportStat::End, 0.25, 1.05, both) == StatValue{90.0, sec(0.9), true});
+}
+
 TEST_CASE("report_stats: an invalid edge neighbour falls back to the probe", "[unit]") {
     TestCache tc;
     const store::Series s = fixtureSeries(tc);

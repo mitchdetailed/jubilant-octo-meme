@@ -104,12 +104,19 @@ struct Applying {
 
 struct AdsBackend::Impl {
     struct Entry {
-        QPointer<ads::CDockWidget> dock;
+        // Held as a QWidget and read as a dock with qobject_cast (adsDock()): QPointer<ads::CDockWidget>
+        // static_casts from QObject on every read, undefined behaviour while the dock is being destroyed
+        // (UBSan -fsanitize=vptr), and the content it deletes then moves the focus, which asks this backend
+        // about its docks (dockIdOf, onFocusChanged). qobject_cast finds no CDockWidget in a dock being
+        // destroyed.
+        QPointer<QWidget> dock;
         DockArea area = DockArea::Left; // where this backend last placed it (registration, reset, re-dock)
         bool justPlaced = false;        // placed by the operation in progress (its geometry is not laid out)
         DockState defaultState = DockState::Docked; // for a perspective that does not know the dock
         DockState reported = DockState::Closed;     // last state the observer heard of
         bool reportedFlownOut = false;
+
+        ads::CDockWidget* adsDock() const { return qobject_cast<ads::CDockWidget*>(dock.data()); }
     };
 
     explicit Impl(QMainWindow& h) : host(h) {}
@@ -123,7 +130,7 @@ struct AdsBackend::Impl {
     bool queued = false; // a settled sync() is queued
     StateObserver observer;
 
-    ads::CDockWidget* dock(const QString& id) const { return docks.value(id).dock.data(); }
+    ads::CDockWidget* dock(const QString& id) const { return docks.value(id).adsDock(); }
 };
 
 AdsBackend::AdsBackend(QMainWindow& host) : d_(std::make_unique<Impl>(host)) {
@@ -224,11 +231,11 @@ void AdsBackend::addDock(const QString& id, const QString& title, QWidget* conte
 // while that one is docked (06 section 3.2: Channels under Data); that first dock stays the current tab.
 void AdsBackend::placeInArea(const QString& id, DockArea area) {
     const auto it = d_->docks.find(id);
-    if (it == d_->docks.end() || it->dock == nullptr || d_->manager == nullptr) {
+    if (it == d_->docks.end() || it->adsDock() == nullptr || d_->manager == nullptr) {
         return;
     }
     const Applying guard(d_->applying);
-    ads::CDockWidget* dock = it->dock;
+    ads::CDockWidget* dock = it->adsDock();
     it->area = area;
     it->justPlaced = true;
     if (dock->isAutoHide()) {
@@ -244,9 +251,9 @@ void AdsBackend::placeInArea(const QString& id, DockArea area) {
             break;
         }
         const auto o = d_->docks.constFind(other);
-        if (o != d_->docks.cend() && o->dock != nullptr && o->area == area &&
-            stateOf(o->dock) == DockState::Docked) {
-            first = o->dock;
+        if (o != d_->docks.cend() && o->adsDock() != nullptr && o->area == area &&
+            stateOf(o->adsDock()) == DockState::Docked) {
+            first = o->adsDock();
             break;
         }
     }
@@ -265,11 +272,11 @@ void AdsBackend::placeInArea(const QString& id, DockArea area) {
 // Shows a Closed dock where it was; an auto-hidden one stays collapsed on its side bar.
 void AdsBackend::open(const QString& id) {
     const auto it = d_->docks.find(id);
-    if (it == d_->docks.end() || it->dock == nullptr) {
+    if (it == d_->docks.end() || it->adsDock() == nullptr) {
         return;
     }
     const Applying guard(d_->applying);
-    ads::CDockWidget* dock = it->dock;
+    ads::CDockWidget* dock = it->adsDock();
     if (dock->dockAreaWidget() == nullptr) {
         placeInArea(id, it->area);
     }
@@ -286,10 +293,10 @@ void AdsBackend::setState(const QString& id, DockState state) {
 // `raise`: make a tabbed dock the current tab (an explicit show/focus; not on add, reset or restore).
 void AdsBackend::apply(const QString& id, DockState target, bool raise) {
     const auto it = d_->docks.find(id);
-    if (it == d_->docks.end() || it->dock == nullptr) {
+    if (it == d_->docks.end() || it->adsDock() == nullptr) {
         return;
     }
-    ads::CDockWidget* dock = it->dock;
+    ads::CDockWidget* dock = it->adsDock();
     {
         const Applying guard(d_->applying);
         switch (target) {
@@ -438,8 +445,8 @@ void AdsBackend::sync(bool report) {
         if (it == d_->docks.end()) {
             continue;
         }
-        const DockState s = stateOf(it->dock);
-        const bool out = flownOut(it->dock);
+        const DockState s = stateOf(it->adsDock());
+        const bool out = flownOut(it->adsDock());
         if (s == it->reported && out == it->reportedFlownOut) {
             continue;
         }
@@ -508,7 +515,7 @@ bool AdsBackend::restoreState(const QByteArray& state) {
         }
         for (const QString& id : std::as_const(d_->order)) {
             const Impl::Entry e = d_->docks.value(id);
-            if (e.dock != nullptr && e.dock->dockAreaWidget() == nullptr) {
+            if (e.adsDock() != nullptr && e.adsDock()->dockAreaWidget() == nullptr) {
                 resetDock(id, e.area, e.defaultState);
             }
         }

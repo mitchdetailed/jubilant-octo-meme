@@ -329,10 +329,10 @@
     {
       "command": "file.reload_source",
       "context": "data_window",
-      "doc": "Reload the highlighted stale source through the open pipeline; disabled unless the source is stale.",
+      "doc": "Reload a stale source through the open pipeline: the highlighted one when it is stale, else the first stale source; disabled while no source is stale.",
       "keys": [],
       "milestone": "M4",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "file.save_project",
@@ -353,10 +353,10 @@
     {
       "command": "help.contents",
       "context": "global",
-      "doc": "Open the user documentation.",
+      "doc": "Open the user documentation: the installed start page, else the online one.",
       "keys": ["F1"],
       "milestone": "M4",
-      "status": "planned"
+      "status": "implemented"
     },
     {
       "command": "file.unload_device",

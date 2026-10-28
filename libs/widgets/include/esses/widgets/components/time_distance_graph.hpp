@@ -52,6 +52,13 @@
 // zoom minimum). Like-units grouping (04 section 8.2 item 3): addChannel joins the first group whose quantity
 // equals the channel's; newPanel (CTRL) or no match appends a new group named after the channel. Memory (04
 // section 6.2): a component hidden for 30 s releases its Static image; showing it rebuilds.
+// M4 (04 section 8.2 item 4, D-211 (e)): a group's heading is its part of the key
+// column outside its labels (plot::HitKind::GroupHeading, an open-hand pointer over it); dragging it shows
+// where the group goes (a dashed line between the groups' keys) and the release moves the group there (one
+// undoable edit, moveGroup: the group takes its traces, vertical zoom and unknown members along; panels with
+// explicit edges keep their heights); a double-click opens Group Properties (the Properties dialog at that
+// group's record of the Channels tab: name, scale, limits, lines, Lo/Hi; openGroupProperties). Links (M4,
+// D-211 (f)): the zoom, cursor and datum are viewState()'s; an unlinked graph's mouse and keys move its own.
 #pragma once
 
 #include <esses/plotcore/component_build.hpp>
@@ -72,6 +79,8 @@
 class QTimer;
 
 namespace esses::widgets {
+
+class PropertiesDialog;
 
 class TimeDistanceGraph final : public ComponentWidget {
     Q_OBJECT
@@ -113,6 +122,13 @@ public:
                        std::optional<double> max = std::nullopt, const QString& unit = {});
     // Makes `name` the active channel (key label click): emits specEditRequested.
     void setActiveChannel(const QString& name);
+    // M4 (D-211 (e)): moves group `from` to index `to` of the groups (one undoable spec edit; false when
+    // either is out of range or they are equal) and opens the Properties dialog at group `group`'s record
+    // (Group Properties; nullptr when there is no such group).
+    bool moveGroup(int from, int to);
+    PropertiesDialog* openGroupProperties(int group);
+    // The insertion index and the line (device px y) a group drag shows now (nullopt when none).
+    std::optional<int> groupDropIndex() const noexcept { return groupDropIndex_; }
 
     // ---- the graph's commands (body edits are undoable spec edits)
     void toggleVariance();     // F3
@@ -156,7 +172,8 @@ public:
     const plot::TdLayout& layout() const noexcept { return layout_; }
     // The view version of the last delivered Static build.
     std::uint64_t builtViewVersion() const noexcept { return builtViewVersion_; }
-    // No Static build is dirty, scheduled or in flight: the Static image shows the current inputs.
+    // No Static build is dirty, scheduled or in flight and no size change waits in the 30 Hz throttle
+    // (sizeChangePending): the Static image shows the current inputs at the current size.
     bool staticUpToDate() const noexcept;
     bool pendingStripeShown() const noexcept { return pendingShown_; }
     // Counters (tests, bench): Static builds submitted and delivered, Dynamic and Chrome lists built. A build
@@ -193,6 +210,8 @@ protected:
     void contextMenuEvent(QContextMenuEvent* event) override;
     void onFocusChanged(bool focused) override;
     int captionHeight() const override;
+    // M4 (D-211 (f)): the Main slot's mapping of the prepared inputs (an unlinked part's own view).
+    std::optional<plot::DomainMapper> mainMapper() const override;
     bool event(QEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
@@ -209,7 +228,7 @@ private:
     // The active channel's value at the cursor as a fraction of group `group`'s shown scale (ALT+UP/DOWN).
     std::optional<double> cursorValueFraction(int group) const;
     void releaseSources();
-    enum class Drag : std::uint8_t { None, Cursor, Pan, Thumb, VPan, VThumb, Offset, Handle };
+    enum class Drag : std::uint8_t { None, Cursor, Pan, Thumb, VPan, VThumb, Offset, Handle, Group };
     enum class BandAxis : std::uint8_t { Horizontal, Vertical, Box };
 
     QString componentId() const;
@@ -275,9 +294,12 @@ private:
     double dragStartY_ = 0.0;
     plot::XSpan dragStartZoom_;
     plot::TdGroupZoom dragStartVZoom_;
-    plot::HitResult dragHit_;         // the region a drag started on (handles, offset axis, scrollbars)
-    double dragLastX_ = 0.0;          // offset drag: the last pointer x (logical)
-    std::optional<float> guideY_;     // Lo/Hi or splitter drag: the guide line (device px)
+    plot::HitResult dragHit_;           // the region a drag started on (handles, offset axis, scrollbars)
+    double dragLastX_ = 0.0;            // offset drag: the last pointer x (logical)
+    std::optional<float> guideY_;       // Lo/Hi or splitter drag: the guide line (device px)
+    std::optional<int> groupDropIndex_; // M4: a group heading drag: where the group goes
+    std::optional<float> groupDropY_;   // and its line (device px)
+    void updateGroupDrop(double logicalY);
     std::optional<double> bandStart_; // rubber band, domain units
     double bandEnd_ = 0.0;
     BandAxis bandAxis_ = BandAxis::Horizontal;

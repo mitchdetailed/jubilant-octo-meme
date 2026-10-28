@@ -54,8 +54,9 @@ const FontEntry* findThreadFont(std::uint64_t setId, std::uint32_t slot);
 const FontEntry& insertThreadFont(std::uint64_t setId, std::uint32_t slot, const QFont& font);
 
 // The calling thread's QStaticText LRU (04 section 6.1 item 4: keyed by text, style and dpr; 4,096 entries).
-// `key` must identify the font set, the slot, the dpr and the (elided) text.
-QStaticText& threadStaticText(const std::string& key, const QString& text);
+// `key` must identify the font set, the slot, the dpr and the (elided) text. `created` (optional) is set to
+// whether the entry is new, i.e. not laid out yet.
+QStaticText& threadStaticText(const std::string& key, const QString& text, bool* created = nullptr);
 std::size_t threadStaticTextCount();
 inline constexpr std::size_t kStaticTextCapacity = 4096;
 

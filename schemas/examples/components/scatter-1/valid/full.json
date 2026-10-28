@@ -1,14 +1,17 @@
 {
   "xChannel": "Corr Speed",
+  "xDisplayUnit": "km/h",
   "traces": [
     {
       "yChannel": "G Force Lat",
       "visible": true,
-      "yDelayUs": 0
+      "yDelayUs": 0,
+      "displayUnit": "G"
     }
   ],
   "colourChannel": {
     "channel": "Throttle Pos",
+    "displayUnit": "%",
     "axis": {
       "mode": "even",
       "bandMode": "count",

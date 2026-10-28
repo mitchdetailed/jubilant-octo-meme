@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "urn:esses:components/channel_report-1",
   "title": "channel_report component body",
-  "description": "The body of a channel_report component (04 section 12 item 8): the ReportSpec (scope, ordered heading group paths, channels with statistics, options), layout, highlight, delta versus Overlay 0, time format and the splitter.",
+  "description": "The body of a channel_report component (04 section 12 item 8): the ReportSpec (scope, ordered heading group paths, channels with statistics and an optional display unit, options), layout, highlight, delta versus Overlay 0, time format and the splitter.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -37,6 +37,10 @@
                 "items": {
                   "enum": ["avg", "min", "max", "absMax", "start", "end", "change", "stdDev", "delta"]
                 }
+              },
+              "displayUnit": {
+                "description": "The unit the channel's cells are shown in; absent or \"\": the channel's default display unit (D-211).",
+                "$ref": "#/definitions/unitSymbolOrEmpty"
               }
             }
           }
@@ -60,6 +64,10 @@
               "maximum": 60
             },
             "zoomLinked": {
+              "type": "boolean"
+            },
+            "ignoreInterpolated": {
+              "description": "Only the channel's own samples count: start, end and change never take a value interpolated at a range edge, even with interpolateBoundaries (M4, D-210). Absent: false.",
               "type": "boolean"
             }
           }
@@ -129,6 +137,11 @@
       "description": "A colour \"#rrggbb\" (alpha ff) or \"#rrggbbaa\"; written in lower case (Rgba, 04 section 5.1).",
       "type": "string",
       "pattern": "^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$"
+    },
+    "unitSymbolOrEmpty": {
+      "description": "A unit symbol or alias of the unit registry (units-1), or \"\" for the unitless unit; no leading or trailing white space.",
+      "type": "string",
+      "pattern": "^(\\S(.*\\S)?)?$"
     }
   }
 }

@@ -6,9 +6,11 @@
 #include <esses/project/keymap.hpp>
 #include <esses/project/scheme.hpp>
 #include <esses/project/shipped_data.hpp>
+#include <esses/qtmodel/memory_budget.hpp>
 #include <esses/qtmodel/project_session.hpp>
 #include <esses/qtmodel/settings_store.hpp>
 #include <esses/qtmodel/undo_commands.hpp>
+#include <esses/store/chunk_cache.hpp>
 #include <esses/widgets/editors_options/options_dialog.hpp>
 #include <esses/widgets/editors_options/scheme_selector.hpp>
 
@@ -32,6 +34,7 @@
 #include <QTableWidget>
 #include <QUrl>
 #include <QVBoxLayout>
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <optional>
@@ -114,6 +117,16 @@ QTableWidget* makeTable(const QStringList& headers, const QString& name, QWidget
     return t;
 }
 
+// The memory budget field (M4 budget package): gigabytes of 2^30 bytes with one decimal, from the floor of
+// qt::kMinBudgetBytes to kMaxBudgetGb.
+constexpr double kBytesPerGb = 1073741824.0;
+constexpr double kMaxBudgetGb = 4096.0;
+
+std::int64_t gbToBytes(double gb) {
+    const double clamped = std::clamp(gb, 0.0, kMaxBudgetGb); // range-checked before the conversion
+    return static_cast<std::int64_t>(std::llround(clamped * kBytesPerGb));
+}
+
 QTableWidgetItem* cell(const QString& text) {
     auto* item = new QTableWidgetItem(text);
     item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
@@ -124,7 +137,8 @@ QTableWidgetItem* cell(const QString& text) {
 
 struct OptionsDialog::Impl {
     // One option field: a project option (dotted path into project.json "options") or a user setting.
-    enum class Kind : std::uint8_t { Bool, Int, Double, Choice };
+    // Gigabytes: a byte count shown in GB (the user setting memory.chunkCacheBudgetBytes, M4 budget package).
+    enum class Kind : std::uint8_t { Bool, Int, Double, Choice, Gigabytes };
     struct Field {
         QString key;
         QString label;
@@ -170,6 +184,9 @@ struct OptionsDialog::Impl {
             return a.toDouble() == b.toDouble();
         case Kind::Choice:
             return a.toString() == b.toString();
+        case Kind::Gigabytes: // equal as the field shows them (tenths of a GB)
+            return std::llround(a.toDouble() / kBytesPerGb * 10.0) ==
+                   std::llround(b.toDouble() / kBytesPerGb * 10.0);
         }
         return false;
     }
@@ -184,6 +201,9 @@ struct OptionsDialog::Impl {
             return static_cast<QDoubleSpinBox*>(f.widget)->value();
         case Kind::Choice:
             return static_cast<QComboBox*>(f.widget)->currentData().toString();
+        case Kind::Gigabytes:
+            return QJsonValue(
+                static_cast<qint64>(gbToBytes(static_cast<QDoubleSpinBox*>(f.widget)->value())));
         }
         return {};
     }
@@ -205,11 +225,20 @@ struct OptionsDialog::Impl {
             combo->setCurrentIndex(i >= 0 ? i : 0);
             break;
         }
+        case Kind::Gigabytes:
+            static_cast<QDoubleSpinBox*>(f.widget)->setValue(v.toDouble() / kBytesPerGb);
+            break;
         }
     }
 
     // The value a field shows: the stored one when it has the right type, else the 02 section 6.2 default.
     QJsonValue effective(const Field& f, const QJsonObject& options) const {
+        if (f.kind == Kind::Gigabytes) {
+            // The budget as the shell applies it (raised to 1 GB), else the runtime's default (25 % of RAM).
+            const std::optional<std::size_t> bytes =
+                settings == nullptr ? std::nullopt : qt::budgetFromSettings(*settings);
+            return bytes ? QJsonValue(static_cast<double>(*bytes)) : f.fallback;
+        }
         QJsonValue v;
         if (f.user) {
             const QVariant s = settings == nullptr ? QVariant() : settings->value(f.key);
@@ -230,6 +259,8 @@ struct OptionsDialog::Impl {
             const auto* combo = static_cast<const QComboBox*>(f.widget);
             return v.isString() && combo->findData(v.toString()) >= 0 ? v : f.fallback;
         }
+        case Kind::Gigabytes:
+            break; // above
         }
         return f.fallback;
     }
@@ -286,6 +317,7 @@ OptionsDialog::OptionsDialog(qt::ProjectSession& session, qt::SettingsStore* set
             connect(static_cast<QSpinBox*>(f.widget), &QSpinBox::valueChanged, this, touched);
             break;
         case Impl::Kind::Double:
+        case Impl::Kind::Gigabytes:
             connect(static_cast<QDoubleSpinBox*>(f.widget), &QDoubleSpinBox::valueChanged, this, touched);
             break;
         case Impl::Kind::Choice:
@@ -365,6 +397,30 @@ void OptionsDialog::buildGeneral() {
     check("general.looseChannelSearch", tr("Loose channel-name search"), false);
     check("general.autoShowMessagesOnError", tr("Show the Messages window on an error"), true);
     check("general.reduceCpuDuringAnimation", tr("Reduce CPU use during animation"), false);
+    // M4 budget package (07 section 7.1 row 1, 01 section 7.2): the chunk cache's memory budget, a user
+    // setting; the open of a file whose estimate exceeds it waits for Continue or Cancel in Messages.
+    const double defaultGb = static_cast<double>(store::ChunkCache::defaultBudgetBytes()) / kBytesPerGb;
+    auto* budget = new QDoubleSpinBox(page);
+    budget->setObjectName(QString::fromLatin1(qt::kBudgetSettingKey));
+    budget->setAccessibleName(tr("Memory budget"));
+    budget->setRange(static_cast<double>(qt::kMinBudgetBytes) / kBytesPerGb, kMaxBudgetGb);
+    budget->setDecimals(1);
+    budget->setSingleStep(0.5);
+    budget->setSuffix(tr(" GB"));
+    budget->setToolTip(
+        tr("Memory for the logged and maths data held in memory, at least 1 GB. Opening a file "
+           "estimated above it asks first (Continue or Cancel in Messages). Default: a quarter "
+           "of the installed memory, %1 GB.")
+            .arg(defaultGb, 0, 'f', 1));
+    form->addRow(tr("Memory budget:"), budget);
+    d_->fields.push_back({budget->objectName(),
+                          tr("Memory budget"),
+                          K::Gigabytes,
+                          true,
+                          QJsonValue(static_cast<double>(store::ChunkCache::defaultBudgetBytes())),
+                          budget,
+                          {},
+                          false});
     auto* language = new QComboBox(page);
     language->setObjectName(QStringLiteral("language"));
     language->setAccessibleName(tr("Language"));
@@ -712,6 +768,12 @@ bool OptionsDialog::validate(QString& error) const {
                         .arg(f.label)
                         .arg(s->minimum())
                         .arg(s->maximum());
+        } else if (f.kind == Impl::Kind::Gigabytes) {
+            const auto* s = static_cast<const QDoubleSpinBox*>(f.widget);
+            error = tr("%1: enter a size from %2 to %3 GB")
+                        .arg(f.label)
+                        .arg(s->minimum(), 0, 'f', 1)
+                        .arg(s->maximum(), 0, 'f', 1);
         } else {
             const auto* s = static_cast<const QDoubleSpinBox*>(f.widget);
             error =

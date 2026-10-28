@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 the Esses contributors
+# SPDX-License-Identifier: MIT
+# The desktop entry of Esses (08 section 7.3, 06 section 19 item 5; D-212): installed to share/applications,
+# used by linuxdeploy for the AppImage. Bare file arguments are log files (06 section 19 item 3).
+[Desktop Entry]
+Type=Application
+Name=Esses
+GenericName=Motorsport data analysis
+Comment=Analyse data-logger log files of a racing car
+Exec=esses %F
+Icon=esses
+Terminal=false
+Categories=Science;DataVisualization;
+MimeType=application/x-esses-log;
+Keywords=motorsport;data;logger;telemetry;laps;

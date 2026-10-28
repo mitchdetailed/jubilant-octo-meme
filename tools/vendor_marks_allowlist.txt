@@ -29,3 +29,11 @@ path TRADEMARK.md
 path docs/*
 path fixtures/*README.md
 path fixtures/*fixture.json
+# (e) the same notices in a release tree (check_vendor_marks.py --tree, AC-M4-08, D-212): NOTICES.md beside the
+#     data folder of every package (the installation folder, share/esses/ or Contents/Resources/) and the
+#     THIRD_PARTY_LICENSES.md generated from it and the licence files,
+path */NOTICES.md
+path THIRD_PARTY_LICENSES.md
+path */THIRD_PARTY_LICENSES.md
+#     and the user guide installed beside the data folder (docs/user/, prose of docs/)
+path */docs/user/*

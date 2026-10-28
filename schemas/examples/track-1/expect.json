@@ -11,6 +11,10 @@
     "pointer": "/lines/centre/0",
     "why": "centreline rows are [x, y, cumDist]"
   },
+  "section-speed-class.json": {
+    "pointer": "/sections/0/speedClass",
+    "why": "a section's speed class is slow or fast"
+  },
   "section-without-unit.json": {
     "pointer": "/sections/0/startDist",
     "why": "section distances carry their unit (D-010)"

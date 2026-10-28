@@ -66,7 +66,8 @@ precedence = "override"
 SPDX-FileCopyrightText = "Catch2 Authors"
 SPDX-License-Identifier = "BSL-1.0"
 
-# The Qt Advanced Docking System 5.1.1, unmodified (D-153): LGPL-2.1-or-later, as its source headers grant ("version
+# The Qt Advanced Docking System 5.1.1 (D-153), with the Esses changes listed in its UPSTREAM.md (each marked in the
+# changed file; the changes are under the same licence): LGPL-2.1-or-later, as its source headers grant ("version
 # 2.1 of the License, or (at your option) any later version"); LICENSES/LGPL-2.1-or-later.txt is a copy of its
 # LICENSE. Built and shipped as a separate shared library (NOTICES.md). UPSTREAM.md beside it is our provenance note.
 [[annotations]]

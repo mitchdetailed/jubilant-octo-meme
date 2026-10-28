@@ -260,6 +260,23 @@ private Q_SLOTS:
         QVERIFY(std::abs((c - after.a) - 0.8 * (c - before.a)) < 1.0);
     }
 
+    // M4: a size the 30 Hz throttle still holds is an input the Static layer does not show yet
+    // (LayeredComponent::staticUpToDate, cmptest::checkQueuedSizeIsNotUpToDate).
+    void queuedSizeIsNotUpToDate() {
+        World w;
+        const auto src = w.publish(SourceOptions{});
+        buildSummaries(*src);
+        selectMain(w, lapRef(*src, 1));
+        Rig<Histogram> rig(w, specOf("histogram", kBody));
+        Histogram& h = *rig.c;
+        QVERIFY(waitQuiet(h));
+        QTRY_VERIFY(!h.sizeThrottleActive());
+        checkQueuedSizeIsNotUpToDate(
+            h, [&h] { return h.staticBuildsSubmitted(); },
+            [&h] { return h.staticBuildShown() == h.staticBuildsSubmitted(); }, QSize(380, 260),
+            QSize(300, 200));
+    }
+
     void exportsTheBinsAsCsv() {
         World w;
         const auto src = w.publish(SourceOptions{});

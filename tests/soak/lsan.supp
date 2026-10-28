@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: 2026 the Esses contributors
+# SPDX-License-Identifier: MIT
+#
+# LeakSanitizer suppressions of the Saturday soak (AC-M4-03; 07 section 7.1 "Soak"; 08 section 6.10; D-213):
+# the leak stacks of Qt, fontconfig and glib.
+#
+# LeakSanitizer drops a leak when ANY frame of its allocation stack matches a pattern below (a module, a function
+# or a file, as a substring). A pattern that could also appear in the stack of an allocation Esses made (Qt's
+# event loop, signal and timer delivery, QObject, widget and model code, glib's main-loop dispatch: they all call
+# into Esses) would therefore hide an Esses leak, so the rule for this file is:
+#   a pattern names code of Qt, fontconfig or glib that allocates for itself and never calls back into the
+#   application: fontconfig as a module (it calls no one), glib's type, quark and interned-string tables (never
+#   its main loop), and Qt's font database, font engines, platform plugin and plugin loader.
+# tests/soak/lsan_check.py --self-test checks every line against that rule (the families and the refused
+# patterns are listed there; ctest soak.lsan_check.self_test and the soak job run it). Leaks LeakSanitizer still
+# prints are judged by lsan_check.py: one with an esses frame fails the soak; one without is a warning naming its
+# library, to be added here under this rule after review.
+
+# fontconfig: the whole module (its caches and patterns; it never calls out).
+leak:libfontconfig.so
+
+# glib: the type system, quarks and interned strings (process-lifetime tables, never the main loop).
+leak:g_type_register_static
+leak:g_type_register_fundamental
+leak:g_type_add_interface_static
+leak:g_type_class_ref
+leak:g_quark_from_static_string
+leak:g_quark_from_string
+leak:g_intern_static_string
+leak:g_intern_string
+
+# Qt: the font database and its engines, the platform plugin and the plugin loader (one-time initialisation
+# whose objects live until exit, never handed to the caller).
+leak:QFontconfigDatabase::
+leak:QFontDatabasePrivate::
+leak:QFontEngineFT::
+leak:QFreetypeFace::
+leak:QOffscreenIntegration::
+leak:QGuiApplicationPrivate::createPlatformIntegration
+leak:QFactoryLoader::
+leak:QLibraryPrivate::

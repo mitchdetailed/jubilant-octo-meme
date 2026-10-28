@@ -130,9 +130,12 @@ const FontEntry& insertThreadFont(std::uint64_t setId, std::uint32_t slot, const
     return ref;
 }
 
-QStaticText& threadStaticText(const std::string& key, const QString& text) {
+QStaticText& threadStaticText(const std::string& key, const QString& text, bool* created) {
     ThreadCaches& c = caches();
     const auto it = c.index.find(key);
+    if (created != nullptr) {
+        *created = it == c.index.end();
+    }
     if (it != c.index.end()) {
         c.lru.splice(c.lru.begin(), c.lru, it->second);
         return it->second->second;

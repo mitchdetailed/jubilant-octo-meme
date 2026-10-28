@@ -5,7 +5,9 @@
 
 #include <esses/analysis/section_detector.hpp>
 #include <esses/base/utf8.hpp>
+#include <esses/plotcore/display_units.hpp>
 #include <esses/plotcore/track_geometry.hpp>
+#include <esses/project/channel_overrides.hpp>
 #include <esses/qtmodel/data_selection_model.hpp>
 #include <esses/qtmodel/maths_service.hpp>
 #include <esses/qtmodel/project_session.hpp>
@@ -35,6 +37,8 @@
 #include <QVBoxLayout>
 #include <algorithm>
 #include <cmath>
+#include <iterator>
+#include <limits>
 #include <set>
 #include <string_view>
 
@@ -102,11 +106,25 @@ constexpr int kColSet = 1;
 constexpr int kColStart = 2;
 constexpr int kColEnd = 3;
 constexpr int kColCategory = 4;
-constexpr int kColUser = 5;
+constexpr int kColSpeedClass = 5; // M4 (D-211 (c))
+constexpr int kColUser = 6;
+constexpr int kColumns = 7;
 constexpr const char* kGpsLateralHints[] = {"G Force Lat", "G Lat", "Lateral G", "Accel Lat", "Lat Accel"};
 
 QString fromUtf8(std::string_view s) {
     return QString::fromUtf8(s.data(), static_cast<qsizetype>(s.size()));
+}
+
+// The display unit the project's channel override gives `channel` ("" without one).
+std::string overrideUnit(const qt::ProjectSession& session, std::string_view channel) {
+    const project::ChannelOverrides::Entry* o = session.overrides().find(channel);
+    return o != nullptr && o->displayUnit ? *o->displayUnit : std::string();
+}
+
+// The decimals that show 0.1 m in a unit of `perMetre` units per metre (m: 1, km: 4, mi: 5, ft: 1).
+int decimalsFor(double perMetre) {
+    const double d = std::ceil(-std::log10(0.1 * perMetre));
+    return std::isfinite(d) ? static_cast<int>(std::clamp(d, 0.0, 6.0)) : 1;
 }
 
 QString sourceLabel(const model::DataSource& src) {
@@ -216,10 +234,8 @@ TrackEditor::TrackEditor(qt::ProjectSession& session, qt::DataSelectionModel& se
     form->addRow(status_);
 
     // 3-4. sections
-    table_ = new QTableWidget(0, 6, this);
+    table_ = new QTableWidget(0, kColumns, this);
     table_->setObjectName(QStringLiteral("trackEditorSections"));
-    table_->setHorizontalHeaderLabels(
-        {tr("Name"), tr("Set"), tr("Start (m)"), tr("End (m)"), tr("Category"), tr("User")});
     table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     table_->setSelectionBehavior(QAbstractItemView::SelectRows);
     table_->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -242,6 +258,12 @@ TrackEditor::TrackEditor(qt::ProjectSession& session, qt::DataSelectionModel& se
     category_->setObjectName(QStringLiteral("trackEditorSectionCategory"));
     category_->setEditable(true);
     category_->addItems({QStringLiteral("corner"), QStringLiteral("straight")});
+    speedClass_ = new QComboBox(this);
+    speedClass_->setObjectName(QStringLiteral("trackEditorSectionSpeedClass"));
+    speedClass_->addItem(tr("(none)"), QString());
+    for (const std::string_view c : analysis::TrackMap::kSpeedClasses) {
+        speedClass_->addItem(fromUtf8(c), fromUtf8(c));
+    }
     add_ = new QPushButton(tr("Add"), this);
     add_->setObjectName(QStringLiteral("trackEditorAdd"));
     addSpan_ = new QPushButton(tr("Add from Cursor Span"), this);
@@ -262,6 +284,7 @@ TrackEditor::TrackEditor(qt::ProjectSession& session, qt::DataSelectionModel& se
     fields->addRow(tr("Start:"), start_);
     fields->addRow(tr("End:"), end_);
     fields->addRow(tr("Category:"), category_);
+    fields->addRow(tr("Speed class:"), speedClass_);
     sectionsLayout->addLayout(fields);
     auto* sectionButtons = new QHBoxLayout;
     for (QPushButton* b : {add_, addSpan_, apply_, delete_, defaults_}) {
@@ -315,14 +338,22 @@ TrackEditor::TrackEditor(qt::ProjectSession& session, qt::DataSelectionModel& se
     });
     connect(table_, &QTableWidget::currentCellChanged, this, [this](int row) { loadForm(row); });
     connect(add_, &QPushButton::clicked, this, [this] {
-        addSection(name_->text(), start_->value(), end_->value(), category_->currentText(), set_->text());
+        const std::shared_ptr<const analysis::TrackMap> map = currentMap();
+        const double length = map != nullptr ? map->lengthM : std::numeric_limits<double>::max();
+        addSection(name_->text(), fieldMetres(*start_, std::nullopt, length),
+                   fieldMetres(*end_, std::nullopt, length), category_->currentText(), set_->text(),
+                   speedClass_->currentData().toString());
     });
     connect(addSpan_, &QPushButton::clicked, this, [this] { addSectionFromCursorSpan(name_->text()); });
     connect(apply_, &QPushButton::clicked, this, [this] {
         const int row = table_->currentRow();
-        if (row >= 0) {
+        const std::shared_ptr<const analysis::TrackMap> map = currentMap();
+        if (row >= 0 && map != nullptr && static_cast<std::size_t>(row) < map->sections.size()) {
+            const analysis::TrackSection& s = map->sections[static_cast<std::size_t>(row)];
             editSection(table_->item(row, kColName)->data(Qt::UserRole).toString(), name_->text(),
-                        start_->value(), end_->value(), category_->currentText());
+                        fieldMetres(*start_, s.startM, map->lengthM),
+                        fieldMetres(*end_, s.endM, map->lengthM), category_->currentText(),
+                        speedClass_->currentData().toString());
         }
     });
     connect(delete_, &QPushButton::clicked, this, [this] {
@@ -340,6 +371,9 @@ TrackEditor::TrackEditor(qt::ProjectSession& session, qt::DataSelectionModel& se
     connect(&session_, &qt::ProjectSession::documentsChanged, this, [this] {
         const QSignalBlocker block(autoGenerate_);
         autoGenerate_->setChecked(autoGenerateOnOpen());
+        // The Corr Dist or Corr Speed override may have changed the unit of the bounds (D-211 (c)).
+        applyDistanceUnit();
+        refreshSections();
     });
     // A generation waiting for its maths inputs starts again when one is evaluated.
     const auto retry = [this] {
@@ -360,6 +394,7 @@ TrackEditor::TrackEditor(qt::ProjectSession& session, qt::DataSelectionModel& se
         const QSignalBlocker block(autoGenerate_);
         autoGenerate_->setChecked(autoGenerateOnOpen());
     }
+    applyDistanceUnit();
     refreshLaps();
     resize(900, 560);
 }
@@ -733,13 +768,74 @@ void TrackEditor::refreshSections() {
         };
         cell(kColName, fromUtf8(s.name))->setData(Qt::UserRole, fromUtf8(s.id));
         cell(kColSet, fromUtf8(s.set));
-        cell(kColStart, QString::number(s.startM, 'f', 1));
-        cell(kColEnd, QString::number(s.endM, 'f', 1));
+        cell(kColStart, QString::number(toShown(s.startM), 'f', start_->decimals()));
+        cell(kColEnd, QString::number(toShown(s.endM), 'f', end_->decimals()));
         cell(kColCategory, fromUtf8(s.category));
+        cell(kColSpeedClass, fromUtf8(s.speedClass));
         cell(kColUser, s.userDefined ? tr("yes") : QString());
     }
-    end_->setMaximum(std::max(0.0, map->lengthM));
-    start_->setMaximum(std::max(0.0, map->lengthM));
+    end_->setMaximum(std::max(0.0, toShown(map->lengthM)));
+    start_->setMaximum(std::max(0.0, toShown(map->lengthM)));
+}
+
+// ---- M4: the Corr Dist display unit of the bounds (06 section 13.5 item 4, D-211 (c)) ---------------------
+
+QString TrackEditor::distanceUnit() const {
+    const units::UnitRegistry* reg = maths_.units().get();
+    if (reg == nullptr) {
+        return QStringLiteral("m");
+    }
+    const units::UnitId id = plot::corrDistDisplayUnit(*reg, overrideUnit(session_, "Corr Dist"),
+                                                       overrideUnit(session_, "Corr Speed"));
+    return reg->contains(id) ? fromUtf8(reg->unit(id).symbol) : QStringLiteral("m");
+}
+
+double TrackEditor::toShown(double metres) const {
+    const units::UnitRegistry* reg = maths_.units().get();
+    if (reg == nullptr) {
+        return metres;
+    }
+    const std::optional<units::UnitId> id = reg->find(distanceUnit().toStdString());
+    return id ? reg->fromBase(*id)(metres) : metres;
+}
+
+double TrackEditor::toMetres(double shown) const {
+    const units::UnitRegistry* reg = maths_.units().get();
+    if (reg == nullptr) {
+        return shown;
+    }
+    const std::optional<units::UnitId> id = reg->find(distanceUnit().toStdString());
+    return id ? reg->toBase(*id)(shown) : shown;
+}
+
+double TrackEditor::fieldMetres(const QDoubleSpinBox& field, std::optional<double> storedM,
+                                double lengthM) const {
+    const double shown = field.value();
+    if (storedM) {
+        // What the field showed when the section was loaded: the stored bound at the field's decimals.
+        const double loaded = std::clamp(QString::number(toShown(*storedM), 'f', field.decimals()).toDouble(),
+                                         field.minimum(), field.maximum());
+        if (std::abs(shown - loaded) < 0.5 * std::pow(10.0, -field.decimals())) {
+            return *storedM;
+        }
+    }
+    return std::clamp(toMetres(shown), 0.0, std::max(0.0, lengthM));
+}
+
+void TrackEditor::applyDistanceUnit() {
+    const QString unit = distanceUnit();
+    const units::UnitRegistry* reg = maths_.units().get();
+    const std::optional<units::UnitId> id = reg != nullptr ? reg->find(unit.toStdString()) : std::nullopt;
+    const double perMetre = id ? reg->fromBase(*id)(1.0) - reg->fromBase(*id)(0.0) : 1.0;
+    const QString label = id ? fromUtf8(reg->unit(*id).label()) : unit;
+    for (QDoubleSpinBox* s : {start_, end_}) {
+        const QSignalBlocker block(s);
+        s->setDecimals(decimalsFor(perMetre));
+        s->setSuffix(QLatin1Char(' ') + label);
+    }
+    table_->setHorizontalHeaderLabels({tr("Name"), tr("Set"), tr("Start (%1)").arg(label),
+                                       tr("End (%1)").arg(label), tr("Category"), tr("Speed class"),
+                                       tr("User")});
 }
 
 void TrackEditor::loadForm(int row) {
@@ -750,9 +846,21 @@ void TrackEditor::loadForm(int row) {
     const analysis::TrackSection& s = map->sections[static_cast<std::size_t>(row)];
     name_->setText(fromUtf8(s.name));
     set_->setText(fromUtf8(s.set));
-    start_->setValue(s.startM);
-    end_->setValue(s.endM);
+    start_->setValue(toShown(s.startM));
+    end_->setValue(toShown(s.endM));
     category_->setCurrentText(fromUtf8(s.category));
+    speedClass_->setCurrentIndex(std::max(0, speedClass_->findData(fromUtf8(s.speedClass))));
+}
+
+bool TrackEditor::checkSpeedClass(const std::string& speedClass) {
+    const auto& classes = analysis::TrackMap::kSpeedClasses;
+    if (speedClass.empty() ||
+        std::find(std::begin(classes), std::end(classes), speedClass) != std::end(classes)) {
+        return true;
+    }
+    error_ = tr("A section's speed class is slow, fast or none");
+    setStatus(error_);
+    return false;
 }
 
 bool TrackEditor::checkSection(const analysis::TrackMap& map, double startM, double endM,
@@ -793,7 +901,7 @@ void TrackEditor::setCursorSpan(std::optional<std::pair<double, double>> span) {
 }
 
 bool TrackEditor::addSection(const QString& name, double startM, double endM, const QString& category,
-                             const QString& set) {
+                             const QString& set, const QString& speedClass) {
     const std::shared_ptr<const analysis::TrackMap> map = currentMap();
     if (map == nullptr) {
         error_ = tr("No track map");
@@ -819,6 +927,10 @@ bool TrackEditor::addSection(const QString& name, double startM, double endM, co
     s.endM = endM;
     s.category = category.trimmed().isEmpty() ? std::string("corner") : category.trimmed().toStdString();
     s.userDefined = true;
+    s.speedClass = speedClass.trimmed().toStdString();
+    if (!checkSpeedClass(s.speedClass)) {
+        return false;
+    }
     next.sections.push_back(std::move(s));
     return pushMap(std::make_shared<const analysis::TrackMap>(std::move(next)),
                    tr("Add section %1").arg(name));
@@ -830,11 +942,12 @@ bool TrackEditor::addSectionFromCursorSpan(const QString& name) {
         return false;
     }
     const auto [a, b] = *cursorSpan_;
-    return addSection(name, std::min(a, b), std::max(a, b), category_->currentText(), set_->text());
+    return addSection(name, std::min(a, b), std::max(a, b), category_->currentText(), set_->text(),
+                      speedClass_->currentData().toString());
 }
 
 bool TrackEditor::editSection(const QString& id, const QString& name, double startM, double endM,
-                              const QString& category) {
+                              const QString& category, const std::optional<QString>& speedClass) {
     const std::shared_ptr<const analysis::TrackMap> map = currentMap();
     if (map == nullptr) {
         error_ = tr("No track map");
@@ -856,6 +969,12 @@ bool TrackEditor::editSection(const QString& id, const QString& name, double sta
     it->userDefined = true; // an edited default section is the user's: a regeneration keeps it (D-203 (n))
     if (!category.trimmed().isEmpty()) {
         it->category = category.trimmed().toStdString();
+    }
+    if (speedClass) {
+        it->speedClass = speedClass->trimmed().toStdString();
+        if (!checkSpeedClass(it->speedClass)) {
+            return false;
+        }
     }
     return pushMap(std::make_shared<const analysis::TrackMap>(std::move(next)),
                    tr("Edit section %1").arg(name));

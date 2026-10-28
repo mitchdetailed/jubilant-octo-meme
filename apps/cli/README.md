@@ -2,7 +2,8 @@
 
 Layer 3, Qt-free (08 §3.5). The command line of 05 §9.2 in its M0 scope (07 §3.1): inspect logs, validate
 documents and maintain the fixture corpus; from M2 also the maths commands of 03 §13 (`eval`, `maths check`,
-`maths functions`), the project-aware `export` and `fixture diff` (05 §9.2, 07 §5.1, D-181). `src/` is the internal library `esses_cli_core` (shared with
+`maths functions`), the project-aware `export` and `fixture diff` (05 §9.2, 07 §5.1, D-181); from M4 `convert` (05 §9.2,
+D-214). `src/` is the internal library `esses_cli_core` (shared with
 `esses-gen-fixtures` in `tools/` and the unit tests); `src/main.cpp` is the executable.
 
 | Command | What it does |
@@ -16,6 +17,7 @@ documents and maintain the fixture corpus; from M2 also the maths commands of 03
 | `maths functions [--json]` | the manifests of the function registry (03 §10.1) |
 | `fixture add <file> --format motec.ld --oracle ref-decode\|<dir> --out <dir> --licence <spdx> [--provenance <class>] [--private] [--validity strict\|finite-only] [--json] [...]` | writes a fixture directory (05 §9.1): `input.<ext>` and companions, `fixture.json`, `expected.probe.json`, `expected.markers.json`, `expected.laps.json` and `expected.channels/<NNN>_<name>.csv` **from the oracle** (`python -I tools/ld_ref_decode.py --dump-channel`), never from the reader (D-041). A public fixture needs `--licence` with a redistributable licence (checked before anything is written); `oracle.validity` defaults to `finite-only` for `--oracle ref-decode`, because the reference decoder does not decode gap blocks |
 | `export [<project>] <log> -o <file> [--channels a,b] [--range "Outings:Laps/3"] [--format csv\|motec.csv] [--rate Hz\|num/den] [--units "<channel>=<unit>,..."] [--layer L] [--importer id] [--options json] [--no-sidecar] [--json]` | opens the log as the application does for the project (its folder or `project.json`; without one, the built-in modules with their defaults): the project's mappings and unit maps at open, its maths modules in `mathsOrder`, the sidecar's local maths, the corrected speed and distance module with the project's settings and enable flag, the GPS corrections where both GPS inputs are logged, aliases and `options.maths.compat`. A name is the maths output when the graph has one (the head of its chain), else the logged channel (name, then logged name); an unknown name is exit 1; without `--channels` every logged channel no maths output shadows, then every maths output that evaluates. Units: a maths item's display unit, else its result unit, then the project's `overrides.json`, then `--units`, else the stored base unit. `--range` writes that range from time 0 and is the Main range of the selection-dependent maths. The maths evaluate on a `TaskPool` of the process (the CLI waits, 03 §7.4); the CSV is the plain (`csv`) or legacy (`motec.csv`) writer of 05 §6 on one grid (`--rate`, exact as for `eval` and at most 1 MHz, else the highest rate up to 1 kHz) |
+| `convert <input> --format csv\|motec.csv\|motec.ld -o <out> [--channels a,b] [--range "Outings:Laps/3"] [--rate Hz\|num/den] [--layer L] [--writer-options json] [--importer id] [--options json] [--no-sidecar] [--json]` | reader to writer without a project or maths (05 §9.2; `--to` is an alias of `--format`): the log's logged channels (by name, then logged name; all of the layer without `--channels`) through the plain or legacy CSV writer (one grid: `--rate`, else the highest rate up to 1 kHz; `--range` from time 0 at its start) or the export-only `.ld` writer: a whole `.ld` is written channel by channel from its stored bytes (read, write, read is bit-exact for samples and validity, 05 §5 item 8); with `--range` each channel keeps the samples whose time lies in the range, from time 0, re-quantised with its stored encoding, and the beacons and device events inside it move with it. The `.ld` writer does not resample in 0.1: `--rate` with `motec.ld` is exit 2, and a channel it cannot hold (timestamped, a rate that is not a whole number of Hz, text) is skipped with `ld.channel_skipped` (listed under `skipped` of `--json`). The output never replaces the input: an output (or a `.ld` output's `.ldx`) that is the input, its `.ldx` or its sidecar (also through another spelling, a case difference where the file system ignores case, or a hard link) is exit 2 before the log is read (the `.ldx` beside the output is protected only when the input is a `.ld`). Since D-217 (j): a `.ld` cut carries its own details (Log Time, and Log Date past midnight, moved to the cut's time 0; Start Lap the cut's first flying lap) instead of the input's header; a `.ldx` already beside a `.ld` output is removed when the writer writes none; a conversion that writes no channel removes what it began and exits 1 ("nothing is written"); a channel named twice in `--channels` is exit 2. `--json`: `input`, `output`, `format`, `files`, `bytes`, `channels` (written), `skipped`, `range`, `notes` |
 | `fixture verify [<dir>...] [--manifest file] [--if-present] [--update] [--json]` | re-probes, re-opens and re-decodes every fixture under the given directories (default `fixtures/`) and compares: input and companion sha256, `expected.probe.json`, the dialect, `expected.markers.json` and `expected.laps.json` byte for byte, every expected channel sample (timestamps exact; integers exact; F32/F64 within the fixture's ulp tolerance; validity per `oracle.validity`) (M2: timestamped channels compare their own time column). A private fixture without its input is `SKIP (private)`; a public one fails. A manifest (`{"fixtures": [{"dir", "input"}]}`) points fixture directories at inputs elsewhere (the user's files, or inputs generated into a build tree). `--update` rewrites the probe/markers/laps goldens, the hashes and the dialect, never the channel values |
 | `fixture diff [<dir>...] [--channel name] [--json]` | `fixture verify`'s checks explained: per channel the samples compared, how many differ, the largest F32/F64 ulp distance and the first differing sample with both values; the JSON Pointer of every difference (at most 25 per file) in `expected.probe.json`, `expected.markers.json` and `expected.laps.json`, which shows missing markers and laps; `--channel` limits the report to one channel (reader or oracle name). Exit 1 when a fixture differs |
 
@@ -46,7 +48,7 @@ oracle channel the reader does not make a channel (`ld.zero_rate`, `ld.unknown_d
   third-party, vendor-sample) and `oracle.validity` (strict, finite-only).
 - New schema `laps-1` (05 §15 item 15) for `laps --json` and `expected.laps.json`; `channels --json` has no
   schema yet.
-- `fixture diff`, `convert`, `export` and `units scan` are later milestones; `validate --all` exists since M2
+- `fixture diff` and `export` arrived in M2, `convert` in M4; `units scan` is a later milestone; `validate --all` exists since M2
   (the `lint` job runs it). There is no `bench` subcommand: the measured paths need Qt Gui, so the
   budget rows come from `esses-plot-bench` and `esses-open-bench` under `bench/` (D-155, proposed; 07 §4.5).
 
@@ -78,3 +80,24 @@ for an unknown channel) and `cli.fixture_diff.explains` (an altered copy of `fix
   `export` resolves `'Ground Speed'` through the project's mapping or alias.
 - `export` writes CSV only (`--format csv|motec.csv`); `motec.ld` output waits for `convert` (05 §9.2 makes `export`
   its alias). See D-181 for the name, unit and selection rules.
+
+## M4: `convert` and the golden-JSON tests of item 11 (D-214)
+
+- `convert` takes `--format` (05 §9.2 spells it `--to <writerId>`, kept as an alias) and writes logged channels only:
+  the project-aware path with maths stays `export` (D-181). `--range` on `motec.ld` cuts the layer in the CLI
+  because the export-only writer writes whole layers (`ld_export.cpp`, M0); resampling for `.ld` (05 §5 item 4) waits
+  for the export UI of v1.0. `--writer-options` passes `WriterOptions::options` (e.g. `{"ld":{"dialect":"m1"}}`).
+- `export --format motec.ld` stays refused (exit 2), now naming `convert`.
+- Tests (label `cli`; 07 §2.2 item 11, AC-M4-01): `cli.golden.info`, `.channels`, `.laps`, `.eval`, `.convert`,
+  `.export`, `.validate` and `.fixture`, each `tests/cli_golden.py <command>`: `info --json` equals the fixtures'
+  `expected.probe.json` and agrees with `tools/ld_ref_decode.py`; `channels --json` against the reference decoder (the
+  unit rule (c) of 05 §3.4 applied to its raw fields) and a text family's generator files; `laps --json` equals
+  `expected.laps.json`; `eval --json` is 2 v + 1 of the oracle at the channel's rate; `convert` round-trips six
+  families `.ld` -> `motec.ld` -> `fixture add --oracle ref-decode` (the oracle CSVs byte for byte; for the strict
+  gap family the values, and the reader's validity through `eval`), `fixture verify` on the converted file, markers
+  unchanged, a lap cut by `--range` to exactly its oracle samples, csv and motec.csv on the lap's grid with the
+  motec.csv read back, and the refusals; `export --json` without a project; `validate --json --schema` over every
+  `schemas/examples/<schema>` (statuses from the directory layout, error pointers from `expect.json`);
+  `fixture verify --json` over a manifest and `fixture add` reproducing the committed oracle. The `bench` row of item
+  11 is the benchmark executables' (D-155: `ctest -L bench`). Unit tests: `tests/convert_tests.cpp` (the overwrite
+  rule, the usage errors before the log is read).

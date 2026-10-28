@@ -6,7 +6,8 @@ scheme fonts and thread-safe text metrics, and the golden pixel comparison. Buil
 
 Namespace `esses::qt` (01 §1, shared with `esses_qtmodel`); public headers in `include/esses/qtrender/`
 (umbrella `qtrender.hpp`). Links `esses_plotcore` (plus `esses_project`, `esses_model`, `esses_store`,
-`esses_units`, `esses_base` for the types it names) and Qt Gui. Never links `esses_qtmodel` (forbidden edge) or
+`esses_units`, `esses_base` for the types it names) and Qt Gui, and privately Qt Gui's private API
+(`Qt6::GuiPrivate`, for `src/glyph_bins.cpp` only, D-220). Never links `esses_qtmodel` (forbidden edge) or
 Qt Widgets (`cmake/qt-free-check.cmake` rule 4). Compiled with `QT_NO_KEYWORDS` (PUBLIC): write `Q_SIGNALS`,
 `Q_SLOTS`, `Q_EMIT`. Sources (`src/**`, `include/**`) are globbed with AUTOMOC; every `tests/**/tst_<name>.cpp` is
 one Qt Test executable (`ctest -R qtrender.tst_`), run offscreen; `tests/qtrender_test_support.cpp` is compiled
@@ -23,7 +24,19 @@ into each.
 
 Internal (`src/`): `font_cache.*` (the one QFont construction rule, the style -> role table, per-thread font and
 `QStaticText` caches), `paint_internal.hpp` (text placement, command bounds and `paintStaticList`, shared by
-`RasterBackend` and `LayerCache`), `span_raster.*` (the Static-layer line rasteriser).
+`RasterBackend` and `LayerCache`), `span_raster.*` (the Static-layer line rasteriser), `glyph_bins.*` (one
+subpixel position count, 4, for every font engine that draws plot text, set before Qt computes one from the
+thread's first glyph-cache fill; on by default on macOS only, and only under the Qt version it was built against,
+D-220).
+
+Diagnostic probe (`probes/`, built only with `-DESSES_BUILD_PROBES=ON`, ctest label `probe`, never part of the
+suites; D-220): `probe_text_engines.cpp` (`qtrender.probe_text_engines`, plus `.cocoa` and `.freetype` on macOS
+and `.directwrite` and `.directwrite_scaled` on Windows) reports, as `PROBE ` lines, which font engine draws each
+scheme role on each thread, its subpixel position count after each DPR history, Qt's own count per glyph and
+scale, and the differing pixels of text drawn after different histories with the count pinned and not. The workflow
+`.github/workflows/probe.yml` runs it, on manual dispatch only: `gh workflow run probe.yml --ref <branch>` (macos-14;
+`-f windows=true` adds windows-2022 and the DirectWrite entries). GitHub dispatches a workflow only once its file is
+on the default branch, so this works after the merge that brings `probe.yml` to `main`.
 
 ## Behaviour notes
 
@@ -100,7 +113,7 @@ the pixel references in `tests/reference/` are geometry-only scenes and therefor
 | Test | Covers |
 |---|---|
 | `tst_raster_backend` | layer life cycle and free-list; every command at DPR 1 and 2 (exact pixels); slices, gaps, dashes; text anchors, elision, background, rotation, DPR scaling against `QtTextMetrics`; compose order; straight-alpha readback; Static rasteriser == QPainter picture, single blend of translucent strokes, scissor clipping of huge coordinates; `geometry_scene@{1,1.5,2}x.png` references |
-| `tst_static_strips` | `RasterBackend::rasteriseStatic` in strips == one `LayerCache::rasteriseStatic` pass (tolerance 0): geometry scene, split traces and text at DPR 1, 2 and 1.5, text across every strip edge at subpixel glyph positions, the eight `time_distance` golden cases; clear colour; one strip on a NoBlock thread; spare-buffer reuse |
+| `tst_static_strips` | `RasterBackend::rasteriseStatic` in strips == one `LayerCache::rasteriseStatic` pass (tolerance 0): geometry scene, split traces and text at DPR 1, 2 and 1.5, text across every strip edge at subpixel glyph positions, the eight `time_distance` golden cases; clear colour; one strip on a NoBlock thread; spare-buffer reuse; text a thread draws at DPR 1 after DPR 2 == text a thread draws at DPR 1 first (D-220; on macOS also an informational control with the pinning off) |
 | `tst_layer_cache` | the ChangeMask table of 04 §2.2 bit by bit (recomposition only on the right masks); resize; buffer reuse; damage = cursor strips + key column at DPR 1 and 2; `paint` == `RasterBackend::compose`; exposed-region clipping |
 | `tst_text_metrics_concurrency` | 8 threads measuring while the GUI thread swaps schemes (200 snapshots); per-snapshot caches; metrics == `SchemeFonts` fonts |
 | `tst_scheme_fonts` | style -> role table, QFont attributes, caption fallback, golden font registration |
@@ -151,3 +164,20 @@ scale 1 takes the M1 path unchanged, so no layer and no golden changed. `LayerCa
 scaled run through the same bounds. Tested by `qtrender.tst_text_scale` (ink growing with the scale, elision and
 the background box at the scaled size, the Dynamic damage covering the scaled ink, the JSON form) and through
 the numeric gauges of `golden.tst_golden_plots`.
+
+## M4 hidpi: crisp strokes and whole-pixel painting at a fractional DPR (AC-M4-07; D-209)
+
+At DPR 1.25 and 1.5 a builder's line of logical width x DPR is 1.25, 1.5 or 2 device px wide and lies on a pixel
+centre or a data position, which antialiasing spreads over a pixel more than its width. `RasterBackend` draws a
+`Polyline` or `Lines` command of a list at a fractional DPR that is wider than 1 px and made only of horizontal and
+vertical segments `lround(width)` px wide on whole device pixels (`raster_backend.hpp` item 7), the same on both paths
+(the Static span rasteriser and `paintList`). Slanted strokes, dots, text, every list at DPR 1 and 2 and the `DrawList`
+itself are unchanged, so no golden at 1 or 2 and no `DrawList` JSON golden changed. `LayerCache::paint` paints the
+Dynamic and Chrome lists from the whole device pixel where the raster engine blits the Static image, so a widget at
+a fractional device position shows `composite()` pixel for pixel. The geometry-only reference
+`tests/reference/geometry_scene@1.5x.png` was re-rendered for the crisp grid lines and segments (the 1x and 2x
+references are unchanged). Tests: `tests/tst_crisp_strokes.cpp` (`qtrender.tst_crisp_strokes`: pixel sets computed
+from the rule at 1.25 and 1.5 on both paths, DPR 1 and 2 as before, `paint` from a fractional origin) and
+`tests/golden/images/tst_dpr_goldens.cpp` (`golden.tst_dpr_goldens`: the `DrawList` JSON goldens of the seven drawn
+MVP types at DPR 1.25 and 1.5 in `tests/golden/images/dpr_sweep/<type>/`, exact on every OS, with the whole-pixel
+check and the drift from DPR 1).

@@ -11,7 +11,9 @@ decision first amends the decision.
 
 - The official distribution contains only MIT-licensed code of this project. Third-party components keep their
   own licences and are listed in `NOTICES.md`; GPL-only libraries are never linked, and LGPL components (Qt,
-  Qt Advanced Docking System) are linked dynamically and unmodified.
+  Qt Advanced Docking System) are linked dynamically. Qt is unmodified. The vendored Qt Advanced Docking System
+  is changed only to fix a defect upstream has not fixed: each change is listed with its date, reason and upstream
+  status in `third_party/qtads/UPSTREAM.md` and marked in the changed file (LGPL-2.1 section 2).
 - **No relicensing without every contributor's consent.** The project will not change the licence of
   contributed code unless every contributor whose work is affected agrees in writing.
 - **No CLA.** Contributors keep their copyright. Sign-off under the Developer Certificate of Origin (`DCO`) is

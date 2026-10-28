@@ -17,6 +17,9 @@
 #include <QPainter>
 #include <QPen>
 #include <QScrollBar>
+#include <QStyle>
+#include <QStyleOptionViewItem>
+#include <QStyledItemDelegate>
 #include <QTableView>
 #include <QVBoxLayout>
 #include <algorithm>
@@ -105,14 +108,40 @@ QVariant ReportStyleProxy::data(const QModelIndex& index, int role) const {
     }
 }
 
+// ---- ReportCellDelegate ---------------------------------------------------------------------------------
+
+// The cells of both views (report_table.hpp): as QStyledItemDelegate paints them, without the keyboard-focus
+// and hover states while the table is painted for Print to Clipboard.
+class ReportCellDelegate final : public QStyledItemDelegate {
+public:
+    using QStyledItemDelegate::QStyledItemDelegate;
+
+    void setExporting(bool on) { exporting_ = on; }
+
+    void paint(QPainter* painter, const QStyleOptionViewItem& option,
+               const QModelIndex& index) const override {
+        if (!exporting_) {
+            QStyledItemDelegate::paint(painter, option, index);
+            return;
+        }
+        QStyleOptionViewItem plain = option;
+        plain.state &= ~(QStyle::State_HasFocus | QStyle::State_MouseOver);
+        QStyledItemDelegate::paint(painter, plain, index);
+    }
+
+private:
+    bool exporting_ = false;
+};
+
 // ---- ReportTable ----------------------------------------------------------------------------------------
 
 ReportTable::ReportTable(QAbstractItemModel* model, QWidget* parent)
     : QWidget(parent), proxy_(new ReportStyleProxy(this)), caption_(new QLabel(this)),
-      frozen_(new QTableView(this)), body_(new QTableView(this)) {
+      frozen_(new QTableView(this)), body_(new QTableView(this)), delegate_(new ReportCellDelegate(this)) {
     proxy_->setSourceModel(model);
     for (QTableView* v : {frozen_, body_}) {
         v->setModel(proxy_);
+        v->setItemDelegate(delegate_);
         setupView(v);
     }
     frozen_->setSelectionModel(body_->selectionModel());
@@ -130,6 +159,8 @@ ReportTable::ReportTable(QAbstractItemModel* model, QWidget* parent)
             &QScrollBar::setValue);
     connect(proxy_, &QAbstractItemModel::modelReset, this, &ReportTable::relayoutColumns);
     connect(proxy_, &QAbstractItemModel::layoutChanged, this, &ReportTable::relayoutColumns);
+    // ReportModel updates a table of the same shape in place (D-210 (e)): its texts may need other widths.
+    connect(proxy_, &QAbstractItemModel::dataChanged, this, &ReportTable::relayoutColumns);
 
     caption_->setObjectName(QStringLiteral("reportCaption"));
     caption_->setContentsMargins(4, 1, 4, 1);
@@ -255,6 +286,10 @@ void ReportTable::applyScheme(const project::Scheme& scheme) {
 void ReportTable::setCaption(const QString& text, bool show) {
     caption_->setText(text);
     caption_->setVisible(show);
+}
+
+void ReportTable::setExporting(bool on) {
+    delegate_->setExporting(on);
 }
 
 void ReportTable::setFocusFrame(bool shown, QColor colour) {

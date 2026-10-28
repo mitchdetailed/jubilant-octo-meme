@@ -20,6 +20,7 @@
 #include <QSignalBlocker>
 #include <QSpinBox>
 #include <QVBoxLayout>
+#include <QVariant>
 #include <algorithm>
 #include <climits>
 #include <cmath>
@@ -130,6 +131,15 @@ QWidget* makeLeafEditor(FieldKind kind, const QStringList& enumValues, const QJs
         c->setProperty("esses.channelPicker", true);
         return c;
     }
+    case FieldKind::Unit: { // M4 (D-211 (b)): the units of the sibling channel's quantity, free text allowed
+        auto* c = new QComboBox(parent);
+        c->setEditable(true);
+        c->setInsertPolicy(QComboBox::NoInsert);
+        c->setProperty("esses.unitPicker", true);
+        c->addItem(QString());
+        c->setEditText(QString());
+        return c;
+    }
     case FieldKind::Text:
         if (!enumValues.isEmpty()) {
             // A heading picker (04 section 12 item 6; D-203 (y)): the suggestions, free text still allowed.
@@ -188,6 +198,7 @@ QJsonValue leafValue(FieldKind kind, const QWidget* editor) {
         }
         break;
     case FieldKind::Channel:
+    case FieldKind::Unit:
         if (const auto* c = qobject_cast<const QComboBox*>(editor)) {
             return c->currentText();
         }
@@ -236,6 +247,7 @@ void setLeafValue(FieldKind kind, QWidget* editor, const QJsonValue& value) {
         }
         return;
     case FieldKind::Channel:
+    case FieldKind::Unit:
         if (auto* c = qobject_cast<QComboBox*>(editor)) {
             c->setEditText(value.toString());
         }
@@ -307,6 +319,98 @@ void markInvalid(QWidget* editor, const QString& reason) {
     if (leaf) {
         editor->setStyleSheet(invalid ? QStringLiteral("border: 1px solid #d03030;") : QString());
     }
+}
+
+// ---- display-unit pickers (M4, D-211 (b)) -----------------------------------------------------------------
+
+namespace {
+
+constexpr const char* kUnitOf = "esses.unitOf";
+constexpr const char* kUnitsByChannel = "esses.unitsByChannel";
+
+QComboBox* unitPicker(QWidget* editor) {
+    auto* c = qobject_cast<QComboBox*>(editor);
+    return c != nullptr && c->property("esses.unitPicker").toBool() ? c : nullptr;
+}
+
+// The Channel editor a Unit editor follows: the sibling named by its unitOf pointer.
+const QComboBox* linkedChannel(const QComboBox& unit) {
+    const QString of = unit.property(kUnitOf).toString();
+    const QWidget* parent = unit.parentWidget();
+    if (of.isEmpty() || parent == nullptr) {
+        return nullptr;
+    }
+    return parent->findChild<QComboBox*>(of, Qt::FindDirectChildrenOnly);
+}
+
+// The items of a Unit editor from its table and its channel's current name; the text is kept.
+void refreshUnitItems(QComboBox& unit) {
+    const QComboBox* channel = linkedChannel(unit);
+    const QVariantHash table = unit.property(kUnitsByChannel).toHash();
+    QStringList items{QString()};
+    if (channel != nullptr) {
+        items += table.value(channel->currentText()).toStringList();
+    }
+    QStringList now;
+    for (int i = 0; i < unit.count(); ++i) {
+        now.push_back(unit.itemText(i));
+    }
+    if (now == items) {
+        return;
+    }
+    const QString text = unit.currentText();
+    const QSignalBlocker block(&unit);
+    unit.clear();
+    unit.addItems(items);
+    unit.setEditText(text);
+}
+
+} // namespace
+
+void setUnitOf(QWidget* unitEditor, const QString& channelPointer) {
+    if (QComboBox* c = unitPicker(unitEditor)) {
+        c->setProperty(kUnitOf, channelPointer);
+    }
+}
+
+void linkUnitPickers(QWidget* parent) {
+    if (parent == nullptr) {
+        return;
+    }
+    for (QComboBox* unit : parent->findChildren<QComboBox*>(QString(), Qt::FindDirectChildrenOnly)) {
+        if (unitPicker(unit) == nullptr || unit->property("esses.unitLinked").toBool()) {
+            continue;
+        }
+        const QComboBox* channel = linkedChannel(*unit);
+        if (channel == nullptr) {
+            continue;
+        }
+        unit->setProperty("esses.unitLinked", true);
+        QObject::connect(channel, &QComboBox::editTextChanged, unit, [unit] { refreshUnitItems(*unit); });
+    }
+}
+
+void setUnitChoices(QWidget* unitEditor, const QHash<QString, QStringList>& unitsByChannel) {
+    QComboBox* c = unitPicker(unitEditor);
+    if (c == nullptr) {
+        return;
+    }
+    QVariantHash table;
+    for (auto it = unitsByChannel.begin(); it != unitsByChannel.end(); ++it) {
+        table.insert(it.key(), it.value());
+    }
+    c->setProperty(kUnitsByChannel, table);
+    refreshUnitItems(*c);
+}
+
+QStringList unitChoices(const QWidget* unitEditor) {
+    QStringList out;
+    if (const auto* c = qobject_cast<const QComboBox*>(unitEditor)) {
+        for (int i = 0; i < c->count(); ++i) {
+            out.push_back(c->itemText(i));
+        }
+    }
+    return out;
 }
 
 // ---- FieldEditor ------------------------------------------------------------------------------------------
@@ -402,10 +506,12 @@ FieldForm::FieldForm(std::vector<FieldRow> rows, const SchemaTree* schema, const
             continue;
         }
         editor->setObjectName(r.pointer);
+        setUnitOf(editor, r.unitOf);
         form->addRow(r.label, editor);
         const QStringList values = r.enumValues.isEmpty() ? SchemaTree::enumValues(node) : r.enumValues;
         binder_->bind(r.pointer, r.kind, editor, r.label, values);
     }
+    linkUnitPickers(this);
     connect(binder_, &FieldBinder::edited, this, &FieldEditor::edited);
 }
 

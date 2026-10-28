@@ -121,11 +121,11 @@ std::shared_ptr<const analysis::TrackMap> octagon() {
         map->inner.push_back(analysis::TrackPoint{x * 0.9 + 15.0, y * 0.9 + 10.0, 0.0});
     }
     map->sections = {
-        analysis::TrackSection{"t1", "Default", "Turn 1", 280.0, 420.0, "corner", false},
-        analysis::TrackSection{"s1", "Default", "Back Straight", 420.0, 700.0, "straight", false},
-        analysis::TrackSection{"t2", "Default", "Turn 2", 700.0, 980.0, "corner", false},
-        analysis::TrackSection{"u1", "Mine", "Braking", 250.0, 300.0, "braking", true},
-        analysis::TrackSection{"s2", "Default", "Start Straight", 1180.0, 1240.0, "straight", false},
+        analysis::TrackSection{"t1", "Default", "Turn 1", 280.0, 420.0, "corner", false, ""},
+        analysis::TrackSection{"s1", "Default", "Back Straight", 420.0, 700.0, "straight", false, ""},
+        analysis::TrackSection{"t2", "Default", "Turn 2", 700.0, 980.0, "corner", false, ""},
+        analysis::TrackSection{"u1", "Mine", "Braking", 250.0, 300.0, "braking", true, ""},
+        analysis::TrackSection{"s2", "Default", "Start Straight", 1180.0, 1240.0, "straight", false, ""},
     };
     return map;
 }

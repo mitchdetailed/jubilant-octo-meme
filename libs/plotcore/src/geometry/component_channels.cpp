@@ -72,7 +72,7 @@ std::vector<ChannelUse> channelReportChannels(const JsonDoc& body) {
         return out;
     }
     for (const analysis::ReportChannel& c : spec->channels) {
-        out.push_back(ChannelUse{c.name, {}, std::nullopt});
+        out.push_back(ChannelUse{c.name, c.displayUnit, std::nullopt});
     }
     return out;
 }

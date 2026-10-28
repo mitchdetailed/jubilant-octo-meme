@@ -74,7 +74,8 @@ public:
     const plot::HitTester& hits() const noexcept { return hits_; }
     // The inputs of the current layers (adjusted); empty until the first build request.
     const plot::ComponentBuildInputs& inputs() const noexcept { return inputs_; }
-    // No Static build is dirty, scheduled or in flight: the Static image shows the current inputs.
+    // No Static build is dirty, scheduled or in flight and no size change waits in the 30 Hz throttle
+    // (sizeChangePending): the Static image shows the current inputs at the current size.
     bool staticUpToDate() const noexcept;
     bool pendingStripeShown() const noexcept { return pendingShown_; }
     std::uint64_t builtViewVersion() const noexcept { return builtViewVersion_; }
@@ -101,6 +102,8 @@ protected:
     LayeredComponent(const project::ComponentSpec& spec, WorksheetContext& context, Builders builders,
                      plot::ChangeMask staticMask, QWidget* parent);
 
+    // M4 (D-211 (f)): the Main slot's mapping of the prepared inputs (an unlinked part's own view).
+    std::optional<plot::DomainMapper> mainMapper() const override;
     // Called on the prepared inputs before every build (Static, Dynamic, Chrome): a subclass's transient view
     // state that is not persisted (the scatter's own axis zoom).
     virtual void adjustInputs(plot::ComponentBuildInputs& inputs) const;

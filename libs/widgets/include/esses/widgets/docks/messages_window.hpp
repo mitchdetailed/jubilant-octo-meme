@@ -10,12 +10,18 @@
 // Error of a session (MessagesModel::firstError) unless the user turned that off.
 // M1 simplification: the Import Log of each file is a run of rows with that file as source (the collapsible
 // per-file group arrives with the M2 importers).
+// M4 (budget package, D-206 (d)-(e), D-207): a row's alternate action (qt::Message::altAction, the budget
+// warning's Cancel) shows as a second suffix and runs on SHIFT+double-click or SHIFT+ENTER
+// (invokeAltAction); the context menu of a row offers both actions. The Stats line above the list
+// (objectName "messagesStats", hidden until the first showPerformance) shows qt::performanceDetails.
 #pragma once
 
 #include <QWidget>
 
+class QLabel;
 class QLineEdit;
 class QListView;
+class QMenu;
 class QModelIndex;
 class QSortFilterProxyModel;
 class QToolButton;
@@ -23,6 +29,7 @@ class QToolButton;
 namespace esses::qt {
 class CommandRegistry;
 class MessagesModel;
+struct PerformanceSnapshot;
 } // namespace esses::qt
 
 namespace esses::widgets {
@@ -48,11 +55,26 @@ public:
     // Runs the action of a row of the list (proxy index); false when it has none or it is disabled.
     bool invokeAction(const QModelIndex& index);
 
+    // ---- M4 budget (D-206; package budget, src/docks/m4_budget/messages_window_budget.cpp) ----
+    // Runs the alternate action of a row (qt::Message::altAction: the budget warning's Cancel beside its
+    // Continue); false when it has none or it is disabled.
+    bool invokeAltAction(const QModelIndex& index);
+    // The dock's Stats line (D-011 "Stats surfaced in MessagesWindow"): qt::performanceDetails of the newest
+    // snapshot, shown above the list (hidden again by an empty snapshot).
+    void showPerformance(const qt::PerformanceSnapshot& snapshot);
+    // The text showPerformance shows now (empty before the first snapshot).
+    QString performanceText() const;
+    // The context menu of a row (proxy index): one entry per action of the row, each running it; nullptr when
+    // the row has none. A child of this window, replaced by the next call (the list's context menu pops it
+    // up).
+    QMenu* rowMenu(const QModelIndex& index);
+
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
     void updateCounts();
+    bool runAction(const QModelIndex& index, bool alternate);
 
     qt::MessagesModel& model_;
     qt::CommandRegistry& commands_;
@@ -60,6 +82,8 @@ private:
     QListView* list_ = nullptr;
     QLineEdit* filter_ = nullptr;
     QToolButton* severityButtons_[3] = {nullptr, nullptr, nullptr};
+    QLabel* stats_ = nullptr;  // M4 budget: the Stats line
+    QMenu* rowMenu_ = nullptr; // M4 budget: the last row menu
 };
 
 } // namespace esses::widgets

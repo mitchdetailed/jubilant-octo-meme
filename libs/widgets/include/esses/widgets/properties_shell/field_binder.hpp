@@ -48,7 +48,11 @@ enum class FieldKind : std::uint8_t {
     Channel,     // channel picker (a name)
     BandAxis,    // the BandAxis editor
     ColourBands, // the ColourBands editor
-    Custom       // a custom widget that owns the subtree (groups tree, scatter Y list)
+    Custom,      // a custom widget that owns the subtree (groups tree, scatter Y list)
+    // Added by M4 (D-211 (b)): a display unit (a unit symbol, "" = the channel's default display unit),
+    // picked from the units of the quantity of the channel a sibling Channel field names (field_editors.hpp
+    // linkUnitPickers); free text stays allowed.
+    Unit
 };
 
 struct FieldBinding {

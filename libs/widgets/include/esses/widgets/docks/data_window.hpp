@@ -15,7 +15,7 @@
 // sets it as Main; the Trusted cell is a checkbox. The highlight follows Main when Main changes by N/P/CTRL+F
 // (Main forced into view). Context menu: Set Main / Toggle Overlay 0 / Toggle Overlay, Filters, Apply Filter
 // To All Sources, Trusted, Lap Editor... and Details... (when the shell registered tools.lap_editor /
-// tools.details), Close File (Clear Offsets For This Source, Reload File and Reveal In File Manager arrive
+// tools.details), Close File (Clear Offsets For This Source and Reveal In File Manager arrive
 // later). Filters (06 sections 5.4 and 6, M2): the Filters submenu of the row's source checks the source's
 // kind (All, Selected, Fastest, Fastest 3, Within 1 % of Fastest, Lap Numbers...) and sets it through
 // DataSelectionModel::setFilter; Apply Filter To All Sources is the shared data.filter_all_sources action (or
@@ -24,6 +24,10 @@
 // that does not parse, keeps the previous filter and the editor open with the error. Rows shown only because
 // they hold a selection slot carry a filter icon and say so in their tool tip; a filtered source row carries
 // the icon with the filter's name.
+// M4 reload (06 section 6): Reload File in the context menu, before Close File (file.reload_source on the
+// row's source when the shell registered it, enabled when that source is stale), and the stale badge, an
+// amber disc with an exclamation mark, before the filter icon on a source row whose file changed on disk
+// (DataWindowModel::StaleRole; item 1).
 #pragma once
 
 #include <esses/model/ids.hpp>

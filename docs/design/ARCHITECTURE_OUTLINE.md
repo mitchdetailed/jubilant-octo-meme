@@ -397,6 +397,110 @@ Registered under the §10 rule when the M3 headers were laid down (`docs/milesto
   `WorksheetCanvas`'s selection, geometry, z-order and lock members with `componentSpecApplied`/`layoutEdited`/
   `selectionChanged` (D-200).
 
+### Names added by the M4 contracts (2026-10-18, D-206)
+
+Registered under the §10 rule when the M4 headers were laid down (`docs/milestones/M4.md` §2); each name's header
+says which package owns it. Every one is implemented as built by its package (the sections below; no contract stub is
+left at the integration of wave 2, D-216).
+- `esses_formats`: `ResidentEstimate`, `estimateChannel`, `estimateResident` (from a `ProbeResult` and from a
+  `DataSource`); `SourceFileState`, `sourceFileStateName`, `SourceFileCheck`, `checkSourceFile`.
+- `esses_qtmodel`: `kBudgetSettingKey`, `kMinBudgetBytes`, `budgetFromSettings`, `OpenBudgetCheck`,
+  `budgetWarningText`, `formatBytes`, `PerformanceSnapshot`, `performanceLine`, `performanceDetails`,
+  `PerformanceMonitor`; `SourceLoader::setBudgetGate`/`budgetGate`/`continueOverBudget`/`cancelOverBudget`/
+  `pendingBudgetOpens`/`pendingBudgetCheck`/`checkChangedFiles`/`isStale`/`staleSources`/`reload`/`pendingReloads`
+  and the signals `budgetExceeded`, `staleChanged`, `sourceReloaded`, `summariesReady`; `Message::altAction`/
+  `altActionArgs`, `MessagesModel::AltActionRole`; `DataWindowModel::StaleRole`/`StaleQuery`/`setStaleQuery`/
+  `isStale`/`refreshStale`.
+- `esses_widgets`: `ShellExtension`, `shellExtension<T>`, `BudgetShell`, `ReloadShell`, `HiDpiShell`,
+  `FollowupsShell`, `AboutShell`, `DocsShell`, `DprWatcher`, `AboutDialog`, `BuildInfo`, `buildInfo`,
+  `versionReport`, `qtLicenceNotice`, `sourceUrl`; `ComponentWidget::recheckDevicePixelRatio`, `DockHost::windowOf`,
+  `MessagesWindow::invokeAltAction`/`showPerformance`/`performanceText`.
+
+### Names added by the M4 budget package (2026-10-18, D-207)
+
+- `esses_widgets`: `BudgetShell::kWarningCode` (`budget.open_estimate`, the Messages row of the open-time warning),
+  `BudgetShell::runtimeBudget`; `MessagesWindow::rowMenu` (a row's context menu with its action and alternate
+  action).
+- Import Log code `open.budget_cancelled` (`SourceLoader`: an open held at the budget gate was cancelled).
+- Bench row `open.resident_rw2_20maths` (`bench/open_bench`, AC-M4-02, 07 §12).
+
+### Names added by the M4 reload package (2026-10-18, D-208)
+
+- `esses_qtmodel`: `source_reload.hpp` with `connectSourceReload`, `staleSourceMessage`, `sourceIdArgument`,
+  `parseSourceIdArgument`, `kReloadSourceCommand`, `kFileChangedCode`; `DataSelectionModel::sourceReloaded` and
+  `DataSelectionModel::kParkedCloses`.
+
+### Names added by the M4 hidpi package (2026-10-18, D-209)
+
+- `esses_widgets`: `WorksheetCanvas::refreshGeometry`; `HiDpiShell::dockRefreshes`/`dockRefreshRebuilds`.
+
+### Names added by the M4 followups of esses_qtmodel and the Qt-free libraries (2026-10-18, D-210)
+
+- `esses_analysis`: `ReportOptions::ignoreInterpolated` (`channel_report-1` `options.ignoreInterpolated`).
+- `esses_qtmodel`: `TrackMapService::asynchronous`/`isLoading`/`mapStamp`/`pendingIo` and the signal
+  `venuesChanged`.
+
+### Names added by the M4 followups of esses_widgets (2026-10-18, D-211)
+
+- `esses_plotcore`: `display_units.hpp` with `defaultDisplayUnit`, `displayUnitFor`, `corrDistDisplayUnit`;
+  `ResolvedChannel::displayUnitId`; `ScatterBody::xDisplayUnit`/`colourDisplayUnit`, `ScatterTrace::displayUnit`
+  (`scatter-1` `xDisplayUnit`, `traces[].displayUnit`, `colourChannel.displayUnit`).
+- `esses_analysis`: `ReportChannel::displayUnit` (`channel_report-1` `report.channels[].displayUnit`);
+  `TrackSection::speedClass`, `TrackMap::kSpeedClasses` (`track-1` `sections[].speedClass`).
+- `esses_qtmodel`: `ValuesModel::ViewSource`/`setViewSource`.
+- `esses_widgets`: `ComponentWidget::zoomLinked`/`cursorLinked`/`datumLinked`/`viewState`/`setViewCursor`/
+  `setViewZoom`/`viewPanBy`/`viewZoomFull`/`mainMapper`/`mainMapperOf`; `FieldKind::Unit`, `FieldRow::unitOf`,
+  `setUnitOf`, `linkUnitPickers`, `setUnitChoices`, `unitChoices`; `PropertiesDialog::focusRecord`;
+  `TimeDistanceGraph::moveGroup`/`openGroupProperties`/`groupDropIndex`; `TrackEditor::distanceUnit`/
+  `startField`/`endField`/`speedClassField` and the `speedClass` parameters of `addSection`/`editSection`;
+  `FollowupsShell::lastSummaryDeliveries`.
+
+### Names added by the M4 packaging package (2026-10-19, D-212)
+
+- `esses_widgets` (`about_dialog.hpp`): `kRepositoryUrl`, `BuildInfo::releaseTag`, `dockLibraryNotice`,
+  `sourceUrlFor`, `qtSourceArchiveUrl`, `noticesUrl`, `AboutDialog(const Paths&, QWidget*)`, `AboutDialog::html`/
+  `noticesLink`/`copyButton`.
+- `esses` (`apps/app/src`, namespace `esses::app`; the application's own, not a library): `LaunchRequest`
+  (`toMessage`, `fromMessage`, `kProtocol`, `kMaxLogs`), `CommandLine`, `shouldForward`, `absoluteFrom`,
+  `isProjectArgument`; `InstanceServer` (`listen`, `close`, `requestReceived`, `clientRefused`), `forwardToInstance`,
+  `ForwardResult`, `instanceName`, `instanceAddress`, `kMaxMessageBytes`, `kClientTimeoutMs`, `kForwardTimeoutMs`;
+  `openRequestedFiles`, `LaunchKind`, `applyScheme`, `applyKeymap`, `applyStartOptions`, `bringToFront`.
+- Command-line options of `esses`: `--new-instance`, `--scheme`, `--keymap` (06 §19, now built); environment
+  `ESSES_INSTANCE_NAME`; Messages codes `launch.scheme`, `launch.keymap`.
+- Build: the cache variable `ESSES_RELEASE_TAG`, the install components `app` and `cli`,
+  `<build>/packaging/package_info.json` (`esses-package-info-1`); `tools/packaging/third_party.json`.
+
+### Names added by the M4 soak, walkthrough and docs packages (2026-10-19, D-213, D-214, D-215)
+
+- Soak (test code only, `tests/soak/`, namespace `esses::soak`): the environment `ESSES_SOAK_SECONDS`,
+  `ESSES_SOAK_MIN_CYCLES`, `ESSES_SOAK_SCALE`, `ESSES_SOAK_SETTLE_SECONDS`, `ESSES_SOAK_LOG_DIR`, `ESSES_SOAK_CRT_CHECK`,
+  `ESSES_SOAK_SELFTEST`; the ctest label `soak`; `tests/soak/lsan.supp`, `tests/soak/lsan_check.py`.
+- `esses-cli convert` (`apps/cli/src/convert.hpp`, namespace `esses::cli`): `ConvertOptions`, `runConvert`,
+  `convertWouldOverwriteInput`; the options `--format` (alias `--to`; `csv`, `motec.csv`, `motec.ld`), `--channels`,
+  `--range`, `--rate`, `--layer`, `--writer-options`, `-o`.
+- `esses_widgets` (`docs_shell.hpp`): `DocsShell::openContents`, `installedStartPage`, `onlineUrl`, `UrlOpener`,
+  `kStartPage`, `kRepositoryUrl`, `kNotOpenedCode` (the Messages code `help.not_opened`); `docs/user/` (the guide,
+  `index.md` its start page).
+
+### Names added by the M4 integration (2026-10-19, D-216)
+
+- Build: `esses_add_qt_test(... ARGS ...)`, `esses_add_qt_test_entry` (`cmake/esses_targets.cmake`);
+  `esses_version_from_git` (`cmake/version_parse.cmake`); ctest entries `soak.guard`, `lint.version_stamp`,
+  `app.tst_demo_command_line`. `DocsShell::kRepositoryUrl` is now the About dialog's `kRepositoryUrl`.
+
+### Names added by the M4 fix pass (2026-10-19, D-217)
+
+- `esses_qtmodel`: `SourceLoader::checkChangedFilesInBackground`, `fileChecksPending`, `staleState`,
+  `setFileCheckForTest`; `analysis::ReportChannelLookup` takes the spec's `ReportChannel` (name and display unit).
+- `esses_widgets`: `MainWindow::projectOpenCancelled`; `DocsShell::HandlerQuery`, `setHandlerQuery`,
+  `hasDefaultHandler`.
+- `esses` (apps/app): `RequestQueue`, `reportNoInstanceChannel`; the settings folder's `instance.salt`;
+  `ESSES_STARTUP_PROBE` (the startup bench's ready line); Messages codes `launch.instance` (Warning: no channel)
+  and `launch.cancelled` (Info: a forwarded project switch cancelled). `esses-cli`: `cutDetails` (convert.hpp).
+- Build: `esses_git_describe` (`cmake/version_parse.cmake`), the option `ESSES_BENCH_GATE`; ctest entries
+  `lint.version_git`, `lint.bench_presets`; bench rows `plot.relayout_resize_20tr`, `values.refresh_250ch`,
+  `app.startup_empty_warm`.
+
 ---
 
 ## 5. Persisted files and schemas

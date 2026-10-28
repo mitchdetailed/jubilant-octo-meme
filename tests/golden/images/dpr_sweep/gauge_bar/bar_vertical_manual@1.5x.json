@@ -1,0 +1,22 @@
+{"case":"bar_vertical_manual","type":"gauge_bar","dpr":1.5,
+"static":{"w":225,"h":390,"dpr":1.5,"cmds":[
+{"k":"clear","c":"#ffffff"},
+{"k":"rect","c":"#f7f7f8","r":[39,65,180,309]},
+{"k":"lines","c":"#202124","w":1.5,"d":"solid","v":[34.5,374,39,374,34.5,271,39,271,34.5,168,39,168,34.5,65,39,65]},
+{"k":"text","t":"0","x":31.5,"y":374,"style":"axis","anchor":"middleRight","c":"#202124","maxw":22.5},
+{"k":"text","t":"20","x":31.5,"y":271,"style":"axis","anchor":"middleRight","c":"#202124","maxw":22.5},
+{"k":"text","t":"40","x":31.5,"y":168,"style":"axis","anchor":"middleRight","c":"#202124","maxw":22.5},
+{"k":"text","t":"60","x":31.5,"y":65,"style":"axis","anchor":"middleRight","c":"#202124","maxw":22.5},
+{"k":"lines","c":"#e53935","w":4,"d":"solid","v":[39,168,219,168]},
+{"k":"polyline","c":"#a0a4a8","w":2,"d":"solid","v":[40,66,218,66,218,373,40,373,40,66]}
+]}
+,"dynamic":{"w":225,"h":390,"dpr":1.5,"cmds":[
+{"k":"rect","c":"#d32f2f","r":[39,119.93,180,254.07]},
+{"k":"lines","c":"#8a8f96","w":4,"d":"solid","v":[39,120,219,120]},
+{"k":"text","t":"49.3","x":129,"y":116.93,"style":"keyValue","anchor":"bottomCentre","c":"#202124","maxw":180,"bg":"#ffffff"}
+]}
+,"chrome":{"w":225,"h":390,"dpr":1.5,"cmds":[
+{"k":"rect","c":"#e8eaed","r":[0,0,225,27]},
+{"k":"text","t":"Brake Pres","x":6,"y":13.5,"style":"caption","anchor":"middleLeft","c":"#202124","maxw":213}
+]}
+}

@@ -150,6 +150,10 @@
           },
           "userDefined": {
             "type": "boolean"
+          },
+          "speedClass": {
+            "description": "The section's speed class (06 section 13.5 item 4, D-211); absent: none.",
+            "enum": ["slow", "fast"]
           }
         }
       }

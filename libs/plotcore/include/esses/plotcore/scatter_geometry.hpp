@@ -45,12 +45,15 @@ struct ScatterTrace {
     std::string yChannel;
     bool visible = true;
     Micros yDelayUs = 0;
+    std::string displayUnit{}; // added by M4 (D-211 (a)): "" = the channel's default display unit
 };
 
 struct ScatterBody { // 04 section 10.2
     std::string xChannel;
+    std::string xDisplayUnit{}; // added by M4 (D-211 (a)): "" = the channel's default display unit
     std::vector<ScatterTrace> traces;
     std::string colourChannel;                    // colourChannel.channel ("" = none)
+    std::string colourDisplayUnit{};              // colourChannel.displayUnit (M4, D-211 (a))
     std::optional<analysis::BandAxis> colourAxis; // colourChannel.axis
     std::string gatingChannel;                    // gating.channel ("" = none)
     std::string layout = "overlapped";            // overlapped | tiled | average

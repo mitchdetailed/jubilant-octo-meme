@@ -7,11 +7,12 @@
 // least kMinSectionM long and lies in [0, lengthM]. `set` names a section set ("Default" for the generated
 // Turns/Straights; user sets may overlap other sets) and `category` is "corner", "straight" or any user
 // category; together they produce the Outings:Laps:Track Sections:<set>[:<category group>] groups of 02
-// section 4.5 (TrackSectionsRule). Stored as trackmaps/<venue>.track.json; esses_project's TrackMapFile wraps
-// the file (load/validate/save) and the undo commands. Values are SI base units; the document carries {v,
-// unit} lengths (D-010), converted on read (m, km, cm, mm, mi, ft, yd, in; written in m).
-// A closed map's centreline ends with its start point again at dist = lengthM (TrackGenerator writes it so);
-// pointAt also wraps across a missing closing row. Owner: src/track/ (the track work).
+// section 4.5 (TrackSectionsRule). `speedClass` (M4) is "", "slow" or "fast" (kSpeedClasses). Stored as
+// trackmaps/<venue>.track.json; esses_project's TrackMapFile wraps the file (load/validate/save) and the undo
+// commands. Values are SI base units; the document carries {v, unit} lengths (D-010), converted on read (m,
+// km, cm, mm, mi, ft, yd, in; written in m). A closed map's centreline ends with its start point again at
+// dist = lengthM (TrackGenerator writes it so); pointAt also wraps across a missing closing row. Owner:
+// src/track/ (the track work).
 #pragma once
 
 #include <esses/base/json_doc.hpp>
@@ -49,6 +50,9 @@ struct TrackSection {
     double endM = 0.0;
     std::string category = "corner"; // "corner" | "straight" | a user category
     bool userDefined = false;
+    // Added by M4 (06 section 13.5 item 4, D-211 (c)): the section's speed class, "" (none), "slow" or
+    // "fast"; written only when set, so maps without one are unchanged.
+    std::string speedClass{};
     double lengthM() const noexcept { return endM - startM; }
     friend bool operator==(const TrackSection&, const TrackSection&) = default;
 };
@@ -63,6 +67,8 @@ struct TrackGeneratedFrom {
 struct TrackMap {
     static constexpr double kMinSectionM = 10.0; // 02 section 6.9, D-027
     static constexpr std::string_view kDefaultSet = "Default";
+    // The speed classes a section may carry (M4, D-211 (c)); "" is none.
+    static constexpr std::string_view kSpeedClasses[] = {"slow", "fast"};
 
     std::string name;
     std::string venue; // the Venue detail the map binds to (04 section 14 item 1)
@@ -86,8 +92,9 @@ struct TrackMap {
     // known member written, generatedFrom only when set). The absent value when a number is not finite.
     JsonDoc toJson() const;
     // Invalid with context.detail when a section is shorter than kMinSectionM, leaves [0, lengthM], has an
-    // empty name, set or category or a duplicate id, the centreline is not ordered by dist, or a number is
-    // not finite (1e-6 m tolerance on the bounds and the minimum).
+    // empty name, set or category, a speed class other than those of kSpeedClasses or a duplicate id, the
+    // centreline is not ordered by dist, or a number is not finite (1e-6 m tolerance on the bounds and the
+    // minimum).
     Result<void> validate() const;
     // The centreline position at a track distance (interpolated; wraps modulo lengthM when closed, clamps
     // otherwise).
