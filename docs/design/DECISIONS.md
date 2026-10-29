@@ -3602,7 +3602,8 @@ D-219, D-220 (a)), spike S-3, the criteria already met (AC-M0-07) and the reason
 libc++) and for `std::thread` (01 §5.1, §12 D-5, E-1). What says where a job runs names `macos-15`: 08 §4.1, §4.2's
 excerpt and §7.2, `AGENTS.md` §7, `tools/packaging/README.md`, `libs/qtrender/README.md`, M4.md §4's proof of AC-M4-04,
 §6.0 steps 3 and 7, §6.1 and §10 item 69, and the workflows' comments; 07's text stays as written, as for D-214's
-amendment of AC-M4-01. The probe's `minimal` entry, which found no font on `macos-14`, is described in the past tense.
+amendment of AC-M4-01. What describes the probe's `minimal` entry uses the past tense and names both runners where
+it found no font: `macos-14`, and `macos-15` in its first run there (M4.md §10 item 70).
 **Consequences.** The pull request that moves the jobs runs `core (macos-15)` and the `package` job there first;
 qt-app's macOS row and the probe run there on dispatch; on `main`, M4.md §6.0 step 3's nightly runs qt-app's macOS row
 and step 4 the `package` job (M4.md §10 item 70). "Launch-tested on macOS 15" and the README's "Apple Clang of macOS 15"
