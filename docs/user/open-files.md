@@ -76,15 +76,17 @@ the log in a small `<log file>.sidecar.json`, so they follow the file into any p
 
 ## When a file changes on disk
 
-Esses notices when a file it has open is changed or replaced by another program (checked each time Esses becomes
-the active application). The file is then marked **stale**: an amber badge on its row in the Data window, and a
-row in Messages. Nothing more is read from the old copy. To use the new contents choose **File > Reload File**,
+Esses notices when a file it has open is changed or replaced by another program: each time Esses becomes the
+active application it checks the size and modification time of every open file, and it also notices a change
+while it reads from the file. The file is then marked **stale**: an amber badge on its row in the Data window, and
+a row in Messages. Nothing more is read from the old copy. To use the new contents choose **File > Reload File**,
 **Reload File** in the file's context menu in the Data window, or the Messages row's action. Reloading opens the
-file again with its sidecar edits and keeps the same laps selected.
+file again with its sidecar edits and keeps the same laps selected. A replacement with exactly the same size and
+modification time as the old file is not noticed: close the file and open it again.
 
-While a file is open in Esses, Windows lets another program replace the file (write a new copy and rename it
-over the old one) but not overwrite it in place. If a program reports that it cannot write a log, close that
-file in Esses first.
+While a file is open in Esses, Windows refuses a program that overwrites it in place, and also some programs that
+replace it with a new copy (those that rename the new copy over the old one with the classic Windows call). Other
+ways of replacing it work. If a program reports that it cannot write a log, close that file in Esses first.
 
 ## The memory budget warning
 

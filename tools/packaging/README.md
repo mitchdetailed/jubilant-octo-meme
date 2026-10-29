@@ -11,8 +11,8 @@ dispatch and on pull requests that touch this folder or `apps/app`); the same sc
 | `esses-cli-<version>-win64.zip` | windows-2022 | `esses-cli` + data + notices + the C++ runtime DLLs | release-blocking (D-034) |
 | `esses-<version>-x86_64.AppImage` | ubuntu-24.04 | linuxdeploy AppDir with Qt, `esses.desktop`, the `.ld` MIME type, the icon | builds green, not supported (D-116) |
 | `esses-cli-<version>-linux-x86_64.tar.gz` | ubuntu-24.04 | `esses-cli` + data + notices | release-blocking (D-034) |
-| `esses-<version>-macos.dmg` | macos-14 | `Esses.app` (universal) by macdeployqt, ad hoc signed, `.ld` document type | builds green, not supported (D-116) |
-| `esses-cli-<version>-macos.tar.gz` | macos-14 | `esses-cli` + data + notices | release-blocking (D-034) |
+| `esses-<version>-macos.dmg` | macos-15 | `Esses.app` (universal) by macdeployqt, ad hoc signed, `.ld` document type | builds green, not supported (D-116) |
+| `esses-cli-<version>-macos.tar.gz` | macos-15 | `esses-cli` + data + notices | release-blocking (D-034) |
 
 Each package also gets `esses[-cli]-<version>-<platform>.cdx.json` (CycloneDX 1.5 SBOM) and the platform's
 `sha256sums-<platform>.txt`; the source job adds `esses-<version>-source.spdx` (`reuse spdx`), and the tag's draft
@@ -77,8 +77,9 @@ deterministic (sorted entries, the time of `SOURCE_DATE_EPOCH`, else 2026-01-01;
   `/MERGETASKS="assocld"`) and the portable zip's `associate-ld.cmd`; `.csv` is only offered in "Open with".
   Linux: `esses.desktop` with `MimeType=application/x-esses-log;` (needs the desktop's integration of the
   AppImage). macOS: `CFBundleDocumentTypes` for `ld`, `LSHandlerRank Alternate`, and the type exported
-  (`UTExportedTypeDeclarations`); `LSMinimumSystemVersion` is the build's deployment target (14.0 in `package.yml`).
-  `smoke.py dmg` checks these on the built bundle (`--macos-minimum`, the job's `MACOS_DEPLOYMENT_TARGET`).
+  (`UTExportedTypeDeclarations`); `LSMinimumSystemVersion` is the build's deployment target (14.4 in
+  `package.yml`, Qt 6.12's minimum; D-222). `smoke.py dmg` checks these on the built bundle (`--macos-minimum`,
+  the job's `MACOS_DEPLOYMENT_TARGET`).
   `associate-ld.cmd` hands the folder's path to `reg` through delayed expansion, so a folder named with `&`, `%` or
   `!` works. Both scripts call `reg` by its full path (`%SystemRoot%\System32\reg.exe`) and look no program up by
   its bare name, and `unassociate-ld.cmd` reads `reg query`'s output itself (`for /f`, whose cmd starts through

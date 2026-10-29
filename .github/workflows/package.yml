@@ -12,7 +12,7 @@
 #                 and the installer's runtime check (a test build requiring a runtime no machine has: refused when
 #                 administrative, app-local runtime DLLs when per-user);
 #   ubuntu-24.04  the AppImage (--version, an offscreen start, the extracted tree) and the esses-cli tarball;
-#   macos-14      the DMG mounted read-only (Info.plist: version, LSMinimumSystemVersion = the deployment target,
+#   macos-15      the DMG mounted read-only (Info.plist: version, LSMinimumSystemVersion = the deployment target,
 #                 .ld as an alternate handler of the exported log type; the bundle, its ad hoc signature,
 #                 --version, an offscreen start of the app inside) and the esses-cli tarball.
 # AppImage and DMG are "builds green, not supported" (D-116, U-09 default): their jobs never block the Windows
@@ -231,13 +231,15 @@ jobs:
           if-no-files-found: error
 
   macos:
-    name: package (macos-14, builds green, not supported)
-    runs-on: macos-14
+    name: package (macos-15, builds green, not supported)
+    runs-on: macos-15
     timeout-minutes: 120
     env:
       # The oldest macOS the bundle runs on: CMAKE_OSX_DEPLOYMENT_TARGET, which the Info.plist names as
-      # LSMinimumSystemVersion, and what smoke.py dmg expects there (D-217). The runner's macOS; Qt 6.12 supports it.
-      MACOS_DEPLOYMENT_TARGET: "14.0"
+      # LSMinimumSystemVersion, and what smoke.py dmg expects there (D-217): Qt 6.12's own minimum, macOS 14.4
+      # (qtbase .cmake.conf QT_SUPPORTED_MIN_MACOS_VERSION; D-222). The runner is macOS 15, so the smoke test starts
+      # the bundle on macOS 15 only (D-223).
+      MACOS_DEPLOYMENT_TARGET: "14.4"
     steps:
       - uses: actions/checkout@v4.2.2
         with: { fetch-depth: 0 }

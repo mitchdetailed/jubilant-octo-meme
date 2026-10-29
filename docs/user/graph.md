@@ -112,8 +112,10 @@ shared zoom, cursor or datum, so it keeps its own.
 Esses follows the display scale of each monitor (100 %, 125 %, 150 %, 200 % and others). Moving the window, or a
 floating dock window, to a monitor with another scale re-lays out and redraws its components at that monitor's
 scale. At fractional scales (125 %, 150 %) grid lines, ticks, the cursor and outlines are drawn on whole screen
-pixels so they stay sharp. Tables (reports, the Values window, the dock lists) are drawn by the toolkit, and their
-thin grid lines can look slightly uneven at fractional scales.
+pixels so they stay sharp. At 200 % they are drawn over three screen pixels at half, full and half strength, so
+they look slightly soft; crisp lines at 200 % are planned for a later release. Tables (reports, the Values
+window, the dock lists) are drawn by the toolkit, and their thin grid lines can look slightly uneven at fractional
+scales.
 
 If a graph looks blurred after you change the display scale while Esses is running, restart Esses and please
 report it (see [Troubleshooting](troubleshooting.md#reporting-a-problem)) with your monitors' scales.

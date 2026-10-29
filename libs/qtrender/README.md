@@ -34,7 +34,7 @@ suites; D-220): `probe_text_engines.cpp` (`qtrender.probe_text_engines`, plus `.
 and `.directwrite` and `.directwrite_scaled` on Windows) reports, as `PROBE ` lines, which font engine draws each
 scheme role on each thread, its subpixel position count after each DPR history, Qt's own count per glyph and
 scale, and the differing pixels of text drawn after different histories with the count pinned and not. The workflow
-`.github/workflows/probe.yml` runs it, on manual dispatch only: `gh workflow run probe.yml --ref <branch>` (macos-14;
+`.github/workflows/probe.yml` runs it, on manual dispatch only: `gh workflow run probe.yml --ref <branch>` (macos-15;
 `-f windows=true` adds windows-2022 and the DirectWrite entries). GitHub dispatches a workflow only once its file is
 on the default branch, so this works after the merge that brings `probe.yml` to `main`.
 

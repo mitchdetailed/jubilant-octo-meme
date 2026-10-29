@@ -41,11 +41,12 @@ These apply to every change, human or AI, and are checked in review and in CI.
 5. **Research material.** `docs/design/background/` (local only) holds the research notes and design-panel
    proposals. Read the relevant summary (`research/features_compact.md`, `research/concepts.md`) before
    implementing a behaviour, but never copy its wording or any quoted help text into a committed file.
-6. **Vendor marks** (00_OVERVIEW §8, D-003, D-125; `TRADEMARK.md` is withheld until a working model, D-192). The vendor's and product's names never appear in
+6. **Vendor marks** (00_OVERVIEW §8, D-003, D-125; `TRADEMARK.md`, restored by D-222). The vendor's and product's names never appear in
    identifiers, file names, UI strings, string literals or JSON values, except for the five allow-listed
    nominative classes in `tools/vendor_marks_allowlist.txt` (importer ids `motec.ld`/`motec.csv`, dialog format
-   labels, the CSV writer's format-name constant, the `x-i2`/`xI2` round-trip bag, and prose in `CLEANROOM.md`,
-   `NOTICES.md`, `docs/` and fixture READMEs). Code that handles a vendor format uses neutral
+   labels, the CSV writer's format-name constant, the `x-i2`/`xI2` round-trip bag, and prose in the root
+   `README.md`, `CLEANROOM.md`, `NOTICES.md`, `TRADEMARK.md`, `docs/` and fixture READMEs). Code that handles a
+   vendor format uses neutral
    names (`Cfg*`, `Legacy*`). `python -I tools/check_vendor_marks.py` must report 0 findings.
 7. **The design is the contract.** Use the names in `ARCHITECTURE_OUTLINE.md` §1 and §4 verbatim; a new public
    name is added to the outline first. A departure from the design is recorded (an ADR in
@@ -70,7 +71,7 @@ These apply to every change, human or AI, and are checked in review and in CI.
 | `data/`, `schemas/` | Shipped data (all our own) and the JSON schemas with their examples |
 | `tools/` | Lint scripts, the reference decoder, fixture and timing tools, `dev/` build wrappers |
 | `bench/` | `workloads.md` (reference workloads RW-1..RW-5 and the reference machine); benchmarks from M1 |
-| `third_party/` | Every library dependency, vendored unchanged with its licence (`third_party/README.md`, D-147), including the Qt Advanced Docking System (`qtads/`, LGPL, a shared library built by its own CMake project; D-153). Adding one needs the maintainer's approval for the download |
+| `third_party/` | Every library dependency, vendored with its licence (`third_party/README.md`, D-147) and unchanged except the two fixes to the Qt Advanced Docking System listed in `third_party/qtads/UPSTREAM.md` (D-218 (c)), including the Qt Advanced Docking System (`qtads/`, LGPL, a shared library built by its own CMake project; D-153). Adding one needs the maintainer's approval for the download |
 | `cmake/` | `esses_targets.cmake` (`esses_add_library`, `esses_add_test`, `esses_add_qt_test_dir`, the layer check), `qt-free-check.cmake`, `third_party.cmake`, `qtads.cmake` (ADS, `ESSES_DOCK_BACKEND`), warnings, sanitizers |
 
 The design documents are large: search them (`grep -n`) and read the section you need by line range.
@@ -238,8 +239,8 @@ Layout and `fixture-1` are defined in 05 §9.1; `fixtures/README.md` lists the f
 
 | Job | Runs | Notes |
 |---|---|---|
-| `core` | ubuntu-24.04, windows-2022, macos-14, no Qt | all Qt-free tests, `DrawList` goldens, fixture verification |
-| `qt-app` | windows-2022 and ubuntu-24.04 on every PR and push; macos-14 nightly and on manual dispatch | Qt 6.12.0 via install-qt-action; every test offscreen but the soak (`-LE soak`); the Saturday walkthrough as a step of its own (AC-M4-01); pixel goldens (authoritative on ubuntu); layering with the Qt layers; golden diffs uploaded on failure |
+| `core` | ubuntu-24.04, windows-2022, macos-15, no Qt | all Qt-free tests, `DrawList` goldens, fixture verification |
+| `qt-app` | windows-2022 and ubuntu-24.04 on every PR and push; macos-15 nightly and on manual dispatch | Qt 6.12.0 via install-qt-action; every test offscreen but the soak (`-LE soak`); the Saturday walkthrough as a step of its own (AC-M4-01); pixel goldens (authoritative on ubuntu); layering with the Qt layers; golden diffs uploaded on failure |
 | `lint` | ubuntu-24.04 | clang-format, clang-tidy, vendor marks (the sources and the installed Qt-free release tree, `--tree`), schemas, keymap coverage, forbidden paths, layering, `reuse lint`, schema validation, Import Log codes |
 | `sanitize` | ubuntu-24.04 | ASan + UBSan; TSan on base, store, maths, plotcore |
 | `fuzz-smoke`, `fuzz-smoke-windows` | ubuntu-24.04, windows-2022 | 60 s per fuzz target |

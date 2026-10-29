@@ -1,6 +1,7 @@
 # Vendored third-party code
 
-Upstream files, unchanged, with each library's own licence file. Licences and copyright lines: `NOTICES.md`
+Upstream files, unchanged except the two fixes to the Qt Advanced Docking System that `qtads/UPSTREAM.md`
+lists (D-218 (c)), with each library's own licence file. Licences and copyright lines: `NOTICES.md`
 and `REUSE.toml` at the repository root; licence texts: `LICENSES/`. Updating a library is a change that
 touches only its directory, this file, `NOTICES.md` and `REUSE.toml` (08_REPO_AND_BUILD.md section 3.7.2).
 

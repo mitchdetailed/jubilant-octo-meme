@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: MIT
 #
 # Diagnostic probes (D-220), on manual dispatch only: `gh workflow run probe.yml --ref <branch>`, with
-# `-f windows=true` for windows-2022 as well as macos-14. The Qt build of ci.yml's qt-app with ESSES_BUILD_PROBES=ON,
+# `-f windows=true` for windows-2022 as well as macos-15. The Qt build of ci.yml's qt-app with ESSES_BUILD_PROBES=ON,
 # then `ctest -L probe` verbose, so every PROBE line of qtrender.probe_text_engines and its platform entries (macOS:
-# cocoa, and minimal, which finds no font on macos-14 (box engines, no control); Windows: the windows platform's
-# DirectWrite, also at QT_SCALE_FACTOR=1.5)
+# cocoa, and minimal, which found no font on macos-14 and on macos-15 (box engines, no control); Windows: the
+# windows platform's DirectWrite, also at QT_SCALE_FACTOR=1.5)
 # is in the job log, in probe.log and, for the env and verdict lines, in the job summary; then the suites the probe is
 # about (qtrender.tst_*, ui.tst_dpr_switch). The report, the images and the test logs are uploaded as the artefact
 # probe-<os>. The same pinned actions and Qt kit as qt-app; never merge-blocking.
@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       windows:
-        description: "Also run on windows-2022 (the probe's DirectWrite entries), not only on macos-14"
+        description: "Also run on windows-2022 (the probe's DirectWrite entries), not only on macos-15"
         type: boolean
         default: false
 
@@ -43,7 +43,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(inputs.windows && '[{"os":"macos-14","preset":"ci-mac-clang-qt","qtarch":"clang_64"},{"os":"windows-2022","preset":"ci-win-msvc-qt","qtarch":"win64_msvc2022_64"}]' || '[{"os":"macos-14","preset":"ci-mac-clang-qt","qtarch":"clang_64"}]') }}
+        include: ${{ fromJSON(inputs.windows && '[{"os":"macos-15","preset":"ci-mac-clang-qt","qtarch":"clang_64"},{"os":"windows-2022","preset":"ci-win-msvc-qt","qtarch":"win64_msvc2022_64"}]' || '[{"os":"macos-15","preset":"ci-mac-clang-qt","qtarch":"clang_64"}]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     env:
