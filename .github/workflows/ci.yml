@@ -54,7 +54,7 @@ jobs:
         include:
           - { os: ubuntu-24.04, preset: ci-linux-gcc-core }
           - { os: windows-2022, preset: ci-win-msvc-core }
-          - { os: macos-14, preset: ci-mac-clang-core }
+          - { os: macos-15, preset: ci-mac-clang-core }
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -126,7 +126,7 @@ jobs:
           rows='{"os":"windows-2022","preset":"ci-win-msvc-qt","qtarch":"win64_msvc2022_64"}'
           rows+=',{"os":"ubuntu-24.04","preset":"ci-linux-gcc-qt","qtarch":"linux_gcc_64"}'
           if [ "$EVENT" = schedule ] || [ "$EVENT" = workflow_dispatch ]; then
-            rows+=',{"os":"macos-14","preset":"ci-mac-clang-qt","qtarch":"clang_64"}'
+            rows+=',{"os":"macos-15","preset":"ci-mac-clang-qt","qtarch":"clang_64"}'
           fi
           echo "include=[$rows]" >> "$GITHUB_OUTPUT"
 

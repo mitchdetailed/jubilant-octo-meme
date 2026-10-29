@@ -11,8 +11,8 @@ dispatch and on pull requests that touch this folder or `apps/app`); the same sc
 | `esses-cli-<version>-win64.zip` | windows-2022 | `esses-cli` + data + notices + the C++ runtime DLLs | release-blocking (D-034) |
 | `esses-<version>-x86_64.AppImage` | ubuntu-24.04 | linuxdeploy AppDir with Qt, `esses.desktop`, the `.ld` MIME type, the icon | builds green, not supported (D-116) |
 | `esses-cli-<version>-linux-x86_64.tar.gz` | ubuntu-24.04 | `esses-cli` + data + notices | release-blocking (D-034) |
-| `esses-<version>-macos.dmg` | macos-14 | `Esses.app` (universal) by macdeployqt, ad hoc signed, `.ld` document type | builds green, not supported (D-116) |
-| `esses-cli-<version>-macos.tar.gz` | macos-14 | `esses-cli` + data + notices | release-blocking (D-034) |
+| `esses-<version>-macos.dmg` | macos-15 | `Esses.app` (universal) by macdeployqt, ad hoc signed, `.ld` document type | builds green, not supported (D-116) |
+| `esses-cli-<version>-macos.tar.gz` | macos-15 | `esses-cli` + data + notices | release-blocking (D-034) |
 
 Each package also gets `esses[-cli]-<version>-<platform>.cdx.json` (CycloneDX 1.5 SBOM) and the platform's
 `sha256sums-<platform>.txt`; the source job adds `esses-<version>-source.spdx` (`reuse spdx`), and the tag's draft

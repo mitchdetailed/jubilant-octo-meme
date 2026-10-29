@@ -490,16 +490,16 @@ The `lint` job also runs the negative tests: it injects, one at a time, `#includ
 
 | Job | Workflow | Runner(s) | Preset | Qt | Runs | Trigger | Budget |
 |---|---|---|---|---|---|---|---|
-| `core` | `ci.yml` | ubuntu-24.04, windows-2022, macos-14 | `ci-linux-gcc-core`, `ci-win-msvc-core`, `ci-mac-clang-core` | none installed | Catch2 unit + property tests, golden JSON, `DrawList` JSON goldens (the cross-platform strict check, §6.4), `fixture verify`, CLI smoke | PR + push | ≤ 6 min |
-| `qt-app` (from M1, D-150) | `ci.yml` | windows-2022 (MSVC) and ubuntu-24.04 (GCC) on PR + push; macos-14 (Apple Clang) nightly, not merge-blocking | `ci-win-msvc-release`, `ci-linux-gcc`, `ci-mac-clang` | 6.12.0 via `install-qt-action@v4` | build all; Qt Test offscreen (`QT_QPA_PLATFORM=offscreen`); keymap behaviour tests; render parity; **pixel golden images authoritative on ubuntu only**, render smoke tests (renders without error, image non-empty, size and DPR correct) on Windows and macOS (§6.4) | PR + push (macOS: nightly) | ≤ 20 min |
+| `core` | `ci.yml` | ubuntu-24.04, windows-2022, macos-15 | `ci-linux-gcc-core`, `ci-win-msvc-core`, `ci-mac-clang-core` | none installed | Catch2 unit + property tests, golden JSON, `DrawList` JSON goldens (the cross-platform strict check, §6.4), `fixture verify`, CLI smoke | PR + push | ≤ 6 min |
+| `qt-app` (from M1, D-150) | `ci.yml` | windows-2022 (MSVC) and ubuntu-24.04 (GCC) on PR + push; macos-15 (Apple Clang) nightly, not merge-blocking | `ci-win-msvc-release`, `ci-linux-gcc`, `ci-mac-clang` | 6.12.0 via `install-qt-action@v4` | build all; Qt Test offscreen (`QT_QPA_PLATFORM=offscreen`); keymap behaviour tests; render parity; **pixel golden images authoritative on ubuntu only**, render smoke tests (renders without error, image non-empty, size and DPR correct) on Windows and macOS (§6.4) | PR + push (macOS: nightly) | ≤ 20 min |
 | `sanitize` | `ci.yml` | ubuntu-24.04 | `linux-clang-asan`, `linux-clang-tsan` | none | ASan+UBSan on all Qt-free tests; TSan on `esses_base_tests`, `esses_store_tests` (including the `tryPin`-versus-eviction test, 01 §5.3 rule 8), `esses_maths_tests`, `esses_plotcore_tests` (D-031); plus a nightly Linux TSan build with a TSan-instrumented Qt for `tests/qtrender/text_metrics_concurrency.cpp` (04 §5.4) | PR + push (Qt TSan: nightly) | ≤ 15 min |
 | `fuzz-smoke` | `ci.yml` | ubuntu-24.04 | `linux-clang-fuzz` | none | each target 60 s with corpus seeds | PR + push | ≤ 8 min |
 | `lint` | `ci.yml` | ubuntu-24.04 | `ci-linux-gcc-core` + `ESSES_ENABLE_CLANG_TIDY` | none | clang-format, clang-tidy (changed Qt-free files on PR, all nightly), `reuse lint`, qt-free-check positive + negative, layer-check negative test, `check_vendor_marks.py`, `check_layering.py`, `check_keymap_coverage.py`, forbidden-path check (§1), schema validation of every JSON in `data/`, `schemas/`, `fixtures/`, `tests/maths/` | PR + push | ≤ 10 min |
 | `bench` | `bench.yml` | the **reference machine** as a self-hosted runner (gate, D-042); ubuntu-24.04 hosted (non-blocking alarm) | `bench` | none (plot bench needs `esses_qtrender` → a second `bench-qt` variant with Qt) | Google Benchmark JSON. Gate: absolute limits of 07 §12, median of ≥ 5 repetitions, `tools/bench_compare.py --limits bench/workloads.md`. Hosted: the same benchmarks as a non-blocking ±30 % regression alarm against their own baseline | gate: push to `main`, nightly, tags, manual dispatch, **never** on pull requests from forks; hosted alarm: nightly | ≤ 30 min |
 | `fuzz` | `fuzz.yml` | ubuntu-24.04 | `linux-clang-fuzz` | none | 30 min per target; new crashes uploaded as artefacts and minimised | nightly | ≤ 3 h |
 | `soak` | `bench.yml` | ubuntu-24.04 (ASan build with Qt) | `linux-gcc` + sanitizer | 6.12 | `tests/soak/saturday` (M4+): 30 min nightly, 2 h before each tag; LSan suppressions `tests/soak/lsan.supp` for Qt, fontconfig and glib; a leak counts only if its stack has an `esses_*` frame (AC-M4-03) | nightly (30 min); pre-tag (2 h) | ≤ 2.5 h |
-| `package` | `release.yml` | windows-2022, macos-14, ubuntu-22.04 (older glibc for AppImage) | `ci-win-msvc-release`, `ci-mac-clang`, `ci-linux-gcc` | 6.12 | windeployqt + Inno Setup + portable zip (release-blocking); CLI tarballs for Linux and macOS (release-blocking); macdeployqt + DMG and linuxdeploy AppImage (best-effort at 0.1: a failure does not block the Windows release; artefacts labelled "builds green, not supported" until U-09; launch smoke test on the same runner); `NOTICES.md`, `THIRD_PARTY_LICENSES.md`, SBOM, sha256sums; GitHub Release draft | tags `v*` | ≤ 40 min |
-| `abi-compat` | `abi-compat.yml` | windows-2022, ubuntu-24.04, macos-14 | `*-release` | 6.12 (host) | build `plugins/examples/c` with Clang and MinGW-GCC, load into the MSVC host; Rust example if cheap | PR touching `sdk/`; nightly | v1.0 (D-028) |
+| `package` | `release.yml` | windows-2022, macos-15, ubuntu-22.04 (older glibc for AppImage) | `ci-win-msvc-release`, `ci-mac-clang`, `ci-linux-gcc` | 6.12 | windeployqt + Inno Setup + portable zip (release-blocking); CLI tarballs for Linux and macOS (release-blocking); macdeployqt + DMG and linuxdeploy AppImage (best-effort at 0.1: a failure does not block the Windows release; artefacts labelled "builds green, not supported" until U-09; launch smoke test on the same runner); `NOTICES.md`, `THIRD_PARTY_LICENSES.md`, SBOM, sha256sums; GitHub Release draft | tags `v*` | ≤ 40 min |
+| `abi-compat` | `abi-compat.yml` | windows-2022, ubuntu-24.04, macos-15 | `*-release` | 6.12 (host) | build `plugins/examples/c` with Clang and MinGW-GCC, load into the MSVC host; Rust example if cheap | PR touching `sdk/`; nightly | v1.0 (D-028) |
 
 ### 4.2 Workflow excerpt (`ci.yml`)
 
@@ -516,7 +516,7 @@ jobs:
     strategy: { fail-fast: false, matrix: { include: [
       { os: ubuntu-24.04, preset: ci-linux-gcc-core },
       { os: windows-2022, preset: ci-win-msvc-core },
-      { os: macos-14,     preset: ci-mac-clang-core } ] } }
+      { os: macos-15,     preset: ci-mac-clang-core } ] } }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -533,7 +533,7 @@ jobs:
     strategy: { fail-fast: false, matrix: { include: [
       { os: windows-2022, preset: ci-win-msvc-release, qtarch: win64_msvc2022_64 },
       { os: ubuntu-24.04, preset: ci-linux-gcc,        qtarch: linux_gcc_64 } ] } }
-      # a separate job qt-app-macos (macos-14, ci-mac-clang, clang_64) has the same steps and
+      # a separate job qt-app-macos (macos-15, ci-mac-clang, clang_64) has the same steps and
       # `if: github.event_name == 'schedule'`, so it runs nightly and never blocks a merge (§4.4)
     runs-on: ${{ matrix.os }}
     steps:
@@ -729,7 +729,7 @@ Targets in `tests/fuzz/`: `fuzz_ld_header` (header + channel list walk), `fuzz_l
 
 ### 7.2 macOS
 
-Best-effort at 0.1 (§4.1 `package`): built on tags, labelled "builds green, not supported" until U-09 decides macOS release status; a failure does not block the Windows release; the launch check is a smoke test on the `macos-14` runner (the hosted runner is Apple hardware, so no macOS VM is needed). `cmake --build --preset ci-mac-clang --target install` → `Esses.app`; `macdeployqt Esses.app -always-overwrite -libpath=<ADS dir>`; `Info.plist` with `CFBundleDocumentTypes` for `.ld`; `create-dmg` (or `hdiutil create -volname Esses -srcfolder stage -ov -format UDZO`) → `esses-<ver>-macos.dmg`; universal binary when both Qt arches are installed (6.12 `clang_64` is universal). Unsigned/unnotarised until U-11: the release note documents right-click → Open; notarisation steps (`codesign --deep --options runtime`, `notarytool submit`, `stapler`) are present and gated on `APPLE_*` secrets.
+Best-effort at 0.1 (§4.1 `package`): built on tags, labelled "builds green, not supported" until U-09 decides macOS release status; a failure does not block the Windows release; the launch check is a smoke test on the `macos-15` runner (D-223; the hosted runner is Apple hardware, so no macOS VM is needed). `cmake --build --preset ci-mac-clang --target install` → `Esses.app`; `macdeployqt Esses.app -always-overwrite -libpath=<ADS dir>`; `Info.plist` with `CFBundleDocumentTypes` for `.ld`; `create-dmg` (or `hdiutil create -volname Esses -srcfolder stage -ov -format UDZO`) → `esses-<ver>-macos.dmg`; universal binary when both Qt arches are installed (6.12 `clang_64` is universal). Unsigned/unnotarised until U-11: the release note documents right-click → Open; notarisation steps (`codesign --deep --options runtime`, `notarytool submit`, `stapler`) are present and gated on `APPLE_*` secrets.
 
 ### 7.3 Linux
 

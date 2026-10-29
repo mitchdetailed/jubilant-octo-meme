@@ -19,7 +19,7 @@ Get the latest release from the [Releases page](https://github.com/mitchdetailed
 | `esses-<version>-win64-setup.exe` | Windows 10 (22H2) and Windows 11, 64-bit | Supported |
 | `esses-<version>-win64-portable.zip` | The same, without installing (a USB stick, a locked-down PC) | Supported |
 | `esses-<version>-x86_64.AppImage` | x86-64 Linux at least as new as Ubuntu 24.04 (built and tested on it; an older system such as Ubuntu 22.04 may not start it) | Builds green, not supported |
-| `esses-<version>-macos.dmg` | macOS 14.4 or later, Apple silicon or Intel (launch-tested on macOS 14) | Builds green, not supported |
+| `esses-<version>-macos.dmg` | macOS 14.4 or later, Apple silicon or Intel (launch-tested on macOS 15) | Builds green, not supported |
 | `esses-cli-<version>-<platform>` | The command-line tool on its own | As its platform |
 
 The 0.1 packages are not code-signed. Windows SmartScreen may ask before the first start: choose **More info**,
@@ -55,7 +55,7 @@ profiles. The [user guide](docs/user/index.md) describes what is there; F1 opens
 ## Building from source
 
 You need CMake 3.28 or later, Ninja and a C++20 compiler (CI builds with Visual Studio 2022, GCC 13 and the
-Apple Clang of macOS 14). The Qt-free core and `esses-cli` need nothing else:
+Apple Clang of macOS 15). The Qt-free core and `esses-cli` need nothing else:
 
 ```
 cmake --preset linux-gcc-core          # or mac-clang-core; win-msvc-core from an x64 Native Tools prompt

@@ -312,6 +312,9 @@ All notable changes are recorded here, newest first. The project follows semanti
   `third_party/README.md` and `AGENTS.md` no longer call the vendored ADS unchanged.
 - The macOS disk image declares macOS 14.4 as its minimum (`package.yml` `MACOS_DEPLOYMENT_TARGET`, `smoke.py dmg`'s
   default, the fallback in `apps/app/CMakeLists.txt`), Qt 6.12's own minimum, instead of 14.0 (D-222).
+- The macOS jobs run on GitHub's `macos-15` runner (D-223), since GitHub retires `macos-14` on 2026-11-02: `core`,
+  qt-app's nightly and dispatch row, the package job (the DMG and the macOS command-line tarball) and the diagnostic
+  probe. The DMG still declares macOS 14.4 as its minimum but is launch-tested on macOS 15 only.
 
 ## Unreleased (M3)
 

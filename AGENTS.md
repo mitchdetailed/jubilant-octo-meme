@@ -239,8 +239,8 @@ Layout and `fixture-1` are defined in 05 §9.1; `fixtures/README.md` lists the f
 
 | Job | Runs | Notes |
 |---|---|---|
-| `core` | ubuntu-24.04, windows-2022, macos-14, no Qt | all Qt-free tests, `DrawList` goldens, fixture verification |
-| `qt-app` | windows-2022 and ubuntu-24.04 on every PR and push; macos-14 nightly and on manual dispatch | Qt 6.12.0 via install-qt-action; every test offscreen but the soak (`-LE soak`); the Saturday walkthrough as a step of its own (AC-M4-01); pixel goldens (authoritative on ubuntu); layering with the Qt layers; golden diffs uploaded on failure |
+| `core` | ubuntu-24.04, windows-2022, macos-15, no Qt | all Qt-free tests, `DrawList` goldens, fixture verification |
+| `qt-app` | windows-2022 and ubuntu-24.04 on every PR and push; macos-15 nightly and on manual dispatch | Qt 6.12.0 via install-qt-action; every test offscreen but the soak (`-LE soak`); the Saturday walkthrough as a step of its own (AC-M4-01); pixel goldens (authoritative on ubuntu); layering with the Qt layers; golden diffs uploaded on failure |
 | `lint` | ubuntu-24.04 | clang-format, clang-tidy, vendor marks (the sources and the installed Qt-free release tree, `--tree`), schemas, keymap coverage, forbidden paths, layering, `reuse lint`, schema validation, Import Log codes |
 | `sanitize` | ubuntu-24.04 | ASan + UBSan; TSan on base, store, maths, plotcore |
 | `fuzz-smoke`, `fuzz-smoke-windows` | ubuntu-24.04, windows-2022 | 60 s per fuzz target |

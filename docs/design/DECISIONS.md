@@ -606,6 +606,8 @@ No custom software rasteriser: golden images come from `RasterBackend` run offsc
 
 **Amended by (A.11):** D-147 (every library dependency is vendored under `third_party/`; no vcpkg manifest, triplet or vcpkg cache) and D-150 (the `qt-app` job starts in M1 with the first Qt target).
 
+**Amended by (A.15):** D-223 (every macOS job, `qt-app`'s macOS row included, runs on `macos-15`).
+
 **User must confirm:** no (signing budget is an open question).
 
 ---
@@ -855,6 +857,7 @@ Rewritten on 2026-10-10 after the review. The list is deduplicated across this d
 | D-220 | macOS plot text independent of the thread and the DPR it first drew at: one subpixel position count, 4, for every font engine plot text is drawn with at subpixel positions (Qt Gui private API; by default on macOS only, and only under the Qt version Esses was built against), the diagnostic probe and its dispatch-only workflow, the relinking page's exact Qt version; D-217 (n)'s macOS strips closed (refines D-209, D-217 (n); amends `docs/user/relinking.md`'s later-patch-release promise) | no | PR #5's macOS runs, AC-M4-06/-07 |
 | D-221 | Print to Clipboard of a report without the keyboard-focus mark: the report table's cells are painted without the focus and hover states while Print to Clipboard paints them, so the picture does not depend on the focus (PR #5's ubuntu qt-app run on 750eae4; reads 04 §7.2 item 9, §12 item 1, §13) | no | PR #5's run on 750eae4 |
 | D-222 | The first public release's front page: the root README describes Esses, its alpha status, downloads, build and licences; TRADEMARK.md is restored; the alpha note is docs/releases/0.1.0.md; the user guide's file-replacement, Windows and macOS first-start and minimum-OS text corrected; the DMG's minimum macOS is 14.4 (completes D-192; amends D-125's class (e), 00 §8 rule 2, 08 §5 and §11's TRADEMARK.md row; refines D-217 (l)'s 14.0) | no | M4.md §6.5 item 9 |
+| D-223 | The macOS jobs on `macos-15`: core, qt-app's nightly and dispatch row, the package job and the probe move from the `macos-14` runner, which GitHub retires on 2026-11-02; the DMG still declares macOS 14.4 but is launch-tested on macOS 15 only; what ran on `macos-14` stays as the record (amends D-034, D-212 (n), 07 AC-M4-04, 08 §4.1, §4.2's excerpt and §7.2; completes D-222's consequence) | no (maintainer request 2026-10-28) | M4.md §6.0 step 7 |
 
 ### A.1 Review amendments
 
@@ -2803,6 +2806,8 @@ and old-runtime checks stay the maintainer's (§6.1); the Qt source archive's SH
 are the release step's (§6.5). No golden changes; no keymap row.
 **User must confirm:** no (the source-offer wording and the URL scheme are the maintainer's §6.5 decision; (b) is the
 default applied until then).
+*Amended by D-223 (A.15, 2026-10-28): (n)'s macOS job runs on `macos-15`; the DMG still targets macOS 14.4
+(D-222 (e)).*
 
 #### D-213 The Saturday soak as built: tests/soak/tst_saturday with its own driver over ten logs written at test time, a Dispatcher thread violation as a failed ESSES_ASSERT or a Qt thread-affinity warning made fatal, pending work and growth judged per cycle, LeakSanitizer suppressions limited to code that never calls back with lsan_check.py counting the leaks that have an esses frame, the soak job on linux-clang-asan with the Qt layers (refines D-031, D-123 (e), D-206 (i); reads 07 §7.1 "Soak", §7.2 AC-M4-03, 08 §4.1, §6.10, 01 §5.3 rules 1, 3-4 and 11, 06 §18; amends 08 §4.1's soak row and §6.10's "parameterised version of the Saturday walkthrough")
 **Context.** 07 §7.1 and AC-M4-03 ask for a Qt Test with ten files open under ASan/UBSan, 30 minutes nightly and 2
@@ -3569,3 +3574,41 @@ needs the macOS jobs moved to `macos-15`, and then the README's and the guide's 
 The macOS 15 and Smart App Control steps are not tested here (no macOS 15 hardware; no Windows with Smart App
 Control on).
 **User must confirm:** no.
+*Completed by D-223 (A.15, 2026-10-28): the macOS jobs run on `macos-15` before the tag; the README, the user guide
+and the alpha note say "launch-tested on macOS 15".*
+
+#### D-223 The macOS jobs on `macos-15` (amends D-034, D-212 (n), 07 AC-M4-04, 08 §4.1, §4.2's excerpt and §7.2; completes D-222's consequence; M4.md §6.0 step 7)
+**Context.** GitHub retires the `macos-14` runner on 2026-11-02, after brownouts on 2026-10-29 and 2026-10-30
+(14:00-24:00 UTC) in which its jobs fail (D-222's consequences, M4.md §6.0 step 7). Four jobs ran there:
+`core (macos-14)` in `ci.yml`, qt-app's macOS row (`ci-mac-clang-qt`, `clang_64`, which `qt-matrix` adds on the
+nightly and on dispatch), `package.yml`'s `macos` job (the universal DMG, ad hoc signed and built for macOS 14.4 by
+D-222 (e), and the macOS CLI tarball) and `probe.yml`'s default row (D-220); `bench.yml` has no macOS row. PR #6's
+runs there were green (`ci` 40751717562, `package` 40751718231). The `macos-14` image builds with Xcode 15.4
+(Apple Clang 15, the macOS 14.5 SDK), below the Xcode 16 and macOS 15 SDK that Qt 6.12 asks for (qtbase
+`.cmake.conf`); `macos-15`'s default is Xcode 16.4 (Apple Clang 17, the macOS 15.5 SDK). M4.md §6.0 step 7 also asked
+for a required check's name to change in the branch protection, but `main` has neither branch protection nor
+rulesets (GitHub's API, 2026-10-28). On 2026-10-28 the maintainer asked for every macOS job to move to `macos-15`.
+**Decision.** (a) **Runners.** Every macOS job runs on `macos-15`, GitHub's arm64 macOS 15 image (`macos-14` was
+arm64 too): `core (macos-15)`, qt-app's macOS row (still nightly and on dispatch, not merge-blocking),
+`package (macos-15, builds green, not supported)` and `probe.yml`'s default row. The presets, the Qt kit (6.12.0
+`clang_64`) and the DMG's deployment target are unchanged; no workflow selects an Xcode, so the jobs use the image's
+default. No check is renamed in GitHub, since `main` has no branch protection. (b) **The DMG** still declares
+macOS 14.4 as its minimum (D-222 (e)); its launch smoke test runs on macOS 15 only, and nothing starts Esses on
+macOS 14.x any more. The README, `docs/user/install.md` and the alpha note say "launch-tested on macOS 15"; their
+first-start steps for macOS 14 stay beside those for macOS 15 and later, since 14.4 is still the minimum. As before,
+the smoke test starts the bundle's arm64 slice only. (c) **Records stay.** What ran or was measured on `macos-14` stays
+as written, with its run ids: the milestone notes (M0-M3, M4's §4 status column and §8), the ADR texts (D-123, D-218,
+D-219, D-220 (a)), spike S-3, the criteria already met (AC-M0-07) and the reasons for `fast_float` (Apple Clang 15's
+libc++) and for `std::thread` (01 §5.1, §12 D-5, E-1). What says where a job runs names `macos-15`: 08 §4.1, §4.2's
+excerpt and §7.2, `AGENTS.md` §7, `tools/packaging/README.md`, `libs/qtrender/README.md`, M4.md §4's proof of AC-M4-04,
+§6.0 steps 3 and 7, §6.1 and §10 item 69, and the workflows' comments; 07's text stays as written, as for D-214's
+amendment of AC-M4-01. The probe's `minimal` entry, which found no font on `macos-14`, is described in the past tense.
+**Consequences.** The pull request that moves the jobs runs `core (macos-15)` and the `package` job there first;
+qt-app's macOS row and the probe run there on dispatch; on `main`, M4.md §6.0 step 3's nightly runs qt-app's macOS row
+and step 4 the `package` job (M4.md §10 item 70). "Launch-tested on macOS 15" and the README's "Apple Clang of macOS 15"
+hold once these are green. A newer Apple Clang can warn where Apple Clang 15 did not, and the `ci-*` presets build with
+`-Werror` (the `package` job does not). D-220 measured CoreText on macOS 14 only: the macOS qt-app row
+(`qtrender.tst_static_strips`, `ui.tst_dpr_switch`) and a `probe.yml` dispatch check it on macOS 15. A macOS 14.x user
+gets a DMG that nothing has started on that version; it is "builds green, not supported" (D-116) either way. A tag no
+longer has to come before the retirement or avoid the brownouts.
+**User must confirm:** no (the maintainer's request, 2026-10-28).

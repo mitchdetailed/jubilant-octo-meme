@@ -8,7 +8,7 @@ checksum of each package:
 | `esses-<version>-win64-setup.exe` | Windows 10 (22H2) and Windows 11, 64-bit | Supported |
 | `esses-<version>-win64-portable.zip` | The same, without installing (a USB stick, a locked-down PC) | Supported |
 | The Linux AppImage (x86-64) | Linux at least as new as Ubuntu 24.04 (built and tested on it; an older system such as Ubuntu 22.04 may not start it) | Builds green, not supported |
-| `esses-<version>-macos.dmg` | macOS 14.4 or later, Apple silicon or Intel (launch-tested on macOS 14) | Builds green, not supported |
+| `esses-<version>-macos.dmg` | macOS 14.4 or later, Apple silicon or Intel (launch-tested on macOS 15) | Builds green, not supported |
 | `esses-cli` on its own | The command-line tool for scripts, per operating system | As its platform |
 
 "Builds green, not supported" means the package is built and launch-tested by the project's automated checks on
